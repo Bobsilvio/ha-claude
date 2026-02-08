@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.9"
+VERSION = "2.9.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -383,8 +383,21 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "get_automations",
-        "description": "Get all existing automations with their YAML source. Returns the list of automations AND the content of automations.yaml, so you have everything needed to edit them. To modify an automation: just call write_config_file with the updated automations.yaml content.",
+        "description": "Get all existing automations with their YAML source. Returns the list of automations AND the content of automations.yaml. To modify an automation, use update_automation instead of write_config_file.",
         "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "update_automation",
+        "description": "Update or modify an existing automation by its ID. Pass the automation_id and the fields you want to change. The tool reads automations.yaml, finds the automation, applies the changes, creates a snapshot, and saves. Much simpler than rewriting the full file.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "automation_id": {"type": "string", "description": "The automation's 'id' field from automations.yaml (e.g. '1728373064590')."},
+                "changes": {"type": "object", "description": "Fields to update. Can include: alias, description, trigger, condition, action, mode. Only pass the fields you want to change."},
+                "add_condition": {"type": "object", "description": "A single condition to ADD to the existing conditions (appended, does not replace). Use this for simple additions like excluding a team."}
+            },
+            "required": ["automation_id"]
+        }
     },
     {
         "name": "trigger_automation",
@@ -822,20 +835,77 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                        "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
                        "id": a.get("attributes", {}).get("id", ""),
                        "last_triggered": a.get("attributes", {}).get("last_triggered", "")} for a in autos]
-            # Also include automations.yaml content so Claude can edit directly
-            response = {"automations": result}
+            return json.dumps({"automations": result, "edit_hint": "To edit an automation, use update_automation with the automation's id and the changes you want to make."}, ensure_ascii=False, default=str)
+
+        elif tool_name == "update_automation":
+            import yaml
+            automation_id = tool_input.get("automation_id", "")
+            changes = tool_input.get("changes", {})
+            add_condition = tool_input.get("add_condition", None)
+            
+            if not automation_id:
+                return json.dumps({"error": "automation_id is required."})
+            
             yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
-            if os.path.isfile(yaml_path):
-                try:
-                    with open(yaml_path, "r", encoding="utf-8") as f:
-                        yaml_content = f.read()
-                    if len(yaml_content) > 12000:
-                        yaml_content = yaml_content[:12000] + f"\n... [TRUNCATED - {len(yaml_content)} chars total. Use read_config_file('automations.yaml') for full content]"
-                    response["automations_yaml"] = yaml_content
-                    response["edit_hint"] = "To edit an automation: modify the YAML above and call write_config_file(filename='automations.yaml', content=<modified_yaml>). Then call check_config to validate."
-                except Exception:
-                    pass
-            return json.dumps(response, ensure_ascii=False, default=str)
+            if not os.path.isfile(yaml_path):
+                return json.dumps({"error": "automations.yaml not found."})
+            
+            try:
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    automations = yaml.safe_load(f)
+                
+                if not isinstance(automations, list):
+                    return json.dumps({"error": "automations.yaml is not a valid list."})
+                
+                # Find the automation by id
+                found = None
+                found_idx = None
+                for idx, auto in enumerate(automations):
+                    if str(auto.get("id", "")) == str(automation_id):
+                        found = auto
+                        found_idx = idx
+                        break
+                
+                if found is None:
+                    return json.dumps({"error": f"Automation with id '{automation_id}' not found.", 
+                                       "available_ids": [str(a.get("id", "")) for a in automations[:20]]})
+                
+                # Capture old state for diff
+                old_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
+                
+                # Apply changes
+                for key, value in changes.items():
+                    found[key] = value
+                
+                # Add condition if specified
+                if add_condition:
+                    if "condition" not in found or not found["condition"]:
+                        found["condition"] = []
+                    if not isinstance(found["condition"], list):
+                        found["condition"] = [found["condition"]]
+                    found["condition"].append(add_condition)
+                
+                # Capture new state for diff
+                new_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
+                
+                # Create snapshot before saving
+                snapshot = create_snapshot("automations.yaml")
+                
+                # Write back
+                automations[found_idx] = found
+                with open(yaml_path, "w", encoding="utf-8") as f:
+                    yaml.dump(automations, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                
+                return json.dumps({
+                    "status": "success",
+                    "message": f"Automation '{found.get('alias', automation_id)}' updated.",
+                    "old_yaml": old_yaml,
+                    "new_yaml": new_yaml,
+                    "snapshot": snapshot.get("snapshot_id", ""),
+                    "tip": "Call services/automation/reload to apply changes."
+                }, ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Failed to update automation: {str(e)}"})
 
         elif tool_name == "trigger_automation":
             entity_id = tool_input.get("entity_id", "")
@@ -1580,12 +1650,12 @@ This helps the user understand and verify the changes. Keep the diff focused on 
 
 ## EFFICIENCY RULES (CRITICAL - minimize API calls)
 - Use the MINIMUM number of tool calls needed. Every extra call wastes time and tokens.
-- For automations: get_automations ALREADY returns the automations.yaml content. Just modify it and call write_config_file. That's 2 calls MAX.
-- NEVER call list_config_files when editing automations - the file is ALWAYS automations.yaml.
-- NEVER call read_config_file('automations.yaml') after get_automations - you already have the content.
+- For modifying automations: get_automations → update_automation. That's 2 calls. DONE.
+- update_automation handles everything: reads the file, finds the automation, modifies it, creates a snapshot, saves.
+- NEVER call read_config_file, list_config_files, or write_config_file for automations - use update_automation instead.
 - NEVER call get_entity_state or search_entities if you already have the info from a previous tool result.
 - Plan your tool calls: think about what you need BEFORE calling, don't explore randomly.
-- For config editing: read_config_file → modify → write_config_file → check_config. Done.
+- For other config editing: read_config_file → modify → write_config_file → check_config. Done.
 
 Always respond in the same language the user uses.
 Be concise but informative."""
@@ -1686,7 +1756,7 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
 
     response = ai_client.messages.create(
         model=get_active_model(),
-        max_tokens=4096,
+        max_tokens=8192,
         system=SYSTEM_PROMPT,
         tools=get_anthropic_tools(),
         messages=messages
@@ -1706,7 +1776,7 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
 
         response = ai_client.messages.create(
             model=get_active_model(),
-            max_tokens=4096,
+            max_tokens=8192,
             system=SYSTEM_PROMPT,
             tools=get_anthropic_tools(),
             messages=messages
@@ -1991,7 +2061,7 @@ def stream_chat_anthropic(messages):
         try:
             with ai_client.messages.stream(
                 model=get_active_model(),
-                max_tokens=4096,
+                max_tokens=8192,
                 system=SYSTEM_PROMPT,
                 tools=get_anthropic_tools(),
                 messages=messages
