@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.7.2"
+VERSION = "2.8.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -201,6 +201,47 @@ def save_conversations():
 
 # Load saved conversations on startup
 load_conversations()
+
+# ---- Snapshot system for safe config editing ----
+
+SNAPSHOTS_DIR = "/data/snapshots"
+HA_CONFIG_DIR = "/homeassistant"  # Mapped via config.json "map": ["config:rw"]
+
+def create_snapshot(filename: str) -> dict:
+    """Create a snapshot of a file before modifying it. Returns snapshot info."""
+    os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+    src_path = os.path.join(HA_CONFIG_DIR, filename)
+    if not os.path.isfile(src_path):
+        return {"snapshot_id": None, "message": f"File '{filename}' does not exist (new file)"}
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    safe_name = filename.replace("/", "__").replace("\\", "__")
+    snapshot_id = f"{timestamp}_{safe_name}"
+    snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_id)
+
+    import shutil
+    shutil.copy2(src_path, snapshot_path)
+
+    # Save metadata
+    meta_path = snapshot_path + ".meta"
+    meta = {"original_file": filename, "timestamp": timestamp, "snapshot_id": snapshot_id,
+            "size": os.path.getsize(src_path)}
+    with open(meta_path, "w") as f:
+        json.dump(meta, f)
+
+    # Keep max 50 snapshots, remove oldest
+    all_snapshots = sorted([f for f in os.listdir(SNAPSHOTS_DIR) if not f.endswith(".meta")])
+    while len(all_snapshots) > 50:
+        oldest = all_snapshots.pop(0)
+        try:
+            os.remove(os.path.join(SNAPSHOTS_DIR, oldest))
+            os.remove(os.path.join(SNAPSHOTS_DIR, oldest + ".meta"))
+        except:
+            pass
+
+    logger.info(f"Snapshot created: {snapshot_id}")
+    return {"snapshot_id": snapshot_id, "original_file": filename, "timestamp": timestamp}
+
 
 # ---- Home Assistant API helpers ----
 
@@ -617,6 +658,61 @@ HA_TOOLS_DESCRIPTION = [
         "name": "get_frontend_resources",
         "description": "List all registered Lovelace frontend resources (custom cards, modules). Use this to check if custom cards like card-mod, bubble-card, mushroom-cards, etc. are installed via HACS.",
         "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "read_config_file",
+        "description": "Read a Home Assistant configuration file (e.g. configuration.yaml, automations.yaml, scripts.yaml, secrets.yaml, ui-lovelace.yaml, or any YAML/JSON file in the config directory). Returns file content as text.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "File path relative to HA config dir (e.g. 'configuration.yaml', 'ui-lovelace.yaml', 'dashboards/energy.yaml')."}
+            },
+            "required": ["filename"]
+        }
+    },
+    {
+        "name": "write_config_file",
+        "description": "Write/update a Home Assistant configuration file. ALWAYS creates a snapshot backup first (automatically). Use for editing configuration.yaml, YAML dashboards, includes, packages, etc. After writing, call check_config to validate.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "File path relative to HA config dir (e.g. 'configuration.yaml', 'ui-lovelace.yaml')."},
+                "content": {"type": "string", "description": "The full file content to write."}
+            },
+            "required": ["filename", "content"]
+        }
+    },
+    {
+        "name": "check_config",
+        "description": "Validate Home Assistant configuration. Call this after modifying configuration.yaml or any YAML file. Returns 'valid' or error details.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "list_config_files",
+        "description": "List files in the Home Assistant config directory (or a subdirectory). Useful to discover YAML dashboards, packages, includes, etc.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Subdirectory to list (empty for root config dir). E.g. 'dashboards', 'packages', 'custom_components'."}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "list_snapshots",
+        "description": "List all available configuration snapshots. Snapshots are auto-created before any file modification.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "restore_snapshot",
+        "description": "Restore a file from a previously created snapshot. Use list_snapshots to see available snapshots.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "snapshot_id": {"type": "string", "description": "The snapshot ID (from list_snapshots)."}
+            },
+            "required": ["snapshot_id"]
+        }
     }
 ]
 
@@ -1101,13 +1197,28 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
         elif tool_name == "update_dashboard":
             url_path = tool_input.get("url_path", None)
             views = tool_input.get("views", [])
+            # Auto-snapshot: save current dashboard config before modifying
+            try:
+                snap_params = {}
+                if url_path and url_path != "lovelace":
+                    snap_params["url_path"] = url_path
+                old_config = call_ha_websocket("lovelace/config", **snap_params)
+                if old_config.get("success"):
+                    snap_file = f"_dashboard_snapshot_{url_path or 'lovelace'}.json"
+                    snap_path = os.path.join(SNAPSHOTS_DIR, datetime.now().strftime("%Y%m%d_%H%M%S") + snap_file)
+                    os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
+                    with open(snap_path, "w") as sf:
+                        json.dump({"url_path": url_path or "lovelace", "config": old_config.get("result", {})}, sf)
+                    logger.info(f"Dashboard snapshot saved: {snap_path}")
+            except Exception as e:
+                logger.warning(f"Could not snapshot dashboard before update: {e}")
             params = {"config": {"views": views}}
             if url_path and url_path != "lovelace":
                 params["url_path"] = url_path
             result = call_ha_websocket("lovelace/config/save", **params)
             if result.get("success"):
                 return json.dumps({"status": "success",
-                                   "message": f"Dashboard '{url_path or 'lovelace'}' updated with {len(views)} view(s).",
+                                   "message": f"Dashboard '{url_path or 'lovelace'}' updated with {len(views)} view(s). A backup snapshot was saved.",
                                    "views_count": len(views)}, ensure_ascii=False, default=str)
             error_msg = result.get("error", {}).get("message", str(result))
             return json.dumps({"error": f"Failed to update dashboard: {error_msg}"}, default=str)
@@ -1141,6 +1252,137 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             error_msg = result.get("error", {}).get("message", str(result))
             return json.dumps({"error": f"Failed to get resources: {error_msg}"}, default=str)
 
+        # ===== CONFIG FILE OPERATIONS =====
+        elif tool_name == "read_config_file":
+            filename = tool_input.get("filename", "")
+            # Security: prevent path traversal
+            if ".." in filename or filename.startswith("/"):
+                return json.dumps({"error": "Invalid filename. Use relative paths only (e.g. 'configuration.yaml')."})
+            filepath = os.path.join(HA_CONFIG_DIR, filename)
+            if not os.path.isfile(filepath):
+                return json.dumps({"error": f"File '{filename}' not found in HA config directory."})
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    content = f.read()
+                # Truncate very large files
+                if len(content) > 15000:
+                    content = content[:15000] + f"\n\n... [TRUNCATED - file is {len(content)} chars total]"
+                return json.dumps({"filename": filename, "content": content,
+                                   "size": os.path.getsize(filepath)}, ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Failed to read '{filename}': {str(e)}"})
+
+        elif tool_name == "write_config_file":
+            filename = tool_input.get("filename", "")
+            content = tool_input.get("content", "")
+            if ".." in filename or filename.startswith("/"):
+                return json.dumps({"error": "Invalid filename. Use relative paths only."})
+            if not filename:
+                return json.dumps({"error": "filename is required."})
+            filepath = os.path.join(HA_CONFIG_DIR, filename)
+            # Auto-create snapshot before writing
+            snapshot = create_snapshot(filename)
+            try:
+                # Create parent directories if needed
+                os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else filepath, exist_ok=True)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(content)
+                msg = f"File '{filename}' saved successfully."
+                if snapshot.get("snapshot_id"):
+                    msg += f" Backup snapshot created: {snapshot['snapshot_id']}"
+                return json.dumps({"status": "success", "message": msg, "snapshot": snapshot,
+                                   "tip": "Call check_config to validate the configuration."}, ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Failed to write '{filename}': {str(e)}", "snapshot": snapshot})
+
+        elif tool_name == "check_config":
+            try:
+                ha_token = get_ha_token()
+                resp = requests.post(
+                    f"{HA_URL}/api/config/core/check_config",
+                    headers={"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"},
+                    timeout=30
+                )
+                result = resp.json()
+                errors = result.get("errors", None)
+                valid = result.get("result", "") == "valid"
+                if valid:
+                    return json.dumps({"status": "valid", "message": "Configuration is valid! You can reload or restart HA."}, ensure_ascii=False)
+                return json.dumps({"status": "invalid", "errors": errors,
+                                   "message": "Configuration has errors! Fix them or restore from snapshot."}, ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Config check failed: {str(e)}"})
+
+        elif tool_name == "list_config_files":
+            subpath = tool_input.get("path", "")
+            if ".." in subpath:
+                return json.dumps({"error": "Invalid path."})
+            dirpath = os.path.join(HA_CONFIG_DIR, subpath) if subpath else HA_CONFIG_DIR
+            if not os.path.isdir(dirpath):
+                return json.dumps({"error": f"Directory '{subpath}' not found."})
+            entries = []
+            try:
+                for entry in sorted(os.listdir(dirpath)):
+                    full = os.path.join(dirpath, entry)
+                    rel = os.path.join(subpath, entry) if subpath else entry
+                    if os.path.isdir(full):
+                        entries.append({"name": entry, "type": "directory", "path": rel})
+                    else:
+                        entries.append({"name": entry, "type": "file", "path": rel,
+                                       "size": os.path.getsize(full)})
+                # Filter out hidden/system and very large dirs
+                entries = [e for e in entries if not e["name"].startswith(".")][:100]
+                return json.dumps({"path": subpath or "/", "entries": entries,
+                                   "count": len(entries)}, ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Failed to list '{subpath}': {str(e)}"})
+
+        # ===== SNAPSHOT MANAGEMENT =====
+        elif tool_name == "list_snapshots":
+            if not os.path.isdir(SNAPSHOTS_DIR):
+                return json.dumps({"snapshots": [], "count": 0})
+            snapshots = []
+            for f in sorted(os.listdir(SNAPSHOTS_DIR)):
+                if f.endswith(".meta"):
+                    continue
+                meta_path = os.path.join(SNAPSHOTS_DIR, f + ".meta")
+                if os.path.isfile(meta_path):
+                    with open(meta_path, "r") as mf:
+                        meta = json.load(mf)
+                    snapshots.append(meta)
+                else:
+                    snapshots.append({"snapshot_id": f, "original_file": f.split("_", 2)[-1].replace("__", "/")})
+            return json.dumps({"snapshots": snapshots, "count": len(snapshots)}, ensure_ascii=False, default=str)
+
+        elif tool_name == "restore_snapshot":
+            snapshot_id = tool_input.get("snapshot_id", "")
+            snapshot_path = os.path.join(SNAPSHOTS_DIR, snapshot_id)
+            meta_path = snapshot_path + ".meta"
+            if not os.path.isfile(snapshot_path):
+                return json.dumps({"error": f"Snapshot '{snapshot_id}' not found. Use list_snapshots."})
+            # Read metadata to find original file
+            original_file = ""
+            if os.path.isfile(meta_path):
+                with open(meta_path, "r") as mf:
+                    meta = json.load(mf)
+                original_file = meta.get("original_file", "")
+            else:
+                # Try to reconstruct from snapshot name
+                parts = snapshot_id.split("_", 2)
+                if len(parts) >= 3:
+                    original_file = parts[2].replace("__", "/")
+            if not original_file:
+                return json.dumps({"error": "Cannot determine original file from snapshot."})
+            # Create a snapshot of current state before restoring
+            create_snapshot(original_file)
+            # Restore
+            import shutil
+            dest = os.path.join(HA_CONFIG_DIR, original_file)
+            shutil.copy2(snapshot_path, dest)
+            return json.dumps({"status": "success",
+                               "message": f"Restored '{original_file}' from snapshot '{snapshot_id}'. A new snapshot of the overwritten file was created.",
+                               "restored_file": original_file}, ensure_ascii=False, default=str)
+
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
         logger.error(f"Tool error ({tool_name}): {e}")
@@ -1170,6 +1412,23 @@ You can:
 16. **Shopping list** - View, add, and complete shopping list items
 17. **Backup** - Create full Home Assistant backups
 18. **Browse media** - Browse media content from players (music, photos, etc.)
+19. **Read/write config files** - Read and edit configuration.yaml, automations.yaml, YAML dashboards, packages, etc.
+20. **Validate config** - Check HA configuration for errors after editing
+21. **Snapshots** - Automatic backups before every file change, with restore capability
+
+## Configuration File Management
+- Use **list_config_files** to explore the HA config directory
+- Use **read_config_file** to read any YAML/config file (including YAML-mode dashboards like ui-lovelace.yaml)
+- Use **write_config_file** to modify files (auto-creates a snapshot before writing)
+- Use **check_config** to validate after editing configuration.yaml
+- Use **list_snapshots** and **restore_snapshot** to manage/restore backups
+
+IMPORTANT for config editing:
+1. ALWAYS read the file first with read_config_file
+2. Make targeted changes (don't rewrite everything unless necessary)
+3. After writing configuration.yaml, ALWAYS call check_config to validate
+4. If validation fails, use restore_snapshot to undo changes
+5. Snapshots are created automatically before every write - inform the user about this safety net
 
 ## Dashboard Management
 - Use **get_dashboards** to list all dashboards
