@@ -11,6 +11,11 @@ arch:
 homeassistant: "2024.1.0"
 host_network: false
 host_dbus: false
+ingress: true
+ingress_port: 5000
+ingress_entry: "/"
+panel_icon: "mdi:robot"
+panel_title: "Claude AI"
 privileged:
   - NET_ADMIN
 ports:
