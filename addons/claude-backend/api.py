@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.8"
+VERSION = "2.8.9"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1555,6 +1555,28 @@ To delete resources, use delete_automation, delete_script, or delete_dashboard.
 - NEVER just describe what you plan to do. Execute ALL necessary tool calls in sequence and complete the task fully.
 - Only respond with the final result AFTER the task is complete.
 - If a task requires multiple tool calls, keep calling tools until the task is done. Do not stop halfway to explain your plan.
+
+## SHOW YOUR CHANGES (CRITICAL)
+When you modify an automation, script, configuration, or any YAML file, ALWAYS show the user exactly what you changed.
+In your final response, include:
+1. A brief summary of what you did
+2. The relevant YAML section BEFORE (old) and AFTER (new) using code blocks, for example:
+
+**Prima (old):**
+```yaml
+condition: []
+```
+
+**Dopo (new):**
+```yaml
+condition:
+  - condition: not
+    conditions:
+      - condition: template
+        value_template: "{{ 'Inter' in trigger.to_state.state }}"
+```
+
+This helps the user understand and verify the changes. Keep the diff focused on what changed, not the entire file.
 
 ## EFFICIENCY RULES (CRITICAL - minimize API calls)
 - Use the MINIMUM number of tool calls needed. Every extra call wastes time and tokens.
