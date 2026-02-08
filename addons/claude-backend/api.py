@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.6.2"
+VERSION = "2.6.3"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -411,6 +411,29 @@ HA_TOOLS_DESCRIPTION = [
             },
             "required": ["message"]
         }
+    },
+    {
+        "name": "get_dashboards",
+        "description": "Get all Lovelace dashboards in Home Assistant.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "create_dashboard",
+        "description": "Create a NEW Lovelace dashboard (does NOT modify existing ones). The AI builds the views and cards config. Common card types: entities, gauge, history-graph, weather-forecast, light, thermostat, button, markdown, grid, horizontal-stack, vertical-stack.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Dashboard title (e.g. 'Luci e Temperature')."},
+                "url_path": {"type": "string", "description": "URL slug (lowercase, no spaces, e.g. 'luci-temp'). Must be unique."},
+                "icon": {"type": "string", "description": "MDI icon (e.g. 'mdi:thermometer', 'mdi:lightbulb'). Optional."},
+                "views": {
+                    "type": "array",
+                    "description": "List of views (tabs) with cards. Each view has: title, path, icon, cards[].",
+                    "items": {"type": "object"}
+                }
+            },
+            "required": ["title", "url_path", "views"]
+        }
     }
 ]
 
@@ -605,6 +628,39 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                 result = call_ha_api("POST", "services/persistent_notification/create", {"message": message, "title": title})
             return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
 
+        elif tool_name == "get_dashboards":
+            url = f"{HA_URL}/api/lovelace/dashboards"
+            resp = requests.get(url, headers=get_ha_headers(), timeout=30)
+            if resp.status_code == 200:
+                dashboards = resp.json()
+                result = [{"id": d.get("id"), "title": d.get("title"), "url_path": d.get("url_path"),
+                           "icon": d.get("icon", ""), "mode": d.get("mode", "")} for d in dashboards]
+                return json.dumps(result, ensure_ascii=False, default=str)
+            return json.dumps({"error": f"Could not get dashboards: {resp.status_code}"}, default=str)
+
+        elif tool_name == "create_dashboard":
+            title = tool_input.get("title", "AI Dashboard")
+            url_path = tool_input.get("url_path", "ai-dashboard")
+            icon = tool_input.get("icon", "mdi:robot")
+            views = tool_input.get("views", [])
+
+            # Step 1: Create the dashboard entry
+            create_url = f"{HA_URL}/api/lovelace/dashboards"
+            create_data = {"title": title, "url_path": url_path, "icon": icon, "mode": "storage"}
+            resp1 = requests.post(create_url, headers=get_ha_headers(), json=create_data, timeout=30)
+            if resp1.status_code not in [200, 201]:
+                return json.dumps({"error": f"Failed to create dashboard: {resp1.status_code} - {resp1.text}"}, default=str)
+
+            # Step 2: Set the dashboard config with views and cards
+            config = {"views": views}
+            config_url = f"{HA_URL}/api/lovelace/config/{url_path}"
+            resp2 = requests.post(config_url, headers=get_ha_headers(), json=config, timeout=30)
+            if resp2.status_code not in [200, 201]:
+                return json.dumps({"status": "partial", "message": f"Dashboard created but config failed: {resp2.status_code} - {resp2.text}"}, default=str)
+
+            return json.dumps({"status": "success", "message": f"Dashboard '{title}' created at /{url_path}",
+                               "url_path": url_path, "views_count": len(views)}, ensure_ascii=False, default=str)
+
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
         logger.error(f"Tool error ({tool_name}): {e}")
@@ -626,6 +682,18 @@ You can:
 8. **List & trigger automations** - See and run existing automations
 9. **Notifications** - Send persistent notifications or push to mobile devices
 10. **Discover services & events** - See all available HA services and event types
+11. **Create dashboards** - Create NEW Lovelace dashboards with cards (never modifies existing ones)
+
+When creating dashboards, use proper Lovelace card types:
+- entities card: {"type": "entities", "title": "Lights", "entities": ["light.living_room", "light.bedroom"]}
+- gauge card: {"type": "gauge", "entity": "sensor.temperature", "name": "Temperature"}
+- history-graph: {"type": "history-graph", "entities": [{"entity": "sensor.temperature"}], "hours_to_show": 24}
+- thermostat: {"type": "thermostat", "entity": "climate.living_room"}
+- button: {"type": "button", "entity": "switch.outlet", "name": "Toggle"}
+- markdown: {"type": "markdown", "content": "# Title"}
+- grid/horizontal-stack/vertical-stack for layout
+
+Always first use get_entities or search_entities to find real entity IDs before creating dashboards.
 
 When creating automations, use proper Home Assistant formats:
 - State trigger: {"platform": "state", "entity_id": "binary_sensor.motion", "to": "on"}
