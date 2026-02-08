@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.6"
+VERSION = "2.8.7"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -776,6 +776,22 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
         elif tool_name == "get_entity_state":
             entity_id = tool_input.get("entity_id", "")
             result = call_ha_api("GET", f"states/{entity_id}")
+            # Return only essential fields to save tokens
+            if isinstance(result, dict):
+                slim = {
+                    "entity_id": result.get("entity_id"),
+                    "state": result.get("state"),
+                    "friendly_name": result.get("attributes", {}).get("friendly_name", ""),
+                    "last_changed": result.get("last_changed", "")
+                }
+                # Include only useful attributes
+                attrs = result.get("attributes", {})
+                useful_keys = ("friendly_name", "unit_of_measurement", "device_class",
+                              "brightness", "color_temp", "temperature", "current_temperature",
+                              "hvac_modes", "hvac_action", "preset_mode", "source", "media_title",
+                              "id")  # 'id' is critical for automations
+                slim["attributes"] = {k: v for k, v in attrs.items() if k in useful_keys}
+                return json.dumps(slim, ensure_ascii=False, default=str)
             return json.dumps(result, ensure_ascii=False, default=str)
 
         elif tool_name == "call_service":
@@ -830,8 +846,7 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                     matches.append({
                         "entity_id": s.get("entity_id"),
                         "state": s.get("state"),
-                        "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
-                        "attributes": s.get("attributes", {})
+                        "friendly_name": s.get("attributes", {}).get("friendly_name", "")
                     })
             max_results = 20 if AI_PROVIDER == "github" else 50
             return json.dumps(matches[:max_results], ensure_ascii=False, default=str)
@@ -1524,9 +1539,16 @@ To delete resources, use delete_automation, delete_script, or delete_dashboard.
 ## CRITICAL BEHAVIOR RULES
 - When the user asks you to CREATE or MODIFY something (dashboard, automation, script, config), DO IT IMMEDIATELY.
 - NEVER just describe what you plan to do. Execute ALL necessary tool calls in sequence and complete the task fully.
-- For example: if asked to create a dashboard, call search_entities → (optionally get_frontend_resources) → create_dashboard ALL in one go.
-- Only respond with the final result AFTER the task is complete (e.g. "Dashboard created! It's in the sidebar at /my-dashboard").
+- Only respond with the final result AFTER the task is complete.
 - If a task requires multiple tool calls, keep calling tools until the task is done. Do not stop halfway to explain your plan.
+
+## EFFICIENCY RULES (CRITICAL - minimize API calls)
+- Use the MINIMUM number of tool calls needed. Every extra call wastes time and tokens.
+- For automations: get_automations gives you the list. Then read_config_file('automations.yaml') gives the YAML content. Then write_config_file to save changes. That's 3 calls MAX.
+- Do NOT call get_entity_state, list_config_files, or search_entities if you already have the info from a previous tool result.
+- Do NOT call search_entities if you already know the entity_id from get_automations or another tool.
+- Plan your tool calls: think about what you need BEFORE calling, don't explore randomly.
+- For config editing: read_config_file → modify → write_config_file → check_config. Done.
 
 Always respond in the same language the user uses.
 Be concise but informative."""
@@ -1896,8 +1918,10 @@ def stream_chat_openai(messages):
             yield {"type": "tool", "name": fn_name}
             args = json.loads(tc["function"]["arguments"])
             result = execute_tool(fn_name, args)
-            if AI_PROVIDER == "github" and len(result) > 3000:
-                result = result[:3000] + '... (truncated)'
+            # Truncate large results to prevent token overflow
+            max_len = 3000 if AI_PROVIDER == "github" else 8000
+            if len(result) > max_len:
+                result = result[:max_len] + '\n... [TRUNCATED - ' + str(len(result)) + ' chars total]'
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
 
     messages.append({"role": "assistant", "content": full_text})
@@ -1994,6 +2018,9 @@ def stream_chat_anthropic(messages):
             logger.info(f"Tool: {tool['name']}")
             yield {"type": "tool", "name": tool["name"]}
             result = execute_tool(tool["name"], tool["input"])
+            # Truncate large tool results to prevent token overflow
+            if len(result) > 8000:
+                result = result[:8000] + '\n... [TRUNCATED to save tokens - ' + str(len(result)) + ' chars total]'
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tool["id"],
