@@ -883,14 +883,20 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                         
                         if found is not None:
                             old_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
+                            cond_key = "conditions" if "conditions" in found else "condition"
+                            # Remap condition↔conditions in changes to match existing key
+                            if "condition" in changes and cond_key == "conditions":
+                                changes["conditions"] = changes.pop("condition")
+                            elif "conditions" in changes and cond_key == "condition":
+                                changes["condition"] = changes.pop("conditions")
                             for key, value in changes.items():
                                 found[key] = value
                             if add_condition:
-                                if "condition" not in found or not found["condition"]:
-                                    found["condition"] = []
-                                if not isinstance(found["condition"], list):
-                                    found["condition"] = [found["condition"]]
-                                found["condition"].append(add_condition)
+                                if cond_key not in found or not found[cond_key]:
+                                    found[cond_key] = []
+                                if not isinstance(found[cond_key], list):
+                                    found[cond_key] = [found[cond_key]]
+                                found[cond_key].append(add_condition)
                             new_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
                             snapshot = create_snapshot("automations.yaml")
                             automations[found_idx] = found
@@ -907,15 +913,34 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                     current = call_ha_api("GET", f"config/automation/config/{automation_id}")
                     if isinstance(current, dict) and "error" not in current:
                         old_yaml = yaml.dump(current, default_flow_style=False, allow_unicode=True)
+                        
+                        # Normalize: HA may use 'condition' or 'conditions' - unify to what HA returned
+                        cond_key = "conditions" if "conditions" in current else "condition"
+                        
+                        # Remap condition↔conditions in changes to match existing key
+                        if "condition" in changes and cond_key == "conditions":
+                            changes["conditions"] = changes.pop("condition")
+                        elif "conditions" in changes and cond_key == "condition":
+                            changes["condition"] = changes.pop("conditions")
+                        
                         # Apply changes
                         for key, value in changes.items():
                             current[key] = value
                         if add_condition:
-                            if "condition" not in current or not current["condition"]:
-                                current["condition"] = []
-                            if not isinstance(current["condition"], list):
-                                current["condition"] = [current["condition"]]
-                            current["condition"].append(add_condition)
+                            if cond_key not in current or not current[cond_key]:
+                                current[cond_key] = []
+                            if not isinstance(current[cond_key], list):
+                                current[cond_key] = [current[cond_key]]
+                            current[cond_key].append(add_condition)
+                        
+                        # Ensure no duplicate condition/conditions keys
+                        if "condition" in current and "conditions" in current:
+                            # Keep whichever has data, prefer 'conditions' (new format)
+                            if current.get("conditions"):
+                                current.pop("condition", None)
+                            else:
+                                current.pop("conditions", None)
+                        
                         new_yaml = yaml.dump(current, default_flow_style=False, allow_unicode=True)
                         # Save via REST API (HA uses POST for both create and update)
                         save_result = call_ha_api("POST", f"config/automation/config/{automation_id}", current)
