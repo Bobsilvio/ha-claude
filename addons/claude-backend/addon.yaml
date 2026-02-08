@@ -1,6 +1,6 @@
 name: Claude AI Backend
 description: All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant
-version: "2.0.3"
+version: "2.0.4"
 slug: claude-backend
 image: "ghcr.io/Bobsilvio/claude-backend:{VERSION}"
 init: true
