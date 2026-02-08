@@ -26,7 +26,7 @@ COPY api.py .
 RUN mkdir -p /etc/services.d/claude-api
 
 # Copy run script to services.d for s6-overlay
-COPY addons/claude-backend/run.sh /etc/services.d/claude-api/run
+COPY run.sh /etc/services.d/claude-api/run
 RUN chmod +x /etc/services.d/claude-api/run
 
 # Expose API port
