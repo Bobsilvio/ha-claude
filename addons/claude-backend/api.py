@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.6.7"
+VERSION = "2.7.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -479,6 +479,116 @@ HA_TOOLS_DESCRIPTION = [
             },
             "required": ["script_id", "alias", "sequence"]
         }
+    },
+    {
+        "name": "delete_dashboard",
+        "description": "Delete a Lovelace dashboard by its ID.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "dashboard_id": {"type": "string", "description": "The dashboard ID (get it from get_dashboards)."}
+            },
+            "required": ["dashboard_id"]
+        }
+    },
+    {
+        "name": "delete_automation",
+        "description": "Delete an existing automation.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "automation_id": {"type": "string", "description": "The automation entity_id (e.g. 'automation.my_automation')."}
+            },
+            "required": ["automation_id"]
+        }
+    },
+    {
+        "name": "delete_script",
+        "description": "Delete an existing script.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "script_id": {"type": "string", "description": "The script ID without prefix (e.g. 'goodnight_routine')."}
+            },
+            "required": ["script_id"]
+        }
+    },
+    {
+        "name": "manage_areas",
+        "description": "Manage Home Assistant areas/rooms: list, create, rename, or delete areas.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "create", "update", "delete"], "description": "Action to perform."},
+                "name": {"type": "string", "description": "Area name (for create/update)."},
+                "area_id": {"type": "string", "description": "Area ID (for update/delete)."},
+                "icon": {"type": "string", "description": "MDI icon for the area (optional)."}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "manage_entity",
+        "description": "Update entity registry: rename, assign to area, enable/disable an entity.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string", "description": "The entity ID to manage."},
+                "name": {"type": "string", "description": "New friendly name (optional)."},
+                "area_id": {"type": "string", "description": "Assign to area ID (optional). Use manage_areas list to get IDs."},
+                "disabled_by": {"type": "string", "enum": ["user", ""], "description": "Set to 'user' to disable, '' to enable."},
+                "icon": {"type": "string", "description": "Custom icon (optional)."}
+            },
+            "required": ["entity_id"]
+        }
+    },
+    {
+        "name": "get_devices",
+        "description": "Get all devices registered in Home Assistant with manufacturer, model, and area.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "get_statistics",
+        "description": "Get advanced statistics (min, max, mean, sum) for a sensor over a time period. Useful for energy, temperature trends, averages.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string", "description": "Sensor entity_id (e.g. 'sensor.temperature')."},
+                "period": {"type": "string", "enum": ["5minute", "hour", "day", "week", "month"], "description": "Statistics period (default: hour)."},
+                "hours": {"type": "number", "description": "How many hours back to query (default 24, max 720)."}
+            },
+            "required": ["entity_id"]
+        }
+    },
+    {
+        "name": "shopping_list",
+        "description": "Manage the Home Assistant shopping list: view items, add new items, or mark items as complete.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string", "enum": ["list", "add", "complete"], "description": "Action to perform."},
+                "name": {"type": "string", "description": "Item name (for add)."},
+                "item_id": {"type": "string", "description": "Item ID (for complete, get from list)."}
+            },
+            "required": ["action"]
+        }
+    },
+    {
+        "name": "create_backup",
+        "description": "Create a full Home Assistant backup. This may take a few minutes.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "browse_media",
+        "description": "Browse available media content (music, photos, etc.) from media players.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "media_content_id": {"type": "string", "description": "Content path to browse (empty for root)."},
+                "media_content_type": {"type": "string", "description": "Media type (e.g. 'music', 'image'). Default: 'music'."}
+            },
+            "required": []
+        }
     }
 ]
 
@@ -728,6 +838,198 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                                    "entity_id": f"script.{script_id}", "result": result}, ensure_ascii=False, default=str)
             return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
+        # ===== DELETE OPERATIONS (WebSocket) =====
+        elif tool_name == "delete_dashboard":
+            dashboard_id = tool_input.get("dashboard_id", "")
+            result = call_ha_websocket("lovelace/dashboards/delete", dashboard_id=dashboard_id)
+            if result.get("success"):
+                return json.dumps({"status": "success", "message": f"Dashboard '{dashboard_id}' deleted."}, ensure_ascii=False)
+            error_msg = result.get("error", {}).get("message", str(result))
+            return json.dumps({"error": f"Failed to delete dashboard: {error_msg}"}, default=str)
+
+        elif tool_name == "delete_automation":
+            automation_id = tool_input.get("automation_id", "")
+            # Need the object_id (without automation. prefix)
+            object_id = automation_id.replace("automation.", "") if automation_id.startswith("automation.") else automation_id
+            result = call_ha_api("DELETE", f"config/automation/config/{object_id}")
+            return json.dumps({"status": "success", "message": f"Automation '{automation_id}' deleted."}, ensure_ascii=False, default=str)
+
+        elif tool_name == "delete_script":
+            script_id = tool_input.get("script_id", "").replace("script.", "")
+            result = call_ha_api("DELETE", f"config/script/config/{script_id}")
+            return json.dumps({"status": "success", "message": f"Script '{script_id}' deleted."}, ensure_ascii=False, default=str)
+
+        # ===== AREA MANAGEMENT (WebSocket) =====
+        elif tool_name == "manage_areas":
+            action = tool_input.get("action", "list")
+            if action == "list":
+                result = call_ha_websocket("config/area_registry/list")
+                areas = result.get("result", [])
+                summary = [{"area_id": a.get("area_id"), "name": a.get("name"), "icon": a.get("icon", "")} for a in areas]
+                return json.dumps({"areas": summary, "count": len(summary)}, ensure_ascii=False, default=str)
+            elif action == "create":
+                name = tool_input.get("name", "")
+                params = {"name": name}
+                if tool_input.get("icon"):
+                    params["icon"] = tool_input["icon"]
+                result = call_ha_websocket("config/area_registry/create", **params)
+                if result.get("success"):
+                    area = result.get("result", {})
+                    return json.dumps({"status": "success", "message": f"Area '{name}' created.", "area_id": area.get("area_id")}, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                return json.dumps({"error": f"Failed to create area: {error_msg}"}, default=str)
+            elif action == "update":
+                area_id = tool_input.get("area_id", "")
+                params = {"area_id": area_id}
+                if tool_input.get("name"):
+                    params["name"] = tool_input["name"]
+                if tool_input.get("icon"):
+                    params["icon"] = tool_input["icon"]
+                result = call_ha_websocket("config/area_registry/update", **params)
+                if result.get("success"):
+                    return json.dumps({"status": "success", "message": f"Area '{area_id}' updated."}, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                return json.dumps({"error": f"Failed to update area: {error_msg}"}, default=str)
+            elif action == "delete":
+                area_id = tool_input.get("area_id", "")
+                result = call_ha_websocket("config/area_registry/delete", area_id=area_id)
+                if result.get("success"):
+                    return json.dumps({"status": "success", "message": f"Area '{area_id}' deleted."}, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                return json.dumps({"error": f"Failed to delete area: {error_msg}"}, default=str)
+
+        # ===== ENTITY REGISTRY (WebSocket) =====
+        elif tool_name == "manage_entity":
+            entity_id = tool_input.get("entity_id", "")
+            params = {"entity_id": entity_id}
+            if tool_input.get("name") is not None:
+                params["name"] = tool_input["name"]
+            if tool_input.get("area_id") is not None:
+                params["area_id"] = tool_input["area_id"]
+            if tool_input.get("disabled_by") is not None:
+                params["disabled_by"] = tool_input["disabled_by"] if tool_input["disabled_by"] else None
+            if tool_input.get("icon") is not None:
+                params["icon"] = tool_input["icon"]
+            result = call_ha_websocket("config/entity_registry/update", **params)
+            if result.get("success"):
+                entry = result.get("result", {})
+                return json.dumps({"status": "success", "message": f"Entity '{entity_id}' updated.",
+                                   "name": entry.get("name"), "area_id": entry.get("area_id"),
+                                   "disabled_by": entry.get("disabled_by")}, ensure_ascii=False, default=str)
+            error_msg = result.get("error", {}).get("message", str(result))
+            return json.dumps({"error": f"Failed to update entity: {error_msg}"}, default=str)
+
+        # ===== DEVICE REGISTRY (WebSocket) =====
+        elif tool_name == "get_devices":
+            result = call_ha_websocket("config/device_registry/list")
+            devices = result.get("result", [])
+            summary = []
+            for d in devices[:100]:  # Limit to 100 devices
+                summary.append({
+                    "id": d.get("id"),
+                    "name": d.get("name_by_user") or d.get("name", ""),
+                    "manufacturer": d.get("manufacturer", ""),
+                    "model": d.get("model", ""),
+                    "area_id": d.get("area_id", ""),
+                    "via_device_id": d.get("via_device_id", "")
+                })
+            return json.dumps({"devices": summary, "count": len(devices), "showing": len(summary)}, ensure_ascii=False, default=str)
+
+        # ===== ADVANCED STATISTICS (WebSocket) =====
+        elif tool_name == "get_statistics":
+            entity_id = tool_input.get("entity_id", "")
+            period = tool_input.get("period", "hour")
+            hours = min(tool_input.get("hours", 24), 720)
+            start_time = (datetime.utcnow() - timedelta(hours=hours)).isoformat() + "Z"
+            result = call_ha_websocket(
+                "recorder/statistics_during_period",
+                start_time=start_time,
+                statistic_ids=[entity_id],
+                period=period
+            )
+            stats = result.get("result", {}).get(entity_id, [])
+            # Summarize: take last 50 entries max
+            summary_stats = []
+            for s in stats[-50:]:
+                summary_stats.append({
+                    "start": s.get("start"),
+                    "mean": s.get("mean"),
+                    "min": s.get("min"),
+                    "max": s.get("max"),
+                    "sum": s.get("sum"),
+                    "state": s.get("state")
+                })
+            return json.dumps({"entity_id": entity_id, "period": period,
+                               "hours": hours, "statistics": summary_stats,
+                               "total_entries": len(stats)}, ensure_ascii=False, default=str)
+
+        # ===== SHOPPING LIST (WebSocket) =====
+        elif tool_name == "shopping_list":
+            action = tool_input.get("action", "list")
+            if action == "list":
+                result = call_ha_websocket("shopping_list/items")
+                items = result.get("result", [])
+                return json.dumps({"items": items, "count": len(items)}, ensure_ascii=False, default=str)
+            elif action == "add":
+                name = tool_input.get("name", "")
+                result = call_ha_websocket("shopping_list/items/add", name=name)
+                if result.get("success"):
+                    return json.dumps({"status": "success", "message": f"'{name}' added to shopping list.",
+                                       "item": result.get("result", {})}, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                return json.dumps({"error": f"Failed to add item: {error_msg}"}, default=str)
+            elif action == "complete":
+                item_id = tool_input.get("item_id", "")
+                result = call_ha_websocket("shopping_list/items/update", item_id=item_id, complete=True)
+                if result.get("success"):
+                    return json.dumps({"status": "success", "message": f"Item marked as complete."}, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                return json.dumps({"error": f"Failed to complete item: {error_msg}"}, default=str)
+
+        # ===== BACKUP (Supervisor REST API) =====
+        elif tool_name == "create_backup":
+            try:
+                ha_token = get_ha_token()
+                resp = requests.post(
+                    "http://supervisor/backups/new/full",
+                    headers={"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"},
+                    json={"name": f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"},
+                    timeout=300
+                )
+                result = resp.json()
+                if result.get("result") == "ok":
+                    slug = result.get("data", {}).get("slug", "")
+                    return json.dumps({"status": "success", "message": f"Backup created successfully!", "slug": slug}, ensure_ascii=False, default=str)
+                return json.dumps({"error": f"Backup failed: {result}"}, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Backup error: {str(e)}"}, default=str)
+
+        # ===== BROWSE MEDIA (WebSocket) =====
+        elif tool_name == "browse_media":
+            content_id = tool_input.get("media_content_id", "")
+            content_type = tool_input.get("media_content_type", "music")
+            params = {"media_content_type": content_type}
+            if content_id:
+                params["media_content_id"] = content_id
+            result = call_ha_websocket("media_player/browse_media", **params)
+            if result.get("success"):
+                media = result.get("result", {})
+                children = media.get("children", [])
+                summary = []
+                for c in children[:50]:
+                    summary.append({
+                        "title": c.get("title", ""),
+                        "media_content_id": c.get("media_content_id", ""),
+                        "media_content_type": c.get("media_content_type", ""),
+                        "media_class": c.get("media_class", ""),
+                        "can_expand": c.get("can_expand", False),
+                        "can_play": c.get("can_play", False)
+                    })
+                return json.dumps({"title": media.get("title", "Media"), "children": summary,
+                                   "count": len(children)}, ensure_ascii=False, default=str)
+            error_msg = result.get("error", {}).get("message", str(result))
+            return json.dumps({"error": f"Browse media failed: {error_msg}"}, default=str)
+
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
         logger.error(f"Tool error ({tool_name}): {e}")
@@ -743,13 +1045,19 @@ You can:
 2. **Control devices** - Turn on/off lights, switches, set temperatures, etc.
 3. **Search entities** - Find specific devices or integrations by keyword
 4. **Entity history** - Check past values and trends ("what was the temperature yesterday?")
-5. **Scenes & scripts** - List and activate scenes, run scripts
-6. **Areas/rooms** - See entities organized by room for room-based control
-7. **Create automations** - Build new automations with triggers, conditions, and actions
-8. **List & trigger automations** - See and run existing automations
-9. **Notifications** - Send persistent notifications or push to mobile devices
-10. **Discover services & events** - See all available HA services and event types
-11. **Create dashboards** - Create NEW Lovelace dashboards with cards (never modifies existing ones)
+5. **Advanced statistics** - Get min/max/mean/sum statistics for sensors over time periods
+6. **Scenes & scripts** - List, activate scenes, run scripts, create new scripts
+7. **Areas/rooms** - List, create, rename, delete areas. Assign entities to areas
+8. **Devices & entity registry** - List devices, rename entities, enable/disable entities, assign to areas
+9. **Create automations** - Build new automations with triggers, conditions, and actions
+10. **List & trigger automations** - See and run existing automations
+11. **Delete automations/scripts/dashboards** - Remove unwanted configurations
+12. **Notifications** - Send persistent notifications or push to mobile devices
+13. **Discover services & events** - See all available HA services and event types
+14. **Create dashboards** - Create NEW Lovelace dashboards with cards (never modifies existing ones)
+15. **Shopping list** - View, add, and complete shopping list items
+16. **Backup** - Create full Home Assistant backups
+17. **Browse media** - Browse media content from players (music, photos, etc.)
 
 When creating dashboards, use proper Lovelace card types:
 - entities card: {"type": "entities", "title": "Lights", "entities": ["light.living_room", "light.bedroom"]}
@@ -768,9 +1076,12 @@ When creating automations, use proper Home Assistant formats:
 - Sun trigger: {"platform": "sun", "event": "sunset", "offset": "-00:30:00"}
 - Service action: {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}, "data": {"brightness": 255}}
 
+When managing areas/rooms, use manage_areas. To assign an entity to a room, use manage_entity with the area_id.
+For advanced sensor analytics (averages, peaks, trends), use get_statistics instead of get_history.
 When a user asks about specific devices or addons, use search_entities to find them by keyword.
-Use get_history to answer questions about past states and trends.
+Use get_history for recent state changes, get_statistics for aggregated data over longer periods.
 Use get_areas when the user refers to rooms.
+To delete resources, use delete_automation, delete_script, or delete_dashboard.
 
 Always respond in the same language the user uses.
 Be concise but informative."""
