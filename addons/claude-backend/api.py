@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.5"
+VERSION = "2.9.6"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -169,6 +169,57 @@ else:
 
 # Conversation history
 conversations: Dict[str, List[Dict]] = {}
+
+# Abort flag per session (for stop button)
+abort_streams: Dict[str, bool] = {}
+
+# User-friendly tool descriptions (Italian)
+TOOL_DESCRIPTIONS = {
+    "get_entities": "Carico dispositivi",
+    "get_entity_state": "Leggo stato dispositivo",
+    "call_service": "Eseguo comando",
+    "search_entities": "Cerco dispositivi",
+    "get_automations": "Carico automazioni",
+    "update_automation": "Modifico automazione",
+    "create_automation": "Creo automazione",
+    "trigger_automation": "Avvio automazione",
+    "delete_automation": "Elimino automazione",
+    "get_scripts": "Carico script",
+    "run_script": "Eseguo script",
+    "update_script": "Modifico script",
+    "create_script": "Creo script",
+    "delete_script": "Elimino script",
+    "get_dashboards": "Carico dashboard",
+    "get_dashboard_config": "Leggo config dashboard",
+    "update_dashboard": "Modifico dashboard",
+    "create_dashboard": "Creo dashboard",
+    "delete_dashboard": "Elimino dashboard",
+    "get_frontend_resources": "Verifico card installate",
+    "get_scenes": "Carico scene",
+    "activate_scene": "Attivo scena",
+    "get_areas": "Carico stanze",
+    "manage_areas": "Gestisco stanze",
+    "get_history": "Carico storico",
+    "get_statistics": "Carico statistiche",
+    "send_notification": "Invio notifica",
+    "read_config_file": "Leggo file config",
+    "write_config_file": "Salvo file config",
+    "list_config_files": "Elenco file config",
+    "check_config": "Valido configurazione",
+    "create_backup": "Creo backup",
+    "get_available_services": "Carico servizi",
+    "get_events": "Carico eventi",
+    "manage_entity": "Gestisco entità",
+    "get_devices": "Carico dispositivi",
+    "shopping_list": "Lista spesa",
+    "browse_media": "Sfoglio media",
+    "list_snapshots": "Elenco snapshot",
+    "restore_snapshot": "Ripristino snapshot",
+}
+
+def get_tool_description(tool_name: str) -> str:
+    """Get user-friendly Italian description for a tool."""
+    return TOOL_DESCRIPTIONS.get(tool_name, tool_name.replace('_', ' ').title())
 
 # Conversation persistence
 CONVERSATIONS_FILE = "/data/conversations.json"
@@ -2156,7 +2207,7 @@ def stream_chat_openai(messages):
                 messages.append({"role": "tool", "tool_call_id": tc["id"],
                                  "content": json.dumps({"note": f"Skipped: {fn_name} already called. Use existing data. Respond NOW."})})
                 continue
-            yield {"type": "tool", "name": fn_name}
+            yield {"type": "tool", "name": fn_name, "description": get_tool_description(fn_name)}
             args = json.loads(tc["function"]["arguments"])
             result = execute_tool(fn_name, args)
             tools_called_this_session.add(fn_name)
@@ -2181,12 +2232,23 @@ def stream_chat_anthropic(messages):
     tools_called_this_session = set()  # Track tools already called to detect redundancy
 
     for round_num in range(max_rounds):
+        # Check abort flag
+        if abort_streams.get("default"):
+            logger.info("Stream aborted by user")
+            yield {"type": "error", "message": "Interrotto dall'utente."}
+            abort_streams["default"] = False
+            break
         # Rate-limit prevention: delay between API calls (not on first round)
         if round_num > 0:
             delay = min(3 + round_num, 6)  # 4s, 5s, 6s, 6s...
             logger.info(f"Rate-limit prevention: waiting {delay}s before round {round_num+1}")
-            yield {"type": "status", "message": f"Elaborazione in corso... (step {round_num+1})"}
+            yield {"type": "status", "message": f"Elaboro la risposta... (step {round_num+1})"}
             time.sleep(delay)
+            if abort_streams.get("default"):
+                logger.info("Stream aborted by user during delay")
+                yield {"type": "error", "message": "Interrotto dall'utente."}
+                abort_streams["default"] = False
+                break
 
         content_parts = []
         tool_uses = []
@@ -2276,7 +2338,7 @@ def stream_chat_anthropic(messages):
                 continue
 
             logger.info(f"Tool: {tool['name']}")
-            yield {"type": "tool", "name": tool["name"]}
+            yield {"type": "tool", "name": tool["name"], "description": get_tool_description(tool["name"])}
             result = execute_tool(tool["name"], tool["input"])
             tools_called_this_session.add(tool_key)
             # Truncate large tool results to prevent token overflow
@@ -2632,13 +2694,17 @@ def get_chat_ui():
         .input-area {{ padding: 12px 16px; background: white; border-top: 1px solid #e0e0e0; display: flex; gap: 8px; align-items: flex-end; }}
         .input-area textarea {{ flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 10px 16px; font-size: 14px; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.2s; }}
         .input-area textarea:focus {{ border-color: #667eea; }}
-        .input-area button {{ background: #667eea; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; flex-shrink: 0; }}
+        .input-area button {{ background: #667eea; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }}
         .input-area button:hover {{ background: #5a6fd6; }}
         .input-area button:disabled {{ background: #ccc; cursor: not-allowed; }}
+        .input-area button.stop-btn {{ background: #ef4444; animation: pulse-stop 1s infinite; }}
+        .input-area button.stop-btn:hover {{ background: #dc2626; }}
+        @keyframes pulse-stop {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
         .suggestion:hover {{ background: #667eea; color: white; border-color: #667eea; }}
         .tool-badge {{ display: inline-block; background: #e8f0fe; color: #1967d2; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
+        .status-badge {{ display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
     </style>
 </head>
 <body>
@@ -2673,8 +2739,9 @@ def get_chat_ui():
 
     <div class="input-area">
         <textarea id="input" rows="1" placeholder="Scrivi un messaggio..." onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
-        <button id="sendBtn" onclick="sendMessage()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <button id="sendBtn" onclick="handleButtonClick()">
+            <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
         </button>
     </div>
 
@@ -2682,8 +2749,39 @@ def get_chat_ui():
         const chat = document.getElementById('chat');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('sendBtn');
+        const sendIcon = document.getElementById('sendIcon');
+        const stopIcon = document.getElementById('stopIcon');
         const suggestionsEl = document.getElementById('suggestions');
         let sending = false;
+        let currentReader = null;
+
+        function setStopMode(active) {{
+            if (active) {{
+                sendBtn.classList.add('stop-btn');
+                sendBtn.disabled = false;
+                sendIcon.style.display = 'none';
+                stopIcon.style.display = 'block';
+            }} else {{
+                sendBtn.classList.remove('stop-btn');
+                sendIcon.style.display = 'block';
+                stopIcon.style.display = 'none';
+            }}
+        }}
+
+        async function handleButtonClick() {{
+            if (sending) {{
+                try {{
+                    await fetch('api/chat/abort', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: '{{}}' }});
+                    if (currentReader) {{ currentReader.cancel(); currentReader = null; }}
+                }} catch(e) {{ console.error('Abort error:', e); }}
+                removeThinking();
+                sending = false;
+                setStopMode(false);
+                sendBtn.disabled = false;
+            }} else {{
+                sendMessage();
+            }}
+        }}
 
         function autoResize(el) {{
             el.style.height = 'auto';
@@ -2715,7 +2813,7 @@ def get_chat_ui():
             const div = document.createElement('div');
             div.className = 'message thinking';
             div.id = 'thinking';
-            div.innerHTML = 'Sto pensando<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            div.innerHTML = 'Analizzo la richiesta<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }}
@@ -2734,7 +2832,7 @@ def get_chat_ui():
             const text = input.value.trim();
             if (!text || sending) return;
             sending = true;
-            sendBtn.disabled = true;
+            setStopMode(true);
             input.value = '';
             input.style.height = 'auto';
             suggestionsEl.style.display = 'none';
@@ -2756,15 +2854,20 @@ def get_chat_ui():
                 }}
             }} catch (err) {{
                 removeThinking();
-                addMessage('\u274c Errore: ' + err.message, 'system');
+                if (err.name !== 'AbortError') {{
+                    addMessage('\u274c Errore: ' + err.message, 'system');
+                }}
             }}
             sending = false;
+            setStopMode(false);
             sendBtn.disabled = false;
+            currentReader = null;
             input.focus();
         }}
 
         async function handleStream(resp) {{
             const reader = resp.body.getReader();
+            currentReader = reader;
             const decoder = new TextDecoder();
             let div = null;
             let fullText = '';
@@ -2789,7 +2892,8 @@ def get_chat_ui():
                                 removeThinking();
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 hasTools = true;
-                                div.innerHTML += '<div class="tool-badge">\U0001f527 ' + evt.name + '</div>';
+                                const desc = evt.description || evt.name;
+                                div.innerHTML += '<div class="tool-badge">\U0001f527 ' + desc + '</div>';
                             }} else if (evt.type === 'clear') {{
                                 removeThinking();
                                 if (div) {{ div.innerHTML = ''; }}
@@ -2798,7 +2902,9 @@ def get_chat_ui():
                             }} else if (evt.type === 'status') {{
                                 removeThinking();
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
-                                div.innerHTML += '<div class="tool-badge">\u23f3 ' + evt.message + '</div>';
+                                const oldStatus = div.querySelector('.status-badge');
+                                if (oldStatus) oldStatus.remove();
+                                div.innerHTML += '<div class="status-badge">\u23f3 ' + evt.message + '</div>';
                             }} else if (evt.type === 'token') {{
                                 removeThinking();
                                 if (hasTools && div) {{ div.innerHTML = ''; fullText = ''; hasTools = false; }}
@@ -2817,7 +2923,9 @@ def get_chat_ui():
                 }}
             }}
             }} catch(streamErr) {{
-                console.error('Stream error:', streamErr);
+                if (streamErr.name !== 'AbortError') {{
+                    console.error('Stream error:', streamErr);
+                }}
             }}
             // Safety: if stream ended without final response, show a message
             removeThinking();
@@ -2918,6 +3026,7 @@ def api_chat_stream():
     if not message:
         return jsonify({"error": "Empty message"}), 400
     logger.info(f"Stream [{AI_PROVIDER}]: {message}")
+    abort_streams[session_id] = False  # Reset abort flag
 
     def generate():
         for event in stream_chat_with_ai(message, session_id):
@@ -2928,6 +3037,16 @@ def api_chat_stream():
         mimetype='text/event-stream',
         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
     )
+
+
+@app.route('/api/chat/abort', methods=['POST'])
+def api_chat_abort():
+    """Abort a running stream."""
+    data = request.get_json() or {}
+    session_id = data.get("session_id", "default")
+    abort_streams[session_id] = True
+    logger.info(f"Abort requested for session {session_id}")
+    return jsonify({"status": "abort_requested"}), 200
 
 
 @app.route('/api/conversations', methods=['GET'])
