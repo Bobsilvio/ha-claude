@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.6"
+VERSION = "2.9.7"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2065,8 +2065,7 @@ def chat_google(messages: List[Dict]) -> tuple:
 
 def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
     """Remove messages incompatible with the current provider.
-    OpenAI/GitHub use role='tool', Anthropic uses role='user' with tool_result content.
-    Google uses function_response parts. Strip incompatible formats on provider switch."""
+    Also truncates old messages to reduce token count (critical for rate limits)."""
     clean = []
     for m in messages:
         role = m.get("role", "")
@@ -2078,7 +2077,6 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
             continue
         # Skip Anthropic-format tool_result messages for OpenAI/GitHub
         if AI_PROVIDER in ("openai", "github") and role == "user" and isinstance(m.get("content"), list):
-            # Anthropic tool_results are lists with type: tool_result
             if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in m.get("content", [])):
                 continue
         # Only keep simple user/assistant text messages
@@ -2086,6 +2084,23 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
             content = m.get("content", "")
             if isinstance(content, str) and content:
                 clean.append({"role": role, "content": content})
+    
+    # Limit total messages: keep only last 10
+    if len(clean) > 10:
+        clean = clean[-10:]
+    
+    # Truncate OLD messages to save tokens (keep last 2 messages full)
+    MAX_OLD_MSG = 1500
+    for i in range(len(clean) - 2):
+        content = clean[i].get("content", "")
+        # Strip previously injected smart context from old messages
+        if "\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO" in content:
+            # Keep only the user's original message (before the smart context separator)
+            content = content.split("\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO")[0]
+        if len(content) > MAX_OLD_MSG:
+            content = content[:MAX_OLD_MSG] + "... [old message truncated]"
+        clean[i] = {"role": clean[i]["role"], "content": content}
+    
     return clean
 
 
@@ -2195,6 +2210,7 @@ def stream_chat_openai(messages):
 
         messages.append({"role": "assistant", "content": accumulated, "tool_calls": tc_list})
 
+        tool_call_results = {}  # Map tc_id -> (fn_name, result)
         for tc in tc_list:
             fn_name = tc["function"]["name"]
             # Block redundant read-only tool calls
@@ -2216,6 +2232,29 @@ def stream_chat_openai(messages):
             if len(result) > max_len:
                 result = result[:max_len] + '\n... [TRUNCATED - ' + str(len(result)) + ' chars total]'
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+            tool_call_results[tc["id"]] = (fn_name, result)
+
+        # AUTO-STOP: If a write tool succeeded, format response directly
+        WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
+                       "create_automation", "create_script", "create_dashboard", "update_dashboard"}
+        auto_stop = False
+        for tc_id, (fn_name, result) in tool_call_results.items():
+            if fn_name in WRITE_TOOLS:
+                try:
+                    rdata = json.loads(result)
+                    if rdata.get("status") == "success":
+                        auto_stop = True
+                        full_text = _format_write_tool_response(fn_name, rdata)
+                        break
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+        if auto_stop:
+            logger.info(f"Auto-stop: write tool succeeded, skipping further API calls")
+            yield {"type": "clear"}
+            for i in range(0, len(full_text), 4):
+                yield {"type": "token", "content": full_text[i:i+4]}
+            break
 
     messages.append({"role": "assistant", "content": full_text})
     yield {"type": "done", "full_text": full_text}
@@ -2354,15 +2393,86 @@ def stream_chat_anthropic(messages):
         if redundant_blocked == len(tool_uses):
             logger.info("All tool calls were redundant - forcing final response")
             messages.append({"role": "user", "content": tool_results})
-            # Add a nudge to respond
             messages.append({"role": "user", "content": [{"type": "text", "text": "You already have all the data needed. Respond to the user now with the results. Do not call any more tools."}]})
             continue
+
+        # AUTO-STOP: If a write tool succeeded, format response directly — no more API calls needed
+        WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
+                       "create_automation", "create_script", "create_dashboard", "update_dashboard"}
+        auto_stop = False
+        for tool in tool_uses:
+            if tool["name"] in WRITE_TOOLS:
+                for tr in tool_results:
+                    if tr.get("tool_use_id") == tool["id"]:
+                        try:
+                            rdata = json.loads(tr["content"])
+                            if rdata.get("status") == "success":
+                                auto_stop = True
+                                full_text = _format_write_tool_response(tool["name"], rdata)
+                        except (json.JSONDecodeError, KeyError):
+                            pass
+                        break
+            if auto_stop:
+                break
+
+        if auto_stop:
+            logger.info(f"Auto-stop: write tool succeeded, skipping further API calls")
+            yield {"type": "clear"}
+            for i in range(0, len(full_text), 4):
+                yield {"type": "token", "content": full_text[i:i+4]}
+            break
 
         messages.append({"role": "user", "content": tool_results})
         # Loop back for next round
 
     messages.append({"role": "assistant", "content": full_text})
     yield {"type": "done", "full_text": full_text}
+
+
+def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
+    """Format a human-readable response from a successful write tool result.
+    This avoids needing another API round just to format the response."""
+    parts = []
+    
+    msg = result_data.get("message", "")
+    if msg:
+        parts.append(f"✅ {msg}")
+    else:
+        parts.append("✅ Operazione completata con successo!")
+    
+    # Show diff for update tools
+    old_yaml = result_data.get("old_yaml", "")
+    new_yaml = result_data.get("new_yaml", "")
+    
+    if old_yaml and new_yaml:
+        # Show compact diff: only changed sections
+        old_lines = set(old_yaml.strip().splitlines())
+        new_lines = set(new_yaml.strip().splitlines())
+        removed = old_lines - new_lines
+        added = new_lines - old_lines
+        
+        if removed or added:
+            parts.append("\n**Modifiche:**")
+            if removed:
+                parts.append("\n**Prima (rimosso):**")
+                parts.append(f"```yaml\n{chr(10).join(sorted(removed))}\n```")
+            if added:
+                parts.append("\n**Dopo (aggiunto):**")
+                parts.append(f"```yaml\n{chr(10).join(sorted(added))}\n```")
+        else:
+            # Show full before/after if sets don't differ well (order changes)
+            parts.append(f"\n**Prima:**\n```yaml\n{old_yaml[:2000]}\n```")
+            parts.append(f"\n**Dopo:**\n```yaml\n{new_yaml[:2000]}\n```")
+    
+    tip = result_data.get("tip", "")
+    if tip:
+        parts.append(f"\nℹ️ {tip}")
+    
+    snapshot = result_data.get("snapshot", "")
+    if snapshot and snapshot != "N/A (REST API)":
+        parts.append(f"\n💾 Snapshot creato: `{snapshot}`")
+    
+    return "\n".join(parts)
 
 
 def stream_chat_google(messages):
@@ -2423,10 +2533,13 @@ def stream_chat_google(messages):
     yield {"type": "done", "full_text": final_text}
 
 
+MAX_SMART_CONTEXT = 10000  # Max chars to inject — keeps tokens under control
+
 def build_smart_context(user_message: str) -> str:
     """Pre-load relevant context based on user's message intent.
     Works like VS Code: gathers all needed data BEFORE sending to AI,
-    so Claude can respond with a single action instead of multiple tool rounds."""
+    so Claude can respond with a single action instead of multiple tool rounds.
+    IMPORTANT: Context must be compact to avoid rate limits."""
     msg_lower = user_message.lower()
     context_parts = []
 
@@ -2442,12 +2555,12 @@ def build_smart_context(user_message: str) -> str:
                          "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
                          "id": str(a.get("attributes", {}).get("id", "")),
                          "state": a.get("state")} for a in autos]
-            context_parts.append(f"## AUTOMAZIONI DISPONIBILI\n{json.dumps(auto_list, ensure_ascii=False, indent=1)}")
 
             # If user mentions a specific automation name, include its config
             # Try YAML first, then REST API for UI-created automations
             yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
             found_in_yaml = False
+            found_specific = False
             target_auto_id = None
             target_auto_alias = None
             
@@ -2468,10 +2581,11 @@ def build_smart_context(user_message: str) -> str:
                         for auto in all_automations:
                             if str(auto.get("id", "")) == str(target_auto_id):
                                 auto_yaml = yaml.dump(auto, default_flow_style=False, allow_unicode=True)
-                                if len(auto_yaml) > 6000:
-                                    auto_yaml = auto_yaml[:6000] + "\n... [TRUNCATED]"
-                                context_parts.append(f"## YAML AUTOMAZIONE TROVATA: \"{auto.get('alias')}\" (id: {target_auto_id})\n```yaml\n{auto_yaml}```\nPer modificarla usa update_automation con automation_id='{target_auto_id}' e i campi da cambiare.")
+                                if len(auto_yaml) > 4000:
+                                    auto_yaml = auto_yaml[:4000] + "\n... [TRUNCATED]"
+                                context_parts.append(f"## AUTOMAZIONE: \"{auto.get('alias')}\" (id: {target_auto_id})\n```yaml\n{auto_yaml}```\nUsa update_automation con automation_id='{target_auto_id}'.")
                                 found_in_yaml = True
+                                found_specific = True
                                 break
                 
                 # REST API fallback for UI-created automations
@@ -2480,11 +2594,21 @@ def build_smart_context(user_message: str) -> str:
                         rest_config = call_ha_api("GET", f"config/automation/config/{target_auto_id}")
                         if isinstance(rest_config, dict) and "error" not in rest_config:
                             auto_yaml = yaml.dump(rest_config, default_flow_style=False, allow_unicode=True)
-                            if len(auto_yaml) > 6000:
-                                auto_yaml = auto_yaml[:6000] + "\n... [TRUNCATED]"
-                            context_parts.append(f"## CONFIG AUTOMAZIONE (UI-created): \"{target_auto_alias}\" (id: {target_auto_id})\n```yaml\n{auto_yaml}```\n⚠️ Automazione creata dalla UI (non in automations.yaml). update_automation la gestisce comunque via REST API. Usa automation_id='{target_auto_id}'.")
+                            if len(auto_yaml) > 4000:
+                                auto_yaml = auto_yaml[:4000] + "\n... [TRUNCATED]"
+                            context_parts.append(f"## AUTOMAZIONE (UI): \"{target_auto_alias}\" (id: {target_auto_id})\n```yaml\n{auto_yaml}```\nUsa update_automation con automation_id='{target_auto_id}'.")
+                            found_specific = True
                     except Exception:
                         pass
+            
+            # Only include the full automations list if NO specific automation was found
+            if not found_specific:
+                # Compact list: only name + id, no entity_id/state (saves ~60% chars)
+                compact_list = [{"name": a.get("friendly_name", ""), "id": a.get("id", "")} for a in auto_list if a.get("friendly_name")]
+                list_json = json.dumps(compact_list, ensure_ascii=False, separators=(',', ':'))
+                if len(list_json) > 3000:
+                    list_json = list_json[:3000] + '...]'
+                context_parts.append(f"## AUTOMAZIONI DISPONIBILI\n{list_json}")
 
         # --- SCRIPT CONTEXT ---
         script_keywords = ["script", "scena", "scenari", "routine", "sequenza"]
@@ -2593,6 +2717,9 @@ def build_smart_context(user_message: str) -> str:
 
     if context_parts:
         context = "\n\n".join(context_parts)
+        # Cap total context size to avoid rate limits
+        if len(context) > MAX_SMART_CONTEXT:
+            context = context[:MAX_SMART_CONTEXT] + "\n... [CONTEXT TRUNCATED]"
         logger.info(f"Smart context: injected {len(context)} chars of pre-loaded data")
         return context
     return ""
