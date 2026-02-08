@@ -37,7 +37,7 @@ EXPOSE 5000
 # Set environment defaults
 ENV DEBUG_MODE=False
 ENV API_PORT=5000
-ENV HA_URL=http://homeassistant:8123
+ENV HA_URL=http://supervisor/core
 ENV TIMEOUT=30
 ENV MAX_RETRIES=3
 
