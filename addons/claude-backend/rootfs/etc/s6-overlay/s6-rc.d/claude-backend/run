@@ -11,6 +11,7 @@ AI_PROVIDER=$(bashio::config 'ai_provider')
 ANTHROPIC_API_KEY=$(bashio::config 'anthropic_api_key')
 OPENAI_API_KEY=$(bashio::config 'openai_api_key')
 GOOGLE_API_KEY=$(bashio::config 'google_api_key')
+GITHUB_TOKEN=$(bashio::config 'github_token')
 AI_MODEL=$(bashio::config 'ai_model')
 API_PORT=$(bashio::config 'api_port')
 DEBUG_MODE=$(bashio::config 'debug_mode')
@@ -19,6 +20,7 @@ export AI_PROVIDER
 export ANTHROPIC_API_KEY
 export OPENAI_API_KEY
 export GOOGLE_API_KEY
+export GITHUB_TOKEN
 export AI_MODEL
 export API_PORT
 export DEBUG_MODE

@@ -16,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.3.0"
+VERSION = "2.4.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -25,6 +25,7 @@ AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 AI_MODEL = os.getenv("AI_MODEL", "")
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
@@ -44,12 +45,14 @@ PROVIDER_DEFAULTS = {
     "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
     "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
+    "github": {"model": "gpt-4o", "name": "GitHub Copilot"},
 }
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    "github": ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini", "claude-3.5-sonnet", "Meta-Llama-3.1-405B-Instruct"],
 }
 
 
@@ -68,6 +71,8 @@ def get_api_key() -> str:
         return OPENAI_API_KEY
     elif AI_PROVIDER == "google":
         return GOOGLE_API_KEY
+    elif AI_PROVIDER == "github":
+        return GITHUB_TOKEN
     return ""
 
 
@@ -89,6 +94,13 @@ elif AI_PROVIDER == "google" and api_key:
     genai.configure(api_key=api_key)
     ai_client = genai
     logger.info(f"Google Gemini client initialized (model: {get_active_model()})")
+elif AI_PROVIDER == "github" and api_key:
+    from openai import OpenAI
+    ai_client = OpenAI(
+        api_key=api_key,
+        base_url="https://models.inference.ai.azure.com"
+    )
+    logger.info(f"GitHub Copilot client initialized (model: {get_active_model()})")
 else:
     logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
 
@@ -499,8 +511,10 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
             final_text, messages = chat_openai(messages)
         elif AI_PROVIDER == "google":
             final_text, messages = chat_google(messages)
+        elif AI_PROVIDER == "github":
+            final_text, messages = chat_openai(messages)  # Same format, different base_url
         else:
-            return f"\u274c Provider '{AI_PROVIDER}' non supportato. Scegli: anthropic, openai, google."
+            return f"\u274c Provider '{AI_PROVIDER}' non supportato. Scegli: anthropic, openai, google, github."
 
         conversations[session_id] = messages
         conversations[session_id].append({"role": "assistant", "content": final_text})

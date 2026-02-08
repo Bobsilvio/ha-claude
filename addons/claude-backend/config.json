@@ -1,8 +1,8 @@
 {
   "name": "AI Assistant for Home Assistant",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "slug": "claude-backend",
-  "description": "AI-powered smart home assistant with Claude, ChatGPT and Gemini support",
+  "description": "AI-powered smart home assistant with Claude, ChatGPT, Gemini and GitHub Copilot support",
   "url": "https://github.com/Bobsilvio/ha-claude",
   "init": false,
   "arch": [
@@ -36,6 +36,7 @@
     "anthropic_api_key": "",
     "openai_api_key": "",
     "google_api_key": "",
+    "github_token": "",
     "ai_model": "",
     "api_port": "5000",
     "debug_mode": false,
@@ -43,10 +44,11 @@
     "max_retries": "3"
   },
   "schema": {
-    "ai_provider": "list(anthropic|openai|google)",
+    "ai_provider": "list(anthropic|openai|google|github)",
     "anthropic_api_key": "password?",
     "openai_api_key": "password?",
     "google_api_key": "password?",
+    "github_token": "password?",
     "ai_model": "str?",
     "api_port": "str",
     "debug_mode": "bool?",
