@@ -14,9 +14,14 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# Version
+VERSION = "2.1.2"
+
 # Configuration
-HA_URL = os.getenv("HA_URL", "http://localhost:8123")
-HA_TOKEN = os.getenv("HA_TOKEN", "")
+# Inside HA addon, SUPERVISOR_TOKEN is provided automatically
+# and the Supervisor API proxy is at http://supervisor/core
+HA_URL = os.getenv("HA_URL", "http://supervisor/core")
+HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 
@@ -29,40 +34,53 @@ HA_HEADERS = {
     "Content-Type": "application/json",
 }
 
-# Simple HTML UI
-HTML_UI = """
-<!DOCTYPE html>
+def get_html_ui():
+    """Generate the HTML UI with current version."""
+    return f"""<!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <title>Claude AI Backend</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        h1 { color: #333; text-align: center; }
-        .status { text-align: center; padding: 10px; background: #e8f5e9; border-radius: 4px; margin: 10px 0; }
-        .info { color: #666; font-size: 14px; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }}
+        .container {{ max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+        h1 {{ color: #333; text-align: center; }}
+        .status {{ text-align: center; padding: 10px; background: #e8f5e9; border-radius: 4px; margin: 10px 0; }}
+        .info {{ color: #666; font-size: 14px; }}
+        .endpoints {{ margin-top: 20px; }}
+        .endpoints h3 {{ color: #555; }}
+        .endpoint {{ background: #f9f9f9; padding: 8px 12px; margin: 4px 0; border-radius: 4px; font-family: monospace; font-size: 13px; }}
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🤖 Claude AI Backend</h1>
+        <h1>\U0001f916 Claude AI Backend</h1>
         <div class="status">
-            <p><strong>Status:</strong> ✅ Running</p>
-            <p><strong>Version:</strong> 2.0.1</p>
+            <p><strong>Status:</strong> \u2705 Running</p>
+            <p><strong>Version:</strong> {VERSION}</p>
         </div>
         <div class="info">
             <p>Claude AI Backend is running and integrated with Home Assistant.</p>
             <p>Configure through the Home Assistant Add-on settings.</p>
         </div>
+        <div class="endpoints">
+            <h3>API Endpoints</h3>
+            <div class="endpoint">GET /health - Health check</div>
+            <div class="endpoint">GET /entities - List all entities</div>
+            <div class="endpoint">GET /entity/&lt;id&gt;/state - Get entity state</div>
+            <div class="endpoint">POST /message - Send message to Claude</div>
+            <div class="endpoint">POST /service/call - Call HA service</div>
+            <div class="endpoint">POST /execute/automation - Trigger automation</div>
+            <div class="endpoint">POST /execute/script - Run script</div>
+        </div>
     </div>
 </body>
-</html>
-"""
+</html>"""
 
 @app.route('/')
 def index():
     """Serve the UI."""
-    return HTML_UI, 200, {'Content-Type': 'text/html'}
+    return get_html_ui(), 200, {'Content-Type': 'text/html; charset=utf-8'}
 
 
 
@@ -94,7 +112,7 @@ def call_ha_api(method: str, endpoint: str, data: Optional[Dict[str, Any]] = Non
 @app.route("/health", methods=["GET"])
 def health():
     """Health check endpoint."""
-    return jsonify({"status": "ok", "version": "1.0.0"}), 200
+    return jsonify({"status": "ok", "version": VERSION}), 200
 
 
 @app.route("/entities", methods=["GET"])
