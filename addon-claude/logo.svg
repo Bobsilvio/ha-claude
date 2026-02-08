@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 128">
+  <text x="50" y="90" font-size="80" font-weight="bold" fill="#3498db">Claude AI</text>
+  <circle cx="32" cy="64" r="20" fill="#3498db"/>
+  <circle cx="32" cy="64" r="14" fill="#2c3e50"/>
+</svg>
