@@ -335,7 +335,7 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             if domain:
                 states = [s for s in states if s.get("entity_id", "").startswith(f"{domain}.")]
             # Limit results for providers with small context windows
-            max_entities = 30 if AI_PROVIDER == \"github\" else 100
+            max_entities = 30 if AI_PROVIDER == "github" else 100
             result = []
             for s in states[:max_entities]:
                 result.append({
