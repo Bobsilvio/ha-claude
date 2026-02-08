@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.3"
+VERSION = "2.9.4"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -288,6 +288,8 @@ def call_ha_api(method: str, endpoint: str, data: Optional[Dict[str, Any]] = Non
             response = requests.get(url, headers=headers, timeout=30)
         elif method.upper() == "POST":
             response = requests.post(url, headers=headers, json=data, timeout=30)
+        elif method.upper() == "PUT":
+            response = requests.put(url, headers=headers, json=data, timeout=30)
         elif method.upper() == "DELETE":
             response = requests.delete(url, headers=headers, timeout=30)
         else:
@@ -858,67 +860,88 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             if not automation_id:
                 return json.dumps({"error": "automation_id is required."})
             
-            yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
-            if not os.path.isfile(yaml_path):
-                return json.dumps({"error": "automations.yaml not found."})
+            # Strategy: try YAML first, then REST API fallback (for UI-created automations)
+            updated_via = None
+            old_yaml = ""
+            new_yaml = ""
             
-            try:
-                with open(yaml_path, "r", encoding="utf-8") as f:
-                    automations = yaml.safe_load(f)
-                
-                if not isinstance(automations, list):
-                    return json.dumps({"error": "automations.yaml is not a valid list."})
-                
-                # Find the automation by id
-                found = None
-                found_idx = None
-                for idx, auto in enumerate(automations):
-                    if str(auto.get("id", "")) == str(automation_id):
-                        found = auto
-                        found_idx = idx
-                        break
-                
-                if found is None:
-                    return json.dumps({"error": f"Automation with id '{automation_id}' not found.", 
-                                       "available_ids": [str(a.get("id", "")) for a in automations[:20]]})
-                
-                # Capture old state for diff
-                old_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
-                
-                # Apply changes
-                for key, value in changes.items():
-                    found[key] = value
-                
-                # Add condition if specified
-                if add_condition:
-                    if "condition" not in found or not found["condition"]:
-                        found["condition"] = []
-                    if not isinstance(found["condition"], list):
-                        found["condition"] = [found["condition"]]
-                    found["condition"].append(add_condition)
-                
-                # Capture new state for diff
-                new_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
-                
-                # Create snapshot before saving
-                snapshot = create_snapshot("automations.yaml")
-                
-                # Write back
-                automations[found_idx] = found
-                with open(yaml_path, "w", encoding="utf-8") as f:
-                    yaml.dump(automations, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-                
-                return json.dumps({
-                    "status": "success",
-                    "message": f"Automation '{found.get('alias', automation_id)}' updated.",
-                    "old_yaml": old_yaml,
-                    "new_yaml": new_yaml,
-                    "snapshot": snapshot.get("snapshot_id", ""),
-                    "tip": "Call services/automation/reload to apply changes.",
-                    "IMPORTANT": "DONE. Show the user the before/after diff and stop. Do NOT call any more tools."
-                }, ensure_ascii=False, default=str)
-            except Exception as e:
-                return json.dumps({"error": f"Failed to update automation: {str(e)}"})
+            # --- ATTEMPT 1: YAML file ---
+            yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
+            if os.path.isfile(yaml_path):
+                try:
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        automations = yaml.safe_load(f)
+                    
+                    if isinstance(automations, list):
+                        found = None
+                        found_idx = None
+                        for idx, auto in enumerate(automations):
+                            if str(auto.get("id", "")) == str(automation_id):
+                                found = auto
+                                found_idx = idx
+                                break
+                        
+                        if found is not None:
+                            old_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
+                            for key, value in changes.items():
+                                found[key] = value
+                            if add_condition:
+                                if "condition" not in found or not found["condition"]:
+                                    found["condition"] = []
+                                if not isinstance(found["condition"], list):
+                                    found["condition"] = [found["condition"]]
+                                found["condition"].append(add_condition)
+                            new_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
+                            snapshot = create_snapshot("automations.yaml")
+                            automations[found_idx] = found
+                            with open(yaml_path, "w", encoding="utf-8") as f:
+                                yaml.dump(automations, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                            updated_via = "yaml"
+                except Exception as e:
+                    logger.warning(f"YAML update attempt failed: {e}")
+            
+            # --- ATTEMPT 2: REST API (for UI-created automations) ---
+            if updated_via is None:
+                try:
+                    # Get current config via REST API
+                    current = call_ha_api("GET", f"config/automation/config/{automation_id}")
+                    if isinstance(current, dict) and "error" not in current:
+                        old_yaml = yaml.dump(current, default_flow_style=False, allow_unicode=True)
+                        # Apply changes
+                        for key, value in changes.items():
+                            current[key] = value
+                        if add_condition:
+                            if "condition" not in current or not current["condition"]:
+                                current["condition"] = []
+                            if not isinstance(current["condition"], list):
+                                current["condition"] = [current["condition"]]
+                            current["condition"].append(add_condition)
+                        new_yaml = yaml.dump(current, default_flow_style=False, allow_unicode=True)
+                        # Save via REST API
+                        save_result = call_ha_api("PUT", f"config/automation/config/{automation_id}", current)
+                        if isinstance(save_result, dict) and "error" not in save_result:
+                            updated_via = "rest_api"
+                        else:
+                            return json.dumps({"error": f"REST API update failed: {save_result}",
+                                               "IMPORTANT": "STOP. Inform the user about the error. Do NOT try other tools."}, default=str)
+                    else:
+                        return json.dumps({"error": f"Automation '{automation_id}' not found in YAML or via REST API.",
+                                           "IMPORTANT": "STOP. Tell the user the automation was not found. Do NOT call more tools."}, default=str)
+                except Exception as e:
+                    return json.dumps({"error": f"Failed to update automation: {str(e)}",
+                                       "IMPORTANT": "STOP. Inform the user about the error. Do NOT try other tools."})
+            
+            msg_parts = [f"Automation updated via {'YAML file' if updated_via == 'yaml' else 'HA REST API (UI-created automation)'}.",]
+            return json.dumps({
+                "status": "success",
+                "message": " ".join(msg_parts),
+                "updated_via": updated_via,
+                "old_yaml": old_yaml,
+                "new_yaml": new_yaml,
+                "snapshot": snapshot.get("snapshot_id", "") if updated_via == "yaml" else "N/A (REST API)",
+                "tip": "Changes applied immediately via REST API. No reload needed." if updated_via == "rest_api" else "Call services/automation/reload to apply changes.",
+                "IMPORTANT": "DONE. Show the user the before/after diff and stop. Do NOT call any more tools."
+            }, ensure_ascii=False, default=str)
 
         elif tool_name == "trigger_automation":
             entity_id = tool_input.get("entity_id", "")
@@ -2334,22 +2357,47 @@ def build_smart_context(user_message: str) -> str:
                          "state": a.get("state")} for a in autos]
             context_parts.append(f"## AUTOMAZIONI DISPONIBILI\n{json.dumps(auto_list, ensure_ascii=False, indent=1)}")
 
-            # If user mentions a specific automation name, include its YAML
+            # If user mentions a specific automation name, include its config
+            # Try YAML first, then REST API for UI-created automations
             yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
-            if os.path.isfile(yaml_path):
-                with open(yaml_path, "r", encoding="utf-8") as f:
-                    all_automations = yaml.safe_load(f)
-                if isinstance(all_automations, list):
-                    # Find mentioned automation by name match
-                    for auto in all_automations:
-                        alias = str(auto.get("alias", "")).lower()
-                        auto_id = str(auto.get("id", ""))
-                        if alias and (alias in msg_lower or any(word in alias for word in msg_lower.split() if len(word) > 4)):
-                            auto_yaml = yaml.dump(auto, default_flow_style=False, allow_unicode=True)
+            found_in_yaml = False
+            target_auto_id = None
+            target_auto_alias = None
+            
+            # Find the matching automation from the states list
+            for a in auto_list:
+                fname = str(a.get("friendly_name", "")).lower()
+                if fname and (fname in msg_lower or any(word in fname for word in msg_lower.split() if len(word) > 4)):
+                    target_auto_id = a.get("id", "")
+                    target_auto_alias = a.get("friendly_name", "")
+                    break
+            
+            if target_auto_id:
+                # Try YAML first
+                if os.path.isfile(yaml_path):
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        all_automations = yaml.safe_load(f)
+                    if isinstance(all_automations, list):
+                        for auto in all_automations:
+                            if str(auto.get("id", "")) == str(target_auto_id):
+                                auto_yaml = yaml.dump(auto, default_flow_style=False, allow_unicode=True)
+                                if len(auto_yaml) > 6000:
+                                    auto_yaml = auto_yaml[:6000] + "\n... [TRUNCATED]"
+                                context_parts.append(f"## YAML AUTOMAZIONE TROVATA: \"{auto.get('alias')}\" (id: {target_auto_id})\n```yaml\n{auto_yaml}```\nPer modificarla usa update_automation con automation_id='{target_auto_id}' e i campi da cambiare.")
+                                found_in_yaml = True
+                                break
+                
+                # REST API fallback for UI-created automations
+                if not found_in_yaml:
+                    try:
+                        rest_config = call_ha_api("GET", f"config/automation/config/{target_auto_id}")
+                        if isinstance(rest_config, dict) and "error" not in rest_config:
+                            auto_yaml = yaml.dump(rest_config, default_flow_style=False, allow_unicode=True)
                             if len(auto_yaml) > 6000:
                                 auto_yaml = auto_yaml[:6000] + "\n... [TRUNCATED]"
-                            context_parts.append(f"## YAML AUTOMAZIONE TROVATA: \"{auto.get('alias')}\" (id: {auto_id})\n```yaml\n{auto_yaml}```\nPer modificarla usa update_automation con automation_id='{auto_id}' e i campi da cambiare.")
-                            break
+                            context_parts.append(f"## CONFIG AUTOMAZIONE (UI-created): \"{target_auto_alias}\" (id: {target_auto_id})\n```yaml\n{auto_yaml}```\n⚠️ Automazione creata dalla UI (non in automations.yaml). update_automation la gestisce comunque via REST API. Usa automation_id='{target_auto_id}'.")
+                    except Exception:
+                        pass
 
         # --- SCRIPT CONTEXT ---
         script_keywords = ["script", "scena", "scenari", "routine", "sequenza"]
