@@ -18,12 +18,14 @@ fi
 if [ -f /data/options.json ] && command -v jq &> /dev/null; then
     HA_URL=$(jq -r '.ha_url // "http://homeassistant:8123"' /data/options.json 2>/dev/null || echo "http://homeassistant:8123")
     HA_TOKEN=$(jq -r '.ha_token // ""' /data/options.json 2>/dev/null || echo "")
+    CLAUDE_API_KEY=$(jq -r '.claude_api_key // ""' /data/options.json 2>/dev/null || echo "")
     API_PORT=$(jq -r '.api_port // 5000' /data/options.json 2>/dev/null || echo "5000")
     DEBUG_MODE=$(jq -r '.debug_mode // false' /data/options.json 2>/dev/null || echo "false")
 else
     # Use environment variables or defaults
     HA_URL="${HA_URL:-http://homeassistant:8123}"
     HA_TOKEN="${HA_TOKEN:-}"
+    CLAUDE_API_KEY="${CLAUDE_API_KEY:-}"
     API_PORT="${API_PORT:-5000}"
     DEBUG_MODE="${DEBUG_MODE:-false}"
 fi
@@ -41,7 +43,15 @@ if [ -z "$HA_TOKEN" ]; then
     exit 1
 fi
 
-log_info "✅ Token configured"
+if [ -z "$CLAUDE_API_KEY" ]; then
+    log_error "❌ CLAUDE_API_KEY not configured!"
+    log_info "Please configure the Add-on with your Anthropic Claude API key."
+    log_info "Get a key from: https://console.anthropic.com/"
+    sleep 30
+    exit 1
+fi
+
+log_info "✅ Tokens configured"
 
 # ========================================
 # Start Claude Backend API
@@ -52,6 +62,7 @@ log_info "✅ Claude AI Backend is ready!"
 
 export HA_URL
 export HA_TOKEN
+export CLAUDE_API_KEY
 export API_PORT
 export DEBUG_MODE
 
