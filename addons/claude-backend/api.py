@@ -16,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.4.3"
+VERSION = "2.4.4"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -75,14 +75,27 @@ PROVIDER_DEFAULTS = {
     "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
     "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
-    "github": {"model": "gpt-4o", "name": "GitHub Copilot"},
+    "github": {"model": "gpt-4o", "name": "GitHub Models"},
 }
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
-    "github": ["gpt-4o", "gpt-4o-mini", "o1", "o3-mini", "claude-3.5-sonnet", "Meta-Llama-3.1-405B-Instruct"],
+    "github": [
+        "gpt-4o",              # High tier - 50 req/day free
+        "gpt-4o-mini",         # Low tier - 150 req/day free
+        "o3-mini",             # Copilot Pro+ only
+        "o4-mini",             # Copilot Pro+ only
+        "gpt-5",               # Copilot Pro+ only
+        "gpt-5-mini",          # Copilot Pro+ only
+        "DeepSeek-R1",         # 8 req/day (no tool-calling)
+        "Mistral-large-2411",  # Low tier - 150 req/day, tool-calling OK
+        "Meta-Llama-3.1-405B-Instruct",  # Low tier - 150 req/day
+        "xai-grok-3",          # 15 req/day free
+        "xai-grok-3-mini",     # 30 req/day free
+        "Cohere-command-r-plus-08-2024",  # Low tier, tool-calling OK
+    ],
 }
 
 
