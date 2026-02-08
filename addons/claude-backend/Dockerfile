@@ -41,4 +41,6 @@ ENV HA_URL=http://homeassistant:8123
 ENV TIMEOUT=30
 ENV MAX_RETRIES=3
 
+# s6-overlay init system
+ENTRYPOINT ["/init"]
 # s6-overlay will handle everything from here - do not override CMD
