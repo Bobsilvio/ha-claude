@@ -12,12 +12,12 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
+# Copy backend requirements and install dependencies
+COPY backend/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY api.py .
+# Copy backend application
+COPY backend/api.py .
 
 # Copy the Claude custom component
 COPY custom_components/claude /app/claude_component
@@ -26,7 +26,7 @@ COPY custom_components/claude /app/claude_component
 RUN mkdir -p /etc/services.d/claude-api
 
 # Copy run script to services.d for s6-overlay
-COPY run.sh /etc/services.d/claude-api/run
+COPY addons/claude-backend/run.sh /etc/services.d/claude-api/run
 RUN chmod +x /etc/services.d/claude-api/run
 
 # Expose API port
