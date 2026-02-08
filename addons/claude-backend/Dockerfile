@@ -22,9 +22,6 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 # Copy backend application
 COPY backend/api.py .
 
-# Copy the Claude custom component
-COPY custom_components/claude /app/claude_component
-
 # Create s6-overlay service directory
 RUN mkdir -p /etc/services.d/claude-api
 
