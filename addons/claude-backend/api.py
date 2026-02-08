@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.7"
+VERSION = "2.8.8"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -383,7 +383,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "get_automations",
-        "description": "Get all existing automations.",
+        "description": "Get all existing automations with their YAML source. Returns the list of automations AND the content of automations.yaml, so you have everything needed to edit them. To modify an automation: just call write_config_file with the updated automations.yaml content.",
         "parameters": {"type": "object", "properties": {}, "required": []}
     },
     {
@@ -820,8 +820,22 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             autos = [s for s in states if s.get("entity_id", "").startswith("automation.")]
             result = [{"entity_id": a.get("entity_id"), "state": a.get("state"),
                        "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
+                       "id": a.get("attributes", {}).get("id", ""),
                        "last_triggered": a.get("attributes", {}).get("last_triggered", "")} for a in autos]
-            return json.dumps(result, ensure_ascii=False, default=str)
+            # Also include automations.yaml content so Claude can edit directly
+            response = {"automations": result}
+            yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
+            if os.path.isfile(yaml_path):
+                try:
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        yaml_content = f.read()
+                    if len(yaml_content) > 12000:
+                        yaml_content = yaml_content[:12000] + f"\n... [TRUNCATED - {len(yaml_content)} chars total. Use read_config_file('automations.yaml') for full content]"
+                    response["automations_yaml"] = yaml_content
+                    response["edit_hint"] = "To edit an automation: modify the YAML above and call write_config_file(filename='automations.yaml', content=<modified_yaml>). Then call check_config to validate."
+                except Exception:
+                    pass
+            return json.dumps(response, ensure_ascii=False, default=str)
 
         elif tool_name == "trigger_automation":
             entity_id = tool_input.get("entity_id", "")
@@ -1544,9 +1558,10 @@ To delete resources, use delete_automation, delete_script, or delete_dashboard.
 
 ## EFFICIENCY RULES (CRITICAL - minimize API calls)
 - Use the MINIMUM number of tool calls needed. Every extra call wastes time and tokens.
-- For automations: get_automations gives you the list. Then read_config_file('automations.yaml') gives the YAML content. Then write_config_file to save changes. That's 3 calls MAX.
-- Do NOT call get_entity_state, list_config_files, or search_entities if you already have the info from a previous tool result.
-- Do NOT call search_entities if you already know the entity_id from get_automations or another tool.
+- For automations: get_automations ALREADY returns the automations.yaml content. Just modify it and call write_config_file. That's 2 calls MAX.
+- NEVER call list_config_files when editing automations - the file is ALWAYS automations.yaml.
+- NEVER call read_config_file('automations.yaml') after get_automations - you already have the content.
+- NEVER call get_entity_state or search_entities if you already have the info from a previous tool result.
 - Plan your tool calls: think about what you need BEFORE calling, don't explore randomly.
 - For config editing: read_config_file → modify → write_config_file → check_config. Done.
 
