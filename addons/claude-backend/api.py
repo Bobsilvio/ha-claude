@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.8"
+VERSION = "2.9.9"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1929,20 +1929,24 @@ INTENT_TOOL_SETS = {
 # Compact focused prompts by intent
 INTENT_PROMPTS = {
     "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
-The automation config is provided below. Use update_automation with the automation_id and ONLY the changed fields.
+The automation config is provided in the DATI section of the user's message.
 RULES:
-- Call update_automation ONCE. That's it.
-- Show the user a before/after diff of what changed.
+1. FIRST, briefly confirm which automation you found: "Ho trovato l'automazione: [NAME] (id: [ID])"
+2. Then call update_automation ONCE with only the changed fields.
+3. Show a before/after diff of the changes.
 - Respond in the user's language. Be concise.
-- NEVER call get_automations or read_config_file — the data is already provided.""",
+- NEVER call get_automations or read_config_file — the data is already provided.
+- If the automation in DATI doesn't match what the user asked for, tell them and ask for clarification. Do NOT modify the wrong automation.""",
 
     "modify_script": """You are a Home Assistant script editor. The user wants to modify a script.
-The script config is provided below. Use update_script with the script_id and ONLY the changed fields.
+The script config is provided in the DATI section.
 RULES:
-- Call update_script ONCE. That's it.
-- Show the user a before/after diff.
+1. FIRST, briefly confirm which script you found: "Ho trovato lo script: [NAME] (id: [ID])"
+2. Then call update_script ONCE with only the changed fields.
+3. Show a before/after diff.
 - Respond in the user's language. Be concise.
-- NEVER call get_scripts or read_config_file — the data is already provided.""",
+- NEVER call get_scripts or read_config_file — the data is already provided.
+- If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
 
     "control_device": """You are a Home Assistant device controller. Help the user control their devices.
 Use search_entities to find entities if needed, then call_service to control them.
@@ -2748,13 +2752,62 @@ def build_smart_context(user_message: str) -> str:
             target_auto_id = None
             target_auto_alias = None
             
-            # Find the matching automation from the states list
+            # Find the BEST matching automation using scored matching
+            # Score each automation by how many words match AND how specific the match is
+            best_score = 0
+            best_match = None
+            
+            # Words to IGNORE in matching (common Italian/English words that appear everywhere)
+            STOP_WORDS = {"questa", "questo", "quella", "quello", "della", "delle", "dello",
+                          "degli", "dalla", "dalle", "stessa", "stesso", "altra", "altro",
+                          "prima", "dopo", "quando", "perché", "quindi", "anche", "ancora",
+                          "molto", "troppo", "sempre", "dovremmo", "dovrebbe", "potrebbe",
+                          "voglio", "vorrei", "puoi", "fammi", "invia", "manda", "notifica",
+                          "about", "this", "that", "with", "from", "have", "which", "there",
+                          "their", "would", "should", "could"}
+            
+            # Extract meaningful words from user message (>3 chars, not stop words)
+            msg_words = [w for w in msg_lower.split() if len(w) > 3 and w not in STOP_WORDS]
+            
             for a in auto_list:
                 fname = str(a.get("friendly_name", "")).lower()
-                if fname and (fname in msg_lower or any(word in fname for word in msg_lower.split() if len(word) > 4)):
-                    target_auto_id = a.get("id", "")
-                    target_auto_alias = a.get("friendly_name", "")
-                    break
+                if not fname:
+                    continue
+                
+                score = 0
+                
+                # Check 1: Full name appears in message (highest priority)
+                if fname in msg_lower:
+                    score = 100
+                
+                # Check 2: Check if message contains quoted automation name
+                # Look for text between quotes that matches
+                import re
+                quoted = re.findall(r'["\u201c\u201d]([^"\u201c\u201d]+)["\u201c\u201d]', user_message)
+                for q in quoted:
+                    if q.lower() in fname or fname in q.lower():
+                        score = 90
+                        break
+                
+                # Check 3: Score by matching meaningful words
+                if score == 0:
+                    fname_words = set(fname.lower().split())
+                    matching_words = [w for w in msg_words if w in fname or any(w in fw for fw in fname_words)]
+                    if matching_words:
+                        # Weight by length of matched words (longer = more specific)
+                        score = sum(len(w) for w in matching_words)
+                        # Bonus if multiple words match
+                        if len(matching_words) >= 2:
+                            score += 10
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = a
+            
+            if best_match and best_score >= 5:  # Minimum threshold
+                target_auto_id = best_match.get("id", "")
+                target_auto_alias = best_match.get("friendly_name", "")
+                logger.info(f"Smart context: matched automation '{target_auto_alias}' (score: {best_score})")
             
             if target_auto_id:
                 # Try YAML first
