@@ -1,327 +1,84 @@
-# 🏠🤖 Claude AI for Home Assistant
+# 🏠🤖 Claude AI Backend for Home Assistant
 
-**Integrazione All-in-One** - Controlla la tua casa intelligente con Claude (Haiku, Sonnet, Opus).
+Home Assistant Add-on - Chat interface powered by Claude AI integrated directly into your Home Assistant sidebar.
 
-> ⏱️ **Installation**: 16 minuti | 🔧 **Setup**: Ultra-semplice | 🔄 **Auto-restart**: Sì ✅
+## 🎯 Features
 
-Integrazione Home Assistant completa per controllare la tua casa intelligente con Claude Haiku 4.5, Sonnet o Opus.
+- **Chat Interface**: Direct chat with Claude in the Home Assistant sidebar
+- **Multiple Models**: Claude Haiku, Sonnet, or Opus
+- **Smart Home Control**: Interact with your lights, automations, sensors, and devices
+- **One-Click Install**: Docker add-on with automatic setup
+- **Ingress UI**: Secure integration through Home Assistant ingress
 
-## 🎯 Caratteristiche Principali
-
-- **Multi-modello Claude**: Haiku ⚡⚡⚡ (veloce), Sonnet ⚡⚡ (bilanciato), Opus ⚡ (potente)
-- **Controllo completo**: Luci, automazioni, script, sensori, climate
-- **Config Flow UI**: Interfaccia di configurazione intuitiva in italiano
-- **Sensori di monitoraggio**: Stato connessione, conteggio entità/automazioni/script
-- **6 Servizi avanzati**:
-  - `claude.send_message` - Invia messaggi a Claude
-  - `claude.execute_automation` - Esegui automazioni
-  - `claude.execute_script` - Esegui script con variabili
-  - `claude.get_entity_state` - Leggi stato entità
-  - `claude.call_service` - Chiama servizi Home Assistant
-  - `claude.create_automation` - **Crea automazioni dinamicamente** ✨
-- **Docker + Add-on**: Setup automatico con auto-restart su reboot
-- **Documentazione completa**: In italiano e inglese
-
-## 📋 Requisiti
+## 📋 Requirements
 
 - Home Assistant **2024.1.0+**
-- Python 3.11+
-- API Token Home Assistant (Settings → Developer Tools → Long-lived Access Tokens)
-- Chiave API Anthropic Claude
+- Anthropic Claude API Key
+- Home Assistant Long-lived Access Token
 
-## 🚀 Quick Start (16 minuti)
+## 🚀 Installation
 
-### 1️⃣ Aggiungi Repository (5 min)
+### 1. Add Repository
 
-Nel tuo Home Assistant:
-
+In Home Assistant:
 ```
 Settings → Add-ons & backups → Add-on store (⋮) → Repositories
-→ https://github.com/Bobsilvio/ha-claude → Create
+→ Add: https://github.com/Bobsilvio/ha-claude
 ```
 
-Dovrebbe apparire "Claude AI Backend" nello store!
-
-### 2️⃣ Installa Add-on (7 min)
+### 2. Install Add-on
 
 ```
 Settings → Add-ons & backups → Add-on store
-→ Cerca "Claude AI Backend" → Install
+→ Search "Claude AI Backend" → Install
 ```
 
-**Questo installa automaticamente:**
-- ✅ Component Claude
-- ✅ Backend API Flask
-- ✅ Tutto quello che serve
+### 3. Configure
 
-### 3️⃣ Configura Add-on
+1. Open the addon configuration page
+2. Add your **HA Token** (Settings → Developer Tools → Long-lived Access Tokens)
+3. Add your **Anthropic API Key** from https://console.anthropic.com/
+4. Save and **Start** the addon
 
-Nel tab **Configuration** dell'add-on:
-- Copia il tuo HA Token (Settings → Developer Tools → Long-lived Access Tokens)
-- Incollalo nel campo `ha_token`
-- **Save**
+### 4. Access
 
-### 4️⃣ Avvia Add-on (2 min)
+Once running, click **"Claude AI"** in the Home Assistant sidebar!
 
-Nel tab **Info**:
-- Click **Start**
-- Guarda i log per il progresso
-- Quando Status = "Running" ✅ → È pronto!
+## ⚙️ Configuration Options
 
-### 5️⃣ Configura Integrazione (2 min)
+| Option | Description | Default |
+|--------|-------------|---------|
+| `ha_url` | Home Assistant URL | `http://homeassistant:8123` |
+| `api_port` | Backend API port | `5000` |
+| `debug_mode` | Enable debug logging | `false` |
+| `polling_interval` | Update interval (seconds) | `60` |
+| `timeout` | API timeout (seconds) | `30` |
+| `max_retries` | Retry attempts | `3` |
 
-```
-Settings → Devices & Services → Create Integration
-→ Cerca "Claude" → Configura:
-  - API Endpoint: http://localhost:5000
-  - Modello: claude-3-haiku (o sonnet/opus)
-  - Save
-```
+## 🆘 Troubleshooting
 
-✅ **Done!** La tua integrazione Claude è attiva!
+### "Claude AI" not showing in sidebar
+- Restart Home Assistant completely
+- Check addon logs for errors
+- Verify addon status is "Running"
 
-## 📦 Alternative di Installazione
+### Cannot connect to API
+- Verify HA Token is correct
+- Check network connectivity within Home Assistant
+- Review addon logs
 
-### Con Docker Compose (per sviluppatori)
+### API Key errors
+- Verify your Anthropic API key is valid
+- Check for expired access tokens
 
-```bash
-git clone https://github.com/Bobsilvio/ha-claude.git
-cd ha-claude
-cp .env.example .env
+## 📝 License
 
-# Configura in .env:
-# - HA_TOKEN=your_token
-# - HA_URL=http://localhost:8123
-# - CLAUDE_MODEL=claude-3-haiku
+MIT
 
-docker-compose up -d
-```
+## 🤝 Support
 
-### Manuale (no Add-on, no Docker)
-
-```bash
-# 1. Copia component
-cp -r custom_components/claude ~/.homeassistant/custom_components/
-
-# 2. Avvia backend
-cd backend
-pip install -r requirements.txt
-python api.py &
-
-# 3. Riavvia Home Assistant
-# 4. Configura integrazione (vedi step 5 sopra)
-```
-
-Vedi [docs/INSTALLATION.md](docs/INSTALLATION.md) per istruzioni dettagliate.
-
-## 🔧 Configurazione
-
-### Config Flow
-
-La configurazione è facile tramite l'interfaccia visuale:
-
-1. **API Endpoint**: URL del backend Flask (default: `http://localhost:5000`)
-2. **Modello**: Scegli tra:
-   - `claude-3-haiku` - ⚡ veloce, economico (perfetto per task semplici)
-   - `claude-3-sonnet` - ⚡⚡ equilibrato (perfetto per la maggior parte dei task)
-   - `claude-3-opus` - ⚡⚡⚡ potente (per task complessi)
-3. **Polling Interval**: Secondi tra gli aggiornamenti (default: 60)
-4. **Timeout**: Timeout richieste API in secondi (default: 30)
-5. **Max Retries**: Tentativi per richieste fallite (default: 3)
-
-### Environment Variables (Docker/Manuale)
-
-```bash
-HA_URL=http://localhost:8123         # Home Assistant URL
-HA_TOKEN=your_long_lived_token       # HA Token
-API_PORT=5000                         # Backend port
-CLAUDE_MODEL=claude-3-haiku          # Modello Claude
-DEBUG_MODE=false                      # Abilita debug log
-```
-
-## 📚 Documentazione
-
-| Documento | Descrizione |
-|-----------|------------|
-| [QUICK_START.md](QUICK_START.md) | Setup veloce (5 min) |
-| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Guida completa |
-| [docs/api_reference.md](docs/api_reference.md) | Tutti gli API endpoint |
-| [docs/BACKEND_API_EXPLAINED.md](docs/BACKEND_API_EXPLAINED.md) | Architettura sistema |
-| [docs/CREATING_AUTOMATIONS.md](docs/CREATING_AUTOMATIONS.md) | Come creare automazioni dinamiche |
-| [docs/automations_examples.md](docs/automations_examples.md) | Template pronti all'uso |
-
-## 🎮 Servizi Disponibili
-
-### claude.send_message
-```yaml
-service: claude.send_message
-data:
-  message: "Messaggio per Claude"
-  context: "Contesto aggiuntivo (opzionale)"
-```
-
-### claude.execute_automation
-```yaml
-service: claude.execute_automation
-data:
-  automation_id: "automation.my_automation"
-```
-
-### claude.execute_script
-```yaml
-service: claude.execute_script
-data:
-  script_id: "script.my_script"
-  variables: '{"temperature": 22, "brightness": 100}'
-```
-
-### claude.get_entity_state
-```yaml
-service: claude.get_entity_state
-data:
-  entity_id: "light.living_room"
-```
-
-### claude.call_service
-Chiama qualsiasi servizio Home Assistant.
-
-```yaml
-service: claude.call_service
-data:
-  service: "light.turn_on"
-  data: '{"entity_id": "light.living_room", "brightness": 255}'
-```
-
-### claude.create_automation ✨ NEW
-Crea automazioni dinamicamente tramite Claude!
-
-```yaml
-service: claude.create_automation
-data:
-  automation_name: "Turn on lights at sunset"
-  description: "Accendi le luci al tramonto"
-  trigger: '{"platform": "sun", "event": "sunset"}'
-  condition: '{"condition": "state", "entity_id": "input_boolean.people_home", "state": "on"}'
-  action: '[{"service": "light.turn_on", "target": {"entity_id": "light.living_room"}}]'
-```
-
-## 🐳 Docker
-
-```bash
-# Setup
-cp .env.example .env
-# Configura il CLAUDE_MODEL desiderato in .env
-
-# Run
-docker-compose up -d
-
-# Logs
-docker-compose logs -f claude-backend
-```
-
-## 🧪 Testing
-
-```bash
-# Install dependencies
-pip install -r tests/requirements.txt
-
-# Run tests
-pytest tests/
-
-# Test API endpoints
-python test_api.py
-```
-
-## 📊 Sensori
-
-- **claude_status**: Stato connessione (connected/disconnected)
-- **claude_entities_count**: Numero entità disponibili
-- **claude_automations_count**: Numero automazioni
-- **claude_scripts_count**: Numero script
-
-## 🔌 Switch
-
-- **claude_connection**: Attiva/Disattiva connessione all'API
-
-## 🌐 Modelli Supportati
-
-| Modello | Velocità | Costo | Caso d'uso |
-|---------|----------|-------|----------|
-| claude-3-haiku | ⚡⚡⚡ | Basso | Real-time, task semplici |
-| claude-3-sonnet | ⚡⚡ | Medio | Balance ideale |
-| claude-3-opus | ⚡ | Alto | Task complessi |
-
-## 📝 Esempi di Utilizzo
-
-### Scena automatica vocale
-```yaml
-automation:
-  - id: "claude_voice_scene"
-    trigger:
-      platform: conversation
-      command: "Claude, accendi la modalità serata"
-    action:
-      - service: claude.send_message
-        data:
-          message: "Attiva scena serata"
-          context: "Home Assistant scene"
-```
-
-### Controllo temperatura intelligente
-```yaml
-automation:
-  - id: "claude_smart_temp"
-    trigger:
-      platform: time
-      at: "18:00:00"
-    action:
-      - service: claude.call_service
-        data:
-          service: "climate.set_temperature"
-          data: '{"entity_id": "climate.living_room", "temperature": 21}'
-```
-
-## 🔒 Sicurezza
-
-- Usa token Home Assistant sicuri
-- Configura firewall per il backend API
-- Non esporre il backend su internet senza SSL/TLS
-- Usa password forti per Home Assistant
-
-## 🐛 Troubleshooting
-
-### "Cannot connect to API"
-- Verifica che il backend sia in esecuzione
-- Controlla l'URL dell'endpoint
-- Verifica la connettività di rete
-
-### "Model not found"
-- Controlla che il modello sia disponibile nel tuo account Anthropic
-- Verifica il nome del modello nelle impostazioni
-
-### "Timeout error"
-- Aumenta il valore di timeout nelle opzioni
-- Controlla la latenza di rete
-
-## 📄 Licenza
-
-MIT License - vedi [LICENSE](LICENSE)
-
-## 🤝 Contribuire
-
-Contribuzioni benvenute! Vedi [CONTRIBUTION.md](CONTRIBUTION.md)
-
-## 📞 Supporto
-
-- [GitHub Issues](https://github.com/Bobsilvio/ha-claude/issues)
-- [Home Assistant Community](https://community.home-assistant.io/)
-
-## 🎉 Ringraziamenti
-
-- Home Assistant team
-- Anthropic per Claude
-- Comunità Home Assistant
+Issues? Visit: https://github.com/Bobsilvio/ha-claude/issues
 
 ---
 
-**Creato con ❤️ per controllare la casa intelligente con IA**
+**Created with ❤️ for Home Assistant**
