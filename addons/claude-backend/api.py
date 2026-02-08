@@ -4,7 +4,7 @@ import os
 import logging
 from typing import Any, Dict, Optional
 
-from flask import Flask, request, jsonify, render_string_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
