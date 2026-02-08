@@ -16,19 +16,19 @@ fi
 
 # Get configuration from /data/options.json
 if [ -f /data/options.json ] && command -v jq &> /dev/null; then
-    HA_URL=$(jq -r '.ha_url // "http://homeassistant:8123"' /data/options.json 2>/dev/null || echo "http://homeassistant:8123")
-    HA_TOKEN=$(jq -r '.ha_token // ""' /data/options.json 2>/dev/null || echo "")
     CLAUDE_API_KEY=$(jq -r '.claude_api_key // ""' /data/options.json 2>/dev/null || echo "")
     API_PORT=$(jq -r '.api_port // 5000' /data/options.json 2>/dev/null || echo "5000")
     DEBUG_MODE=$(jq -r '.debug_mode // false' /data/options.json 2>/dev/null || echo "false")
 else
     # Use environment variables or defaults
-    HA_URL="${HA_URL:-http://homeassistant:8123}"
-    HA_TOKEN="${HA_TOKEN:-}"
     CLAUDE_API_KEY="${CLAUDE_API_KEY:-}"
     API_PORT="${API_PORT:-5000}"
     DEBUG_MODE="${DEBUG_MODE:-false}"
 fi
+
+# Home Assistant passes this automatically in addons
+HA_URL="${HA_URL:-http://homeassistant:8123}"
+HA_TOKEN="${SUPERVISOR_TOKEN:-}"
 
 log_info "🚀 Starting Claude Backend API Add-on (v2.0.1)"
 log_info "HA URL: $HA_URL"

@@ -1,6 +1,6 @@
 {
   "name": "Claude AI Backend",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "slug": "claude-backend",
   "description": "All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant",
   "url": "https://github.com/Bobsilvio/ha-claude",
@@ -31,8 +31,6 @@
     "DEBUG_MODE": "False"
   },
   "options": {
-    "ha_url": "http://homeassistant:8123",
-    "ha_token": "",
     "claude_api_key": "",
     "api_port": "5000",
     "debug_mode": false,
@@ -41,8 +39,6 @@
     "max_retries": "3"
   },
   "schema": {
-    "ha_url": "str",
-    "ha_token": "password",
     "claude_api_key": "password",
     "api_port": "str",
     "debug_mode": "bool?",
