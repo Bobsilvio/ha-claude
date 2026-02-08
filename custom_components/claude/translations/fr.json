@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurer Claude AI Assistant",
+        "description": "Entrez les détails de configuration pour Claude",
+        "data": {
+          "api_endpoint": "Point final API",
+          "model": "Modèle Claude",
+          "polling_interval": "Intervalle de sondage (secondes)",
+          "enable_logging": "Activer la journalisation",
+          "max_retries": "Nombre maximal de tentatives",
+          "timeout": "Délai d'attente (secondes)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à l'API",
+      "invalid_auth": "Authentification invalide",
+      "unknown": "Erreur inconnue"
+    },
+    "abort": {
+      "already_configured": "Claude est déjà configuré"
+    }
+  },
+  "services": {
+    "send_message": {
+      "name": "Envoyer un message à Claude",
+      "description": "Envoyer un message à Claude AI"
+    },
+    "execute_automation": {
+      "name": "Exécuter une automatisation",
+      "description": "Exécuter une automatisation par ID"
+    },
+    "create_automation": {
+      "name": "Créer une automatisation",
+      "description": "Créer une nouvelle automatisation dynamiquement"
+    }
+  }
+}
