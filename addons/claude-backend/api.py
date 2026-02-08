@@ -16,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.4.4"
+VERSION = "2.5.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -25,6 +25,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_MODEL = os.getenv("GITHUB_MODEL", "")
 AI_MODEL = os.getenv("AI_MODEL", "")
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
@@ -83,26 +84,38 @@ PROVIDER_MODELS = {
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
     "github": [
-        "gpt-4o",              # High tier - 50 req/day free
-        "gpt-4o-mini",         # Low tier - 150 req/day free
-        "o3-mini",             # Copilot Pro+ only
-        "o4-mini",             # Copilot Pro+ only
-        "gpt-5",               # Copilot Pro+ only
-        "gpt-5-mini",          # Copilot Pro+ only
-        "DeepSeek-R1",         # 8 req/day (no tool-calling)
-        "Mistral-large-2411",  # Low tier - 150 req/day, tool-calling OK
-        "Meta-Llama-3.1-405B-Instruct",  # Low tier - 150 req/day
-        "xai-grok-3",          # 15 req/day free
-        "xai-grok-3-mini",     # 30 req/day free
-        "Cohere-command-r-plus-08-2024",  # Low tier, tool-calling OK
+        # OpenAI
+        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+        "o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini",
+        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-chat",
+        # Meta Llama
+        "Meta-Llama-3.1-405B-Instruct", "Meta-Llama-3.1-8B-Instruct",
+        "Llama-3.3-70B-Instruct", "Llama-4-Scout-17B-16E-Instruct",
+        "Llama-4-Maverick-17B-128E-Instruct-FP8",
+        # Mistral
+        "mistral-small-2503", "mistral-medium-2505", "Ministral-3B", "Codestral-2501",
+        # Cohere
+        "Cohere-command-r-plus-08-2024", "Cohere-command-r-08-2024", "cohere-command-a",
+        # DeepSeek
+        "DeepSeek-R1", "DeepSeek-R1-0528", "DeepSeek-V3-0324",
+        # Microsoft
+        "MAI-DS-R1", "Phi-4", "Phi-4-mini-instruct", "Phi-4-reasoning", "Phi-4-mini-reasoning",
+        # AI21
+        "AI21-Jamba-1.5-Large",
+        # xAI
+        "grok-3", "grok-3-mini",
     ],
 }
 
 
 def get_active_model() -> str:
     """Get the active model name."""
+    # ai_model (manual override) takes priority
     if AI_MODEL:
         return AI_MODEL
+    # For github provider, use the dropdown selection
+    if AI_PROVIDER == "github" and GITHUB_MODEL:
+        return GITHUB_MODEL
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
 
 
