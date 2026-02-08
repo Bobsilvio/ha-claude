@@ -1,8 +1,8 @@
 {
-  "name": "Claude AI Backend",
-  "version": "1.0.0",
-  "slug": "claude-backend",
-  "description": "All-in-one add-on - Automatically deploys Claude component and runs backend API for Claude AI Assistant",
+  "name": "Claude AI Assistant",
+  "version": "2.0.0",
+  "slug": "claude-ai",
+  "description": "Chat with Claude AI to control your smart home. Create automations, read sensors, control devices - all from a conversational interface.",
   "url": "https://github.com/Bobsilvio/ha-claude",
   "arch": [
     "aarch64",
@@ -12,23 +12,26 @@
   "startup": "application",
   "apparmor": false,
   "boot": "auto",
+  "ingress": true,
+  "ingress_port": 8099,
+  "ingress_entry": "/",
+  "panel_icon": "mdi:robot",
+  "panel_title": "Claude AI",
+  "homeassistant_api": true,
   "map": [
     "config:rw"
   ],
   "ports": {
-    "5000/tcp": 5000
-  },
-  "ports_description": {
-    "5000/tcp": "Claude Backend API"
+    "8099/tcp": null
   },
   "options": {
-    "ha_url": "http://homeassistant:8123",
-    "api_port": 5000,
-    "debug_mode": false
+    "anthropic_api_key": "",
+    "claude_model": "claude-sonnet-4-20250514",
+    "language": "it"
   },
   "schema": {
-    "ha_url": "str",
-    "api_port": "int",
-    "debug_mode": "bool"
+    "anthropic_api_key": "str",
+    "claude_model": "list(claude-sonnet-4-20250514|claude-3-5-haiku-20241022|claude-opus-4-20250514)?",
+    "language": "list(it|en|es|fr|de|nl)?"
   }
 }
