@@ -12,22 +12,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Build Add-on Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./addons/claude-backend
           file: ./addons/claude-backend/Dockerfile
           push: false
           tags: claude-backend:latest
-
-      - name: Build Backend Docker image (deprecated)
-        uses: docker/build-push-action@v4
-        with:
-          context: ./backend
-          push: false
-          tags: claude-api:latest
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base:latest

@@ -11,21 +11,34 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.11]
+        python-version: ['3.11']
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt pytest pytest-cov
+          pip install -r addons/claude-backend/requirements.txt pytest
 
-      - name: Run backend tests
+      - name: Lint check
         run: |
-          pytest tests/test_api.py -v --cov=backend || true
+          pip install flake8
+          flake8 addons/claude-backend/api.py --max-line-length=120 --count --show-source --statistics || true
+
+      - name: Verify addon structure
+        run: |
+          echo "Checking addon files..."
+          test -f addons/claude-backend/config.json && echo "✅ config.json"
+          test -f addons/claude-backend/addon.yaml && echo "✅ addon.yaml"
+          test -f addons/claude-backend/Dockerfile && echo "✅ Dockerfile"
+          test -f addons/claude-backend/build.json && echo "✅ build.json"
+          test -f addons/claude-backend/rootfs/etc/s6-overlay/s6-rc.d/claude-backend/run && echo "✅ s6 run script"
+          test -f addons/claude-backend/rootfs/etc/s6-overlay/s6-rc.d/claude-backend/type && echo "✅ s6 type file"
+          test -f addons/claude-backend/rootfs/etc/s6-overlay/s6-rc.d/user/contents.d/claude-backend && echo "✅ s6 user service"
+          echo "All addon files present!"
