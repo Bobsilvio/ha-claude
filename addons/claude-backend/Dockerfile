@@ -15,12 +15,12 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy backend requirements and install dependencies
-COPY backend/requirements.txt .
+# Copy requirements and install dependencies
+COPY requirements.txt .
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
-# Copy backend application
-COPY backend/api.py .
+# Copy API application
+COPY api.py .
 
 # Create s6-overlay service directory
 RUN mkdir -p /etc/services.d/claude-api
