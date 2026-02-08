@@ -1,0 +1,77 @@
+name: Claude AI Backend
+description: Backend API for Claude AI Assistant integration with Home Assistant
+version: "1.0.0"
+slug: claude-backend
+image: "ghcr.io/Bobsilvio/claude-backend:{VERSION}"
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armv7
+homeassistant: "2024.1.0"
+host_network: false
+host_dbus: false
+privileged:
+  - NET_ADMIN
+ports:
+  5000/tcp: 5000
+ports_description:
+  5000/tcp: "Claude Backend API"
+environment:
+  DEBUG_MODE: "False"
+options:
+  ha_url: "http://homeassistant:8123"
+  api_port: 5000
+  debug_mode: false
+  polling_interval: 60
+  timeout: 30
+  max_retries: 3
+schema:
+  ha_url:
+    name: Home Assistant URL
+    description: "URL of Home Assistant (use http://homeassistant:8123 for Add-on)"
+    type: string
+    required: true
+    default: "http://homeassistant:8123"
+  api_port:
+    name: API Port
+    description: "Port for the Claude Backend API"
+    type: integer
+    required: true
+    default: 5000
+    minimum: 1024
+    maximum: 65535
+  debug_mode:
+    name: Debug Mode
+    description: "Enable debug logging"
+    type: boolean
+    required: false
+    default: false
+  polling_interval:
+    name: Polling Interval
+    description: "Seconds between entity updates"
+    type: integer
+    required: false
+    default: 60
+    minimum: 10
+    maximum: 3600
+  timeout:
+    name: API Timeout
+    description: "Timeout for API requests in seconds"
+    type: integer
+    required: false
+    default: 30
+    minimum: 5
+    maximum: 300
+  max_retries:
+    name: Maximum Retries
+    description: "Number of retries for failed requests"
+    type: integer
+    required: false
+    default: 3
+    minimum: 1
+    maximum: 10
+documentation: "https://github.com/Bobsilvio/ha-claude"
+support: "https://github.com/Bobsilvio/ha-claude/issues"
+maintainers:
+  - Bobsilvio
