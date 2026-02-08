@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.7.1"
+VERSION = "2.7.2"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -589,6 +589,34 @@ HA_TOOLS_DESCRIPTION = [
             },
             "required": []
         }
+    },
+    {
+        "name": "get_dashboard_config",
+        "description": "Get the full configuration of a Lovelace dashboard. Use this to read an existing dashboard before modifying it.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url_path": {"type": "string", "description": "Dashboard URL path (e.g. 'lovelace', 'energy-dashboard'). Use 'lovelace' or null for the default dashboard. Use get_dashboards to list all."}
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "update_dashboard",
+        "description": "Update/modify an existing Lovelace dashboard configuration. First use get_dashboard_config to read the current config, modify it, then save with this tool. Supports all card types including custom cards (card-mod, bubble-card, mushroom, etc.).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "url_path": {"type": "string", "description": "Dashboard URL path. Use 'lovelace' or null for the default dashboard."},
+                "views": {"type": "array", "description": "Complete array of views with their cards. This REPLACES all views.", "items": {"type": "object"}}
+            },
+            "required": ["views"]
+        }
+    },
+    {
+        "name": "get_frontend_resources",
+        "description": "List all registered Lovelace frontend resources (custom cards, modules). Use this to check if custom cards like card-mod, bubble-card, mushroom-cards, etc. are installed via HACS.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
     }
 ]
 
@@ -1030,6 +1058,89 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             error_msg = result.get("error", {}).get("message", str(result))
             return json.dumps({"error": f"Browse media failed: {error_msg}"}, default=str)
 
+        # ===== DASHBOARD READ/EDIT =====
+        elif tool_name == "get_dashboard_config":
+            url_path = tool_input.get("url_path", None)
+            params = {}
+            if url_path and url_path != "lovelace":
+                params["url_path"] = url_path
+            result = call_ha_websocket("lovelace/config", **params)
+            if result.get("success"):
+                config = result.get("result", {})
+                views = config.get("views", [])
+                # Summarize to avoid huge response
+                summary_views = []
+                for v in views:
+                    cards = v.get("cards", [])
+                    card_summary = []
+                    for c in cards:
+                        card_info = {"type": c.get("type", "unknown")}
+                        if c.get("title"):
+                            card_info["title"] = c["title"]
+                        if c.get("entity"):
+                            card_info["entity"] = c["entity"]
+                        if c.get("entities"):
+                            card_info["entities"] = c["entities"][:10]
+                        # Include full card for custom types
+                        if c.get("type", "").startswith("custom:"):
+                            card_info = c
+                        card_summary.append(card_info)
+                    summary_views.append({
+                        "title": v.get("title", ""),
+                        "path": v.get("path", ""),
+                        "icon": v.get("icon", ""),
+                        "cards_count": len(cards),
+                        "cards": card_summary
+                    })
+                return json.dumps({"url_path": url_path or "lovelace",
+                                   "views": summary_views, "views_count": len(views),
+                                   "full_config": config}, ensure_ascii=False, default=str)
+            error_msg = result.get("error", {}).get("message", str(result))
+            return json.dumps({"error": f"Failed to get dashboard config: {error_msg}"}, default=str)
+
+        elif tool_name == "update_dashboard":
+            url_path = tool_input.get("url_path", None)
+            views = tool_input.get("views", [])
+            params = {"config": {"views": views}}
+            if url_path and url_path != "lovelace":
+                params["url_path"] = url_path
+            result = call_ha_websocket("lovelace/config/save", **params)
+            if result.get("success"):
+                return json.dumps({"status": "success",
+                                   "message": f"Dashboard '{url_path or 'lovelace'}' updated with {len(views)} view(s).",
+                                   "views_count": len(views)}, ensure_ascii=False, default=str)
+            error_msg = result.get("error", {}).get("message", str(result))
+            return json.dumps({"error": f"Failed to update dashboard: {error_msg}"}, default=str)
+
+        elif tool_name == "get_frontend_resources":
+            result = call_ha_websocket("lovelace/resources")
+            if result.get("success"):
+                resources = result.get("result", [])
+                summary = []
+                for r in resources:
+                    url = r.get("url", "")
+                    # Extract card name from URL
+                    name = url.split("/")[-1].split(".")[0].split("?")[0] if url else ""
+                    summary.append({
+                        "id": r.get("id"),
+                        "url": url,
+                        "type": r.get("type", "module"),
+                        "name": name
+                    })
+                # Check for common custom cards
+                all_urls = " ".join([r.get("url", "") for r in resources]).lower()
+                detected = []
+                for card_name in ["card-mod", "bubble-card", "mushroom", "mini-graph", "mini-media-player",
+                                  "button-card", "layout-card", "stack-in-card", "slider-entity-row",
+                                  "auto-entities", "decluttering-card", "apexcharts-card", "swipe-card",
+                                  "tabbed-card", "vertical-stack-in-card", "atomic-calendar"]:
+                    if card_name in all_urls:
+                        detected.append(card_name)
+                return json.dumps({"resources": summary, "count": len(summary),
+                                   "detected_custom_cards": detected}, ensure_ascii=False, default=str)
+            error_msg = result.get("error", {}).get("message", str(result))
+            return json.dumps({"error": f"Failed to get resources: {error_msg}"}, default=str)
+
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
         logger.error(f"Tool error ({tool_name}): {e}")
@@ -1054,22 +1165,59 @@ You can:
 11. **Delete automations/scripts/dashboards** - Remove unwanted configurations
 12. **Notifications** - Send persistent notifications or push to mobile devices
 13. **Discover services & events** - See all available HA services and event types
-14. **Create dashboards** - Create NEW Lovelace dashboards with cards (never modifies existing ones)
-15. **Shopping list** - View, add, and complete shopping list items
-16. **Backup** - Create full Home Assistant backups
-17. **Browse media** - Browse media content from players (music, photos, etc.)
+14. **Create & modify dashboards** - Create NEW dashboards or modify EXISTING ones with any card type
+15. **Check custom cards** - Verify which HACS custom cards are installed (card-mod, bubble-card, mushroom, etc.)
+16. **Shopping list** - View, add, and complete shopping list items
+17. **Backup** - Create full Home Assistant backups
+18. **Browse media** - Browse media content from players (music, photos, etc.)
 
-When creating dashboards, use proper Lovelace card types:
-- entities card: {"type": "entities", "title": "Lights", "entities": ["light.living_room", "light.bedroom"]}
-- gauge card: {"type": "gauge", "entity": "sensor.temperature", "name": "Temperature"}
-- history-graph: {"type": "history-graph", "entities": [{"entity": "sensor.temperature"}], "hours_to_show": 24}
+## Dashboard Management
+- Use **get_dashboards** to list all dashboards
+- Use **get_dashboard_config** to read an existing dashboard's full configuration
+- Use **update_dashboard** to modify an existing dashboard (replaces all views)
+- Use **create_dashboard** to create a brand new dashboard
+- Use **get_frontend_resources** to check which custom cards (HACS) are installed
+- Use **delete_dashboard** to remove a dashboard
+
+IMPORTANT: When modifying a dashboard, ALWAYS:
+1. First call get_dashboard_config to read the current config
+2. Modify the views/cards as needed
+3. Save with update_dashboard passing the complete views array
+
+### Standard Lovelace card types:
+- entities: {"type": "entities", "title": "Lights", "entities": ["light.living_room"]}
+- gauge: {"type": "gauge", "entity": "sensor.temperature"}
+- history-graph: {"type": "history-graph", "entities": [{"entity": "sensor.temp"}], "hours_to_show": 24}
 - thermostat: {"type": "thermostat", "entity": "climate.living_room"}
 - button: {"type": "button", "entity": "switch.outlet", "name": "Toggle"}
 - markdown: {"type": "markdown", "content": "# Title"}
 - grid/horizontal-stack/vertical-stack for layout
 
-Always first use get_entities or search_entities to find real entity IDs before creating dashboards.
+### Custom cards (check availability with get_frontend_resources first!):
 
+**card-mod** - Style any card with CSS:
+{"type": "entities", "entities": ["light.room"], "card_mod": {"style": "ha-card { background: rgba(0,0,0,0.3); border-radius: 16px; }"}}
+
+**bubble-card** - Modern UI cards:
+{"type": "custom:bubble-card", "card_type": "button", "entity": "light.room", "name": "Light", "icon": "mdi:lightbulb", "button_type": "switch"}
+{"type": "custom:bubble-card", "card_type": "pop-up", "hash": "#room", "name": "Living Room", "icon": "mdi:sofa"}
+{"type": "custom:bubble-card", "card_type": "separator", "name": "Section", "icon": "mdi:home"}
+
+**mushroom cards**:
+{"type": "custom:mushroom-entity-card", "entity": "light.room", "fill_container": true}
+{"type": "custom:mushroom-climate-card", "entity": "climate.room"}
+
+**button-card** - Highly customizable buttons:
+{"type": "custom:button-card", "entity": "light.room", "name": "Light", "icon": "mdi:lightbulb", "show_state": true,
+ "styles": {"card": [{"background-color": "rgba(0,0,0,0.3)"}]}}
+
+**mini-graph-card** - Beautiful sensor graphs:
+{"type": "custom:mini-graph-card", "entities": ["sensor.temperature"], "hours_to_show": 24, "line_color": "#e74c3c"}
+
+Before using any custom: card type, ALWAYS call get_frontend_resources to verify it's installed.
+If the user wants a custom card that is not installed, inform them and suggest installing it via HACS.
+
+## Automations
 When creating automations, use proper Home Assistant formats:
 - State trigger: {"platform": "state", "entity_id": "binary_sensor.motion", "to": "on"}
 - Time trigger: {"platform": "time", "at": "07:00:00"}
