@@ -1,5 +1,16 @@
 {
   "name": "Claude AI Backend Repository",
   "url": "https://github.com/Bobsilvio/ha-claude",
-  "maintainer": "Silvio Vaira <silvio.vaira@gmail.com>"
+  "maintainer": "Silvio Vaira <silvio.vaira@gmail.com>",
+  "addons": [
+    {
+      "name": "Claude AI Backend",
+      "slug": "claude-backend",
+      "description": "All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant",
+      "url": "https://github.com/Bobsilvio/ha-claude/tree/main/addons/claude-backend",
+      "version": "2.0.1",
+      "image": "ghcr.io/Bobsilvio/claude-backend:{VERSION}",
+      "arch": ["aarch64", "amd64", "armv7"]
+    }
+  ]
 }
