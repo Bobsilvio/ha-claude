@@ -705,11 +705,20 @@ def get_openai_tools_for_provider():
 
 
 def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
-    """Trim conversation history for providers with small context windows."""
-    if AI_PROVIDER == "github":
-        # Keep only last 6 messages for GitHub free tier (8k token limit)
-        return messages[-6:] if len(messages) > 6 else messages
-    return messages[-max_messages:] if len(messages) > max_messages else messages
+    """Trim conversation history, preserving tool_call/tool response pairs."""
+    limit = 6 if AI_PROVIDER == "github" else max_messages
+    if len(messages) <= limit:
+        return messages
+    trimmed = messages[-limit:]
+    # Remove orphaned tool messages at the start (their parent assistant+tool_calls was trimmed)
+    while trimmed and trimmed[0].get("role") == "tool":
+        trimmed = trimmed[1:]
+    # Also remove an assistant message with tool_calls if its tool responses were trimmed
+    if trimmed and trimmed[0].get("role") == "assistant" and trimmed[0].get("tool_calls"):
+        # Check if next message is a matching tool response
+        if len(trimmed) < 2 or trimmed[1].get("role") != "tool":
+            trimmed = trimmed[1:]
+    return trimmed
 
 
 # ---- Provider-specific chat implementations ----
