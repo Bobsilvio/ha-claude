@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.4"
+VERSION = "2.9.5"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
