@@ -9,7 +9,12 @@ RUN apk add --no-cache \
     bash \
     jq \
     build-base \
-    python3-dev
+    python3-dev \
+    openssl-dev \
+    libffi-dev
+
+# Upgrade pip
+RUN pip3 install --upgrade pip setuptools wheel
 
 WORKDIR /app
 
