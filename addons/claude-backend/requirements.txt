@@ -2,5 +2,5 @@ flask==3.0.0
 flask-cors==4.0.0
 requests==2.31.0
 python-dotenv==1.0.0
-pydantic>=2.5.0
-aiohttp==3.9.1
+anthropic>=0.39.0
+pyyaml>=6.0
