@@ -1,9 +1,9 @@
 name: Claude AI Backend
-description: Backend API for Claude AI Assistant integration with Home Assistant
+description: All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant
 version: "1.0.0"
 slug: claude-backend
 image: "ghcr.io/Bobsilvio/claude-backend:{VERSION}"
-init: false
+init: true
 arch:
   - aarch64
   - amd64

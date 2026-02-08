@@ -37,13 +37,12 @@
 - ✅ `addons/repository.json` - Metadati del repository
 - ✅ `addons/README.md` - README repository
 
-### Documentazione (7 file)
-- ✅ `INSTALLATION.md` - Guida generica
-- ✅ `FINAL_INSTALLATION_GUIDE.md` - Guida specifica Add-on (questa)
-- ✅ `ADDON_SETUP.md` - Come creare/configurare il repository
-- ✅ `docs/DOCKER_VS_COMPONENT.md` - Differenze deploy
+### Documentazione (6 file)
+- ✅ `README.md` - Panoramica completa con setup veloce
+- ✅ `docs/INSTALLATION.md` - Guida completa
 - ✅ `docs/CREATING_AUTOMATIONS.md` - Come creare automazioni
 - ✅ `docs/BACKEND_API_EXPLAINED.md` - Spiegazione architettura
+- ✅ `docs/api_reference.md` - Tutti gli API endpoint
 - ✅ `QUICK_START.md` - Setup veloce
 
 ### Test e CI/CD
@@ -149,7 +148,7 @@ PRONTO PER AUTOMOZIONE! 🚀
 | Componente non carica | Check: `~/.homeassistant/custom_components/claude/` esiste? Riavvia HA? |
 | Automazioni non create | Check: `automations.yaml` è scrivibile? Check: Sintassi JSON corretta? |
 
-Vedi [FINAL_INSTALLATION_GUIDE.md](FINAL_INSTALLATION_GUIDE.md) sezione **Risoluzione Problemi**
+Vedi [README.md](README.md) sezione **Troubleshooting**
 
 ---
 
@@ -161,7 +160,7 @@ Vedi [FINAL_INSTALLATION_GUIDE.md](FINAL_INSTALLATION_GUIDE.md) sezione **Risolu
 | Come creare automazioni dinamiche | [docs/CREATING_AUTOMATIONS.md](docs/CREATING_AUTOMATIONS.md) |
 | Differenza Docker vs Component | [docs/DOCKER_VS_COMPONENT.md](docs/DOCKER_VS_COMPONENT.md) |
 | API Endpoints disponibili | [docs/api_reference.md](docs/api_reference.md) |
-| Setup GitHub Add-on Repo | [ADDON_SETUP.md](ADDON_SETUP.md) |
+| Pagina Principale | [README.md](README.md) |
 
 ---
 
@@ -236,7 +235,7 @@ Nel tuo setup:
 
 ## 🚀 Prossimi Passi
 
-1. **Segui FINAL_INSTALLATION_GUIDE.md** per installare tutto
+1. **Segui README.md** per l'installazione veloce (5 step)
 2. **Crea prima automazione** di test
 3. **Esplora i 6 servizi** disponibili
 4. **Crea automazioni dinamiche** con `claude.create_automation`

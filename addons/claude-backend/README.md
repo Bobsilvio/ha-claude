@@ -1,37 +1,61 @@
 # Claude AI Backend Add-on for Home Assistant
 
-Home Assistant add-on that provides the backend API for Claude AI Assistant integration.
+✨ **Complete all-in-one add-on** that automatically installs the Claude custom component AND runs the backend API.
 
-## Installation
+## What This Add-on Does
 
-1. **Add Repository to Home Assistant**:
-   - Settings → Add-ons → Repositories
-   - Add: `https://github.com/Bobsilvio/ha-claude-addon-repo`
-   - Click "Create"
+1. ✓ Deploys the Claude custom component automatically
+2. ✓ Starts the backend Flask API on port 5000
+3. ✓ Reloads Home Assistant to register the component
+4. ✓ Ready to use in seconds!
 
-2. **Install Add-on**:
-   - Settings → Add-ons → Claude AI Backend
-   - Click "Install"
+## Installation (4 Simple Steps)
 
-3. **Configure Add-on**:
-   - Click on "Claude AI Backend"
-   - Go to "Configuration" tab
-   - Add your Home Assistant Long-lived Token:
-     - Go to Settings → Developer Tools → Long-lived access tokens
-     - Create a new token
-     - Paste it in add-on configuration
-   - Save
+### Step 1: Add Repository
+1. **Settings** → **Add-ons & backups** → **Add-on store**
+2. Click **⋮** (menu) in top-right
+3. **Repositories**
+4. Add: `https://github.com/Bobsilvio/ha-claude`
+5. **Create**
 
-4. **Start Add-on**:
-   - Click "Start" button
-   - The add-on will start on port 5000
+### Step 2: Install Add-on
+1. **Settings** → **Add-ons**
+2. Search for **"Claude AI Backend"**
+3. Click **Install**
 
-5. **Configure Claude Integration**:
-   - Settings → Devices & Services → Create Integration
-   - Search for "Claude"
-   - API Endpoint: `http://localhost:5000`
-   - Select your preferred model
-   - Click "Submit"
+### Step 3: Configure
+1. Click on **"Claude AI Backend"**
+2. Go to **Configuration** tab
+3. Add your **Home Assistant Long-lived Token**:
+   - Go to Settings → Developer Tools → Long-lived Access Tokens
+   - Click **Create Token**
+   - Name it "Claude Backend"
+   - Copy token
+   - Paste in add-on configuration
+4. Click **Save**
+
+### Step 4: Start
+1. Click **Start**
+2. Watch logs - you'll see:
+   ```
+   ✓ Component deployed
+   ✓ Home Assistant reloaded
+   ✓ Claude AI Backend is ready!
+   ```
+3. Done! 🎉
+
+## Configure Claude Integration
+
+The component is now installed. Create the integration:
+
+1. **Settings** → **Devices & Services** → **Integrations**
+2. Click **Create Integration**
+3. Search for **"Claude"**
+4. **API Endpoint**: `http://localhost:5000`
+5. **Model**: Choose your preference (Haiku/Sonnet/Opus)
+6. **Submit**
+
+**You're ready to use Claude!** 🚀
 
 ## Configuration
 

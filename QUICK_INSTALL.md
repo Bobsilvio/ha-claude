@@ -84,7 +84,7 @@ data:
 
 ## Issues?
 
-See [FINAL_INSTALLATION_GUIDE.md](FINAL_INSTALLATION_GUIDE.md) → Troubleshooting section
+See [docs/INSTALLATION.md](docs/INSTALLATION.md) → Troubleshooting section
 
 ---
 

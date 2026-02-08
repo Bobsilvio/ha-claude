@@ -179,17 +179,10 @@ async def async_setup_services(hass: HomeAssistant, api: ClaudeAPI) -> None:
                     action = json.loads(action_str)
                     if not isinstance(action, list):
                         action = [action]
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_CREATE_AUTOMATION,
-        handle_create_automation,
-    )
-
                 else:
                     action = action_str if isinstance(action_str, list) else [action_str]
 
             # Create automation ID from name
-    hass.services.async_remove(DOMAIN, SERVICE_CREATE_AUTOMATION)
             automation_id = f"automation.{automation_name.lower().replace(' ', '_')}"
 
             # Build automation YAML

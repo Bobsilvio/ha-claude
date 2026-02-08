@@ -1,127 +1,154 @@
 # 🏠🤖 Claude AI for Home Assistant
 
-All-in-one Home Assistant integration - Control your smart home with Claude Haiku, Sonnet, or Opus.
+**Integrazione All-in-One** - Controlla la tua casa intelligente con Claude (Haiku, Sonnet, Opus).
 
-**Installation**: 16 minutes | **Setup**: Ultra-simple | **Auto-update**: On reboot ✅
+> ⏱️ **Installation**: 16 minuti | 🔧 **Setup**: Ultra-semplice | 🔄 **Auto-restart**: Sì ✅
 
 Integrazione Home Assistant completa per controllare la tua casa intelligente con Claude Haiku 4.5, Sonnet o Opus.
 
 ## 🎯 Caratteristiche Principali
 
-- **Multi-modello Claude**: Haiku (veloce), Sonnet (bilanciato), Opus (potente)
+- **Multi-modello Claude**: Haiku ⚡⚡⚡ (veloce), Sonnet ⚡⚡ (bilanciato), Opus ⚡ (potente)
 - **Controllo completo**: Luci, automazioni, script, sensori, climate
-- **Config Flow UI**: Interfaccia di configurazione intuitiva
-- **Sensori di monitoraggio**: Stato della connessione, conteggio entità/automazioni/script
-- **6 servizi avanzati**:
-  - Invia messaggi a Claude
-  - Esegui automazioni
-  - Esegui script con variabili
-  - Ottieni stato entità
-  - Chiama servizi Home Assistant
-  - **Crea automazioni dinamicamente** ✨ NEW
-- **Backend Flask**: API REST completa verso Home Assistant
-- **Docker Support**: Docker Compose per setup facile
+- **Config Flow UI**: Interfaccia di configurazione intuitiva in italiano
+- **Sensori di monitoraggio**: Stato connessione, conteggio entità/automazioni/script
+- **6 Servizi avanzati**:
+  - `claude.send_message` - Invia messaggi a Claude
+  - `claude.execute_automation` - Esegui automazioni
+  - `claude.execute_script` - Esegui script con variabili
+  - `claude.get_entity_state` - Leggi stato entità
+  - `claude.call_service` - Chiama servizi Home Assistant
+  - `claude.create_automation` - **Crea automazioni dinamicamente** ✨
+- **Docker + Add-on**: Setup automatico con auto-restart su reboot
 - **Documentazione completa**: In italiano e inglese
 
 ## 📋 Requisiti
 
-- Home Assistant 2024.1.0+
+- Home Assistant **2024.1.0+**
 - Python 3.11+
-- API Token Home Assistant
+- API Token Home Assistant (Settings → Developer Tools → Long-lived Access Tokens)
 - Chiave API Anthropic Claude
 
-## 🚀 Quick Start - Add-on (CONSIGLIATO - 2 minuti!)
+## 🚀 Quick Start (16 minuti)
 
-**All-in-One: Component + Backend Automatico**
+### 1️⃣ Aggiungi Repository (5 min)
 
-1. **Aggiungi Repository**:
-   - Settings → Add-ons & backups → Add-on store (⋮) → Repositories
-   - Aggiungi: `https://github.com/Bobsilvio/ha-claude`
-   - Crea
+Nel tuo Home Assistant:
 
-2. **Installa Add-on**:
-   - Cerca "Claude AI Backend"
-   - Click Installa
+```
+Settings → Add-ons & backups → Add-on store (⋮) → Repositories
+→ https://github.com/Bobsilvio/ha-claude → Create
+```
 
-3. **Configura Add-on**:
-   - Vai su "Configurazione"
-   - Aggiungi il tuo Home Assistant Token (Settings → Developer Tools → Long-lived Access Tokens)
-   - Salva
+Dovrebbe apparire "Claude AI Backend" nello store!
 
-4. **Avvia Add-on**:
-   - Click "Avvia"
-   - L'addon installa automaticamente il component e avvia l'API
-   - ✅ Pronto!
+### 2️⃣ Installa Add-on (7 min)
 
-5. **Configura Integrazione**:
-   - Settings → Devices & Services → Crea Integrazione
-   - Cerca "Claude"
-   - API Endpoint: `http://localhost:5000`
-   - Seleziona modello
-   - Pronto!
+```
+Settings → Add-ons & backups → Add-on store
+→ Cerca "Claude AI Backend" → Install
+```
 
-## 🚀 Quick Start - Component Standalone (5 minuti)
+**Questo installa automaticamente:**
+- ✅ Component Claude
+- ✅ Backend API Flask
+- ✅ Tutto quello che serve
 
-**Per chi preferisce installazione manuale (no add-ons)**
+### 3️⃣ Configura Add-on
 
-1. **Scarica i file**:
-   ```bash
-   git clone https://github.com/Bobsilvio/ha-claude.git
-   cd ha-claude
-   ```
+Nel tab **Configuration** dell'add-on:
+- Copia il tuo HA Token (Settings → Developer Tools → Long-lived Access Tokens)
+- Incollalo nel campo `ha_token`
+- **Save**
 
-2. **Copia il componente**:
-   ```bash
-   cp -r custom_components/claude ~/.homeassistant/custom_components/
-   ```
+### 4️⃣ Avvia Add-on (2 min)
 
-3. **Avvia il backend**:
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   python api.py
-   ```
+Nel tab **Info**:
+- Click **Start**
+- Guarda i log per il progresso
+- Quando Status = "Running" ✅ → È pronto!
 
-4. **Riavvia Home Assistant**
+### 5️⃣ Configura Integrazione (2 min)
 
-5. **Configura**:
-   - Settings → Devices & Services → Create Integration
-   - Cerca "Claude"
-   - API Endpoint: `http://localhost:5000`
-   - Seleziona modello
+```
+Settings → Devices & Services → Create Integration
+→ Cerca "Claude" → Configura:
+  - API Endpoint: http://localhost:5000
+  - Modello: claude-3-haiku (o sonnet/opus)
+  - Save
+```
 
-## 📦 Installazione Completa
+✅ **Done!** La tua integrazione Claude è attiva!
 
-Vedi [INSTALLATION.md](docs/INSTALLATION.md) per istruzioni dettagliate e [ADDON_SETUP.md](ADDON_SETUP.md) per creare il tuo repository Add-ons.
+## 📦 Alternative di Installazione
+
+### Con Docker Compose (per sviluppatori)
+
+```bash
+git clone https://github.com/Bobsilvio/ha-claude.git
+cd ha-claude
+cp .env.example .env
+
+# Configura in .env:
+# - HA_TOKEN=your_token
+# - HA_URL=http://localhost:8123
+# - CLAUDE_MODEL=claude-3-haiku
+
+docker-compose up -d
+```
+
+### Manuale (no Add-on, no Docker)
+
+```bash
+# 1. Copia component
+cp -r custom_components/claude ~/.homeassistant/custom_components/
+
+# 2. Avvia backend
+cd backend
+pip install -r requirements.txt
+python api.py &
+
+# 3. Riavvia Home Assistant
+# 4. Configura integrazione (vedi step 5 sopra)
+```
+
+Vedi [docs/INSTALLATION.md](docs/INSTALLATION.md) per istruzioni dettagliate.
 
 ## 🔧 Configurazione
 
-### Config Flow UI
+### Config Flow
 
-1. **API Endpoint**: URL del backend Flask (default: http://localhost:5000)
-2. **Modello**: claude-3-haiku, claude-3-sonnet, claude-3-opus
+La configurazione è facile tramite l'interfaccia visuale:
+
+1. **API Endpoint**: URL del backend Flask (default: `http://localhost:5000`)
+2. **Modello**: Scegli tra:
+   - `claude-3-haiku` - ⚡ veloce, economico (perfetto per task semplici)
+   - `claude-3-sonnet` - ⚡⚡ equilibrato (perfetto per la maggior parte dei task)
+   - `claude-3-opus` - ⚡⚡⚡ potente (per task complessi)
 3. **Polling Interval**: Secondi tra gli aggiornamenti (default: 60)
 4. **Timeout**: Timeout richieste API in secondi (default: 30)
 5. **Max Retries**: Tentativi per richieste fallite (default: 3)
 
-### Environment Variables
+### Environment Variables (Docker/Manuale)
 
 ```bash
-HA_URL=http://localhost:8123
-HA_TOKEN=your_home_assistant_token
-API_PORT=5000
-CLAUDE_MODEL=claude-3-haiku
+HA_URL=http://localhost:8123         # Home Assistant URL
+HA_TOKEN=your_long_lived_token       # HA Token
+API_PORT=5000                         # Backend port
+CLAUDE_MODEL=claude-3-haiku          # Modello Claude
+DEBUG_MODE=false                      # Abilita debug log
 ```
 
 ## 📚 Documentazione
 
-- [API Reference](docs/api_reference.md) - Tutti gli endpoint API
-- [Automazioni Examples](docs/automations_examples.md) - Template di automazione
-- [Creating Automations](docs/CREATING_AUTOMATIONS.md) - **Crea automazioni dinamicamente** ✨ NEW
-- [Docker vs Component](docs/DOCKER_VS_COMPONENT.md) - Quali sono le differenze?
-- [HA Config Example](docs/home_assistant_config_example.yaml) - Config HA di esempio
-- [Quick Start](QUICK_START.md) - Setup veloce
-- [Installation](docs/INSTALLATION.md) - Guida completa
+| Documento | Descrizione |
+|-----------|------------|
+| [QUICK_START.md](QUICK_START.md) | Setup veloce (5 min) |
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Guida completa |
+| [docs/api_reference.md](docs/api_reference.md) | Tutti gli API endpoint |
+| [docs/BACKEND_API_EXPLAINED.md](docs/BACKEND_API_EXPLAINED.md) | Architettura sistema |
+| [docs/CREATING_AUTOMATIONS.md](docs/CREATING_AUTOMATIONS.md) | Come creare automazioni dinamiche |
+| [docs/automations_examples.md](docs/automations_examples.md) | Template pronti all'uso |
 
 ## 🎮 Servizi Disponibili
 
@@ -156,22 +183,26 @@ data:
 ```
 
 ### claude.call_service
+Chiama qualsiasi servizio Home Assistant.
+
 ```yaml
 service: claude.call_service
 data:
-  s
+  service: "light.turn_on"
+  data: '{"entity_id": "light.living_room", "brightness": 255}'
+```
 
 ### claude.create_automation ✨ NEW
+Crea automazioni dinamicamente tramite Claude!
+
 ```yaml
 service: claude.create_automation
 data:
   automation_name: "Turn on lights at sunset"
-  description: "Automatically turn on living room lights"
+  description: "Accendi le luci al tramonto"
   trigger: '{"platform": "sun", "event": "sunset"}'
-  condition: '{"condition": "state", "entity_id": "binary_sensor.people_home", "state": "on"}'
+  condition: '{"condition": "state", "entity_id": "input_boolean.people_home", "state": "on"}'
   action: '[{"service": "light.turn_on", "target": {"entity_id": "light.living_room"}}]'
-```ervice: "light.turn_on"
-  data: '{"entity_id": "light.living_room", "brightness": 255}'
 ```
 
 ## 🐳 Docker
@@ -185,7 +216,7 @@ cp .env.example .env
 docker-compose up -d
 
 # Logs
-docker-compose logs -f claude-api
+docker-compose logs -f claude-backend
 ```
 
 ## 🧪 Testing
