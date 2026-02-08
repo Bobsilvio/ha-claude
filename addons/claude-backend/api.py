@@ -16,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.5.0"
+VERSION = "2.5.1"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -334,8 +334,10 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             states = get_all_states()
             if domain:
                 states = [s for s in states if s.get("entity_id", "").startswith(f"{domain}.")]
+            # Limit results for providers with small context windows
+            max_entities = 30 if AI_PROVIDER == \"github\" else 100
             result = []
-            for s in states[:100]:
+            for s in states[:max_entities]:
                 result.append({
                     "entity_id": s.get("entity_id"),
                     "state": s.get("state"),
@@ -419,6 +421,65 @@ When creating automations, use proper Home Assistant formats:
 Always respond in the same language the user uses.
 Be concise but informative."""
 
+# Compact prompt for providers with small context (GitHub Models free tier: 8k tokens)
+SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control smart home devices, query states, create automations.
+Respond in the user's language. Be concise."""
+
+# Compact tool definitions for low-token providers
+HA_TOOLS_COMPACT = [
+    {
+        "name": "get_entities",
+        "description": "Get HA entity states, optionally filtered by domain.",
+        "parameters": {"type": "object", "properties": {"domain": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "call_service",
+        "description": "Call HA service (e.g. light.turn_on, switch.toggle, climate.set_temperature).",
+        "parameters": {"type": "object", "properties": {
+            "domain": {"type": "string"}, "service": {"type": "string"},
+            "data": {"type": "object"}
+        }, "required": ["domain", "service", "data"]}
+    },
+    {
+        "name": "create_automation",
+        "description": "Create HA automation with alias, trigger, action.",
+        "parameters": {"type": "object", "properties": {
+            "alias": {"type": "string"}, "trigger": {"type": "array", "items": {"type": "object"}},
+            "action": {"type": "array", "items": {"type": "object"}}
+        }, "required": ["alias", "trigger", "action"]}
+    },
+    {
+        "name": "get_automations",
+        "description": "List all automations.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    }
+]
+
+
+def get_system_prompt() -> str:
+    """Get system prompt appropriate for current provider."""
+    if AI_PROVIDER == "github":
+        return SYSTEM_PROMPT_COMPACT
+    return SYSTEM_PROMPT
+
+
+def get_openai_tools_for_provider():
+    """Get OpenAI-format tools appropriate for current provider."""
+    if AI_PROVIDER == "github":
+        return [
+            {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
+            for t in HA_TOOLS_COMPACT
+        ]
+    return get_openai_tools()
+
+
+def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
+    """Trim conversation history for providers with small context windows."""
+    if AI_PROVIDER == "github":
+        # Keep only last 6 messages for GitHub free tier (8k token limit)
+        return messages[-6:] if len(messages) > 6 else messages
+    return messages[-max_messages:] if len(messages) > max_messages else messages
+
 
 # ---- Provider-specific chat implementations ----
 
@@ -461,14 +522,18 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
 
 def chat_openai(messages: List[Dict]) -> tuple:
     """Chat with OpenAI. Returns (response_text, updated_messages)."""
-    # Prepend system message for OpenAI format
-    oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+    trimmed = trim_messages(messages)
+    system_prompt = get_system_prompt()
+    tools = get_openai_tools_for_provider()
+    max_tok = 4000 if AI_PROVIDER == "github" else 4096
+
+    oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
 
     response = ai_client.chat.completions.create(
         model=get_active_model(),
         messages=oai_messages,
-        tools=get_openai_tools(),
-        max_tokens=4096
+        tools=tools,
+        max_tokens=max_tok
     )
 
     msg = response.choices[0].message
@@ -483,14 +548,18 @@ def chat_openai(messages: List[Dict]) -> tuple:
             logger.info(f"Tool: {tc.function.name}")
             args = json.loads(tc.function.arguments)
             result = execute_tool(tc.function.name, args)
+            # Truncate tool results for GitHub to stay within token limits
+            if AI_PROVIDER == "github" and len(result) > 3000:
+                result = result[:3000] + '... (truncated)'
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
-        oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+        trimmed = trim_messages(messages)
+        oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
         response = ai_client.chat.completions.create(
             model=get_active_model(),
             messages=oai_messages,
-            tools=get_openai_tools(),
-            max_tokens=4096
+            tools=tools,
+            max_tokens=max_tok
         )
         msg = response.choices[0].message
 
