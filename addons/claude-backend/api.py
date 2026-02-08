@@ -16,7 +16,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.5.2"
+VERSION = "2.5.3"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -290,6 +290,25 @@ HA_TOOLS_DESCRIPTION = [
         "name": "get_available_services",
         "description": "Get all available Home Assistant service domains and services.",
         "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "search_entities",
+        "description": "Search entities by keyword in entity_id or friendly_name. Use this to find specific devices, sensors, or integrations.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search keyword (e.g. 'calcio', 'temperature', 'motion', 'light')."
+                }
+            },
+            "required": ["query"]
+        }
+    },
+    {
+        "name": "get_events",
+        "description": "Get all available Home Assistant event types. Use this to discover events fired by integrations and addons.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
     }
 ]
 
@@ -395,6 +414,30 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                 return json.dumps(compact, ensure_ascii=False)
             return json.dumps(svc_raw, ensure_ascii=False, default=str)
 
+        elif tool_name == "search_entities":
+            query = tool_input.get("query", "").lower()
+            states = get_all_states()
+            matches = []
+            for s in states:
+                eid = s.get("entity_id", "").lower()
+                fname = s.get("attributes", {}).get("friendly_name", "").lower()
+                if query in eid or query in fname:
+                    matches.append({
+                        "entity_id": s.get("entity_id"),
+                        "state": s.get("state"),
+                        "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                        "attributes": s.get("attributes", {})
+                    })
+            max_results = 20 if AI_PROVIDER == "github" else 50
+            return json.dumps(matches[:max_results], ensure_ascii=False, default=str)
+
+        elif tool_name == "get_events":
+            events = call_ha_api("GET", "events")
+            if isinstance(events, list):
+                result = [{"event": e.get("event", ""), "listener_count": e.get("listener_count", 0)} for e in events]
+                return json.dumps(result, ensure_ascii=False, default=str)
+            return json.dumps(events, ensure_ascii=False, default=str)
+
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
         logger.error(f"Tool error ({tool_name}): {e}")
@@ -422,7 +465,8 @@ Always respond in the same language the user uses.
 Be concise but informative."""
 
 # Compact prompt for providers with small context (GitHub Models free tier: 8k tokens)
-SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control smart home devices, query states, create automations.
+SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control devices, query states, search entities, list events, create automations.
+When a user asks about specific devices/addons, use search_entities to find them by keyword. Use get_events to discover event types.
 Respond in the user's language. Be concise."""
 
 # Compact tool definitions for low-token providers
@@ -451,6 +495,16 @@ HA_TOOLS_COMPACT = [
     {
         "name": "get_automations",
         "description": "List all automations.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "search_entities",
+        "description": "Search entities by keyword in entity_id or friendly_name.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+    },
+    {
+        "name": "get_events",
+        "description": "List all available HA event types.",
         "parameters": {"type": "object", "properties": {}, "required": []}
     }
 ]
