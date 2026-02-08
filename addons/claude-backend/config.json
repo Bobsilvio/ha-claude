@@ -32,63 +32,19 @@
   },
   "options": {
     "ha_url": "http://homeassistant:8123",
-    "api_port": 5000,
+    "api_port": "5000",
     "debug_mode": false,
-    "polling_interval": 60,
-    "timeout": 30,
-    "max_retries": 3
+    "polling_interval": "60",
+    "timeout": "30",
+    "max_retries": "3"
   },
   "schema": {
-    "ha_url": {
-      "name": "Home Assistant URL",
-      "description": "URL of Home Assistant (use http://homeassistant:8123 for Add-on)",
-      "type": "string",
-      "required": true,
-      "default": "http://homeassistant:8123"
-    },
-    "api_port": {
-      "name": "API Port",
-      "description": "Port for the Claude Backend API",
-      "type": "integer",
-      "required": true,
-      "default": 5000,
-      "minimum": 1024,
-      "maximum": 65535
-    },
-    "debug_mode": {
-      "name": "Debug Mode",
-      "description": "Enable debug logging",
-      "type": "boolean",
-      "required": false,
-      "default": false
-    },
-    "polling_interval": {
-      "name": "Polling Interval",
-      "description": "Seconds between entity updates",
-      "type": "integer",
-      "required": false,
-      "default": 60,
-      "minimum": 10,
-      "maximum": 3600
-    },
-    "timeout": {
-      "name": "API Timeout",
-      "description": "Timeout for API requests in seconds",
-      "type": "integer",
-      "required": false,
-      "default": 30,
-      "minimum": 5,
-      "maximum": 300
-    },
-    "max_retries": {
-      "name": "Maximum Retries",
-      "description": "Number of retries for failed requests",
-      "type": "integer",
-      "required": false,
-      "default": 3,
-      "minimum": 1,
-      "maximum": 10
-    }
+    "ha_url": "str",
+    "api_port": "str",
+    "debug_mode": "bool?",
+    "polling_interval": "str?",
+    "timeout": "str?",
+    "max_retries": "str?"
   },
   "documentation": "https://github.com/Bobsilvio/ha-claude",
   "support": "https://github.com/Bobsilvio/ha-claude/issues",
