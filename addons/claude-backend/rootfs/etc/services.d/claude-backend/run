@@ -1,4 +1,5 @@
-#!/usr/bin/with-contenv bashio
+#!/usr/bin/with-contenv bash
+set -e
 
 # Get configuration using bashio (Home Assistant way)
 CLAUDE_API_KEY=$(bashio::config 'claude_api_key')
