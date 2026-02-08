@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.1"
+VERSION = "2.8.2"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1490,6 +1490,13 @@ Use get_history for recent state changes, get_statistics for aggregated data ove
 Use get_areas when the user refers to rooms.
 To delete resources, use delete_automation, delete_script, or delete_dashboard.
 
+## CRITICAL BEHAVIOR RULES
+- When the user asks you to CREATE or MODIFY something (dashboard, automation, script, config), DO IT IMMEDIATELY.
+- NEVER just describe what you plan to do. Execute ALL necessary tool calls in sequence and complete the task fully.
+- For example: if asked to create a dashboard, call search_entities → (optionally get_frontend_resources) → create_dashboard ALL in one go.
+- Only respond with the final result AFTER the task is complete (e.g. "Dashboard created! It's in the sidebar at /my-dashboard").
+- If a task requires multiple tool calls, keep calling tools until the task is done. Do not stop halfway to explain your plan.
+
 Always respond in the same language the user uses.
 Be concise but informative."""
 
@@ -2007,15 +2014,22 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
         conversations[session_id] = []
 
     conversations[session_id].append({"role": "user", "content": user_message})
-    messages = sanitize_messages_for_provider(conversations[session_id])
+    # Pass the actual conversation list so tool calls are persisted in-place
+    messages = conversations[session_id]
 
     try:
         if AI_PROVIDER in ("openai", "github"):
             yield from stream_chat_openai(messages)
         elif AI_PROVIDER == "anthropic":
-            yield from stream_chat_anthropic(messages)
+            # For Anthropic, we need to sanitize but keep reference
+            clean_messages = sanitize_messages_for_provider(messages)
+            yield from stream_chat_anthropic(clean_messages)
+            # Sync back: replace conversation with the updated messages (includes tool history)
+            conversations[session_id] = clean_messages
         elif AI_PROVIDER == "google":
-            yield from stream_chat_google(messages)
+            clean_messages = sanitize_messages_for_provider(messages)
+            yield from stream_chat_google(clean_messages)
+            conversations[session_id] = clean_messages
         else:
             yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
             return
