@@ -793,7 +793,7 @@ def health():
         "ai_provider": AI_PROVIDER,
         "ai_model": get_active_model(),
         "ai_configured": bool(get_api_key()),
-        "ha_connected": bool(HA_TOKEN),
+        "ha_connected": bool(get_ha_token()),
     }), 200
 
 
@@ -871,5 +871,5 @@ if __name__ == "__main__":
     logger.info(f"Starting AI Assistant v{VERSION} on port {API_PORT}")
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
     logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
-    logger.info(f"HA Token: {'available' if HA_TOKEN else 'NOT available'}")
+    logger.info(f"HA Token: {'available' if get_ha_token() else 'NOT available'}")
     app.run(host="0.0.0.0", port=API_PORT, debug=DEBUG_MODE)
