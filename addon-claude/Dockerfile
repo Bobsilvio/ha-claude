@@ -1,24 +1,23 @@
-FROM python:3.11-slim
+ARG BUILD_FROM
+FROM ${BUILD_FROM}
 
-# Install bashio (Home Assistant add-on utilities)
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-    bashio \
-    ca-certificates \
-    curl && \
-    rm -rf /var/lib/apt/lists/*
+# Install Python and dependencies
+RUN apk add --no-cache \
+    python3 \
+    py3-pip \
+    curl
 
 WORKDIR /app
 
 # Copy requirements and install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy application
 COPY api.py .
 
 # Copy the Claude custom component (will be deployed automatically)
-COPY custom_components/claude /app/claude_component
+COPY claude_component /app/claude_component
 
 # Copy run script
 COPY run.sh /
@@ -34,9 +33,4 @@ ENV HA_URL=http://homeassistant:8123
 ENV TIMEOUT=30
 ENV MAX_RETRIES=3
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:5000/health')"
-
-# Run the application
 CMD [ "/run.sh" ]

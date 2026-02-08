@@ -1,8 +1,7 @@
 {
   "build_from": {
-    "amd64": "python:3.11-slim",
-    "aarch64": "python:3.11-slim",
-    "armv7": "python:3.11-slim"
-  },
-  "codenotary": "notary@home-assistant.io"
+    "amd64": "ghcr.io/hassio-addons/base:16.3.2",
+    "aarch64": "ghcr.io/hassio-addons/base:16.3.2",
+    "armv7": "ghcr.io/hassio-addons/base:16.3.2"
+  }
 }
