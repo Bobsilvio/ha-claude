@@ -38,5 +38,6 @@ ENV HA_URL=http://homeassistant:8123
 ENV TIMEOUT=30
 ENV MAX_RETRIES=3
 
-# s6-overlay will run /run.sh as init
+# s6-overlay init system (required with init: true in addon.yaml)
+ENTRYPOINT [ "/init" ]
 CMD [ "/run.sh" ]
