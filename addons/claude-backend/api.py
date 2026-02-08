@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.7"
+VERSION = "2.9.8"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1904,6 +1904,174 @@ def get_openai_tools_for_provider():
     return get_openai_tools()
 
 
+# ---- LOCAL INTENT DETECTION ----
+# Analyze user message LOCALLY to determine intent and select only relevant tools/prompt.
+# This dramatically reduces tokens sent to the AI API.
+
+# Tool sets by intent category
+INTENT_TOOL_SETS = {
+    "modify_automation": ["update_automation"],
+    "modify_script": ["update_script"],
+    "create_automation": ["create_automation", "search_entities"],
+    "create_script": ["create_script", "search_entities"],
+    "create_dashboard": ["create_dashboard", "search_entities", "get_frontend_resources"],
+    "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
+    "control_device": ["call_service", "search_entities", "get_entity_state"],
+    "query_state": ["get_entities", "get_entity_state", "search_entities"],
+    "query_history": ["get_history", "get_statistics", "search_entities"],
+    "delete": ["delete_automation", "delete_script", "delete_dashboard"],
+    "config_edit": ["read_config_file", "write_config_file", "check_config", "list_config_files",
+                     "list_snapshots", "restore_snapshot"],
+    "areas": ["manage_areas", "manage_entity", "get_areas", "get_devices"],
+    "notifications": ["send_notification", "search_entities"],
+}
+
+# Compact focused prompts by intent
+INTENT_PROMPTS = {
+    "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
+The automation config is provided below. Use update_automation with the automation_id and ONLY the changed fields.
+RULES:
+- Call update_automation ONCE. That's it.
+- Show the user a before/after diff of what changed.
+- Respond in the user's language. Be concise.
+- NEVER call get_automations or read_config_file — the data is already provided.""",
+
+    "modify_script": """You are a Home Assistant script editor. The user wants to modify a script.
+The script config is provided below. Use update_script with the script_id and ONLY the changed fields.
+RULES:
+- Call update_script ONCE. That's it.
+- Show the user a before/after diff.
+- Respond in the user's language. Be concise.
+- NEVER call get_scripts or read_config_file — the data is already provided.""",
+
+    "control_device": """You are a Home Assistant device controller. Help the user control their devices.
+Use search_entities to find entities if needed, then call_service to control them.
+Respond in the user's language. Be concise. Maximum 2 tool calls.""",
+
+    "query_state": """You are a Home Assistant status assistant. Help the user check device states.
+Use search_entities or get_entity_state to find and report states.
+Respond in the user's language. Be concise.""",
+}
+
+
+def detect_intent(user_message: str, smart_context: str) -> dict:
+    """Detect user intent locally from the message and available context.
+    Returns: {"intent": str, "tools": list[str], "prompt": str|None, "specific_target": bool}
+    If intent is clear + specific target found, use focused mode (fewer tools, shorter prompt).
+    Otherwise fall back to full mode."""
+    msg = user_message.lower()
+    
+    # --- MODIFY AUTOMATION (most common case) ---
+    modify_auto_kw = ["modifica", "cambia", "aggiorna", "escludi", "aggiungi", "rimuovi", "togli",
+                       "modific", "cambiar", "aggiornar", "escluder", "aggiung", "rimuov",
+                       "exclude", "change", "modify", "update", "remove", "add", "fix"]
+    auto_kw = ["automazione", "automation", "automazion"]
+    has_modify = any(k in msg for k in modify_auto_kw)
+    has_auto = any(k in msg for k in auto_kw)
+    # Also detect if smart context found a specific automation
+    has_specific_auto = "## AUTOMAZIONE" in smart_context if smart_context else False
+    
+    if has_modify and (has_auto or has_specific_auto):
+        return {"intent": "modify_automation", "tools": INTENT_TOOL_SETS["modify_automation"],
+                "prompt": INTENT_PROMPTS["modify_automation"], "specific_target": has_specific_auto}
+    
+    # --- MODIFY SCRIPT ---
+    script_kw = ["script", "routine", "sequenza"]
+    has_script = any(k in msg for k in script_kw)
+    has_specific_script = "## SCRIPT" in smart_context if smart_context else False
+    
+    if has_modify and (has_script or has_specific_script):
+        return {"intent": "modify_script", "tools": INTENT_TOOL_SETS["modify_script"],
+                "prompt": INTENT_PROMPTS["modify_script"], "specific_target": has_specific_script}
+    
+    # --- CREATE AUTOMATION ---
+    create_kw = ["crea", "creare", "nuov", "create", "new", "aggiungi nuova"]
+    has_create = any(k in msg for k in create_kw)
+    if has_create and has_auto:
+        return {"intent": "create_automation", "tools": INTENT_TOOL_SETS["create_automation"],
+                "prompt": None, "specific_target": False}
+    
+    # --- CREATE SCRIPT ---
+    if has_create and has_script:
+        return {"intent": "create_script", "tools": INTENT_TOOL_SETS["create_script"],
+                "prompt": None, "specific_target": False}
+    
+    # --- DASHBOARD ---
+    dash_kw = ["dashboard", "lovelace", "scheda", "card", "pannello"]
+    has_dash = any(k in msg for k in dash_kw)
+    if has_dash and has_create:
+        return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
+                "prompt": None, "specific_target": False}
+    if has_dash and has_modify:
+        return {"intent": "modify_dashboard", "tools": INTENT_TOOL_SETS["modify_dashboard"],
+                "prompt": None, "specific_target": False}
+    
+    # --- DEVICE CONTROL ---
+    control_kw = ["accendi", "spegni", "accend", "spegn", "turn on", "turn off",
+                  "imposta", "alza", "abbassa", "apri", "chiudi", "attiva", "disattiva"]
+    if any(k in msg for k in control_kw):
+        return {"intent": "control_device", "tools": INTENT_TOOL_SETS["control_device"],
+                "prompt": INTENT_PROMPTS["control_device"], "specific_target": False}
+    
+    # --- QUERY STATE ---
+    query_kw = ["stato", "status", "come sta", "è acceso", "è spento", "quanto", "temperatura",
+                "valore", "che ore", "quanti gradi"]
+    if any(k in msg for k in query_kw):
+        return {"intent": "query_state", "tools": INTENT_TOOL_SETS["query_state"],
+                "prompt": INTENT_PROMPTS["query_state"], "specific_target": False}
+    
+    # --- HISTORY ---
+    history_kw = ["storico", "storia", "history", "ieri", "yesterday", "trend", "andamento",
+                  "media", "massimo", "minimo", "statistich"]
+    if any(k in msg for k in history_kw):
+        return {"intent": "query_history", "tools": INTENT_TOOL_SETS["query_history"],
+                "prompt": None, "specific_target": False}
+    
+    # --- DELETE ---
+    delete_kw = ["elimina", "cancella", "rimuovi", "delete", "remove"]
+    if any(k in msg for k in delete_kw) and (has_auto or has_script or has_dash):
+        return {"intent": "delete", "tools": INTENT_TOOL_SETS["delete"],
+                "prompt": None, "specific_target": False}
+    
+    # --- CONFIG EDIT ---
+    config_kw = ["configuration.yaml", "config", "yaml", "configurazione", "snapshot"]
+    if any(k in msg for k in config_kw):
+        return {"intent": "config_edit", "tools": INTENT_TOOL_SETS["config_edit"],
+                "prompt": None, "specific_target": False}
+    
+    # --- GENERIC (full mode) ---
+    return {"intent": "generic", "tools": None, "prompt": None, "specific_target": False}
+
+
+def get_tools_for_intent(intent_info: dict, provider: str = "anthropic") -> list:
+    """Get tool definitions filtered by intent. Returns full tools if intent is generic."""
+    tool_names = intent_info.get("tools")
+    if tool_names is None:
+        # Generic: return all tools
+        if provider == "anthropic":
+            return get_anthropic_tools()
+        elif provider in ("openai", "github"):
+            return get_openai_tools_for_provider()
+        return get_anthropic_tools()
+    
+    # Filter to only relevant tools
+    filtered = [t for t in HA_TOOLS_DESCRIPTION if t["name"] in tool_names]
+    
+    if provider == "anthropic":
+        return [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in filtered]
+    elif provider in ("openai", "github"):
+        return [{"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}} for t in filtered]
+    return [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in filtered]
+
+
+def get_prompt_for_intent(intent_info: dict) -> str:
+    """Get system prompt for intent. Returns focused prompt if available, else full."""
+    prompt = intent_info.get("prompt")
+    if prompt:
+        return prompt
+    return get_system_prompt()
+
+
 def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
     """Trim conversation history, preserving tool_call/tool response pairs."""
     limit = 6 if AI_PROVIDER == "github" else max_messages
@@ -2141,12 +2309,20 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 # ---- Streaming chat ----
 
 
-def stream_chat_openai(messages):
+def stream_chat_openai(messages, intent_info=None):
     """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts.
-    Buffers text during tool rounds - only streams final response."""
+    Uses intent_info to select focused tools and prompt when available."""
     trimmed = trim_messages(messages)
-    system_prompt = get_system_prompt()
-    tools = get_openai_tools_for_provider()
+    
+    # Use focused tools/prompt if intent detected, else full
+    if intent_info and intent_info.get("tools"):
+        system_prompt = get_prompt_for_intent(intent_info)
+        tools = get_tools_for_intent(intent_info, AI_PROVIDER)
+        logger.info(f"OpenAI focused mode: {intent_info['intent']} ({len(tools)} tools)")
+    else:
+        system_prompt = get_system_prompt()
+        tools = get_openai_tools_for_provider()
+    
     max_tok = 4000 if AI_PROVIDER == "github" else 4096
     full_text = ""
     max_rounds = 5
@@ -2260,11 +2436,19 @@ def stream_chat_openai(messages):
     yield {"type": "done", "full_text": full_text}
 
 
-def stream_chat_anthropic(messages):
+def stream_chat_anthropic(messages, intent_info=None):
     """Stream chat for Anthropic with real token streaming and tool event emission.
-    Buffers text during tool rounds to avoid showing intermediate 'thinking' text.
-    Only streams text tokens for the FINAL response (no tools)."""
+    Uses intent_info to select focused tools and prompt when available."""
     import anthropic
+
+    # Use focused tools/prompt if intent detected, else full
+    if intent_info and intent_info.get("tools"):
+        focused_prompt = get_prompt_for_intent(intent_info)
+        focused_tools = get_tools_for_intent(intent_info, "anthropic")
+        logger.info(f"Anthropic focused mode: {intent_info['intent']} ({len(focused_tools)} tools)")
+    else:
+        focused_prompt = SYSTEM_PROMPT
+        focused_tools = get_anthropic_tools()
 
     full_text = ""
     max_rounds = 5  # Strict limit: most tasks need 1-2 rounds max
@@ -2299,8 +2483,8 @@ def stream_chat_anthropic(messages):
             with ai_client.messages.stream(
                 model=get_active_model(),
                 max_tokens=8192,
-                system=SYSTEM_PROMPT,
-                tools=get_anthropic_tools(),
+                system=focused_prompt,
+                tools=focused_tools,
                 messages=messages
             ) as stream:
                 for event in stream:
@@ -2727,7 +2911,7 @@ def build_smart_context(user_message: str) -> str:
 
 def stream_chat_with_ai(user_message: str, session_id: str = "default"):
     """Stream chat events for all providers. Yields SSE event dicts.
-    Uses smart context pre-loading to minimize API round trips."""
+    Uses LOCAL intent detection + smart context to minimize tokens sent to AI API."""
     if not ai_client:
         yield {"type": "error", "message": "API key non configurata"}
         return
@@ -2735,11 +2919,47 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
     if session_id not in conversations:
         conversations[session_id] = []
 
-    # Smart context: pre-load relevant data before sending to AI (like VS Code does)
+    # Step 1: Build smart context (loads only the relevant data)
     smart_context = build_smart_context(user_message)
+    
+    # Step 2: LOCAL intent detection — decide which tools and prompt to use
+    intent_info = detect_intent(user_message, smart_context)
+    intent_name = intent_info["intent"]
+    tool_count = len(intent_info.get("tools") or [])
+    all_tools_count = len(HA_TOOLS_DESCRIPTION)
+    logger.info(f"Intent detected: {intent_name} (specific_target={intent_info['specific_target']}, tools={tool_count if tool_count else all_tools_count})")
+    
+    # Show intent to user
+    INTENT_LABELS = {
+        "modify_automation": "Modifica automazione",
+        "modify_script": "Modifica script",
+        "create_automation": "Crea automazione",
+        "create_script": "Crea script",
+        "create_dashboard": "Crea dashboard",
+        "modify_dashboard": "Modifica dashboard",
+        "control_device": "Controllo dispositivo",
+        "query_state": "Stato dispositivo",
+        "query_history": "Storico dati",
+        "delete": "Eliminazione",
+        "config_edit": "Modifica configurazione",
+        "areas": "Gestione stanze",
+        "notifications": "Notifica",
+        "generic": "Analisi richiesta",
+    }
+    intent_label = INTENT_LABELS.get(intent_name, "Elaboro")
+    yield {"type": "status", "message": f"{intent_label}... ({tool_count if tool_count else all_tools_count} tools)"}
+    
+    # Step 3: Build the message to send
     if smart_context:
-        enriched_message = f"{user_message}\n\n---\n⚠️ **CONTESTO PRE-CARICATO - DATI GIÀ DISPONIBILI:**\n{smart_context}\n\n---\n⚠️ **ISTRUZIONI OPERATIVE:** I dati sopra sono già caricati. NON chiamare get_automations, get_scripts, get_dashboards, read_config_file o list_config_files per dati già presenti qui. Se devi modificare un'automazione: usa SOLO update_automation con i dati qui sopra. Se devi modificare uno script: usa SOLO update_script. UNA sola chiamata tool, poi rispondi all'utente."
+        # Shorter, more direct instructions when intent is clear
+        if intent_info["specific_target"]:
+            enriched_message = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+        else:
+            enriched_message = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
         conversations[session_id].append({"role": "user", "content": enriched_message})
+        # Log estimated token count
+        est_tokens = len(enriched_message) // 4  # ~4 chars per token
+        logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
         yield {"type": "status", "message": "Contesto pre-caricato..."}
     else:
         conversations[session_id].append({"role": "user", "content": user_message})
@@ -2749,12 +2969,10 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
 
     try:
         if AI_PROVIDER in ("openai", "github"):
-            yield from stream_chat_openai(messages)
+            yield from stream_chat_openai(messages, intent_info=intent_info)
         elif AI_PROVIDER == "anthropic":
-            # For Anthropic, we need to sanitize but keep reference
             clean_messages = sanitize_messages_for_provider(messages)
-            yield from stream_chat_anthropic(clean_messages)
-            # Sync back: replace conversation with the updated messages (includes tool history)
+            yield from stream_chat_anthropic(clean_messages, intent_info=intent_info)
             conversations[session_id] = clean_messages
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
