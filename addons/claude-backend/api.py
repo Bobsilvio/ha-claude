@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.0"
+VERSION = "2.9.1"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2199,8 +2199,102 @@ def stream_chat_google(messages):
     yield {"type": "done", "full_text": final_text}
 
 
+def build_smart_context(user_message: str) -> str:
+    """Pre-load relevant context based on user's message intent.
+    Works like VS Code: gathers all needed data BEFORE sending to AI,
+    so Claude can respond with a single action instead of multiple tool rounds."""
+    msg_lower = user_message.lower()
+    context_parts = []
+
+    try:
+        # --- AUTOMATION CONTEXT ---
+        auto_keywords = ["automazione", "automation", "automazion", "trigger", "condizione", "condition"]
+        if any(k in msg_lower for k in auto_keywords):
+            import yaml
+            # Get automation list
+            states = get_all_states()
+            autos = [s for s in states if s.get("entity_id", "").startswith("automation.")]
+            auto_list = [{"entity_id": a.get("entity_id"),
+                         "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
+                         "id": str(a.get("attributes", {}).get("id", "")),
+                         "state": a.get("state")} for a in autos]
+            context_parts.append(f"## AUTOMAZIONI DISPONIBILI\n{json.dumps(auto_list, ensure_ascii=False, indent=1)}")
+
+            # If user mentions a specific automation name, include its YAML
+            yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
+            if os.path.isfile(yaml_path):
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    all_automations = yaml.safe_load(f)
+                if isinstance(all_automations, list):
+                    # Find mentioned automation by name match
+                    for auto in all_automations:
+                        alias = str(auto.get("alias", "")).lower()
+                        auto_id = str(auto.get("id", ""))
+                        if alias and (alias in msg_lower or any(word in alias for word in msg_lower.split() if len(word) > 4)):
+                            auto_yaml = yaml.dump(auto, default_flow_style=False, allow_unicode=True)
+                            if len(auto_yaml) > 6000:
+                                auto_yaml = auto_yaml[:6000] + "\n... [TRUNCATED]"
+                            context_parts.append(f"## YAML AUTOMAZIONE TROVATA: \"{auto.get('alias')}\" (id: {auto_id})\n```yaml\n{auto_yaml}```\nPer modificarla usa update_automation con automation_id='{auto_id}' e i campi da cambiare.")
+                            break
+
+        # --- DASHBOARD CONTEXT ---
+        dash_keywords = ["dashboard", "lovelace", "scheda", "card", "pannello"]
+        if any(k in msg_lower for k in dash_keywords):
+            # Get dashboard list
+            try:
+                dashboards = call_ha_websocket("lovelace/dashboards/list")
+                dash_list = dashboards.get("result", [])
+                if dash_list:
+                    summary = [{"id": d.get("id"), "title": d.get("title", ""), "url_path": d.get("url_path", "")} for d in dash_list]
+                    context_parts.append(f"## DASHBOARD DISPONIBILI\n{json.dumps(summary, ensure_ascii=False, indent=1)}")
+            except Exception:
+                pass
+
+            # Get installed custom cards
+            try:
+                resources = call_ha_websocket("lovelace/resources")
+                res_list = resources.get("result", [])
+                if res_list:
+                    cards = [r.get("url", "").split("/")[-1].split(".")[0] for r in res_list if r.get("url")]
+                    context_parts.append(f"## CUSTOM CARDS INSTALLATE\n{', '.join(cards)}")
+            except Exception:
+                pass
+
+        # --- ENTITY/DEVICE CONTEXT ---
+        entity_keywords = ["luce", "luci", "light", "temperatura", "temperature", "sensore", "sensor",
+                          "clima", "climate", "switch", "interruttore", "media_player", "cover", "tapparella"]
+        matched_domains = []
+        domain_map = {"luce": "light", "luci": "light", "light": "light", "lights": "light",
+                     "temperatura": "sensor", "temperature": "sensor", "sensore": "sensor", "sensor": "sensor",
+                     "clima": "climate", "climate": "climate", "switch": "switch", "interruttore": "switch",
+                     "media_player": "media_player", "cover": "cover", "tapparella": "cover"}
+        for kw, domain in domain_map.items():
+            if kw in msg_lower and domain not in matched_domains:
+                matched_domains.append(domain)
+
+        if matched_domains:
+            states = get_all_states()
+            for domain in matched_domains[:3]:  # Max 3 domains
+                domain_entities = [{"entity_id": s.get("entity_id"),
+                                   "state": s.get("state"),
+                                   "friendly_name": s.get("attributes", {}).get("friendly_name", "")}
+                                  for s in states if s.get("entity_id", "").startswith(f"{domain}.")][:30]
+                if domain_entities:
+                    context_parts.append(f"## ENTITÀ {domain.upper()}\n{json.dumps(domain_entities, ensure_ascii=False, indent=1)}")
+
+    except Exception as e:
+        logger.warning(f"Smart context error: {e}")
+
+    if context_parts:
+        context = "\n\n".join(context_parts)
+        logger.info(f"Smart context: injected {len(context)} chars of pre-loaded data")
+        return context
+    return ""
+
+
 def stream_chat_with_ai(user_message: str, session_id: str = "default"):
-    """Stream chat events for all providers. Yields SSE event dicts."""
+    """Stream chat events for all providers. Yields SSE event dicts.
+    Uses smart context pre-loading to minimize API round trips."""
     if not ai_client:
         yield {"type": "error", "message": "API key non configurata"}
         return
@@ -2208,7 +2302,15 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
     if session_id not in conversations:
         conversations[session_id] = []
 
-    conversations[session_id].append({"role": "user", "content": user_message})
+    # Smart context: pre-load relevant data before sending to AI (like VS Code does)
+    smart_context = build_smart_context(user_message)
+    if smart_context:
+        enriched_message = f"{user_message}\n\n---\n**CONTESTO PRE-CARICATO (dati già disponibili, NON serve chiamare tool per ottenerli):**\n{smart_context}"
+        conversations[session_id].append({"role": "user", "content": enriched_message})
+        yield {"type": "status", "message": "Contesto pre-caricato..."}
+    else:
+        conversations[session_id].append({"role": "user", "content": user_message})
+
     # Pass the actual conversation list so tool calls are persisted in-place
     messages = conversations[session_id]
 
