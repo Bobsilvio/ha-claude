@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.5"
+VERSION = "2.8.6"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1927,40 +1927,50 @@ def stream_chat_anthropic(messages):
         current_tool_name = None
         current_tool_input_json = ""
 
-        with ai_client.messages.stream(
-            model=get_active_model(),
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            tools=get_anthropic_tools(),
-            messages=messages
-        ) as stream:
-            for event in stream:
-                if event.type == "content_block_start":
-                    if event.content_block.type == "tool_use":
-                        current_tool_id = event.content_block.id
-                        current_tool_name = event.content_block.name
-                        current_tool_input_json = ""
-                elif event.type == "content_block_delta":
-                    if event.delta.type == "text_delta":
-                        content_parts.append(event.delta.text)
-                    elif event.delta.type == "input_json_delta":
-                        current_tool_input_json += event.delta.partial_json
-                elif event.type == "content_block_stop":
-                    if current_tool_name:
-                        try:
-                            tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
-                        except json.JSONDecodeError:
-                            tool_input = {}
-                        tool_uses.append({
-                            "id": current_tool_id,
-                            "name": current_tool_name,
-                            "input": tool_input
-                        })
-                        current_tool_name = None
-                        current_tool_id = None
-                        current_tool_input_json = ""
+        try:
+            with ai_client.messages.stream(
+                model=get_active_model(),
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                tools=get_anthropic_tools(),
+                messages=messages
+            ) as stream:
+                for event in stream:
+                    if event.type == "content_block_start":
+                        if event.content_block.type == "tool_use":
+                            current_tool_id = event.content_block.id
+                            current_tool_name = event.content_block.name
+                            current_tool_input_json = ""
+                    elif event.type == "content_block_delta":
+                        if event.delta.type == "text_delta":
+                            content_parts.append(event.delta.text)
+                        elif event.delta.type == "input_json_delta":
+                            current_tool_input_json += event.delta.partial_json
+                    elif event.type == "content_block_stop":
+                        if current_tool_name:
+                            try:
+                                tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
+                            except json.JSONDecodeError:
+                                tool_input = {}
+                            tool_uses.append({
+                                "id": current_tool_id,
+                                "name": current_tool_name,
+                                "input": tool_input
+                            })
+                            current_tool_name = None
+                            current_tool_id = None
+                            current_tool_input_json = ""
 
-            final_message = stream.get_final_message()
+                final_message = stream.get_final_message()
+        except Exception as api_err:
+            error_msg = str(api_err)
+            if "429" in error_msg or "rate" in error_msg.lower():
+                logger.warning(f"Rate limit hit at round {round_num+1}: {error_msg}")
+                yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
+                time.sleep(10)  # Wait and retry this round
+                continue
+            else:
+                raise
 
         accumulated_text = "".join(content_parts)
 
@@ -2280,6 +2290,8 @@ def get_chat_ui():
             let fullText = '';
             let buffer = '';
             let hasTools = false;
+            let gotAnyEvent = false;
+            try {{
             while (true) {{
                 const {{ done, value }} = await reader.read();
                 if (done) break;
@@ -2292,31 +2304,45 @@ def get_chat_ui():
                         if (!line.startsWith('data: ')) continue;
                         try {{
                             const evt = JSON.parse(line.slice(6));
+                            gotAnyEvent = true;
                             if (evt.type === 'tool') {{
+                                removeThinking();
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 hasTools = true;
                                 div.innerHTML += '<div class="tool-badge">\U0001f527 ' + evt.name + '</div>';
                             }} else if (evt.type === 'clear') {{
-                                // Reset everything for the final response
+                                removeThinking();
                                 if (div) {{ div.innerHTML = ''; }}
                                 fullText = '';
                                 hasTools = false;
                             }} else if (evt.type === 'status') {{
-                                // Show status message during tool processing
+                                removeThinking();
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
-                                div.innerHTML += '<div class="tool-badge">⏳ ' + evt.message + '</div>';
+                                div.innerHTML += '<div class="tool-badge">\u23f3 ' + evt.message + '</div>';
                             }} else if (evt.type === 'token') {{
+                                removeThinking();
                                 if (hasTools && div) {{ div.innerHTML = ''; fullText = ''; hasTools = false; }}
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 fullText += evt.content;
                                 div.innerHTML = formatMarkdown(fullText);
                             }} else if (evt.type === 'error') {{
+                                removeThinking();
                                 addMessage('\u274c ' + evt.message, 'system');
+                            }} else if (evt.type === 'done') {{
+                                removeThinking();
                             }}
                             chat.scrollTop = chat.scrollHeight;
                         }} catch(e) {{}}
                     }}
                 }}
+            }}
+            }} catch(streamErr) {{
+                console.error('Stream error:', streamErr);
+            }}
+            // Safety: if stream ended without final response, show a message
+            removeThinking();
+            if (!gotAnyEvent) {{
+                addMessage('\u274c Connessione interrotta. Riprova.', 'system');
             }}
         }}
 
