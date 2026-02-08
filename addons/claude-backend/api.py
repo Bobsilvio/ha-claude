@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.0"
+VERSION = "2.8.1"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1860,18 +1860,136 @@ def stream_chat_openai(messages):
 
 
 def stream_chat_anthropic(messages):
-    """Stream chat for Anthropic (processes tools, then streams final text word-by-word)."""
-    final_text, _ = chat_anthropic(messages)
-    messages.append({"role": "assistant", "content": final_text})
-    words = final_text.split(' ')
-    for i, word in enumerate(words):
-        yield {"type": "token", "content": word + (' ' if i < len(words) - 1 else '')}
-    yield {"type": "done", "full_text": final_text}
+    """Stream chat for Anthropic with real token streaming and tool event emission."""
+    import anthropic
+
+    full_text = ""
+
+    while True:
+        # Use streaming API
+        content_parts = []
+        tool_uses = []
+        current_tool_id = None
+        current_tool_name = None
+        current_tool_input_json = ""
+
+        with ai_client.messages.stream(
+            model=get_active_model(),
+            max_tokens=4096,
+            system=SYSTEM_PROMPT,
+            tools=get_anthropic_tools(),
+            messages=messages
+        ) as stream:
+            for event in stream:
+                if event.type == "content_block_start":
+                    if event.content_block.type == "tool_use":
+                        current_tool_id = event.content_block.id
+                        current_tool_name = event.content_block.name
+                        current_tool_input_json = ""
+                    elif event.content_block.type == "text":
+                        pass  # Text block starting
+                elif event.type == "content_block_delta":
+                    if event.delta.type == "text_delta":
+                        content_parts.append(event.delta.text)
+                        yield {"type": "token", "content": event.delta.text}
+                    elif event.delta.type == "input_json_delta":
+                        current_tool_input_json += event.delta.partial_json
+                elif event.type == "content_block_stop":
+                    if current_tool_name:
+                        try:
+                            tool_input = json.loads(current_tool_input_json) if current_tool_input_json else {}
+                        except json.JSONDecodeError:
+                            tool_input = {}
+                        tool_uses.append({
+                            "id": current_tool_id,
+                            "name": current_tool_name,
+                            "input": tool_input
+                        })
+                        current_tool_name = None
+                        current_tool_id = None
+                        current_tool_input_json = ""
+
+            # Get the final message for stop_reason
+            final_message = stream.get_final_message()
+
+        accumulated_text = "".join(content_parts)
+
+        if not tool_uses:
+            # No tools called, we're done
+            full_text = accumulated_text
+            break
+
+        # Process tool calls - emit tool events so the UI shows badges
+        assistant_content = final_message.content
+        messages.append({"role": "assistant", "content": assistant_content})
+
+        tool_results = []
+        for tool in tool_uses:
+            logger.info(f"Tool: {tool['name']}")
+            yield {"type": "tool", "name": tool["name"]}
+            result = execute_tool(tool["name"], tool["input"])
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": tool["id"],
+                "content": result
+            })
+
+        messages.append({"role": "user", "content": tool_results})
+        # Loop back to get the next response (might call more tools or give final answer)
+
+    messages.append({"role": "assistant", "content": full_text})
+    yield {"type": "done", "full_text": full_text}
 
 
 def stream_chat_google(messages):
-    """Stream chat for Google Gemini (processes tools, then streams final text word-by-word)."""
-    final_text, _ = chat_google(messages)
+    """Stream chat for Google Gemini with tool events. Falls back to word-by-word for text."""
+    from google.generativeai.types import content_types
+
+    model = ai_client.GenerativeModel(
+        model_name=get_active_model(),
+        system_instruction=SYSTEM_PROMPT,
+        tools=[get_gemini_tools()]
+    )
+
+    gemini_history = []
+    for m in messages[:-1]:
+        role = "model" if m["role"] == "assistant" else "user"
+        if isinstance(m.get("content"), str):
+            gemini_history.append({"role": role, "parts": [m["content"]]})
+
+    chat = model.start_chat(history=gemini_history)
+    last_message = messages[-1]["content"] if messages else ""
+    response = chat.send_message(last_message)
+
+    while response.candidates[0].content.parts:
+        has_function_call = False
+        function_responses = []
+
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "function_call") and part.function_call:
+                has_function_call = True
+                fn = part.function_call
+                logger.info(f"Tool: {fn.name}")
+                yield {"type": "tool", "name": fn.name}
+                args = dict(fn.args) if fn.args else {}
+                result = execute_tool(fn.name, args)
+                function_responses.append(
+                    ai_client.protos.Part(function_response=ai_client.protos.FunctionResponse(
+                        name=fn.name,
+                        response={"result": json.loads(result)}
+                    ))
+                )
+
+        if not has_function_call:
+            break
+        response = chat.send_message(function_responses)
+
+    final_text = ""
+    for part in response.candidates[0].content.parts:
+        if hasattr(part, "text") and part.text:
+            final_text += part.text
+
+    # Stream text word by word
     messages.append({"role": "assistant", "content": final_text})
     words = final_text.split(' ')
     for i, word in enumerate(words):
