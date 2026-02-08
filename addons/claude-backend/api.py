@@ -4,6 +4,7 @@ import os
 import json
 import logging
 import queue
+import time
 import threading
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -19,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.4"
+VERSION = "2.8.5"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1823,14 +1824,16 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 
 
 def stream_chat_openai(messages):
-    """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts."""
+    """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts.
+    Buffers text during tool rounds - only streams final response."""
     trimmed = trim_messages(messages)
     system_prompt = get_system_prompt()
     tools = get_openai_tools_for_provider()
     max_tok = 4000 if AI_PROVIDER == "github" else 4096
     full_text = ""
+    max_rounds = 15
 
-    while True:
+    for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
 
         response = ai_client.chat.completions.create(
@@ -1851,7 +1854,6 @@ def stream_chat_openai(messages):
 
             if delta.content:
                 content_parts.append(delta.content)
-                yield {"type": "token", "content": delta.content}
 
             if delta.tool_calls:
                 for tc_delta in delta.tool_calls:
@@ -1869,10 +1871,16 @@ def stream_chat_openai(messages):
         accumulated = "".join(content_parts)
 
         if not tool_calls_map:
+            # No tools - stream the final text now
             full_text = accumulated
+            yield {"type": "clear"}
+            for i in range(0, len(full_text), 4):
+                chunk = full_text[i:i+4]
+                yield {"type": "token", "content": chunk}
             break
 
         # Build assistant message with tool calls
+        logger.info(f"Round {round_num+1}: {len(tool_calls_map)} tool(s), skipping intermediate text")
         tc_list = []
         for idx in sorted(tool_calls_map.keys()):
             tc = tool_calls_map[idx]
@@ -1906,6 +1914,13 @@ def stream_chat_anthropic(messages):
     max_rounds = 15  # Prevent infinite loops
 
     for round_num in range(max_rounds):
+        # Rate-limit prevention: delay between API calls (not on first round)
+        if round_num > 0:
+            delay = min(2 + round_num, 5)  # 3s, 4s, 5s, 5s...
+            logger.info(f"Rate-limit prevention: waiting {delay}s before round {round_num+1}")
+            yield {"type": "status", "message": f"Elaborazione in corso... (step {round_num+1})"}
+            time.sleep(delay)
+
         content_parts = []
         tool_uses = []
         current_tool_id = None
@@ -2023,6 +2038,8 @@ def stream_chat_google(messages):
 
         if not has_function_call:
             break
+        # Rate-limit prevention for Google
+        time.sleep(1)
         response = chat.send_message(function_responses)
 
     final_text = ""
@@ -2284,6 +2301,10 @@ def get_chat_ui():
                                 if (div) {{ div.innerHTML = ''; }}
                                 fullText = '';
                                 hasTools = false;
+                            }} else if (evt.type === 'status') {{
+                                // Show status message during tool processing
+                                if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
+                                div.innerHTML += '<div class="tool-badge">⏳ ' + evt.message + '</div>';
                             }} else if (evt.type === 'token') {{
                                 if (hasTools && div) {{ div.innerHTML = ''; fullText = ''; hasTools = false; }}
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
