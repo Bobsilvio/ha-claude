@@ -1,4 +1,4 @@
-FROM ghcr.io/home-assistant/amd64-base:latest
+FROM %%BASE_IMAGE%%
 
 # Install Python and dependencies
 RUN apk add --no-cache \
