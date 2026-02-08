@@ -13,14 +13,11 @@ RUN apk add --no-cache \
     openssl-dev \
     libffi-dev
 
-# Upgrade pip
-RUN pip3 install --upgrade pip setuptools wheel
-
 WORKDIR /app
 
 # Copy backend requirements and install dependencies
 COPY backend/requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy backend application
 COPY backend/api.py .
