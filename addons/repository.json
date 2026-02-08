@@ -4,15 +4,6 @@
   "maintainer": "Silvio Vaira <silvio.vaira@gmail.com>",
   "addons": [
     {
-      "name": "Claude AI Assistant",
-      "slug": "claude-ai",
-      "description": "Chat with Claude AI to control your smart home. Create automations, read sensors, control devices - all from a conversational interface.",
-      "url": "https://github.com/Bobsilvio/ha-claude/tree/main/addon-claude",
-      "version": "2.0.1",
-      "image": "ghcr.io/Bobsilvio/addon-claude:{VERSION}",
-      "arch": ["aarch64", "amd64", "armv7"]
-    },
-    {
       "name": "Claude AI Backend",
       "slug": "claude-backend",
       "description": "All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant",
