@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.3"
+VERSION = "2.8.4"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1897,13 +1897,15 @@ def stream_chat_openai(messages):
 
 
 def stream_chat_anthropic(messages):
-    """Stream chat for Anthropic with real token streaming and tool event emission."""
+    """Stream chat for Anthropic with real token streaming and tool event emission.
+    Buffers text during tool rounds to avoid showing intermediate 'thinking' text.
+    Only streams text tokens for the FINAL response (no tools)."""
     import anthropic
 
     full_text = ""
+    max_rounds = 15  # Prevent infinite loops
 
-    while True:
-        # Use streaming API
+    for round_num in range(max_rounds):
         content_parts = []
         tool_uses = []
         current_tool_id = None
@@ -1923,12 +1925,9 @@ def stream_chat_anthropic(messages):
                         current_tool_id = event.content_block.id
                         current_tool_name = event.content_block.name
                         current_tool_input_json = ""
-                    elif event.content_block.type == "text":
-                        pass  # Text block starting
                 elif event.type == "content_block_delta":
                     if event.delta.type == "text_delta":
                         content_parts.append(event.delta.text)
-                        yield {"type": "token", "content": event.delta.text}
                     elif event.delta.type == "input_json_delta":
                         current_tool_input_json += event.delta.partial_json
                 elif event.type == "content_block_stop":
@@ -1946,17 +1945,22 @@ def stream_chat_anthropic(messages):
                         current_tool_id = None
                         current_tool_input_json = ""
 
-            # Get the final message for stop_reason
             final_message = stream.get_final_message()
 
         accumulated_text = "".join(content_parts)
 
         if not tool_uses:
-            # No tools called, we're done
+            # No tools - this is the final response. Stream the text now.
             full_text = accumulated_text
+            # Yield a clear signal to reset any previous tool badges
+            yield {"type": "clear"}
+            for i in range(0, len(full_text), 4):
+                chunk = full_text[i:i+4]
+                yield {"type": "token", "content": chunk}
             break
 
-        # Process tool calls - emit tool events so the UI shows badges
+        # Tools found - DON'T stream intermediate text, just show tool badges
+        logger.info(f"Round {round_num+1}: {len(tool_uses)} tool(s), skipping intermediate text")
         assistant_content = final_message.content
         messages.append({"role": "assistant", "content": assistant_content})
 
@@ -1972,7 +1976,7 @@ def stream_chat_anthropic(messages):
             })
 
         messages.append({"role": "user", "content": tool_results})
-        # Loop back to get the next response (might call more tools or give final answer)
+        # Loop back for next round
 
     messages.append({"role": "assistant", "content": full_text})
     yield {"type": "done", "full_text": full_text}
@@ -2275,8 +2279,13 @@ def get_chat_ui():
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 hasTools = true;
                                 div.innerHTML += '<div class="tool-badge">\U0001f527 ' + evt.name + '</div>';
+                            }} else if (evt.type === 'clear') {{
+                                // Reset everything for the final response
+                                if (div) {{ div.innerHTML = ''; }}
+                                fullText = '';
+                                hasTools = false;
                             }} else if (evt.type === 'token') {{
-                                if (hasTools && div) {{ div.innerHTML = ''; hasTools = false; }}
+                                if (hasTools && div) {{ div.innerHTML = ''; fullText = ''; hasTools = false; }}
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 fullText += evt.content;
                                 div.innerHTML = formatMarkdown(fullText);
