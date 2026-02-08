@@ -20,7 +20,6 @@ VERSION = "2.4.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
-HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -33,11 +32,42 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Home Assistant headers
-HA_HEADERS = {
-    "Authorization": f"Bearer {HA_TOKEN}",
-    "Content-Type": "application/json",
-}
+def get_ha_token() -> str:
+    """Get Home Assistant Supervisor token with multiple fallbacks."""
+    # 1. Environment variable (set by s6 run script)
+    token = os.getenv("SUPERVISOR_TOKEN", "")
+    if token:
+        return token
+    # 2. s6-overlay container environment file
+    try:
+        token_file = "/run/s6/container_environment/SUPERVISOR_TOKEN"
+        if os.path.isfile(token_file):
+            with open(token_file, "r") as f:
+                token = f.read().strip()
+                if token:
+                    return token
+    except Exception:
+        pass
+    # 3. bashio config approach (HA addon env)
+    try:
+        token_file2 = "/var/run/s6/container_environment/SUPERVISOR_TOKEN"
+        if os.path.isfile(token_file2):
+            with open(token_file2, "r") as f:
+                token = f.read().strip()
+                if token:
+                    return token
+    except Exception:
+        pass
+    return ""
+
+
+def get_ha_headers() -> dict:
+    """Build HA API headers with current token."""
+    token = get_ha_token()
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
 
 # ---- Provider defaults ----
 
@@ -113,18 +143,24 @@ conversations: Dict[str, List[Dict]] = {}
 def call_ha_api(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> Any:
     """Call Home Assistant API."""
     url = f"{HA_URL}/api/{endpoint}"
+    headers = get_ha_headers()
+    token = get_ha_token()
+    logger.debug(f"HA API call: {method} {url} (token present: {bool(token)}, len={len(token)})")
     try:
         if method.upper() == "GET":
-            response = requests.get(url, headers=HA_HEADERS, timeout=30)
+            response = requests.get(url, headers=headers, timeout=30)
         elif method.upper() == "POST":
-            response = requests.post(url, headers=HA_HEADERS, json=data, timeout=30)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
         elif method.upper() == "DELETE":
-            response = requests.delete(url, headers=HA_HEADERS, timeout=30)
+            response = requests.delete(url, headers=headers, timeout=30)
         else:
             return {"error": f"Unsupported method: {method}"}
 
         if response.status_code in [200, 201]:
             return response.json() if response.text else {"status": "success"}
+        elif response.status_code == 401:
+            logger.error(f"HA API 401 Unauthorized - token might be missing or invalid. HA_URL={HA_URL}, token_len={len(token)}")
+            return {"error": "401 Unauthorized - check SUPERVISOR_TOKEN"}
         else:
             logger.error(f"HA API error {response.status_code}: {response.text}")
             return {"error": f"API error {response.status_code}", "details": response.text}
@@ -707,6 +743,32 @@ def get_chat_ui():
 def index():
     """Serve the chat UI."""
     return get_chat_ui(), 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+
+@app.route('/api/status')
+def api_status():
+    """Debug endpoint to check HA connection status."""
+    token = get_ha_token()
+    ha_ok = False
+    ha_msg = ""
+    try:
+        resp = requests.get(f"{HA_URL}/api/", headers=get_ha_headers(), timeout=10)
+        ha_ok = resp.status_code == 200
+        ha_msg = f"{resp.status_code}: {resp.text[:200]}"
+    except Exception as e:
+        ha_msg = str(e)
+
+    return jsonify({
+        "version": VERSION,
+        "provider": AI_PROVIDER,
+        "model": get_active_model(),
+        "api_key_set": bool(get_api_key()),
+        "ha_url": HA_URL,
+        "supervisor_token_present": bool(token),
+        "supervisor_token_length": len(token),
+        "ha_connection_ok": ha_ok,
+        "ha_response": ha_msg,
+    })
 
 
 @app.route('/api/chat', methods=['POST'])

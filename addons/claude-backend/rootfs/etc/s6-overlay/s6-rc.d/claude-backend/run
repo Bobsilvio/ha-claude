@@ -16,6 +16,14 @@ AI_MODEL=$(bashio::config 'ai_model')
 API_PORT=$(bashio::config 'api_port')
 DEBUG_MODE=$(bashio::config 'debug_mode')
 
+# SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
+if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
+    SUPERVISOR_TOKEN="${HASSIO_TOKEN:-}"
+fi
+if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
+    SUPERVISOR_TOKEN=$(bashio::api.supervisor_token 2>/dev/null || true)
+fi
+
 export AI_PROVIDER
 export ANTHROPIC_API_KEY
 export OPENAI_API_KEY
@@ -27,6 +35,8 @@ export DEBUG_MODE
 export SUPERVISOR_TOKEN
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
+bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && echo 'yes' || echo 'NO - HA API will fail!')"
+bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
 
 cd /app
 exec python3 api.py
