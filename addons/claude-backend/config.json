@@ -1,8 +1,8 @@
 {
-  "name": "Claude AI Backend",
-  "version": "2.2.0",
+  "name": "AI Assistant for Home Assistant",
+  "version": "2.3.0",
   "slug": "claude-backend",
-  "description": "All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant",
+  "description": "AI-powered smart home assistant with Claude, ChatGPT and Gemini support",
   "url": "https://github.com/Bobsilvio/ha-claude",
   "init": false,
   "arch": [
@@ -17,7 +17,7 @@
   "ingress_port": 5000,
   "ingress_entry": "/",
   "panel_icon": "mdi:robot",
-  "panel_title": "Claude AI",
+  "panel_title": "AI Assistant",
   "homeassistant_api": true,
   "map": [
     "config:rw"
@@ -26,24 +26,30 @@
     "5000/tcp": null
   },
   "ports_description": {
-    "5000/tcp": "Claude Backend API"
+    "5000/tcp": "AI Assistant API"
   },
   "environment": {
     "DEBUG_MODE": "False"
   },
   "options": {
-    "claude_api_key": "",
+    "ai_provider": "anthropic",
+    "anthropic_api_key": "",
+    "openai_api_key": "",
+    "google_api_key": "",
+    "ai_model": "",
     "api_port": "5000",
     "debug_mode": false,
-    "polling_interval": "60",
     "timeout": "30",
     "max_retries": "3"
   },
   "schema": {
-    "claude_api_key": "password",
+    "ai_provider": "list(anthropic|openai|google)",
+    "anthropic_api_key": "password?",
+    "openai_api_key": "password?",
+    "google_api_key": "password?",
+    "ai_model": "str?",
     "api_port": "str",
     "debug_mode": "bool?",
-    "polling_interval": "str?",
     "timeout": "str?",
     "max_retries": "str?"
   },

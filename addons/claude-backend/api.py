@@ -1,4 +1,4 @@
-"""Flask API with real Claude AI integration for Home Assistant."""
+"""AI Assistant API with multi-provider support for Home Assistant."""
 
 import os
 import json
@@ -9,7 +9,6 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
-import anthropic
 
 load_dotenv()
 
@@ -17,12 +16,16 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.2.0"
+VERSION = "2.3.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
 HA_TOKEN = os.getenv("SUPERVISOR_TOKEN", "")
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
+AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+AI_MODEL = os.getenv("AI_MODEL", "")
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 
@@ -35,15 +38,61 @@ HA_HEADERS = {
     "Content-Type": "application/json",
 }
 
-# Claude client
-claude_client = None
-if CLAUDE_API_KEY:
-    claude_client = anthropic.Anthropic(api_key=CLAUDE_API_KEY)
-    logger.info("Claude API client initialized")
-else:
-    logger.warning("CLAUDE_API_KEY not set - Claude integration disabled")
+# ---- Provider defaults ----
 
-# Conversation history (per-session, in memory)
+PROVIDER_DEFAULTS = {
+    "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
+    "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
+    "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
+}
+
+PROVIDER_MODELS = {
+    "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
+    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
+    "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+}
+
+
+def get_active_model() -> str:
+    """Get the active model name."""
+    if AI_MODEL:
+        return AI_MODEL
+    return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
+
+
+def get_api_key() -> str:
+    """Get the API key for the active provider."""
+    if AI_PROVIDER == "anthropic":
+        return ANTHROPIC_API_KEY
+    elif AI_PROVIDER == "openai":
+        return OPENAI_API_KEY
+    elif AI_PROVIDER == "google":
+        return GOOGLE_API_KEY
+    return ""
+
+
+# ---- Initialize AI client ----
+
+ai_client = None
+api_key = get_api_key()
+
+if AI_PROVIDER == "anthropic" and api_key:
+    import anthropic
+    ai_client = anthropic.Anthropic(api_key=api_key)
+    logger.info(f"Anthropic client initialized (model: {get_active_model()})")
+elif AI_PROVIDER == "openai" and api_key:
+    from openai import OpenAI
+    ai_client = OpenAI(api_key=api_key)
+    logger.info(f"OpenAI client initialized (model: {get_active_model()})")
+elif AI_PROVIDER == "google" and api_key:
+    import google.generativeai as genai
+    genai.configure(api_key=api_key)
+    ai_client = genai
+    logger.info(f"Google Gemini client initialized (model: {get_active_model()})")
+else:
+    logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
+
+# Conversation history
 conversations: Dict[str, List[Dict]] = {}
 
 # ---- Home Assistant API helpers ----
@@ -78,18 +127,18 @@ def get_all_states() -> List[Dict]:
     return result if isinstance(result, list) else []
 
 
-# ---- Claude Tool Definitions ----
+# ---- Tool definitions (shared across providers) ----
 
-CLAUDE_TOOLS = [
+HA_TOOLS_DESCRIPTION = [
     {
         "name": "get_entities",
-        "description": "Get the current state of all Home Assistant entities, or filter by domain (e.g. 'light', 'switch', 'sensor', 'automation', 'climate'). Returns entity_id, state, and attributes.",
-        "input_schema": {
+        "description": "Get the current state of all Home Assistant entities, or filter by domain (e.g. 'light', 'switch', 'sensor', 'automation', 'climate').",
+        "parameters": {
             "type": "object",
             "properties": {
                 "domain": {
                     "type": "string",
-                    "description": "Optional domain to filter (e.g. 'light', 'switch', 'sensor', 'climate', 'automation'). If empty, returns all."
+                    "description": "Optional domain filter (e.g. 'light', 'switch', 'sensor')."
                 }
             },
             "required": []
@@ -98,12 +147,12 @@ CLAUDE_TOOLS = [
     {
         "name": "get_entity_state",
         "description": "Get the current state and attributes of a specific entity.",
-        "input_schema": {
+        "parameters": {
             "type": "object",
             "properties": {
                 "entity_id": {
                     "type": "string",
-                    "description": "The entity ID (e.g. 'light.living_room', 'sensor.temperature')."
+                    "description": "The entity ID (e.g. 'light.living_room')."
                 }
             },
             "required": ["entity_id"]
@@ -111,21 +160,21 @@ CLAUDE_TOOLS = [
     },
     {
         "name": "call_service",
-        "description": "Call a Home Assistant service. Use this to control devices: turn on/off lights, switches, set climate temperature, lock/unlock, open/close covers, send notifications, etc.",
-        "input_schema": {
+        "description": "Call a Home Assistant service to control devices: turn on/off lights, switches, set climate temperature, lock/unlock, open/close covers, send notifications, etc.",
+        "parameters": {
             "type": "object",
             "properties": {
                 "domain": {
                     "type": "string",
-                    "description": "Service domain (e.g. 'light', 'switch', 'climate', 'cover', 'lock', 'media_player', 'notify')."
+                    "description": "Service domain (e.g. 'light', 'switch', 'climate', 'cover')."
                 },
                 "service": {
                     "type": "string",
-                    "description": "Service name (e.g. 'turn_on', 'turn_off', 'toggle', 'set_temperature')."
+                    "description": "Service name (e.g. 'turn_on', 'turn_off', 'toggle')."
                 },
                 "data": {
                     "type": "object",
-                    "description": "Service data including target entity_id and any parameters."
+                    "description": "Service data including target entity_id and parameters."
                 }
             },
             "required": ["domain", "service", "data"]
@@ -133,81 +182,78 @@ CLAUDE_TOOLS = [
     },
     {
         "name": "create_automation",
-        "description": "Create a new Home Assistant automation. Provide alias, triggers, conditions (optional), and actions using HA format.",
-        "input_schema": {
+        "description": "Create a new Home Assistant automation with triggers, conditions, and actions.",
+        "parameters": {
             "type": "object",
             "properties": {
-                "alias": {
-                    "type": "string",
-                    "description": "Human-readable name for the automation."
-                },
-                "description": {
-                    "type": "string",
-                    "description": "Description of what the automation does."
-                },
-                "trigger": {
-                    "type": "array",
-                    "description": "List of triggers.",
-                    "items": {"type": "object"}
-                },
-                "condition": {
-                    "type": "array",
-                    "description": "Optional list of conditions.",
-                    "items": {"type": "object"}
-                },
-                "action": {
-                    "type": "array",
-                    "description": "List of actions to execute.",
-                    "items": {"type": "object"}
-                },
-                "mode": {
-                    "type": "string",
-                    "description": "Automation mode: 'single', 'restart', 'queued', 'parallel'.",
-                    "enum": ["single", "restart", "queued", "parallel"]
-                }
+                "alias": {"type": "string", "description": "Name for the automation."},
+                "description": {"type": "string", "description": "Description of the automation."},
+                "trigger": {"type": "array", "description": "List of triggers.", "items": {"type": "object"}},
+                "condition": {"type": "array", "description": "Optional conditions.", "items": {"type": "object"}},
+                "action": {"type": "array", "description": "List of actions.", "items": {"type": "object"}},
+                "mode": {"type": "string", "enum": ["single", "restart", "queued", "parallel"]}
             },
             "required": ["alias", "trigger", "action"]
         }
     },
     {
         "name": "get_automations",
-        "description": "Get all existing automations with their state and last triggered time.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": "Get all existing automations.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
     },
     {
         "name": "trigger_automation",
-        "description": "Manually trigger/run an existing automation.",
-        "input_schema": {
+        "description": "Manually trigger an existing automation.",
+        "parameters": {
             "type": "object",
             "properties": {
-                "entity_id": {
-                    "type": "string",
-                    "description": "The automation entity_id (e.g. 'automation.my_automation')."
-                }
+                "entity_id": {"type": "string", "description": "Automation entity_id."}
             },
             "required": ["entity_id"]
         }
     },
     {
         "name": "get_available_services",
-        "description": "Get a list of all available Home Assistant service domains and their services.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
+        "description": "Get all available Home Assistant service domains and services.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
     }
 ]
+
+
+def get_anthropic_tools():
+    """Convert tools to Anthropic format."""
+    return [
+        {"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
+        for t in HA_TOOLS_DESCRIPTION
+    ]
+
+
+def get_openai_tools():
+    """Convert tools to OpenAI function-calling format."""
+    return [
+        {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
+        for t in HA_TOOLS_DESCRIPTION
+    ]
+
+
+def get_gemini_tools():
+    """Convert tools to Google Gemini format."""
+    from google.generativeai.types import FunctionDeclaration, Tool
+    declarations = []
+    for t in HA_TOOLS_DESCRIPTION:
+        declarations.append(FunctionDeclaration(
+            name=t["name"],
+            description=t["description"],
+            parameters=t["parameters"]
+        ))
+    return Tool(function_declarations=declarations)
+
 
 # ---- Tool execution ----
 
 
 def execute_tool(tool_name: str, tool_input: Dict) -> str:
-    """Execute a Claude tool call and return the result as string."""
+    """Execute a tool call and return the result as string."""
     try:
         if tool_name == "get_entities":
             domain = tool_input.get("domain", "")
@@ -240,7 +286,7 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "create_automation":
-            automation_config = {
+            config = {
                 "alias": tool_input.get("alias", "New Automation"),
                 "description": tool_input.get("description", ""),
                 "trigger": tool_input.get("trigger", []),
@@ -248,27 +294,17 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                 "action": tool_input.get("action", []),
                 "mode": tool_input.get("mode", "single"),
             }
-            result = call_ha_api("POST", "config/automation/config/new", automation_config)
+            result = call_ha_api("POST", "config/automation/config/new", config)
             if isinstance(result, dict) and "error" not in result:
-                return json.dumps({
-                    "status": "success",
-                    "message": f"Automation '{automation_config['alias']}' created!",
-                    "result": result
-                }, ensure_ascii=False)
-            else:
-                return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
+                return json.dumps({"status": "success", "message": f"Automation '{config['alias']}' created!", "result": result}, ensure_ascii=False)
+            return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "get_automations":
             states = get_all_states()
-            automations = [s for s in states if s.get("entity_id", "").startswith("automation.")]
-            result = []
-            for a in automations:
-                result.append({
-                    "entity_id": a.get("entity_id"),
-                    "state": a.get("state"),
-                    "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
-                    "last_triggered": a.get("attributes", {}).get("last_triggered", ""),
-                })
+            autos = [s for s in states if s.get("entity_id", "").startswith("automation.")]
+            result = [{"entity_id": a.get("entity_id"), "state": a.get("state"),
+                       "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
+                       "last_triggered": a.get("attributes", {}).get("last_triggered", "")} for a in autos]
             return json.dumps(result, ensure_ascii=False, default=str)
 
         elif tool_name == "trigger_automation":
@@ -277,130 +313,202 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "get_available_services":
-            services_raw = call_ha_api("GET", "services")
-            if isinstance(services_raw, list):
-                compact = {}
-                for svc in services_raw:
-                    domain = svc.get("domain", "")
-                    compact[domain] = list(svc.get("services", {}).keys())
+            svc_raw = call_ha_api("GET", "services")
+            if isinstance(svc_raw, list):
+                compact = {s.get("domain", ""): list(s.get("services", {}).keys()) for s in svc_raw}
                 return json.dumps(compact, ensure_ascii=False)
-            return json.dumps(services_raw, ensure_ascii=False, default=str)
+            return json.dumps(svc_raw, ensure_ascii=False, default=str)
 
-        else:
-            return json.dumps({"error": f"Unknown tool: {tool_name}"})
-
+        return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
-        logger.error(f"Tool execution error ({tool_name}): {e}")
+        logger.error(f"Tool error ({tool_name}): {e}")
         return json.dumps({"error": str(e)})
 
 
 # ---- System prompt ----
 
-SYSTEM_PROMPT = """You are Claude, an AI assistant integrated into Home Assistant. You help users manage their smart home.
+SYSTEM_PROMPT = """You are an AI assistant integrated into Home Assistant. You help users manage their smart home.
 
 You can:
-1. **Query entities** - See the state of all devices (lights, sensors, switches, climate, covers, etc.)
-2. **Control devices** - Turn on/off lights, switches, set temperatures, open/close covers, etc.
+1. **Query entities** - See device states (lights, sensors, switches, climate, covers, etc.)
+2. **Control devices** - Turn on/off lights, switches, set temperatures, etc.
 3. **Create automations** - Build new automations with triggers, conditions, and actions
-4. **List automations** - See existing automations
-5. **Trigger automations** - Manually run automations
-6. **Discover services** - See all available HA services
+4. **List & trigger automations** - See and run existing automations
+5. **Discover services** - See all available HA services
 
-When creating automations, use proper Home Assistant trigger/action formats. Examples:
-
-Triggers:
-- State: {"platform": "state", "entity_id": "binary_sensor.motion", "to": "on"}
-- Time: {"platform": "time", "at": "07:00:00"}
-- Sun: {"platform": "sun", "event": "sunset", "offset": "-00:30:00"}
-- Numeric state: {"platform": "numeric_state", "entity_id": "sensor.temperature", "above": 25}
-
-Actions:
-- Service call: {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}, "data": {"brightness": 255}}
-- Delay: {"delay": {"seconds": 30}}
-- Notification: {"service": "notify.mobile_app", "data": {"message": "Hello!"}}
-- Condition check: {"condition": "state", "entity_id": "input_boolean.away", "state": "on"}
+When creating automations, use proper Home Assistant formats:
+- State trigger: {"platform": "state", "entity_id": "binary_sensor.motion", "to": "on"}
+- Time trigger: {"platform": "time", "at": "07:00:00"}
+- Sun trigger: {"platform": "sun", "event": "sunset", "offset": "-00:30:00"}
+- Service action: {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}, "data": {"brightness": 255}}
 
 Always respond in the same language the user uses.
-When you create an automation, confirm what was created and explain how it works.
-When listing entities, organize them clearly by type.
 Be concise but informative."""
 
 
-# ---- Chat with Claude ----
+# ---- Provider-specific chat implementations ----
 
 
-def chat_with_claude(user_message: str, session_id: str = "default") -> str:
-    """Send a message to Claude with HA tool-calling capabilities."""
-    if not claude_client:
-        return "\u26a0\ufe0f Claude API key non configurata. Impostala nelle impostazioni dell'add-on."
+def chat_anthropic(messages: List[Dict]) -> tuple:
+    """Chat with Anthropic Claude. Returns (response_text, updated_messages)."""
+    import anthropic
 
-    # Get or create conversation history
-    if session_id not in conversations:
-        conversations[session_id] = []
+    response = ai_client.messages.create(
+        model=get_active_model(),
+        max_tokens=4096,
+        system=SYSTEM_PROMPT,
+        tools=get_anthropic_tools(),
+        messages=messages
+    )
 
-    # Add user message
-    conversations[session_id].append({"role": "user", "content": user_message})
+    while response.stop_reason == "tool_use":
+        tool_results = []
+        assistant_content = response.content
+        for block in response.content:
+            if block.type == "tool_use":
+                logger.info(f"Tool: {block.name}")
+                result = execute_tool(block.name, block.input)
+                tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
 
-    # Keep last 20 messages to avoid token limits
-    messages = conversations[session_id][-20:]
+        messages.append({"role": "assistant", "content": assistant_content})
+        messages.append({"role": "user", "content": tool_results})
 
-    try:
-        # Call Claude with tools
-        response = claude_client.messages.create(
-            model="claude-sonnet-4-20250514",
+        response = ai_client.messages.create(
+            model=get_active_model(),
             max_tokens=4096,
             system=SYSTEM_PROMPT,
-            tools=CLAUDE_TOOLS,
+            tools=get_anthropic_tools(),
             messages=messages
         )
 
-        # Process tool calls in a loop
-        while response.stop_reason == "tool_use":
-            tool_results = []
-            assistant_content = response.content
+    final_text = "".join(block.text for block in response.content if hasattr(block, "text"))
+    return final_text, messages
 
-            for block in response.content:
-                if block.type == "tool_use":
-                    logger.info(f"Tool call: {block.name}({json.dumps(block.input, ensure_ascii=False)[:200]})")
-                    tool_result = execute_tool(block.name, block.input)
-                    logger.info(f"Tool result: {tool_result[:300]}...")
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": tool_result
-                    })
 
-            # Add assistant message + tool results
-            messages.append({"role": "assistant", "content": assistant_content})
-            messages.append({"role": "user", "content": tool_results})
+def chat_openai(messages: List[Dict]) -> tuple:
+    """Chat with OpenAI. Returns (response_text, updated_messages)."""
+    # Prepend system message for OpenAI format
+    oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
-            # Continue the conversation
-            response = claude_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4096,
-                system=SYSTEM_PROMPT,
-                tools=CLAUDE_TOOLS,
-                messages=messages
-            )
+    response = ai_client.chat.completions.create(
+        model=get_active_model(),
+        messages=oai_messages,
+        tools=get_openai_tools(),
+        max_tokens=4096
+    )
 
-        # Extract final text response
-        final_text = ""
-        for block in response.content:
-            if hasattr(block, "text"):
-                final_text += block.text
+    msg = response.choices[0].message
 
-        # Save to conversation history
+    while msg.tool_calls:
+        messages.append({"role": "assistant", "content": msg.content, "tool_calls": [
+            {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+            for tc in msg.tool_calls
+        ]})
+
+        for tc in msg.tool_calls:
+            logger.info(f"Tool: {tc.function.name}")
+            args = json.loads(tc.function.arguments)
+            result = execute_tool(tc.function.name, args)
+            messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+
+        oai_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+        response = ai_client.chat.completions.create(
+            model=get_active_model(),
+            messages=oai_messages,
+            tools=get_openai_tools(),
+            max_tokens=4096
+        )
+        msg = response.choices[0].message
+
+    return msg.content or "", messages
+
+
+def chat_google(messages: List[Dict]) -> tuple:
+    """Chat with Google Gemini. Returns (response_text, updated_messages)."""
+    from google.generativeai.types import content_types
+
+    model = ai_client.GenerativeModel(
+        model_name=get_active_model(),
+        system_instruction=SYSTEM_PROMPT,
+        tools=[get_gemini_tools()]
+    )
+
+    # Convert messages to Gemini format
+    gemini_history = []
+    for m in messages[:-1]:  # All except last
+        role = "model" if m["role"] == "assistant" else "user"
+        if isinstance(m["content"], str):
+            gemini_history.append({"role": role, "parts": [m["content"]]})
+
+    chat = model.start_chat(history=gemini_history)
+    last_message = messages[-1]["content"] if messages else ""
+
+    response = chat.send_message(last_message)
+
+    # Handle function calls
+    while response.candidates[0].content.parts:
+        has_function_call = False
+        function_responses = []
+
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "function_call") and part.function_call:
+                has_function_call = True
+                fn = part.function_call
+                logger.info(f"Tool: {fn.name}")
+                args = dict(fn.args) if fn.args else {}
+                result = execute_tool(fn.name, args)
+                function_responses.append(
+                    ai_client.protos.Part(function_response=ai_client.protos.FunctionResponse(
+                        name=fn.name,
+                        response={"result": json.loads(result)}
+                    ))
+                )
+
+        if not has_function_call:
+            break
+
+        response = chat.send_message(function_responses)
+
+    final_text = ""
+    for part in response.candidates[0].content.parts:
+        if hasattr(part, "text") and part.text:
+            final_text += part.text
+
+    return final_text, messages
+
+
+# ---- Main chat function ----
+
+
+def chat_with_ai(user_message: str, session_id: str = "default") -> str:
+    """Send a message to the configured AI provider with HA tools."""
+    if not ai_client:
+        provider_name = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("name", AI_PROVIDER)
+        return f"\u26a0\ufe0f Chiave API per {provider_name} non configurata. Impostala nelle impostazioni dell'add-on."
+
+    if session_id not in conversations:
+        conversations[session_id] = []
+
+    conversations[session_id].append({"role": "user", "content": user_message})
+    messages = conversations[session_id][-20:]
+
+    try:
+        if AI_PROVIDER == "anthropic":
+            final_text, messages = chat_anthropic(messages)
+        elif AI_PROVIDER == "openai":
+            final_text, messages = chat_openai(messages)
+        elif AI_PROVIDER == "google":
+            final_text, messages = chat_google(messages)
+        else:
+            return f"\u274c Provider '{AI_PROVIDER}' non supportato. Scegli: anthropic, openai, google."
+
         conversations[session_id] = messages
         conversations[session_id].append({"role": "assistant", "content": final_text})
-
         return final_text
 
-    except anthropic.APIError as e:
-        logger.error(f"Claude API error: {e}")
-        return f"\u274c Claude API error: {e.message}"
     except Exception as e:
-        logger.error(f"Chat error: {e}")
-        return f"\u274c Error: {str(e)}"
+        logger.error(f"AI error ({AI_PROVIDER}): {e}")
+        return f"\u274c Errore {PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get('name', AI_PROVIDER)}: {str(e)}"
 
 
 # ---- Chat UI HTML ----
@@ -408,20 +516,26 @@ def chat_with_claude(user_message: str, session_id: str = "default") -> str:
 
 def get_chat_ui():
     """Generate the chat UI."""
+    provider_name = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("name", AI_PROVIDER)
+    model_name = get_active_model()
+    configured = bool(get_api_key())
+    status_color = "#4caf50" if configured else "#ff9800"
+    status_text = provider_name if configured else f"{provider_name} (no key)"
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Claude AI - Home Assistant</title>
+    <title>AI Assistant - Home Assistant</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
-        .header .version {{ font-size: 11px; opacity: 0.8; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
+        .header .badge {{ font-size: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
         .header .status {{ margin-left: auto; font-size: 12px; display: flex; align-items: center; gap: 6px; }}
-        .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: #4caf50; animation: pulse 2s infinite; }}
+        .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {status_color}; animation: pulse 2s infinite; }}
         @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
         .chat-container {{ flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }}
         .message {{ max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-wrap: break-word; animation: fadeIn 0.3s ease; }}
@@ -436,7 +550,6 @@ def get_chat_ui():
         .message.assistant p {{ margin: 4px 0; }}
         .message.system {{ background: #fff3cd; color: #856404; align-self: center; text-align: center; font-size: 13px; border-radius: 8px; max-width: 90%; }}
         .message.thinking {{ background: #f8f9fa; color: #999; align-self: flex-start; border-bottom-left-radius: 4px; font-style: italic; }}
-        .message.thinking .dots {{ display: inline-block; }}
         .message.thinking .dots span {{ animation: blink 1.4s infinite both; }}
         .message.thinking .dots span:nth-child(2) {{ animation-delay: 0.2s; }}
         .message.thinking .dots span:nth-child(3) {{ animation-delay: 0.4s; }}
@@ -455,17 +568,19 @@ def get_chat_ui():
 <body>
     <div class="header">
         <span style="font-size: 24px;">\U0001f916</span>
-        <h1>Claude AI</h1>
-        <span class="version">v{VERSION}</span>
+        <h1>AI Assistant</h1>
+        <span class="badge">v{VERSION}</span>
+        <span class="badge">{model_name}</span>
         <div class="status">
             <div class="status-dot"></div>
-            Home Assistant
+            {status_text}
         </div>
     </div>
 
     <div class="chat-container" id="chat">
         <div class="message system">
-            \U0001f44b Ciao! Sono Claude, il tuo assistente AI per Home Assistant.<br>
+            \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
+            Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
             Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
         </div>
     </div>
@@ -497,35 +612,22 @@ def get_chat_ui():
         }}
 
         function handleKeyDown(e) {{
-            if (e.key === 'Enter' && !e.shiftKey) {{
-                e.preventDefault();
-                sendMessage();
-            }}
+            if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
         }}
 
         function addMessage(text, role) {{
             const div = document.createElement('div');
             div.className = 'message ' + role;
-            if (role === 'assistant') {{
-                div.innerHTML = formatMarkdown(text);
-            }} else {{
-                div.textContent = text;
-            }}
+            if (role === 'assistant') {{ div.innerHTML = formatMarkdown(text); }}
+            else {{ div.textContent = text; }}
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
-            return div;
         }}
 
         function formatMarkdown(text) {{
-            // Code blocks
             text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<pre><code>$2</code></pre>');
-            // Inline code
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
-            // Bold
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
-            // Italic
-            text = text.replace(/(?<![*])\\*(?![*])(.+?)(?<![*])\\*(?![*])/g, '<em>$1</em>');
-            // Line breaks
             text = text.replace(/\\n/g, '<br>');
             return text;
         }}
@@ -534,7 +636,7 @@ def get_chat_ui():
             const div = document.createElement('div');
             div.className = 'message thinking';
             div.id = 'thinking';
-            div.innerHTML = 'Claude sta pensando<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            div.innerHTML = 'Sto pensando<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }}
@@ -545,24 +647,20 @@ def get_chat_ui():
         }}
 
         function sendSuggestion(el) {{
-            const text = el.textContent.replace(/^[\\s\\S]{{2}}/, '').trim();
-            input.value = text;
+            input.value = el.textContent.replace(/^.{{2}}/, '').trim();
             sendMessage();
         }}
 
         async function sendMessage() {{
             const text = input.value.trim();
             if (!text || sending) return;
-
             sending = true;
             sendBtn.disabled = true;
             input.value = '';
             input.style.height = 'auto';
             suggestionsEl.style.display = 'none';
-
             addMessage(text, 'user');
             showThinking();
-
             try {{
                 const resp = await fetch('api/chat', {{
                     method: 'POST',
@@ -571,17 +669,12 @@ def get_chat_ui():
                 }});
                 const data = await resp.json();
                 removeThinking();
-
-                if (data.response) {{
-                    addMessage(data.response, 'assistant');
-                }} else if (data.error) {{
-                    addMessage('\u274c ' + data.error, 'system');
-                }}
+                if (data.response) {{ addMessage(data.response, 'assistant'); }}
+                else if (data.error) {{ addMessage('\u274c ' + data.error, 'system'); }}
             }} catch (err) {{
                 removeThinking();
-                addMessage('\u274c Errore di connessione: ' + err.message, 'system');
+                addMessage('\u274c Errore: ' + err.message, 'system');
             }}
-
             sending = false;
             sendBtn.disabled = false;
             input.focus();
@@ -604,27 +697,26 @@ def index():
 
 @app.route('/api/chat', methods=['POST'])
 def api_chat():
-    """Chat endpoint - sends message to Claude with HA tools."""
+    """Chat endpoint."""
     data = request.get_json()
     message = data.get("message", "").strip()
     session_id = data.get("session_id", "default")
-
     if not message:
         return jsonify({"error": "Empty message"}), 400
-
-    logger.info(f"Chat message: {message}")
-    response_text = chat_with_claude(message, session_id)
-
+    logger.info(f"Chat [{AI_PROVIDER}]: {message}")
+    response_text = chat_with_ai(message, session_id)
     return jsonify({"response": response_text}), 200
 
 
 @app.route("/health", methods=["GET"])
 def health():
-    """Health check endpoint."""
+    """Health check."""
     return jsonify({
         "status": "ok",
         "version": VERSION,
-        "claude_configured": bool(CLAUDE_API_KEY),
+        "ai_provider": AI_PROVIDER,
+        "ai_model": get_active_model(),
+        "ai_configured": bool(get_api_key()),
         "ha_connected": bool(HA_TOKEN),
     }), 200
 
@@ -642,17 +734,14 @@ def get_entities_route():
 @app.route("/entity/<entity_id>/state", methods=["GET"])
 def get_entity_state_route(entity_id: str):
     """Get entity state."""
-    result = call_ha_api("GET", f"states/{entity_id}")
-    return jsonify(result), 200
+    return jsonify(call_ha_api("GET", f"states/{entity_id}")), 200
 
 
 @app.route("/message", methods=["POST"])
 def send_message_legacy():
-    """Send a message to Claude (legacy endpoint)."""
+    """Legacy message endpoint."""
     data = request.get_json()
-    message = data.get("message", "")
-    response_text = chat_with_claude(message)
-    return jsonify({"status": "success", "response": response_text}), 200
+    return jsonify({"status": "success", "response": chat_with_ai(data.get("message", ""))}), 200
 
 
 @app.route("/service/call", methods=["POST"])
@@ -660,59 +749,51 @@ def call_service_route():
     """Call a Home Assistant service."""
     data = request.get_json()
     service = data.get("service", "")
-    service_data = data.get("data", {})
     if not service or "." not in service:
-        return jsonify({"error": "Invalid service format. Use 'domain.service'"}), 400
-    domain, service_name = service.split(".", 1)
-    result = call_ha_api("POST", f"services/{domain}/{service_name}", service_data)
-    return jsonify(result), 200
+        return jsonify({"error": "Use 'domain.service' format"}), 400
+    domain, svc = service.split(".", 1)
+    return jsonify(call_ha_api("POST", f"services/{domain}/{svc}", data.get("data", {}))), 200
 
 
 @app.route("/execute/automation", methods=["POST"])
 def execute_automation():
     """Execute an automation."""
     data = request.get_json()
-    entity_id = data.get("entity_id", data.get("automation_id", ""))
-    if not entity_id.startswith("automation."):
-        entity_id = f"automation.{entity_id}"
-    result = call_ha_api("POST", "services/automation/trigger", {"entity_id": entity_id})
-    return jsonify(result), 200
+    eid = data.get("entity_id", data.get("automation_id", ""))
+    if not eid.startswith("automation."):
+        eid = f"automation.{eid}"
+    return jsonify(call_ha_api("POST", "services/automation/trigger", {"entity_id": eid})), 200
 
 
 @app.route("/execute/script", methods=["POST"])
 def execute_script():
     """Execute a script."""
     data = request.get_json()
-    script_id = data.get("script_id", "")
-    variables = data.get("variables", {})
-    result = call_ha_api("POST", f"services/script/{script_id}", variables)
-    return jsonify(result), 200
+    return jsonify(call_ha_api("POST", f"services/script/{data.get('script_id', '')}", data.get("variables", {}))), 200
 
 
 @app.route("/conversation/clear", methods=["POST"])
 def clear_conversation():
     """Clear conversation history."""
-    data = request.get_json() or {}
-    session_id = data.get("session_id", "default")
-    conversations.pop(session_id, None)
+    sid = (request.get_json() or {}).get("session_id", "default")
+    conversations.pop(sid, None)
     return jsonify({"status": "cleared"}), 200
 
 
 @app.errorhandler(404)
 def not_found(error):
-    """Handle 404 errors."""
     return jsonify({"error": "Endpoint not found"}), 404
 
 
 @app.errorhandler(500)
 def internal_error(error):
-    """Handle 500 errors."""
     logger.error(f"Internal error: {error}")
     return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
-    logger.info(f"Starting Claude AI Backend v{VERSION} on port {API_PORT}")
-    logger.info(f"Claude API: {'configured' if CLAUDE_API_KEY else 'NOT configured'}")
+    logger.info(f"Starting AI Assistant v{VERSION} on port {API_PORT}")
+    logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
+    logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
     logger.info(f"HA Token: {'available' if HA_TOKEN else 'NOT available'}")
     app.run(host="0.0.0.0", port=API_PORT, debug=DEBUG_MODE)
