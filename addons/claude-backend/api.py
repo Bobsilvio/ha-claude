@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.6.3"
+VERSION = "2.6.4"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -434,6 +434,21 @@ HA_TOOLS_DESCRIPTION = [
             },
             "required": ["title", "url_path", "views"]
         }
+    },
+    {
+        "name": "create_script",
+        "description": "Create a new Home Assistant script with a sequence of actions.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "script_id": {"type": "string", "description": "Unique script ID (lowercase, underscores, e.g. 'goodnight_routine')."},
+                "alias": {"type": "string", "description": "Friendly name for the script."},
+                "description": {"type": "string", "description": "Description of what the script does."},
+                "sequence": {"type": "array", "description": "List of actions to execute in order.", "items": {"type": "object"}},
+                "mode": {"type": "string", "enum": ["single", "restart", "queued", "parallel"], "description": "Execution mode (default: single)."}
+            },
+            "required": ["script_id", "alias", "sequence"]
+        }
     }
 ]
 
@@ -660,6 +675,20 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
 
             return json.dumps({"status": "success", "message": f"Dashboard '{title}' created at /{url_path}",
                                "url_path": url_path, "views_count": len(views)}, ensure_ascii=False, default=str)
+
+        elif tool_name == "create_script":
+            script_id = tool_input.get("script_id", "")
+            config = {
+                "alias": tool_input.get("alias", "New Script"),
+                "description": tool_input.get("description", ""),
+                "sequence": tool_input.get("sequence", []),
+                "mode": tool_input.get("mode", "single"),
+            }
+            result = call_ha_api("POST", f"config/script/config/{script_id}", config)
+            if isinstance(result, dict) and "error" not in result:
+                return json.dumps({"status": "success", "message": f"Script '{config['alias']}' created (script.{script_id})",
+                                   "entity_id": f"script.{script_id}", "result": result}, ensure_ascii=False, default=str)
+            return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
