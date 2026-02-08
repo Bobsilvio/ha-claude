@@ -4,7 +4,7 @@ import os
 import logging
 from typing import Any, Dict, Optional
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_string_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
@@ -28,6 +28,42 @@ HA_HEADERS = {
     "Authorization": f"Bearer {HA_TOKEN}",
     "Content-Type": "application/json",
 }
+
+# Simple HTML UI
+HTML_UI = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Claude AI Backend</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .status { text-align: center; padding: 10px; background: #e8f5e9; border-radius: 4px; margin: 10px 0; }
+        .info { color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Claude AI Backend</h1>
+        <div class="status">
+            <p><strong>Status:</strong> ✅ Running</p>
+            <p><strong>Version:</strong> 2.0.1</p>
+        </div>
+        <div class="info">
+            <p>Claude AI Backend is running and integrated with Home Assistant.</p>
+            <p>Configure through the Home Assistant Add-on settings.</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+@app.route('/')
+def index():
+    """Serve the UI."""
+    return HTML_UI, 200, {'Content-Type': 'text/html'}
+
 
 
 def call_ha_api(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
