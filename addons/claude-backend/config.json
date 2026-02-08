@@ -1,6 +1,6 @@
 {
   "name": "Claude AI Backend",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "slug": "claude-backend",
   "description": "All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant",
   "url": "https://github.com/Bobsilvio/ha-claude",
