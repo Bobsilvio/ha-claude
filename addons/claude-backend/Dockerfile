@@ -1,4 +1,6 @@
-FROM %%BASE_IMAGE%%
+ARG BUILD_FROM
+
+FROM ${BUILD_FROM}
 
 # Install Python and dependencies
 RUN apk add --no-cache \
