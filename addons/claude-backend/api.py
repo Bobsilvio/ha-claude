@@ -917,8 +917,8 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                                 current["condition"] = [current["condition"]]
                             current["condition"].append(add_condition)
                         new_yaml = yaml.dump(current, default_flow_style=False, allow_unicode=True)
-                        # Save via REST API
-                        save_result = call_ha_api("PUT", f"config/automation/config/{automation_id}", current)
+                        # Save via REST API (HA uses POST for both create and update)
+                        save_result = call_ha_api("POST", f"config/automation/config/{automation_id}", current)
                         if isinstance(save_result, dict) and "error" not in save_result:
                             updated_via = "rest_api"
                         else:
