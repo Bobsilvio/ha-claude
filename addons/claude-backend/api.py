@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.6.4"
+VERSION = "2.6.5"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -738,8 +738,9 @@ Always respond in the same language the user uses.
 Be concise but informative."""
 
 # Compact prompt for providers with small context (GitHub Models free tier: 8k tokens)
-SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, send notifications, create automations.
-When users ask about specific devices, use search_entities. Use get_history for past data. Use call_service for scenes/scripts too.
+SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, create automations, create dashboards.
+When users ask about specific devices, use search_entities. Use get_history for past data.
+To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
 Respond in the user's language. Be concise."""
 
 # Compact tool definitions for low-token providers
@@ -778,11 +779,13 @@ HA_TOOLS_COMPACT = [
         }, "required": ["alias", "trigger", "action"]}
     },
     {
-        "name": "send_notification",
-        "description": "Send notification. Params: message (required), title, target (notify service, empty=persistent).",
+        "name": "create_dashboard",
+        "description": "Create a NEW Lovelace dashboard. Params: title, url_path (slug), views (array of {title, cards[]}). Card types: entities, gauge, history-graph, thermostat, button.",
         "parameters": {"type": "object", "properties": {
-            "message": {"type": "string"}, "title": {"type": "string"}, "target": {"type": "string"}
-        }, "required": ["message"]}
+            "title": {"type": "string"}, "url_path": {"type": "string"},
+            "icon": {"type": "string"},
+            "views": {"type": "array", "items": {"type": "object"}}
+        }, "required": ["title", "url_path", "views"]}
     }
 ]
 
