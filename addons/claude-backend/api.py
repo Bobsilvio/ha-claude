@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.6.6"
+VERSION = "2.6.7"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -203,6 +203,36 @@ def save_conversations():
 load_conversations()
 
 # ---- Home Assistant API helpers ----
+
+
+def call_ha_websocket(msg_type: str, **kwargs) -> dict:
+    """Send a WebSocket command to Home Assistant and return the result."""
+    import websocket as ws_lib
+    token = get_ha_token()
+    ws_url = HA_URL.replace("http://", "ws://").replace("https://", "wss://") + "/websocket"
+    logger.debug(f"WS connect: {ws_url} for {msg_type}")
+    try:
+        ws = ws_lib.create_connection(ws_url, timeout=15)
+        # Wait for auth_required
+        auth_req = json.loads(ws.recv())
+        logger.debug(f"WS auth_required: {auth_req.get('type')}")
+        # Authenticate
+        ws.send(json.dumps({"type": "auth", "access_token": token}))
+        auth_resp = json.loads(ws.recv())
+        if auth_resp.get("type") != "auth_ok":
+            ws.close()
+            return {"error": f"WS auth failed: {auth_resp}"}
+        # Send command
+        msg = {"id": 1, "type": msg_type}
+        msg.update(kwargs)
+        ws.send(json.dumps(msg))
+        result = json.loads(ws.recv())
+        ws.close()
+        logger.debug(f"WS result: {result}")
+        return result
+    except Exception as e:
+        logger.error(f"WS error ({msg_type}): {e}")
+        return {"error": str(e)}
 
 
 def call_ha_api(method: str, endpoint: str, data: Optional[Dict[str, Any]] = None) -> Any:
@@ -644,14 +674,13 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "get_dashboards":
-            url = f"{HA_URL}/api/lovelace/dashboards"
-            resp = requests.get(url, headers=get_ha_headers(), timeout=30)
-            if resp.status_code == 200:
-                dashboards = resp.json()
+            ws_result = call_ha_websocket("lovelace/dashboards/list")
+            if ws_result.get("success") and ws_result.get("result"):
+                dashboards = ws_result["result"]
                 result = [{"id": d.get("id"), "title": d.get("title"), "url_path": d.get("url_path"),
                            "icon": d.get("icon", ""), "mode": d.get("mode", "")} for d in dashboards]
                 return json.dumps(result, ensure_ascii=False, default=str)
-            return json.dumps({"error": f"Could not get dashboards: {resp.status_code}"}, default=str)
+            return json.dumps({"error": f"Could not get dashboards: {ws_result}"}, default=str)
 
         elif tool_name == "create_dashboard":
             title = tool_input.get("title", "AI Dashboard")
@@ -659,21 +688,30 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             icon = tool_input.get("icon", "mdi:robot")
             views = tool_input.get("views", [])
 
-            # Step 1: Create the dashboard entry
-            create_url = f"{HA_URL}/api/lovelace/dashboards"
-            create_data = {"title": title, "url_path": url_path, "icon": icon, "mode": "storage"}
-            resp1 = requests.post(create_url, headers=get_ha_headers(), json=create_data, timeout=30)
-            if resp1.status_code not in [200, 201]:
-                return json.dumps({"error": f"Failed to create dashboard: {resp1.status_code} - {resp1.text}"}, default=str)
+            # Step 1: Register dashboard via WebSocket (REST API doesn't support this)
+            ws_result = call_ha_websocket(
+                "lovelace/dashboards/create",
+                url_path=url_path,
+                title=title,
+                icon=icon,
+                show_in_sidebar=True,
+                require_admin=False
+            )
+            if ws_result.get("success") is False:
+                error_msg = ws_result.get("error", {}).get("message", str(ws_result))
+                return json.dumps({"error": f"Failed to create dashboard: {error_msg}"}, default=str)
 
-            # Step 2: Set the dashboard config with views and cards
-            config = {"views": views}
-            config_url = f"{HA_URL}/api/lovelace/config/{url_path}"
-            resp2 = requests.post(config_url, headers=get_ha_headers(), json=config, timeout=30)
-            if resp2.status_code not in [200, 201]:
-                return json.dumps({"status": "partial", "message": f"Dashboard created but config failed: {resp2.status_code} - {resp2.text}"}, default=str)
+            # Step 2: Set the dashboard config with views and cards via WebSocket
+            ws_config = call_ha_websocket(
+                "lovelace/config/save",
+                url_path=url_path,
+                config={"views": views}
+            )
+            if ws_config.get("success") is False:
+                error_msg = ws_config.get("error", {}).get("message", str(ws_config))
+                return json.dumps({"status": "partial", "message": f"Dashboard registered but config failed: {error_msg}"}, default=str)
 
-            return json.dumps({"status": "success", "message": f"Dashboard '{title}' created at /{url_path}",
+            return json.dumps({"status": "success", "message": f"Dashboard '{title}' created! It appears in the sidebar at /{url_path}",
                                "url_path": url_path, "views_count": len(views)}, ensure_ascii=False, default=str)
 
         elif tool_name == "create_script":
