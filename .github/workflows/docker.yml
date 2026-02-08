@@ -17,7 +17,15 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build Docker image
+      - name: Build Add-on Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./addons/claude-backend/Dockerfile
+          push: false
+          tags: claude-backend:latest
+
+      - name: Build Backend Docker image (deprecated)
         uses: docker/build-push-action@v4
         with:
           context: ./backend
