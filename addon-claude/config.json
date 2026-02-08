@@ -1,6 +1,6 @@
 {
   "name": "Claude AI Assistant",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "slug": "claude-ai",
   "description": "Chat with Claude AI to control your smart home. Create automations, read sensors, control devices - all from a conversational interface.",
   "url": "https://github.com/Bobsilvio/ha-claude",
