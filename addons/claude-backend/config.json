@@ -53,9 +53,7 @@
     "api_port": "str",
     "debug_mode": "bool?",
     "timeout": "str?",
-    "max_retries": "str?",
-    "claude_api_key": "password?",
-    "polling_interval": "str?"
+    "max_retries": "str?"
   },
   "documentation": "https://github.com/Bobsilvio/ha-claude",
   "support": "https://github.com/Bobsilvio/ha-claude/issues",
