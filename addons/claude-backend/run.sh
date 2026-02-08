@@ -44,29 +44,10 @@ fi
 log_info "✅ Token configured"
 
 # ========================================
-# Deploy Component
-# ========================================
-log_info "📦 Deploying Claude custom component..."
-
-COMPONENT_SRC="/app/claude_component"
-COMPONENT_DST="/homeassistant/custom_components/claude"
-
-if [ -d "$COMPONENT_SRC" ]; then
-    mkdir -p /homeassistant/custom_components
-    if [ -d "$COMPONENT_DST" ]; then
-        log_info "🔄 Removing old component version..."
-        rm -rf "$COMPONENT_DST"
-    fi
-    cp -r "$COMPONENT_SRC" "$COMPONENT_DST"
-    log_info "✅ Component deployed"
-else
-    log_warning "⚠️ Component source not found at $COMPONENT_SRC"
-fi
-
-# ========================================
 # Start Claude Backend API
 # ========================================
 log_info "🎯 Starting API server on port $API_PORT..."
+log_info "🤖 Claude AI will be available in the sidebar (Ingress)"
 log_info "✅ Claude AI Backend is ready!"
 
 export HA_URL
