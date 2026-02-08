@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.1"
+VERSION = "2.9.3"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -480,6 +480,18 @@ HA_TOOLS_DESCRIPTION = [
         }
     },
     {
+        "name": "update_script",
+        "description": "Update/modify an existing script directly in scripts.yaml. Reads the file, finds the script, applies changes, creates a snapshot, saves. Use this instead of write_config_file for scripts.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "script_id": {"type": "string", "description": "The script ID (e.g. 'goodnight_routine' without 'script.' prefix)."},
+                "changes": {"type": "object", "description": "Object with the fields to change (e.g. {\"alias\": \"New Name\", \"sequence\": [...]}). Only specified fields are modified."}
+            },
+            "required": ["script_id", "changes"]
+        }
+    },
+    {
         "name": "get_areas",
         "description": "Get all areas/rooms configured in Home Assistant and their entities. Useful for room-based control like 'turn off everything in the bedroom'.",
         "parameters": {"type": "object", "properties": {}, "required": []}
@@ -902,7 +914,8 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                     "old_yaml": old_yaml,
                     "new_yaml": new_yaml,
                     "snapshot": snapshot.get("snapshot_id", ""),
-                    "tip": "Call services/automation/reload to apply changes."
+                    "tip": "Call services/automation/reload to apply changes.",
+                    "IMPORTANT": "DONE. Show the user the before/after diff and stop. Do NOT call any more tools."
                 }, ensure_ascii=False, default=str)
             except Exception as e:
                 return json.dumps({"error": f"Failed to update automation: {str(e)}"})
@@ -981,6 +994,66 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             script_id = entity_id.replace("script.", "") if entity_id.startswith("script.") else entity_id
             result = call_ha_api("POST", f"services/script/{script_id}", variables)
             return json.dumps({"status": "success", "script": entity_id, "result": result}, ensure_ascii=False, default=str)
+
+        elif tool_name == "update_script":
+            import yaml
+            script_id = tool_input.get("script_id", "")
+            changes = tool_input.get("changes", {})
+
+            if not script_id:
+                return json.dumps({"error": "script_id is required."})
+
+            # Remove 'script.' prefix if present
+            script_id = script_id.replace("script.", "") if script_id.startswith("script.") else script_id
+
+            yaml_path = os.path.join(HA_CONFIG_DIR, "scripts.yaml")
+            if not os.path.isfile(yaml_path):
+                return json.dumps({"error": "scripts.yaml not found."})
+
+            try:
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    scripts = yaml.safe_load(f)
+
+                if not isinstance(scripts, dict):
+                    return json.dumps({"error": "scripts.yaml is not a valid dict."})
+
+                if script_id not in scripts:
+                    return json.dumps({"error": f"Script '{script_id}' not found.",
+                                       "available_scripts": list(scripts.keys())[:20]})
+
+                found = scripts[script_id]
+                if not isinstance(found, dict):
+                    found = {}
+
+                # Capture old state for diff
+                old_yaml = yaml.dump({script_id: found}, default_flow_style=False, allow_unicode=True)
+
+                # Apply changes
+                for key, value in changes.items():
+                    found[key] = value
+
+                # Capture new state for diff
+                new_yaml = yaml.dump({script_id: found}, default_flow_style=False, allow_unicode=True)
+
+                # Create snapshot before saving
+                snapshot = create_snapshot("scripts.yaml")
+
+                # Write back
+                scripts[script_id] = found
+                with open(yaml_path, "w", encoding="utf-8") as f:
+                    yaml.dump(scripts, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+                return json.dumps({
+                    "status": "success",
+                    "message": f"Script '{found.get('alias', script_id)}' updated.",
+                    "old_yaml": old_yaml,
+                    "new_yaml": new_yaml,
+                    "snapshot": snapshot.get("snapshot_id", ""),
+                    "tip": "Call services/script/reload to apply changes.",
+                    "IMPORTANT": "DONE. Show the user the before/after diff and stop. Do NOT call any more tools."
+                }, ensure_ascii=False, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Failed to update script: {str(e)}"})
 
         elif tool_name == "get_areas":
             try:
@@ -1648,14 +1721,16 @@ condition:
 
 This helps the user understand and verify the changes. Keep the diff focused on what changed, not the entire file.
 
-## EFFICIENCY RULES (CRITICAL - minimize API calls)
-- Use the MINIMUM number of tool calls needed. Every extra call wastes time and tokens.
-- For modifying automations: get_automations → update_automation. That's 2 calls. DONE.
-- update_automation handles everything: reads the file, finds the automation, modifies it, creates a snapshot, saves.
-- NEVER call read_config_file, list_config_files, or write_config_file for automations - use update_automation instead.
-- NEVER call get_entity_state or search_entities if you already have the info from a previous tool result.
-- Plan your tool calls: think about what you need BEFORE calling, don't explore randomly.
-- For other config editing: read_config_file → modify → write_config_file → check_config. Done.
+## EFFICIENCY RULES (ABSOLUTELY CRITICAL - MAXIMUM 1-2 tool calls per task)
+- EVERY extra tool call wastes 5-20 seconds. Users WILL experience errors and timeouts with too many calls.
+- When context is pre-loaded in the user message, ALL that data is already available. NEVER re-fetch it.
+- PRE-LOADED DATA = do NOT call: get_automations, get_scripts, get_dashboards, read_config_file, list_config_files, search_entities, get_entity_state for data already present.
+- For modifying automations: call update_automation ONCE with automation_id + changes. That's IT. ONE call total.
+- For modifying scripts: call update_script ONCE with script_id + changes. That's IT. ONE call total.
+- After update_automation or update_script succeeds: STOP. Show the diff to the user. Do NOT call any verification tools.
+- NEVER verify changes by calling get_automations or read_config_file after an update - the tool already returns old/new YAML.
+- The MAXIMUM number of tool calls for ANY modification task is 2. If you've made 2 calls, you MUST respond.
+- For other config editing: read_config_file → write_config_file → check_config (3 calls max).
 
 Always respond in the same language the user uses.
 Be concise but informative."""
@@ -1960,7 +2035,8 @@ def stream_chat_openai(messages):
     tools = get_openai_tools_for_provider()
     max_tok = 4000 if AI_PROVIDER == "github" else 4096
     full_text = ""
-    max_rounds = 15
+    max_rounds = 5
+    tools_called_this_session = set()
 
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
@@ -2022,9 +2098,20 @@ def stream_chat_openai(messages):
 
         for tc in tc_list:
             fn_name = tc["function"]["name"]
+            # Block redundant read-only tool calls
+            redundant_read_tools = {"get_automations", "get_scripts", "get_dashboards",
+                                    "get_dashboard_config", "read_config_file",
+                                    "list_config_files", "get_frontend_resources",
+                                    "search_entities", "get_entity_state"}
+            if fn_name in redundant_read_tools and fn_name in tools_called_this_session:
+                logger.warning(f"Blocked redundant tool call: {fn_name}")
+                messages.append({"role": "tool", "tool_call_id": tc["id"],
+                                 "content": json.dumps({"note": f"Skipped: {fn_name} already called. Use existing data. Respond NOW."})})
+                continue
             yield {"type": "tool", "name": fn_name}
             args = json.loads(tc["function"]["arguments"])
             result = execute_tool(fn_name, args)
+            tools_called_this_session.add(fn_name)
             # Truncate large results to prevent token overflow
             max_len = 3000 if AI_PROVIDER == "github" else 8000
             if len(result) > max_len:
@@ -2042,12 +2129,13 @@ def stream_chat_anthropic(messages):
     import anthropic
 
     full_text = ""
-    max_rounds = 15  # Prevent infinite loops
+    max_rounds = 5  # Strict limit: most tasks need 1-2 rounds max
+    tools_called_this_session = set()  # Track tools already called to detect redundancy
 
     for round_num in range(max_rounds):
         # Rate-limit prevention: delay between API calls (not on first round)
         if round_num > 0:
-            delay = min(2 + round_num, 5)  # 3s, 4s, 5s, 5s...
+            delay = min(3 + round_num, 6)  # 4s, 5s, 6s, 6s...
             logger.info(f"Rate-limit prevention: waiting {delay}s before round {round_num+1}")
             yield {"type": "status", "message": f"Elaborazione in corso... (step {round_num+1})"}
             time.sleep(delay)
@@ -2121,10 +2209,28 @@ def stream_chat_anthropic(messages):
         messages.append({"role": "assistant", "content": assistant_content})
 
         tool_results = []
+        redundant_blocked = 0
         for tool in tool_uses:
+            tool_key = tool['name']
+            # Block redundant calls: if a read-only tool was already called, skip it
+            redundant_read_tools = {"get_automations", "get_scripts", "get_dashboards", 
+                                    "get_dashboard_config", "read_config_file", 
+                                    "list_config_files", "get_frontend_resources",
+                                    "search_entities", "get_entity_state"}
+            if tool_key in redundant_read_tools and tool_key in tools_called_this_session:
+                logger.warning(f"Blocked redundant tool call: {tool_key} (already called this session)")
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool["id"],
+                    "content": json.dumps({"note": f"Skipped: {tool_key} already called. Use the data you already have. Respond to the user NOW."})
+                })
+                redundant_blocked += 1
+                continue
+
             logger.info(f"Tool: {tool['name']}")
             yield {"type": "tool", "name": tool["name"]}
             result = execute_tool(tool["name"], tool["input"])
+            tools_called_this_session.add(tool_key)
             # Truncate large tool results to prevent token overflow
             if len(result) > 8000:
                 result = result[:8000] + '\n... [TRUNCATED to save tokens - ' + str(len(result)) + ' chars total]'
@@ -2133,6 +2239,14 @@ def stream_chat_anthropic(messages):
                 "tool_use_id": tool["id"],
                 "content": result
             })
+
+        # If ALL tools were blocked as redundant, force stop
+        if redundant_blocked == len(tool_uses):
+            logger.info("All tool calls were redundant - forcing final response")
+            messages.append({"role": "user", "content": tool_results})
+            # Add a nudge to respond
+            messages.append({"role": "user", "content": [{"type": "text", "text": "You already have all the data needed. Respond to the user now with the results. Do not call any more tools."}]})
+            continue
 
         messages.append({"role": "user", "content": tool_results})
         # Loop back for next round
@@ -2237,6 +2351,36 @@ def build_smart_context(user_message: str) -> str:
                             context_parts.append(f"## YAML AUTOMAZIONE TROVATA: \"{auto.get('alias')}\" (id: {auto_id})\n```yaml\n{auto_yaml}```\nPer modificarla usa update_automation con automation_id='{auto_id}' e i campi da cambiare.")
                             break
 
+        # --- SCRIPT CONTEXT ---
+        script_keywords = ["script", "scena", "scenari", "routine", "sequenza"]
+        if any(k in msg_lower for k in script_keywords):
+            import yaml
+            # Get script list from states
+            states = get_all_states() if 'states' not in dir() else states
+            script_entities = [{"entity_id": s.get("entity_id"),
+                               "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                               "state": s.get("state")} for s in states if s.get("entity_id", "").startswith("script.")]
+            if script_entities:
+                context_parts.append(f"## SCRIPT DISPONIBILI\n{json.dumps(script_entities, ensure_ascii=False, indent=1)}")
+
+            # If user mentions a specific script name, include its YAML
+            yaml_path = os.path.join(HA_CONFIG_DIR, "scripts.yaml")
+            if os.path.isfile(yaml_path):
+                try:
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        all_scripts = yaml.safe_load(f)
+                    if isinstance(all_scripts, dict):
+                        for sid, sconfig in all_scripts.items():
+                            alias = str(sconfig.get("alias", "")).lower() if isinstance(sconfig, dict) else ""
+                            if alias and (alias in msg_lower or sid in msg_lower or any(word in alias for word in msg_lower.split() if len(word) > 4)):
+                                script_yaml = yaml.dump({sid: sconfig}, default_flow_style=False, allow_unicode=True)
+                                if len(script_yaml) > 6000:
+                                    script_yaml = script_yaml[:6000] + "\n... [TRUNCATED]"
+                                context_parts.append(f"## YAML SCRIPT TROVATO: \"{sconfig.get('alias', sid)}\" (id: {sid})\n```yaml\n{script_yaml}```\nPer modificarlo usa update_script con script_id='{sid}' e i campi da cambiare.")
+                                break
+                except Exception:
+                    pass
+
         # --- DASHBOARD CONTEXT ---
         dash_keywords = ["dashboard", "lovelace", "scheda", "card", "pannello"]
         if any(k in msg_lower for k in dash_keywords):
@@ -2247,6 +2391,33 @@ def build_smart_context(user_message: str) -> str:
                 if dash_list:
                     summary = [{"id": d.get("id"), "title": d.get("title", ""), "url_path": d.get("url_path", "")} for d in dash_list]
                     context_parts.append(f"## DASHBOARD DISPONIBILI\n{json.dumps(summary, ensure_ascii=False, indent=1)}")
+
+                    # If user mentions a specific dashboard name, pre-load its config
+                    for dash in dash_list:
+                        dash_title = str(dash.get("title", "")).lower()
+                        dash_url = str(dash.get("url_path", "")).lower()
+                        if dash_title and (dash_title in msg_lower or dash_url in msg_lower or any(word in dash_title for word in msg_lower.split() if len(word) > 4)):
+                            try:
+                                dparams = {}
+                                if dash_url and dash_url != "lovelace":
+                                    dparams["url_path"] = dash.get("url_path")
+                                dconfig = call_ha_websocket("lovelace/config", **dparams)
+                                if dconfig.get("success"):
+                                    cfg = dconfig.get("result", {})
+                                    cfg_json = json.dumps(cfg, ensure_ascii=False, default=str)
+                                    if len(cfg_json) > 8000:
+                                        # Summarize views only
+                                        views_summary = []
+                                        for v in cfg.get("views", []):
+                                            views_summary.append({"title": v.get("title", ""), "path": v.get("path", ""),
+                                                                  "cards_count": len(v.get("cards", [])),
+                                                                  "cards": [{"type": c.get("type", "")} for c in v.get("cards", [])[:15]]})
+                                        context_parts.append(f"## CONFIG DASHBOARD '{dash.get('title')}' (url: {dash.get('url_path', 'lovelace')})\n{json.dumps({'views': views_summary}, ensure_ascii=False, indent=1)}\nConfig troppo grande, caricato sommario. Per i dettagli il tool get_dashboard_config è disponibile.")
+                                    else:
+                                        context_parts.append(f"## CONFIG COMPLETA DASHBOARD '{dash.get('title')}' (url: {dash.get('url_path', 'lovelace')})\n```json\n{cfg_json}\n```")
+                            except Exception:
+                                pass
+                            break
             except Exception:
                 pass
 
@@ -2305,7 +2476,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
     # Smart context: pre-load relevant data before sending to AI (like VS Code does)
     smart_context = build_smart_context(user_message)
     if smart_context:
-        enriched_message = f"{user_message}\n\n---\n**CONTESTO PRE-CARICATO (dati già disponibili, NON serve chiamare tool per ottenerli):**\n{smart_context}"
+        enriched_message = f"{user_message}\n\n---\n⚠️ **CONTESTO PRE-CARICATO - DATI GIÀ DISPONIBILI:**\n{smart_context}\n\n---\n⚠️ **ISTRUZIONI OPERATIVE:** I dati sopra sono già caricati. NON chiamare get_automations, get_scripts, get_dashboards, read_config_file o list_config_files per dati già presenti qui. Se devi modificare un'automazione: usa SOLO update_automation con i dati qui sopra. Se devi modificare uno script: usa SOLO update_script. UNA sola chiamata tool, poi rispondi all'utente."
         conversations[session_id].append({"role": "user", "content": enriched_message})
         yield {"type": "status", "message": "Contesto pre-caricato..."}
     else:
