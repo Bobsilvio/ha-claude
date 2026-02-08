@@ -28,7 +28,7 @@ else
     DEBUG_MODE="${DEBUG_MODE:-false}"
 fi
 
-log_info "🚀 Starting Claude Backend API Add-on (v1.0.1)"
+log_info "🚀 Starting Claude Backend API Add-on (v2.0.1)"
 log_info "HA URL: $HA_URL"
 log_info "API Port: $API_PORT"
 
