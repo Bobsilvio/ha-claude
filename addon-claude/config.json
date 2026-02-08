@@ -2,84 +2,33 @@
   "name": "Claude AI Backend",
   "version": "1.0.0",
   "slug": "claude-backend",
-  "description": "All-in-one add-on - Automatically deploys Claude component + runs backend API for Claude AI Assistant",
+  "description": "All-in-one add-on - Automatically deploys Claude component and runs backend API for Claude AI Assistant",
   "url": "https://github.com/Bobsilvio/ha-claude",
-  "arch": ["aarch64", "amd64", "armv7"],
-  "startup": "system",
+  "arch": [
+    "aarch64",
+    "amd64",
+    "armv7"
+  ],
+  "startup": "application",
   "apparmor": false,
   "boot": "auto",
-  "privileged": ["NET_ADMIN"],
+  "map": [
+    "config:rw"
+  ],
   "ports": {
     "5000/tcp": 5000
   },
   "ports_description": {
     "5000/tcp": "Claude Backend API"
   },
-  "image": "bobsilvio/ha-claude-{arch}",
-  "environment": {
-    "DEBUG_MODE": "False"
-  },
   "options": {
     "ha_url": "http://homeassistant:8123",
     "api_port": 5000,
-    "debug_mode": false,
-    "polling_interval": 60,
-    "timeout": 30,
-    "max_retries": 3
+    "debug_mode": false
   },
   "schema": {
-    "ha_url": {
-      "name": "Home Assistant URL",
-      "description": "URL of Home Assistant (use http://homeassistant:8123 for Add-on)",
-      "type": "string",
-      "required": true,
-      "default": "http://homeassistant:8123"
-    },
-    "api_port": {
-      "name": "API Port",
-      "description": "Port for the Claude Backend API",
-      "type": "integer",
-      "required": true,
-      "default": 5000,
-      "minimum": 1024,
-      "maximum": 65535
-    },
-    "debug_mode": {
-      "name": "Debug Mode",
-      "description": "Enable debug logging",
-      "type": "boolean",
-      "required": false,
-      "default": false
-    },
-    "polling_interval": {
-      "name": "Polling Interval",
-      "description": "Seconds between entity updates",
-      "type": "integer",
-      "required": false,
-      "default": 60,
-      "minimum": 10,
-      "maximum": 3600
-    },
-    "timeout": {
-      "name": "API Timeout",
-      "description": "Timeout for API requests in seconds",
-      "type": "integer",
-      "required": false,
-      "default": 30,
-      "minimum": 5,
-      "maximum": 300
-    },
-    "max_retries": {
-      "name": "Maximum Retries",
-      "description": "Number of retries for failed requests",
-      "type": "integer",
-      "required": false,
-      "default": 3,
-      "minimum": 1,
-      "maximum": 10
-    }
-  },
-  "documentation": "https://github.com/Bobsilvio/ha-claude",
-  "support": "https://github.com/Bobsilvio/ha-claude/issues",
-  "maintainers": ["Bobsilvio"]
+    "ha_url": "str",
+    "api_port": "int",
+    "debug_mode": "bool"
+  }
 }
