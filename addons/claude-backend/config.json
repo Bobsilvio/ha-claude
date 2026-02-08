@@ -1,6 +1,6 @@
 {
   "name": "AI Assistant for Home Assistant",
-  "version": "2.5.3",
+  "version": "2.6.0",
   "slug": "claude-backend",
   "description": "AI-powered smart home assistant with Claude, ChatGPT, Gemini and GitHub Models (30+ AI models)",
   "url": "https://github.com/Bobsilvio/ha-claude",

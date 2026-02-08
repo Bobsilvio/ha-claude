@@ -3,9 +3,12 @@
 import os
 import json
 import logging
+import queue
+import threading
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
@@ -16,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.5.3"
+VERSION = "2.6.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -162,6 +165,39 @@ else:
 
 # Conversation history
 conversations: Dict[str, List[Dict]] = {}
+
+# Conversation persistence
+CONVERSATIONS_FILE = "/data/conversations.json"
+
+
+def load_conversations():
+    """Load conversations from persistent storage."""
+    global conversations
+    try:
+        if os.path.isfile(CONVERSATIONS_FILE):
+            with open(CONVERSATIONS_FILE, "r") as f:
+                conversations = json.load(f)
+            logger.info(f"Loaded {len(conversations)} conversation(s) from disk")
+    except Exception as e:
+        logger.warning(f"Could not load conversations: {e}")
+
+
+def save_conversations():
+    """Save conversations to persistent storage."""
+    try:
+        os.makedirs(os.path.dirname(CONVERSATIONS_FILE), exist_ok=True)
+        # Keep only last 10 sessions, 50 messages each
+        trimmed = {}
+        for sid, msgs in list(conversations.items())[-10:]:
+            trimmed[sid] = msgs[-50:]
+        with open(CONVERSATIONS_FILE, "w") as f:
+            json.dump(trimmed, f, ensure_ascii=False, default=str)
+    except Exception as e:
+        logger.warning(f"Could not save conversations: {e}")
+
+
+# Load saved conversations on startup
+load_conversations()
 
 # ---- Home Assistant API helpers ----
 
@@ -309,6 +345,69 @@ HA_TOOLS_DESCRIPTION = [
         "name": "get_events",
         "description": "Get all available Home Assistant event types. Use this to discover events fired by integrations and addons.",
         "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "get_history",
+        "description": "Get the state history of an entity over a time period. Useful for checking past values, trends, and when things changed.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string", "description": "The entity ID to get history for."},
+                "hours": {"type": "number", "description": "Hours of history to retrieve (default 24, max 168)."}
+            },
+            "required": ["entity_id"]
+        }
+    },
+    {
+        "name": "get_scenes",
+        "description": "Get all available scenes in Home Assistant.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "activate_scene",
+        "description": "Activate a Home Assistant scene.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string", "description": "Scene entity_id (e.g. 'scene.movie_night')."}
+            },
+            "required": ["entity_id"]
+        }
+    },
+    {
+        "name": "get_scripts",
+        "description": "Get all available scripts in Home Assistant.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "run_script",
+        "description": "Run a Home Assistant script with optional variables.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {"type": "string", "description": "Script entity_id (e.g. 'script.goodnight')."},
+                "variables": {"type": "object", "description": "Optional variables to pass to the script."}
+            },
+            "required": ["entity_id"]
+        }
+    },
+    {
+        "name": "get_areas",
+        "description": "Get all areas/rooms configured in Home Assistant and their entities. Useful for room-based control like 'turn off everything in the bedroom'.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "send_notification",
+        "description": "Send a notification to Home Assistant (persistent notification visible in HA UI, or to a mobile device).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "The notification message."},
+                "title": {"type": "string", "description": "Optional notification title."},
+                "target": {"type": "string", "description": "Notify service target (e.g. 'mobile_app_phone'). If empty, creates a persistent notification in HA."}
+            },
+            "required": ["message"]
+        }
     }
 ]
 
@@ -438,6 +537,71 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                 return json.dumps(result, ensure_ascii=False, default=str)
             return json.dumps(events, ensure_ascii=False, default=str)
 
+        elif tool_name == "get_history":
+            entity_id = tool_input.get("entity_id", "")
+            hours = min(int(tool_input.get("hours", 24)), 168)
+            start = (datetime.utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S")
+            endpoint = f"history/period/{start}?filter_entity_id={entity_id}&significant_changes_only=1"
+            result = call_ha_api("GET", endpoint)
+            if isinstance(result, list) and result:
+                entries = result[0] if isinstance(result[0], list) else result
+                max_e = 20 if AI_PROVIDER == "github" else 50
+                summary = [{"state": e.get("state"), "last_changed": e.get("last_changed")} for e in entries[-max_e:]]
+                return json.dumps({"entity_id": entity_id, "hours": hours, "total_changes": len(entries), "history": summary}, ensure_ascii=False, default=str)
+            return json.dumps({"entity_id": entity_id, "hours": hours, "history": []}, ensure_ascii=False, default=str)
+
+        elif tool_name == "get_scenes":
+            states = get_all_states()
+            scenes = [{"entity_id": s.get("entity_id"), "state": s.get("state"),
+                       "friendly_name": s.get("attributes", {}).get("friendly_name", "")}
+                      for s in states if s.get("entity_id", "").startswith("scene.")]
+            return json.dumps(scenes, ensure_ascii=False, default=str)
+
+        elif tool_name == "activate_scene":
+            entity_id = tool_input.get("entity_id", "")
+            result = call_ha_api("POST", "services/scene/turn_on", {"entity_id": entity_id})
+            return json.dumps({"status": "success", "scene": entity_id, "result": result}, ensure_ascii=False, default=str)
+
+        elif tool_name == "get_scripts":
+            states = get_all_states()
+            scripts = [{"entity_id": s.get("entity_id"), "state": s.get("state"),
+                        "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                        "last_triggered": s.get("attributes", {}).get("last_triggered", "")}
+                       for s in states if s.get("entity_id", "").startswith("script.")]
+            return json.dumps(scripts, ensure_ascii=False, default=str)
+
+        elif tool_name == "run_script":
+            entity_id = tool_input.get("entity_id", "")
+            variables = tool_input.get("variables", {})
+            script_id = entity_id.replace("script.", "") if entity_id.startswith("script.") else entity_id
+            result = call_ha_api("POST", f"services/script/{script_id}", variables)
+            return json.dumps({"status": "success", "script": entity_id, "result": result}, ensure_ascii=False, default=str)
+
+        elif tool_name == "get_areas":
+            try:
+                template = '[{% for area in areas() %}{"id":{{ area | tojson }}, "name":{{ area_name(area) | tojson }}, "entities":{{ area_entities(area) | list | tojson }}}{% if not loop.last %},{% endif %}{% endfor %}]'
+                url = f"{HA_URL}/api/template"
+                resp = requests.post(url, headers=get_ha_headers(), json={"template": template}, timeout=30)
+                if resp.status_code == 200:
+                    areas_data = json.loads(resp.text)
+                    if AI_PROVIDER == "github":
+                        for area in areas_data:
+                            area["entities"] = area["entities"][:10]
+                    return json.dumps(areas_data, ensure_ascii=False, default=str)
+                return json.dumps({"error": f"Template API error: {resp.status_code}"}, default=str)
+            except Exception as e:
+                return json.dumps({"error": f"Could not get areas: {str(e)}"}, default=str)
+
+        elif tool_name == "send_notification":
+            message = tool_input.get("message", "")
+            title = tool_input.get("title", "AI Assistant")
+            target = tool_input.get("target", "")
+            if target:
+                result = call_ha_api("POST", f"services/notify/{target}", {"message": message, "title": title})
+            else:
+                result = call_ha_api("POST", "services/persistent_notification/create", {"message": message, "title": title})
+            return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
+
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:
         logger.error(f"Tool error ({tool_name}): {e}")
@@ -451,9 +615,14 @@ SYSTEM_PROMPT = """You are an AI assistant integrated into Home Assistant. You h
 You can:
 1. **Query entities** - See device states (lights, sensors, switches, climate, covers, etc.)
 2. **Control devices** - Turn on/off lights, switches, set temperatures, etc.
-3. **Create automations** - Build new automations with triggers, conditions, and actions
-4. **List & trigger automations** - See and run existing automations
-5. **Discover services** - See all available HA services
+3. **Search entities** - Find specific devices or integrations by keyword
+4. **Entity history** - Check past values and trends ("what was the temperature yesterday?")
+5. **Scenes & scripts** - List and activate scenes, run scripts
+6. **Areas/rooms** - See entities organized by room for room-based control
+7. **Create automations** - Build new automations with triggers, conditions, and actions
+8. **List & trigger automations** - See and run existing automations
+9. **Notifications** - Send persistent notifications or push to mobile devices
+10. **Discover services & events** - See all available HA services and event types
 
 When creating automations, use proper Home Assistant formats:
 - State trigger: {"platform": "state", "entity_id": "binary_sensor.motion", "to": "on"}
@@ -461,12 +630,16 @@ When creating automations, use proper Home Assistant formats:
 - Sun trigger: {"platform": "sun", "event": "sunset", "offset": "-00:30:00"}
 - Service action: {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}, "data": {"brightness": 255}}
 
+When a user asks about specific devices or addons, use search_entities to find them by keyword.
+Use get_history to answer questions about past states and trends.
+Use get_areas when the user refers to rooms.
+
 Always respond in the same language the user uses.
 Be concise but informative."""
 
 # Compact prompt for providers with small context (GitHub Models free tier: 8k tokens)
-SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control devices, query states, search entities, list events, create automations.
-When a user asks about specific devices/addons, use search_entities to find them by keyword. Use get_events to discover event types.
+SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, send notifications, create automations.
+When users ask about specific devices, use search_entities. Use get_history for past data. Use call_service for scenes/scripts too.
 Respond in the user's language. Be concise."""
 
 # Compact tool definitions for low-token providers
@@ -478,11 +651,23 @@ HA_TOOLS_COMPACT = [
     },
     {
         "name": "call_service",
-        "description": "Call HA service (e.g. light.turn_on, switch.toggle, climate.set_temperature).",
+        "description": "Call HA service (e.g. light.turn_on, switch.toggle, climate.set_temperature, scene.turn_on, script.turn_on).",
         "parameters": {"type": "object", "properties": {
             "domain": {"type": "string"}, "service": {"type": "string"},
             "data": {"type": "object"}
         }, "required": ["domain", "service", "data"]}
+    },
+    {
+        "name": "search_entities",
+        "description": "Search entities by keyword in entity_id or friendly_name.",
+        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
+    },
+    {
+        "name": "get_history",
+        "description": "Get state history of an entity. Params: entity_id (required), hours (default 24).",
+        "parameters": {"type": "object", "properties": {
+            "entity_id": {"type": "string"}, "hours": {"type": "number"}
+        }, "required": ["entity_id"]}
     },
     {
         "name": "create_automation",
@@ -493,19 +678,11 @@ HA_TOOLS_COMPACT = [
         }, "required": ["alias", "trigger", "action"]}
     },
     {
-        "name": "get_automations",
-        "description": "List all automations.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
-    },
-    {
-        "name": "search_entities",
-        "description": "Search entities by keyword in entity_id or friendly_name.",
-        "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}
-    },
-    {
-        "name": "get_events",
-        "description": "List all available HA event types.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "name": "send_notification",
+        "description": "Send notification. Params: message (required), title, target (notify service, empty=persistent).",
+        "parameters": {"type": "object", "properties": {
+            "message": {"type": "string"}, "title": {"type": "string"}, "target": {"type": "string"}
+        }, "required": ["message"]}
     }
 ]
 
@@ -703,11 +880,141 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 
         conversations[session_id] = messages
         conversations[session_id].append({"role": "assistant", "content": final_text})
+        save_conversations()
         return final_text
 
     except Exception as e:
         logger.error(f"AI error ({AI_PROVIDER}): {e}")
         return f"\u274c Errore {PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get('name', AI_PROVIDER)}: {str(e)}"
+
+
+# ---- Streaming chat ----
+
+
+def stream_chat_openai(messages):
+    """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts."""
+    trimmed = trim_messages(messages)
+    system_prompt = get_system_prompt()
+    tools = get_openai_tools_for_provider()
+    max_tok = 4000 if AI_PROVIDER == "github" else 4096
+    full_text = ""
+
+    while True:
+        oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
+
+        response = ai_client.chat.completions.create(
+            model=get_active_model(),
+            messages=oai_messages,
+            tools=tools,
+            max_tokens=max_tok,
+            stream=True
+        )
+
+        content_parts = []
+        tool_calls_map = {}
+
+        for chunk in response:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+
+            if delta.content:
+                content_parts.append(delta.content)
+                yield {"type": "token", "content": delta.content}
+
+            if delta.tool_calls:
+                for tc_delta in delta.tool_calls:
+                    idx = tc_delta.index
+                    if idx not in tool_calls_map:
+                        tool_calls_map[idx] = {"id": "", "name": "", "arguments": ""}
+                    if tc_delta.id:
+                        tool_calls_map[idx]["id"] = tc_delta.id
+                    if tc_delta.function:
+                        if tc_delta.function.name:
+                            tool_calls_map[idx]["name"] = tc_delta.function.name
+                        if tc_delta.function.arguments:
+                            tool_calls_map[idx]["arguments"] += tc_delta.function.arguments
+
+        accumulated = "".join(content_parts)
+
+        if not tool_calls_map:
+            full_text = accumulated
+            break
+
+        # Build assistant message with tool calls
+        tc_list = []
+        for idx in sorted(tool_calls_map.keys()):
+            tc = tool_calls_map[idx]
+            tc_list.append({
+                "id": tc["id"], "type": "function",
+                "function": {"name": tc["name"], "arguments": tc["arguments"]}
+            })
+
+        messages.append({"role": "assistant", "content": accumulated, "tool_calls": tc_list})
+
+        for tc in tc_list:
+            fn_name = tc["function"]["name"]
+            yield {"type": "tool", "name": fn_name}
+            args = json.loads(tc["function"]["arguments"])
+            result = execute_tool(fn_name, args)
+            if AI_PROVIDER == "github" and len(result) > 3000:
+                result = result[:3000] + '... (truncated)'
+            messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+
+    messages.append({"role": "assistant", "content": full_text})
+    yield {"type": "done", "full_text": full_text}
+
+
+def stream_chat_anthropic(messages):
+    """Stream chat for Anthropic (processes tools, then streams final text word-by-word)."""
+    final_text, _ = chat_anthropic(messages)
+    messages.append({"role": "assistant", "content": final_text})
+    words = final_text.split(' ')
+    for i, word in enumerate(words):
+        yield {"type": "token", "content": word + (' ' if i < len(words) - 1 else '')}
+    yield {"type": "done", "full_text": final_text}
+
+
+def stream_chat_google(messages):
+    """Stream chat for Google Gemini (processes tools, then streams final text word-by-word)."""
+    final_text, _ = chat_google(messages)
+    messages.append({"role": "assistant", "content": final_text})
+    words = final_text.split(' ')
+    for i, word in enumerate(words):
+        yield {"type": "token", "content": word + (' ' if i < len(words) - 1 else '')}
+    yield {"type": "done", "full_text": final_text}
+
+
+def stream_chat_with_ai(user_message: str, session_id: str = "default"):
+    """Stream chat events for all providers. Yields SSE event dicts."""
+    if not ai_client:
+        yield {"type": "error", "message": "API key non configurata"}
+        return
+
+    if session_id not in conversations:
+        conversations[session_id] = []
+
+    conversations[session_id].append({"role": "user", "content": user_message})
+    messages = conversations[session_id]
+
+    try:
+        if AI_PROVIDER in ("openai", "github"):
+            yield from stream_chat_openai(messages)
+        elif AI_PROVIDER == "anthropic":
+            yield from stream_chat_anthropic(messages)
+        elif AI_PROVIDER == "google":
+            yield from stream_chat_google(messages)
+        else:
+            yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
+            return
+
+        # Trim and save
+        if len(conversations[session_id]) > 50:
+            conversations[session_id] = conversations[session_id][-40:]
+        save_conversations()
+    except Exception as e:
+        logger.error(f"Stream error ({AI_PROVIDER}): {e}")
+        yield {"type": "error", "message": str(e)}
 
 
 # ---- Chat UI HTML ----
@@ -762,6 +1069,7 @@ def get_chat_ui():
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
         .suggestion:hover {{ background: #667eea; color: white; border-color: #667eea; }}
+        .tool-badge {{ display: inline-block; background: #e8f0fe; color: #1967d2; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
     </style>
 </head>
 <body>
@@ -787,8 +1095,10 @@ def get_chat_ui():
     <div class="suggestions" id="suggestions">
         <div class="suggestion" onclick="sendSuggestion(this)">\U0001f4a1 Mostra tutte le luci</div>
         <div class="suggestion" onclick="sendSuggestion(this)">\U0001f321 Stato sensori</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3e0 Stanze e aree</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f4c8 Storico temperatura</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3ac Scene disponibili</div>
         <div class="suggestion" onclick="sendSuggestion(this)">\u2699\ufe0f Lista automazioni</div>
-        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3e0 Stato della casa</div>
     </div>
 
     <div class="input-area">
@@ -861,15 +1171,19 @@ def get_chat_ui():
             addMessage(text, 'user');
             showThinking();
             try {{
-                const resp = await fetch('api/chat', {{
+                const resp = await fetch('api/chat/stream', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify({{ message: text }})
                 }});
-                const data = await resp.json();
                 removeThinking();
-                if (data.response) {{ addMessage(data.response, 'assistant'); }}
-                else if (data.error) {{ addMessage('\u274c ' + data.error, 'system'); }}
+                if (resp.headers.get('content-type')?.includes('text/event-stream')) {{
+                    await handleStream(resp);
+                }} else {{
+                    const data = await resp.json();
+                    if (data.response) {{ addMessage(data.response, 'assistant'); }}
+                    else if (data.error) {{ addMessage('\u274c ' + data.error, 'system'); }}
+                }}
             }} catch (err) {{
                 removeThinking();
                 addMessage('\u274c Errore: ' + err.message, 'system');
@@ -877,6 +1191,44 @@ def get_chat_ui():
             sending = false;
             sendBtn.disabled = false;
             input.focus();
+        }}
+
+        async function handleStream(resp) {{
+            const reader = resp.body.getReader();
+            const decoder = new TextDecoder();
+            let div = null;
+            let fullText = '';
+            let buffer = '';
+            let hasTools = false;
+            while (true) {{
+                const {{ done, value }} = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, {{ stream: true }});
+                while (buffer.includes('\\n\\n')) {{
+                    const idx = buffer.indexOf('\\n\\n');
+                    const chunk = buffer.substring(0, idx);
+                    buffer = buffer.substring(idx + 2);
+                    for (const line of chunk.split('\\n')) {{
+                        if (!line.startsWith('data: ')) continue;
+                        try {{
+                            const evt = JSON.parse(line.slice(6));
+                            if (evt.type === 'tool') {{
+                                if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
+                                hasTools = true;
+                                div.innerHTML += '<div class="tool-badge">\U0001f527 ' + evt.name + '</div>';
+                            }} else if (evt.type === 'token') {{
+                                if (hasTools && div) {{ div.innerHTML = ''; hasTools = false; }}
+                                if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
+                                fullText += evt.content;
+                                div.innerHTML = formatMarkdown(fullText);
+                            }} else if (evt.type === 'error') {{
+                                addMessage('\u274c ' + evt.message, 'system');
+                            }}
+                            chat.scrollTop = chat.scrollHeight;
+                        }} catch(e) {{}}
+                    }}
+                }}
+            }}
         }}
 
         input.focus();
@@ -931,6 +1283,36 @@ def api_chat():
     logger.info(f"Chat [{AI_PROVIDER}]: {message}")
     response_text = chat_with_ai(message, session_id)
     return jsonify({"response": response_text}), 200
+
+
+@app.route('/api/chat/stream', methods=['POST'])
+def api_chat_stream():
+    """Streaming chat endpoint using Server-Sent Events."""
+    data = request.get_json()
+    message = data.get("message", "").strip()
+    session_id = data.get("session_id", "default")
+    if not message:
+        return jsonify({"error": "Empty message"}), 400
+    logger.info(f"Stream [{AI_PROVIDER}]: {message}")
+
+    def generate():
+        for event in stream_chat_with_ai(message, session_id):
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
+
+
+@app.route('/api/conversations', methods=['GET'])
+def api_conversations():
+    """List conversation sessions."""
+    sessions = {}
+    for sid, msgs in conversations.items():
+        sessions[sid] = {"message_count": len(msgs), "last_role": msgs[-1]["role"] if msgs else ""}
+    return jsonify(sessions), 200
 
 
 @app.route("/health", methods=["GET"])
