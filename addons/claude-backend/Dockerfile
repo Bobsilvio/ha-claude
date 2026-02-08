@@ -24,11 +24,12 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 # Copy API application
 COPY api.py .
 
-# Copy rootfs (includes s6-overlay service directory)
-COPY rootfs / 
+# Copy rootfs (s6-overlay v3 service structure)
+COPY rootfs /
 
-# Make s6 service executable
-RUN chmod +x /etc/services.d/claude-backend/run
+# Make s6 service scripts executable
+RUN chmod +x /etc/s6-overlay/s6-rc.d/claude-backend/run \
+    && chmod +x /etc/s6-overlay/s6-rc.d/claude-backend/finish
 
 # Expose API port
 EXPOSE 5000
@@ -40,6 +41,6 @@ ENV HA_URL=http://homeassistant:8123
 ENV TIMEOUT=30
 ENV MAX_RETRIES=3
 
-# Do NOT set CMD or ENTRYPOINT
-# /init from s6-overlay will be PID 1
-# It will find and run rootfs/etc/services.d/claude-backend/run
+# s6-overlay init system - /init is inherited from base image
+# s6 will discover and run /etc/s6-overlay/s6-rc.d/claude-backend/run
+ENTRYPOINT ["/init"]

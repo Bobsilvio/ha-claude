@@ -1,0 +1,19 @@
+#!/usr/bin/with-contenv bashio
+# vim: ft=bash
+# shellcheck shell=bash
+# ==============================================================================
+# Start Claude Backend API
+# ==============================================================================
+bashio::log.info "Starting Claude Backend API..."
+
+CLAUDE_API_KEY=$(bashio::config 'claude_api_key')
+API_PORT=$(bashio::config 'api_port')
+DEBUG_MODE=$(bashio::config 'debug_mode')
+
+export CLAUDE_API_KEY
+export API_PORT
+export DEBUG_MODE
+export SUPERVISOR_TOKEN
+
+cd /app
+exec python3 api.py
