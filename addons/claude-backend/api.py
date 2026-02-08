@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.7.0"
+VERSION = "2.7.1"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1527,6 +1527,8 @@ def get_chat_ui():
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
         .header .badge {{ font-size: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
+        .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
+        .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
         .header .status {{ margin-left: auto; font-size: 12px; display: flex; align-items: center; gap: 6px; }}
         .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {status_color}; animation: pulse 2s infinite; }}
         @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
@@ -1565,6 +1567,7 @@ def get_chat_ui():
         <h1>AI Assistant</h1>
         <span class="badge">v{VERSION}</span>
         <span class="badge">{model_name}</span>
+        <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
         <div class="status">
             <div class="status-dot"></div>
             {status_text}
@@ -1718,6 +1721,35 @@ def get_chat_ui():
             }}
         }}
 
+        async function loadHistory() {{
+            try {{
+                const resp = await fetch('api/conversations/default/messages');
+                const data = await resp.json();
+                if (data.messages && data.messages.length > 0) {{
+                    suggestionsEl.style.display = 'none';
+                    data.messages.forEach(m => {{
+                        addMessage(m.content, m.role);
+                    }});
+                }}
+            }} catch(e) {{ console.log('No history:', e); }}
+        }}
+
+        async function newChat() {{
+            if (!confirm('Iniziare una nuova conversazione? La cronologia verrà cancellata.')) return;
+            try {{
+                await fetch('api/conversations/default', {{ method: 'DELETE' }});
+            }} catch(e) {{}}
+            // Clear UI
+            chat.innerHTML = `<div class="message system">
+                \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
+                Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
+                Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
+            </div>`;
+            suggestionsEl.style.display = 'flex';
+        }}
+
+        // Load history on page load
+        loadHistory();
         input.focus();
     </script>
 </body>
@@ -1800,6 +1832,27 @@ def api_conversations():
     for sid, msgs in conversations.items():
         sessions[sid] = {"message_count": len(msgs), "last_role": msgs[-1]["role"] if msgs else ""}
     return jsonify(sessions), 200
+
+
+@app.route('/api/conversations/<session_id>/messages', methods=['GET'])
+def api_conversation_messages(session_id):
+    """Get all messages for a conversation session."""
+    msgs = conversations.get(session_id, [])
+    # Return only user/assistant text messages for UI display
+    display_msgs = []
+    for m in msgs:
+        if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
+            display_msgs.append({"role": m["role"], "content": m["content"]})
+    return jsonify({"session_id": session_id, "messages": display_msgs}), 200
+
+
+@app.route('/api/conversations/<session_id>', methods=['DELETE'])
+def api_conversation_delete(session_id):
+    """Clear a conversation session."""
+    if session_id in conversations:
+        del conversations[session_id]
+        save_conversations()
+    return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
 
 
 @app.route("/health", methods=["GET"])
