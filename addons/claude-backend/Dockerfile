@@ -7,7 +7,9 @@ RUN apk add --no-cache \
     ca-certificates \
     curl \
     bash \
-    jq
+    jq \
+    build-base \
+    python3-dev
 
 WORKDIR /app
 
