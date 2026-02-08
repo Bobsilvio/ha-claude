@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.6.5"
+VERSION = "2.6.6"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -966,6 +966,32 @@ def chat_google(messages: List[Dict]) -> tuple:
 # ---- Main chat function ----
 
 
+def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
+    """Remove messages incompatible with the current provider.
+    OpenAI/GitHub use role='tool', Anthropic uses role='user' with tool_result content.
+    Google uses function_response parts. Strip incompatible formats on provider switch."""
+    clean = []
+    for m in messages:
+        role = m.get("role", "")
+        # Skip tool-role messages for Anthropic (it uses tool_result inside user messages)
+        if AI_PROVIDER == "anthropic" and role == "tool":
+            continue
+        # Skip assistant messages with tool_calls format (OpenAI format) for Anthropic
+        if AI_PROVIDER == "anthropic" and role == "assistant" and m.get("tool_calls"):
+            continue
+        # Skip Anthropic-format tool_result messages for OpenAI/GitHub
+        if AI_PROVIDER in ("openai", "github") and role == "user" and isinstance(m.get("content"), list):
+            # Anthropic tool_results are lists with type: tool_result
+            if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in m.get("content", [])):
+                continue
+        # Only keep simple user/assistant text messages
+        if role in ("user", "assistant"):
+            content = m.get("content", "")
+            if isinstance(content, str) and content:
+                clean.append({"role": role, "content": content})
+    return clean
+
+
 def chat_with_ai(user_message: str, session_id: str = "default") -> str:
     """Send a message to the configured AI provider with HA tools."""
     if not ai_client:
@@ -976,7 +1002,7 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
         conversations[session_id] = []
 
     conversations[session_id].append({"role": "user", "content": user_message})
-    messages = conversations[session_id][-20:]
+    messages = sanitize_messages_for_provider(conversations[session_id][-20:])
 
     try:
         if AI_PROVIDER == "anthropic":
@@ -1107,7 +1133,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
         conversations[session_id] = []
 
     conversations[session_id].append({"role": "user", "content": user_message})
-    messages = conversations[session_id]
+    messages = sanitize_messages_for_provider(conversations[session_id])
 
     try:
         if AI_PROVIDER in ("openai", "github"):
