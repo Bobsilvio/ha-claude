@@ -19,7 +19,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.8.2"
+VERSION = "2.8.3"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1443,6 +1443,37 @@ IMPORTANT: When modifying a dashboard, ALWAYS:
 2. Modify the views/cards as needed
 3. Save with update_dashboard passing the complete views array
 
+### ENTITY RULE (CRITICAL)
+- NEVER invent or guess entity IDs. ALWAYS use search_entities first to find REAL entity IDs.
+- Only use entity IDs that appear in the search results.
+- If a search returns no results for a category, DO NOT include cards for that category.
+- Example: if search_entities("light") returns only light.soggiorno and light.camera, use ONLY those two.
+
+### Dashboard Layout (CRITICAL - never put cards in a flat vertical list!)
+Always create visually appealing layouts using grids and stacks:
+
+**Use grid cards to arrange items in columns:**
+{"type": "grid", "columns": 2, "square": false, "cards": [card1, card2, card3, card4]}
+
+**Use horizontal-stack for side-by-side cards:**
+{"type": "horizontal-stack", "cards": [card1, card2]}
+
+**Use vertical-stack to group related cards:**
+{"type": "vertical-stack", "cards": [headerCard, contentCard]}
+
+**Best layout practices:**
+- Use a grid with 2-3 columns for button/entity cards
+- Group related sensors in horizontal-stack
+- Use vertical-stack with a markdown header + grid of cards for sections
+- Example section structure:
+  {"type": "vertical-stack", "cards": [
+    {"type": "markdown", "content": "## 💡 Luci"},
+    {"type": "grid", "columns": 3, "square": false, "cards": [
+      {"type": "button", "entity": "light.soggiorno", "name": "Soggiorno", "icon": "mdi:sofa", "show_state": true},
+      {"type": "button", "entity": "light.camera", "name": "Camera", "icon": "mdi:bed", "show_state": true}
+    ]}
+  ]}
+
 ### Standard Lovelace card types:
 - entities: {"type": "entities", "title": "Lights", "entities": ["light.living_room"]}
 - gauge: {"type": "gauge", "entity": "sensor.temperature"}
@@ -1450,7 +1481,6 @@ IMPORTANT: When modifying a dashboard, ALWAYS:
 - thermostat: {"type": "thermostat", "entity": "climate.living_room"}
 - button: {"type": "button", "entity": "switch.outlet", "name": "Toggle"}
 - markdown: {"type": "markdown", "content": "# Title"}
-- grid/horizontal-stack/vertical-stack for layout
 
 ### Custom cards (check availability with get_frontend_resources first!):
 
