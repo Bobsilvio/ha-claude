@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.19"
+VERSION = "3.0.20"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2971,12 +2971,17 @@ def chat_openai(messages: List[Dict]) -> tuple:
 
     oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
 
-    response = ai_client.chat.completions.create(
-        model=get_active_model(),
-        messages=oai_messages,
-        tools=tools,
-        max_tokens=max_tok
-    )
+    # NVIDIA Kimi K2.5: disable thinking mode for faster, simpler responses
+    kwargs = {
+        "model": get_active_model(),
+        "messages": oai_messages,
+        "tools": tools,
+        "max_tokens": max_tok
+    }
+    if AI_PROVIDER == "nvidia":
+        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+
+    response = ai_client.chat.completions.create(**kwargs)
 
     msg = response.choices[0].message
 
@@ -2997,12 +3002,18 @@ def chat_openai(messages: List[Dict]) -> tuple:
 
         trimmed = trim_messages(messages)
         oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
-        response = ai_client.chat.completions.create(
-            model=get_active_model(),
-            messages=oai_messages,
-            tools=tools,
-            max_tokens=max_tok
-        )
+
+        # NVIDIA Kimi K2.5: disable thinking mode
+        kwargs = {
+            "model": get_active_model(),
+            "messages": oai_messages,
+            "tools": tools,
+            "max_tokens": max_tok
+        }
+        if AI_PROVIDER == "nvidia":
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+
+        response = ai_client.chat.completions.create(**kwargs)
         msg = response.choices[0].message
 
     return msg.content or "", messages
@@ -3176,13 +3187,18 @@ def stream_chat_openai(messages, intent_info=None):
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
 
-        response = ai_client.chat.completions.create(
-            model=get_active_model(),
-            messages=oai_messages,
-            tools=tools,
-            max_tokens=max_tok,
-            stream=True
-        )
+        # NVIDIA Kimi K2.5: disable thinking mode for faster, simpler responses
+        kwargs = {
+            "model": get_active_model(),
+            "messages": oai_messages,
+            "tools": tools,
+            "max_tokens": max_tok,
+            "stream": True
+        }
+        if AI_PROVIDER == "nvidia":
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+
+        response = ai_client.chat.completions.create(**kwargs)
 
         content_parts = []
         tool_calls_map = {}
@@ -4816,5 +4832,17 @@ if __name__ == "__main__":
     is_valid, error_msg = validate_model_provider_compatibility()
     if not is_valid:
         logger.warning(error_msg)
+        # Auto-fix: reset to provider default model
+        default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "")
+        if default_model:
+            global AI_MODEL
+            AI_MODEL = default_model
+            fix_msgs = {
+                "en": f"✅ AUTO-FIX: Model automatically changed to '{MODEL_DISPLAY_MAPPING.get(default_model, default_model)}' (default for {AI_PROVIDER})",
+                "it": f"✅ AUTO-FIX: Modello cambiato automaticamente a '{MODEL_DISPLAY_MAPPING.get(default_model, default_model)}' (default per {AI_PROVIDER})",
+                "es": f"✅ AUTO-FIX: Modelo cambiado automáticamente a '{MODEL_DISPLAY_MAPPING.get(default_model, default_model)}' (predeterminado para {AI_PROVIDER})",
+                "fr": f"✅ AUTO-FIX: Modèle changé automatiquement en '{MODEL_DISPLAY_MAPPING.get(default_model, default_model)}' (par défaut pour {AI_PROVIDER})"
+            }
+            logger.warning(fix_msgs.get(LANGUAGE, fix_msgs["en"]))
 
     app.run(host="0.0.0.0", port=API_PORT, debug=DEBUG_MODE)
