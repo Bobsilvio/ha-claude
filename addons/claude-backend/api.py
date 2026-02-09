@@ -3189,7 +3189,7 @@ def stream_chat_openai(messages, intent_info=None):
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
 
-        # NVIDIA Kimi K2.5: use instant mode (thinking mode causes streaming issues)
+        # NVIDIA Kimi K2.5: configure thinking mode
         kwargs = {
             "model": get_active_model(),
             "messages": oai_messages,
@@ -3198,8 +3198,9 @@ def stream_chat_openai(messages, intent_info=None):
             "stream": True
         }
         if AI_PROVIDER == "nvidia":
-            kwargs["temperature"] = 0.6
-            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
+            kwargs["temperature"] = 1.0
+            kwargs["max_tokens"] = 16384
+            kwargs["chat_template_kwargs"] = {"thinking": False}
 
         logger.info(f"OpenAI: Calling API with model={kwargs['model']}, stream=True")
         response = ai_client.chat.completions.create(**kwargs)
