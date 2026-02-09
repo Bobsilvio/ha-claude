@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.21"
+VERSION = "2.9.28"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -53,22 +53,30 @@ LANGUAGE_TEXT = {
     "en": {
         "before": "Before",
         "after": "After",
-        "respond_instruction": "Respond in English."
+        "respond_instruction": "Respond in English.",
+        "show_yaml_rule": "CRITICAL: After CREATING or MODIFYING automations/scripts/dashboards, you MUST show the YAML code to the user in your response. Never skip this step.",
+        "confirm_entity_rule": "CRITICAL: Before creating automations, ALWAYS use search_entities first to find the correct entity_id, then confirm with the user if multiple matches are found."
     },
     "it": {
         "before": "Prima",
         "after": "Dopo",
-        "respond_instruction": "Rispondi sempre in Italiano."
+        "respond_instruction": "Rispondi sempre in Italiano.",
+        "show_yaml_rule": "CRITICO: Dopo aver CREATO o MODIFICATO automazioni/script/dashboard, DEVI sempre mostrare il codice YAML all'utente nella tua risposta. Non saltare mai questo passaggio.",
+        "confirm_entity_rule": "CRITICO: Prima di creare automazioni, USA SEMPRE search_entities per trovare il corretto entity_id, poi conferma con l'utente se ci sono più risultati."
     },
     "es": {
         "before": "Antes",
         "after": "Después",
-        "respond_instruction": "Responde siempre en Español."
+        "respond_instruction": "Responde siempre en Español.",
+        "show_yaml_rule": "CRÍTICO: Después de CREAR o MODIFICAR automatizaciones/scripts/dashboards, DEBES mostrar el código YAML al usuario en tu respuesta. Nunca omitas este paso.",
+        "confirm_entity_rule": "CRÍTICO: Antes de crear automatizaciones, USA SIEMPRE search_entities para encontrar el entity_id correcto, luego confirma con el usuario si hay múltiples resultados."
     },
     "fr": {
         "before": "Avant",
         "after": "Après",
-        "respond_instruction": "Réponds toujours en Français."
+        "respond_instruction": "Réponds toujours en Français.",
+        "show_yaml_rule": "CRITIQUE: Après avoir CRÉÉ ou MODIFIÉ des automatisations/scripts/dashboards, tu DOIS toujours montrer le code YAML à l'utilisateur dans ta réponse. Ne saute jamais cette étape.",
+        "confirm_entity_rule": "CRITIQUE: Avant de créer des automatisations, UTILISE TOUJOURS search_entities pour trouver le bon entity_id, puis confirme avec l'utilisateur s'il y a plusieurs résultats."
     }
 }
 
@@ -2153,6 +2161,16 @@ When creating automations, use proper Home Assistant formats:
 - Sun trigger: {"platform": "sun", "event": "sunset", "offset": "-00:30:00"}
 - Service action: {"service": "light.turn_on", "target": {"entity_id": "light.living_room"}, "data": {"brightness": 255}}
 
+**CRITICAL - Entity Selection:**
+BEFORE creating an automation, script, or dashboard:
+1. ALWAYS use search_entities to find the correct entity_id (search for "light", "switch", "sensor", etc.)
+2. If the user says "luce" (light) or mentions a device, search BOTH "light" AND "switch" domains
+3. Present found entities to the user and ASK which one to use if there are multiple matches
+4. NEVER guess or invent entity IDs - only use entities that actually exist
+
+**CRITICAL - Show YAML After Creation:**
+After CREATING or MODIFYING an automation, script, or dashboard, you MUST immediately show the YAML code to the user in your response. This is MANDATORY - never skip this step.
+
 When managing areas/rooms, use manage_areas. To assign an entity to a room, use manage_entity with the area_id.
 For advanced sensor analytics (averages, peaks, trends), use get_statistics instead of get_history.
 When a user asks about specific devices or addons, use search_entities to find them by keyword.
@@ -2203,21 +2221,34 @@ Always respond in the same language the user uses.
 Be concise but informative."""
 
 # Compact prompt for providers with small context (GitHub Models free tier: 8k tokens)
-SYSTEM_PROMPT_COMPACT = """You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, create automations, create dashboards.
+def get_compact_prompt():
+    """Generate compact prompt with language-specific instructions."""
+    lang_instruction = get_lang_text("respond_instruction")
+    show_yaml_rule = get_lang_text("show_yaml_rule")
+    confirm_entity_rule = get_lang_text("confirm_entity_rule")
+
+    return f"""You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, create automations, create dashboards.
+{confirm_entity_rule}
+{show_yaml_rule}
 When users ask about specific devices, use search_entities. Use get_history for past data.
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
-Respond in the user's language. Be concise."""
+{lang_instruction} Be concise."""
 
 def get_compact_prompt_with_files():
     """Generate compact prompt with files support and language-specific instructions."""
     before_text = get_lang_text("before")
     after_text = get_lang_text("after")
     lang_instruction = get_lang_text("respond_instruction")
+    show_yaml_rule = get_lang_text("show_yaml_rule")
+    confirm_entity_rule = get_lang_text("confirm_entity_rule")
 
     return f"""You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.
 Use list_config_files to explore folders (e.g., 'lovelace', 'yaml'). Use read_config_file to read YAML/JSON files.
 Use get_automations, get_scripts, get_dashboards to list existing configs.
 When users ask about files/folders, use list_config_files first to show what's available.
+
+{show_yaml_rule}
+{confirm_entity_rule}
 
 CRITICAL - Show changes clearly:
 When you MODIFY configs, show ONLY the changed sections in diff format:
@@ -2323,15 +2354,17 @@ def get_system_prompt() -> str:
     """Get system prompt appropriate for current provider."""
     if AI_PROVIDER == "github":
         # GitHub has 8k token limit - use minimal prompt with only includes mapping
-        compact_prompt = get_compact_prompt_with_files() if ENABLE_FILE_ACCESS else SYSTEM_PROMPT_COMPACT
+        compact_prompt = get_compact_prompt_with_files() if ENABLE_FILE_ACCESS else get_compact_prompt()
         # Only include file mapping if file access is enabled, skip verbose config structure
         if ENABLE_FILE_ACCESS and CONFIG_INCLUDES:
             includes_compact = "Config files: " + ", ".join([f"{k}={v}" for k, v in list(CONFIG_INCLUDES.items())[:5]]) + "\n"
             return includes_compact + compact_prompt
         return compact_prompt
-    # For other providers, add language instruction to base prompt
+    # For other providers, add language instruction and critical rules to base prompt
     lang_instruction = get_lang_text("respond_instruction")
-    return get_config_structure_section() + get_config_includes_text() + base_prompt + f"\n\n{lang_instruction}"
+    show_yaml_rule = get_lang_text("show_yaml_rule")
+    confirm_entity_rule = get_lang_text("confirm_entity_rule")
+    return get_config_structure_section() + get_config_includes_text() + base_prompt + f"\n\n{show_yaml_rule}\n{confirm_entity_rule}\n\n{lang_instruction}"
 
 
 def get_openai_tools_for_provider():
