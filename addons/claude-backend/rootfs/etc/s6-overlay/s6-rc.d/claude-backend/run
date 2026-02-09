@@ -8,18 +8,12 @@ bashio::log.info "Starting AI Assistant Backend API..."
 
 # AI Provider configuration
 AI_PROVIDER=$(bashio::config 'ai_provider')
+AI_MODEL=$(bashio::config "ai_model" 2>/dev/null || echo "")
+if [ "${AI_MODEL}" = "null" ]; then AI_MODEL=""; fi
 ANTHROPIC_API_KEY=$(bashio::config 'anthropic_api_key')
-ANTHROPIC_MODEL=$(bashio::config "anthropic_model" 2>/dev/null || echo "")
-if [ "${ANTHROPIC_MODEL}" = "null" ]; then ANTHROPIC_MODEL=""; fi
 OPENAI_API_KEY=$(bashio::config 'openai_api_key')
-OPENAI_MODEL=$(bashio::config "openai_model" 2>/dev/null || echo "")
-if [ "${OPENAI_MODEL}" = "null" ]; then OPENAI_MODEL=""; fi
 GOOGLE_API_KEY=$(bashio::config 'google_api_key')
-GOOGLE_MODEL=$(bashio::config "google_model" 2>/dev/null || echo "")
-if [ "${GOOGLE_MODEL}" = "null" ]; then GOOGLE_MODEL=""; fi
 GITHUB_TOKEN=$(bashio::config 'github_token')
-GITHUB_MODEL=$(bashio::config "github_model" 2>/dev/null || echo "")
-if [ "${GITHUB_MODEL}" = "null" ]; then GITHUB_MODEL=""; fi
 API_PORT=$(bashio::config 'api_port')
 DEBUG_MODE=$(bashio::config 'debug_mode')
 ENABLE_FILE_ACCESS=$(bashio::config 'enable_file_access')
@@ -34,14 +28,11 @@ if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
 fi
 
 export AI_PROVIDER
+export AI_MODEL
 export ANTHROPIC_API_KEY
-export ANTHROPIC_MODEL
 export OPENAI_API_KEY
-export OPENAI_MODEL
 export GOOGLE_API_KEY
-export GOOGLE_MODEL
 export GITHUB_TOKEN
-export GITHUB_MODEL
 export API_PORT
 export DEBUG_MODE
 export ENABLE_FILE_ACCESS

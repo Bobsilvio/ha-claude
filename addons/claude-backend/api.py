@@ -25,26 +25,14 @@ VERSION = "3.0.8"
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
-ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
-GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "")
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-GITHUB_MODEL = os.getenv("GITHUB_MODEL", "")
 AI_MODEL = os.getenv("AI_MODEL", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
-if ANTHROPIC_MODEL in ("null", "None", ""):
-    ANTHROPIC_MODEL = ""
-if OPENAI_MODEL in ("null", "None", ""):
-    OPENAI_MODEL = ""
-if GOOGLE_MODEL in ("null", "None", ""):
-    GOOGLE_MODEL = ""
-if GITHUB_MODEL in ("null", "None", ""):
-    GITHUB_MODEL = ""
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
@@ -288,18 +276,8 @@ PROVIDER_MODELS = {
 
 def get_active_model() -> str:
     """Get the active model name."""
-    # ai_model (manual override) takes priority
     if AI_MODEL:
         return AI_MODEL
-    # Provider-specific model selections
-    if AI_PROVIDER == "anthropic" and ANTHROPIC_MODEL:
-        return ANTHROPIC_MODEL
-    if AI_PROVIDER == "openai" and OPENAI_MODEL:
-        return OPENAI_MODEL
-    if AI_PROVIDER == "google" and GOOGLE_MODEL:
-        return GOOGLE_MODEL
-    if AI_PROVIDER == "github" and GITHUB_MODEL:
-        return GITHUB_MODEL
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
 
 
@@ -3848,6 +3826,9 @@ def get_chat_ui():
         .header .badge {{ font-size: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
         .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
         .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
+        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 200px; }}
+        .model-selector:hover {{ background: rgba(255,255,255,0.35); }}
+        .model-selector option {{ background: #2c3e50; color: white; }}
         .header .status {{ margin-left: auto; font-size: 12px; display: flex; align-items: center; gap: 6px; }}
         .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {status_color}; animation: pulse 2s infinite; }}
         @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
@@ -3901,7 +3882,9 @@ def get_chat_ui():
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
         <span class="badge">v{VERSION}</span>
-        <span class="badge">{model_name}</span>
+        <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="Cambia modello">
+            <!-- Populated by JavaScript -->
+        </select>
         <span class="badge">\U0001f5bc Vision</span>
         <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
         <div class="status">
@@ -4313,7 +4296,54 @@ def get_chat_ui():
             loadChatList();
         }}
 
+        // Load models and populate dropdown
+        async function loadModels() {{
+            try {{
+                const response = await fetch('/api/get_models');
+                const data = await response.json();
+                const select = document.getElementById('modelSelect');
+                const provider = data.current_provider;
+                const currentModel = data.current_model;
+
+                // Clear existing options
+                select.innerHTML = '';
+
+                // Add models for current provider
+                if (data.models[provider]) {{
+                    data.models[provider].forEach(model => {{
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        if (model === currentModel) {{
+                            option.selected = true;
+                        }}
+                        select.appendChild(option);
+                    }});
+                }}
+            }} catch (error) {{
+                console.error('Error loading models:', error);
+            }}
+        }}
+
+        // Change model
+        async function changeModel(model) {{
+            try {{
+                const response = await fetch('/api/set_model', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{model: model}})
+                }});
+                if (response.ok) {{
+                    console.log('Model changed to:', model);
+                    // Optionally show a notification
+                }}
+            }} catch (error) {{
+                console.error('Error changing model:', error);
+            }}
+        }}
+
         // Load history on page load
+        loadModels();
         loadChatList();
         loadHistory();
         input.focus();
@@ -4465,6 +4495,29 @@ def api_conversation_delete(session_id):
         del conversations[session_id]
         save_conversations()
     return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
+
+
+@app.route('/api/set_model', methods=['POST'])
+def api_set_model():
+    """Change AI model at runtime."""
+    global AI_MODEL
+    data = request.get_json()
+    new_model = data.get("model", "")
+    if new_model:
+        AI_MODEL = new_model
+        logger.info(f"Model changed to: {new_model}")
+        return jsonify({"status": "ok", "model": get_active_model()}), 200
+    return jsonify({"status": "error", "message": "No model specified"}), 400
+
+
+@app.route('/api/get_models', methods=['GET'])
+def api_get_models():
+    """Get available models for all providers."""
+    return jsonify({
+        "current_provider": AI_PROVIDER,
+        "current_model": get_active_model(),
+        "models": PROVIDER_MODELS
+    }), 200
 
 
 @app.route("/health", methods=["GET"])

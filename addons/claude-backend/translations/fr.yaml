@@ -2,30 +2,21 @@ configuration:
   ai_provider:
     name: Fournisseur d'IA
     description: Sélectionnez votre fournisseur d'IA (Anthropic Claude, OpenAI, Google Gemini ou GitHub Models)
+  ai_model:
+    name: Modèle d'IA
+    description: "Sélectionnez le modèle d'IA (selon fournisseur: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, GitHub=40+ modèles)"
   anthropic_api_key:
     name: Clé API Anthropic
-    description: Clé API de console.anthropic.com (requise si provider=anthropic)
-  anthropic_model:
-    name: Modèle Anthropic
-    description: Sélectionnez le modèle Claude (Sonnet, Opus ou Haiku)
+    description: Clé API de console.anthropic.com (sauvegardez même si non utilisée, pour changement rapide)
   openai_api_key:
     name: Clé API OpenAI
-    description: Clé API de platform.openai.com (requise si provider=openai)
-  openai_model:
-    name: Modèle OpenAI
-    description: Sélectionnez le modèle OpenAI (GPT-4o, GPT-4o-mini, o1, etc.)
+    description: Clé API de platform.openai.com (sauvegardez même si non utilisée, pour changement rapide)
   google_api_key:
     name: Clé API Google
-    description: Clé API de aistudio.google.com (requise si provider=google)
-  google_model:
-    name: Modèle Google
-    description: Sélectionnez le modèle Gemini (2.0 Flash, 2.5 Pro, etc.)
+    description: Clé API de aistudio.google.com (sauvegardez même si non utilisée, pour changement rapide)
   github_token:
     name: Token GitHub
-    description: Personal Access Token de github.com/settings/tokens (requis si provider=github)
-  github_model:
-    name: Modèle GitHub
-    description: Sélectionnez le modèle d'IA pour le fournisseur GitHub (40+ modèles disponibles)
+    description: Personal Access Token de github.com/settings/tokens (sauvegardez même si non utilisé, pour changement rapide)
   api_port:
     name: Port API
     description: Port API interne (par défaut 5000, utilisateurs avancés uniquement)
