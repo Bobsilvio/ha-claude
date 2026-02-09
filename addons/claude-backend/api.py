@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT SET')}")
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
-logger.info(f"HA_CONFIG_DIR: /homeassistant")
+logger.info(f"HA_CONFIG_DIR: /config")
 
 def get_system_prompt() -> str:
     """Return the system prompt with dynamic config structure prepended."""
@@ -238,7 +238,7 @@ abort_streams: Dict[str, bool] = {}
 # --- Dynamic config structure scan ---
 CONFIG_STRUCTURE_TEXT = ""
 
-def scan_config_structure(root_dir="/homeassistant", max_depth=2):
+def scan_config_structure(root_dir="/config", max_depth=2):
     """Scan the config directory and return a formatted string of its structure."""
     lines = []
     def _scan(path, depth):
@@ -279,7 +279,7 @@ CONFIG_INCLUDES = {}
 def parse_configuration_includes():
     """Parse configuration.yaml and extract all !include directives."""
     includes = {}
-    config_file = "/homeassistant/configuration.yaml"
+    config_file = "/config/configuration.yaml"
 
     if not os.path.isfile(config_file):
         logger.warning("configuration.yaml not found")
@@ -432,7 +432,7 @@ load_conversations()
 # ---- Snapshot system for safe config editing ----
 
 SNAPSHOTS_DIR = "/data/snapshots"
-HA_CONFIG_DIR = "/homeassistant"  # Mapped via config.json "map": ["config:rw"]
+HA_CONFIG_DIR = "/config"  # Mapped via config.json "map": ["config:rw"]
 
 def create_snapshot(filename: str) -> dict:
     """Create a snapshot of a file before modifying it. Returns snapshot info."""
@@ -2622,7 +2622,11 @@ def stream_chat_openai(messages, intent_info=None):
     else:
         system_prompt = get_system_prompt()
         tools = get_openai_tools_for_provider()
-    
+
+    # Log available tools for debugging
+    tool_names = [t.get("function", {}).get("name", "unknown") for t in tools]
+    logger.info(f"OpenAI tools available ({len(tools)}): {', '.join(tool_names)}")
+
     max_tok = 4000 if AI_PROVIDER == "github" else 4096
     full_text = ""
     max_rounds = 5
@@ -2668,6 +2672,8 @@ def stream_chat_openai(messages, intent_info=None):
         if not tool_calls_map:
             # No tools - stream the final text now
             full_text = accumulated
+            logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
+            logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tools)} available tools")
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
                 chunk = full_text[i:i+4]
@@ -2701,7 +2707,9 @@ def stream_chat_openai(messages, intent_info=None):
                 continue
             yield {"type": "tool", "name": fn_name, "description": get_tool_description(fn_name)}
             args = json.loads(tc["function"]["arguments"])
+            logger.info(f"OpenAI: Executing tool '{fn_name}' with args: {args}")
             result = execute_tool(fn_name, args)
+            logger.info(f"OpenAI: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
             tools_called_this_session.add(fn_name)
             # Truncate large results to prevent token overflow
             max_len = 3000 if AI_PROVIDER == "github" else 8000
@@ -2749,6 +2757,10 @@ def stream_chat_anthropic(messages, intent_info=None):
     else:
         focused_prompt = get_system_prompt()
         focused_tools = get_anthropic_tools()
+
+    # Log available tools for debugging
+    tool_names = [t.get("name", "unknown") for t in focused_tools]
+    logger.info(f"Anthropic tools available ({len(focused_tools)}): {', '.join(tool_names)}")
 
     full_text = ""
     max_rounds = 5  # Strict limit: most tasks need 1-2 rounds max
@@ -2829,6 +2841,8 @@ def stream_chat_anthropic(messages, intent_info=None):
         if not tool_uses:
             # No tools - this is the final response. Stream the text now.
             full_text = accumulated_text
+            logger.warning(f"Anthropic: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
+            logger.info(f"Anthropic: This means the AI decided not to use any of the {len(focused_tools)} available tools")
             # Yield a clear signal to reset any previous tool badges
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
@@ -2864,9 +2878,10 @@ def stream_chat_anthropic(messages, intent_info=None):
                 redundant_blocked += 1
                 continue
 
-            logger.info(f"Tool: {tool['name']}")
+            logger.info(f"Anthropic: Executing tool '{tool['name']}' with input: {tool['input']}")
             yield {"type": "tool", "name": tool["name"], "description": get_tool_description(tool["name"])}
             result = execute_tool(tool["name"], tool["input"])
+            logger.info(f"Anthropic: Tool '{tool['name']}' returned {len(result)} chars: {result[:300]}...")
             tools_called_this_session.add(tool_key)
             # Truncate large tool results to prevent token overflow
             if len(result) > 8000:
@@ -3865,7 +3880,13 @@ def api_conversations_list():
 def api_conversation_get(session_id):
     """Get a specific conversation session."""
     if session_id in conversations:
-        return jsonify({"session_id": session_id, "messages": conversations[session_id]}), 200
+        # Filter to only return displayable messages (user/assistant with string content)
+        msgs = conversations.get(session_id, [])
+        display_msgs = []
+        for m in msgs:
+            if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
+                display_msgs.append({"role": m["role"], "content": m["content"]})
+        return jsonify({"session_id": session_id, "messages": display_msgs}), 200
     return jsonify({"error": "Conversation not found"}), 404
 
 
