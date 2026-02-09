@@ -5190,9 +5190,8 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
-    # ...existing code...
+...existing code...
 if __name__ == "__main__":
-VERSION = "3.0.35"
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
     logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
     # get_ha_token() è già definita sopra, quindi qui è sicuro
