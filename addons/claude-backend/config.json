@@ -1,6 +1,6 @@
 {
   "name": "AI Assistant for Home Assistant",
-  "version": "2.9.26",
+  "version": "2.9.27",
   "slug": "claude-backend",
   "description": "AI-powered smart home assistant with Claude, ChatGPT, Gemini and GitHub Models (30+ AI models)",
   "url": "https://github.com/Bobsilvio/ha-claude",
@@ -41,6 +41,7 @@
     "api_port": "5000",
     "debug_mode": false,
     "enable_file_access": false,
+    "language": "en",
     "timeout": "30",
     "max_retries": "3"
   },
@@ -54,6 +55,7 @@
     "api_port": "str",
     "debug_mode": "bool?",
     "enable_file_access": "bool?",
+    "language": "list(en|it|es|fr)?",
     "timeout": "str?",
     "max_retries": "str?"
   },

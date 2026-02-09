@@ -37,6 +37,7 @@ if AI_MODEL in ("null", "None", ""):
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
+LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
@@ -45,6 +46,35 @@ logger = logging.getLogger(__name__)
 logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT SET')}")
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
+logger.info(f"LANGUAGE: {LANGUAGE}")
+
+# Language-specific text
+LANGUAGE_TEXT = {
+    "en": {
+        "before": "Before",
+        "after": "After",
+        "respond_instruction": "Respond in English."
+    },
+    "it": {
+        "before": "Prima",
+        "after": "Dopo",
+        "respond_instruction": "Rispondi sempre in Italiano."
+    },
+    "es": {
+        "before": "Antes",
+        "after": "Después",
+        "respond_instruction": "Responde siempre en Español."
+    },
+    "fr": {
+        "before": "Avant",
+        "after": "Après",
+        "respond_instruction": "Réponds toujours en Français."
+    }
+}
+
+def get_lang_text(key: str) -> str:
+    """Get language-specific text."""
+    return LANGUAGE_TEXT.get(LANGUAGE, LANGUAGE_TEXT["en"]).get(key, "")
 
 def get_system_prompt() -> str:
     """Return the system prompt with dynamic config structure prepended."""
@@ -2178,28 +2208,34 @@ When users ask about specific devices, use search_entities. Use get_history for 
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
 Respond in the user's language. Be concise."""
 
-SYSTEM_PROMPT_COMPACT_WITH_FILES = """You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.
+def get_compact_prompt_with_files():
+    """Generate compact prompt with files support and language-specific instructions."""
+    before_text = get_lang_text("before")
+    after_text = get_lang_text("after")
+    lang_instruction = get_lang_text("respond_instruction")
+
+    return f"""You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.
 Use list_config_files to explore folders (e.g., 'lovelace', 'yaml'). Use read_config_file to read YAML/JSON files.
 Use get_automations, get_scripts, get_dashboards to list existing configs.
 When users ask about files/folders, use list_config_files first to show what's available.
 
-CRITICAL: When you CREATE or MODIFY automations, scripts, dashboards, or configs, ALWAYS show the YAML code:
-- For modifications: show **Prima (old):** and **Dopo (new):** in YAML code blocks
-- For new creations: show the complete YAML code created
-This helps users verify your work. Example:
-**Prima (old):**
+CRITICAL - Show changes clearly:
+When you MODIFY configs, show ONLY the changed sections in diff format:
+**{before_text}:**
 ```yaml
-condition: []
+- condition: []
 ```
-**Dopo (new):**
+**{after_text}:**
 ```yaml
-condition:
-  - condition: state
-    entity_id: light.room
-    state: "on"
++ condition:
++   - condition: state
++     entity_id: light.room
++     state: "on"
 ```
 
-Respond in the user's language. Be concise."""
+For NEW creations, show the complete YAML.
+
+{lang_instruction} Be concise."""
 
 # Compact tool definitions for low-token providers
 HA_TOOLS_COMPACT = [
@@ -2287,13 +2323,15 @@ def get_system_prompt() -> str:
     """Get system prompt appropriate for current provider."""
     if AI_PROVIDER == "github":
         # GitHub has 8k token limit - use minimal prompt with only includes mapping
-        compact_prompt = SYSTEM_PROMPT_COMPACT_WITH_FILES if ENABLE_FILE_ACCESS else SYSTEM_PROMPT_COMPACT
+        compact_prompt = get_compact_prompt_with_files() if ENABLE_FILE_ACCESS else SYSTEM_PROMPT_COMPACT
         # Only include file mapping if file access is enabled, skip verbose config structure
         if ENABLE_FILE_ACCESS and CONFIG_INCLUDES:
             includes_compact = "Config files: " + ", ".join([f"{k}={v}" for k, v in list(CONFIG_INCLUDES.items())[:5]]) + "\n"
             return includes_compact + compact_prompt
         return compact_prompt
-    return get_config_structure_section() + get_config_includes_text() + base_prompt
+    # For other providers, add language instruction to base prompt
+    lang_instruction = get_lang_text("respond_instruction")
+    return get_config_structure_section() + get_config_includes_text() + base_prompt + f"\n\n{lang_instruction}"
 
 
 def get_openai_tools_for_provider():

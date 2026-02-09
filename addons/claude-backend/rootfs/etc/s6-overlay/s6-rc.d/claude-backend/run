@@ -17,6 +17,7 @@ if [ "${GITHUB_MODEL}" = "null" ]; then GITHUB_MODEL=""; fi
 API_PORT=$(bashio::config 'api_port')
 DEBUG_MODE=$(bashio::config 'debug_mode')
 ENABLE_FILE_ACCESS=$(bashio::config 'enable_file_access')
+LANGUAGE=$(bashio::config 'language')
 
 # SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
 if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
@@ -35,6 +36,7 @@ export GITHUB_MODEL
 export API_PORT
 export DEBUG_MODE
 export ENABLE_FILE_ACCESS
+export LANGUAGE
 export SUPERVISOR_TOKEN
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
