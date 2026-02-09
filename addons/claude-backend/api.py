@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.3"
+VERSION = "3.0.4"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -3014,6 +3014,8 @@ def stream_chat_openai(messages, intent_info=None):
             full_text = accumulated
             logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
             logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tools)} available tools")
+            # Save assistant message to conversation
+            messages.append({"role": "assistant", "content": full_text})
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
                 chunk = full_text[i:i+4]
@@ -3183,6 +3185,8 @@ def stream_chat_anthropic(messages, intent_info=None):
             full_text = accumulated_text
             logger.warning(f"Anthropic: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
             logger.info(f"Anthropic: This means the AI decided not to use any of the {len(focused_tools)} available tools")
+            # Save assistant message to conversation
+            messages.append({"role": "assistant", "content": full_text})
             # Yield a clear signal to reset any previous tool badges
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
