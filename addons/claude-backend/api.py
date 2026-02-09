@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.28"
+VERSION = "2.9.29"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -55,28 +55,32 @@ LANGUAGE_TEXT = {
         "after": "After",
         "respond_instruction": "Respond in English.",
         "show_yaml_rule": "CRITICAL: After CREATING or MODIFYING automations/scripts/dashboards, you MUST show the YAML code to the user in your response. Never skip this step.",
-        "confirm_entity_rule": "CRITICAL: Before creating automations, ALWAYS use search_entities first to find the correct entity_id, then confirm with the user if multiple matches are found."
+        "confirm_entity_rule": "CRITICAL: Before creating automations, ALWAYS use search_entities first to find the correct entity_id, then confirm with the user if multiple matches are found.",
+        "confirm_delete_rule": "CRITICAL DESTRUCTIVE: Before DELETING or MODIFYING an automation/script/dashboard, you MUST:\n1. Use get_automations/get_scripts/get_dashboards to list all options\n2. Identify with CERTAINTY which one the user wants to delete/modify (by name/alias)\n3. Show the user WHICH ONE you will delete/modify\n4. ASK for EXPLICIT CONFIRMATION before proceeding\n5. NEVER delete/modify without confirmation - it's an IRREVERSIBLE operation"
     },
     "it": {
         "before": "Prima",
         "after": "Dopo",
         "respond_instruction": "Rispondi sempre in Italiano.",
         "show_yaml_rule": "CRITICO: Dopo aver CREATO o MODIFICATO automazioni/script/dashboard, DEVI sempre mostrare il codice YAML all'utente nella tua risposta. Non saltare mai questo passaggio.",
-        "confirm_entity_rule": "CRITICO: Prima di creare automazioni, USA SEMPRE search_entities per trovare il corretto entity_id, poi conferma con l'utente se ci sono più risultati."
+        "confirm_entity_rule": "CRITICO: Prima di creare automazioni, USA SEMPRE search_entities per trovare il corretto entity_id, poi conferma con l'utente se ci sono più risultati.",
+        "confirm_delete_rule": "CRITICO DISTRUTTIVO: Prima di ELIMINARE o MODIFICARE un'automazione/script/dashboard, DEVI:\n1. Usare get_automations/get_scripts/get_dashboards per elencare tutte le opzioni\n2. Identificare con CERTEZZA quale l'utente vuole eliminare/modificare (per nome/alias)\n3. Mostrare all'utente QUALE eliminerai/modificherai\n4. CHIEDERE CONFERMA ESPLICITA prima di procedere\n5. NON eliminare/modificare MAI senza conferma - è un'operazione IRREVERSIBILE"
     },
     "es": {
         "before": "Antes",
         "after": "Después",
         "respond_instruction": "Responde siempre en Español.",
         "show_yaml_rule": "CRÍTICO: Después de CREAR o MODIFICAR automatizaciones/scripts/dashboards, DEBES mostrar el código YAML al usuario en tu respuesta. Nunca omitas este paso.",
-        "confirm_entity_rule": "CRÍTICO: Antes de crear automatizaciones, USA SIEMPRE search_entities para encontrar el entity_id correcto, luego confirma con el usuario si hay múltiples resultados."
+        "confirm_entity_rule": "CRÍTICO: Antes de crear automatizaciones, USA SIEMPRE search_entities para encontrar el entity_id correcto, luego confirma con el usuario si hay múltiples resultados.",
+        "confirm_delete_rule": "CRÍTICO DESTRUCTIVO: Antes de ELIMINAR o MODIFICAR una automatización/script/dashboard, DEBES:\n1. Usar get_automations/get_scripts/get_dashboards para listar todas las opciones\n2. Identificar con CERTEZA cuál quiere eliminar/modificar el usuario (por nombre/alias)\n3. Mostrar al usuario CUÁL eliminarás/modificarás\n4. PEDIR CONFIRMACIÓN EXPLÍCITA antes de proceder\n5. NUNCA eliminar/modificar sin confirmación - es una operación IRREVERSIBLE"
     },
     "fr": {
         "before": "Avant",
         "after": "Après",
         "respond_instruction": "Réponds toujours en Français.",
         "show_yaml_rule": "CRITIQUE: Après avoir CRÉÉ ou MODIFIÉ des automatisations/scripts/dashboards, tu DOIS toujours montrer le code YAML à l'utilisateur dans ta réponse. Ne saute jamais cette étape.",
-        "confirm_entity_rule": "CRITIQUE: Avant de créer des automatisations, UTILISE TOUJOURS search_entities pour trouver le bon entity_id, puis confirme avec l'utilisateur s'il y a plusieurs résultats."
+        "confirm_entity_rule": "CRITIQUE: Avant de créer des automatisations, UTILISE TOUJOURS search_entities pour trouver le bon entity_id, puis confirme avec l'utilisateur s'il y a plusieurs résultats.",
+        "confirm_delete_rule": "CRITIQUE DESTRUCTIF: Avant de SUPPRIMER ou MODIFIER une automatisation/script/dashboard, tu DOIS:\n1. Utiliser get_automations/get_scripts/get_dashboards pour lister toutes les options\n2. Identifier avec CERTITUDE laquelle l'utilisateur veut supprimer/modifier (par nom/alias)\n3. Montrer à l'utilisateur LAQUELLE tu vas supprimer/modifier\n4. DEMANDER une CONFIRMATION EXPLICITE avant de procéder\n5. NE JAMAIS supprimer/modifier sans confirmation - c'est une opération IRRÉVERSIBLE"
     }
 }
 
@@ -2176,7 +2180,18 @@ For advanced sensor analytics (averages, peaks, trends), use get_statistics inst
 When a user asks about specific devices or addons, use search_entities to find them by keyword.
 Use get_history for recent state changes, get_statistics for aggregated data over longer periods.
 Use get_areas when the user refers to rooms.
-To delete resources, use delete_automation, delete_script, or delete_dashboard.
+
+**CRITICAL - Delete/Modify Confirmation (ALWAYS REQUIRED):**
+BEFORE deleting or modifying ANY automation, script, or dashboard:
+1. **List all options**: Use get_automations, get_scripts, or get_dashboards to see all available items
+2. **Identify with certainty**: Match by exact alias/name - if the user says "rimuovi questa" (remove this one), look at the conversation context to identify which one was just created/discussed
+3. **Show what you'll delete/modify**: Display the name/alias of the item you identified
+4. **ASK for confirmation**: "Vuoi eliminare l'automazione 'Nome Automazione'? Confermi?" (Do you want to delete automation 'Name'? Confirm?)
+5. **Wait for user response**: NEVER proceed without explicit "sì"/"yes"/"conferma"/"ok" from the user
+6. **NEVER delete the wrong item**: If there's ANY doubt, ask the user to clarify which item they mean
+
+This is a DESTRUCTIVE operation - mistakes can delete important automations. ALWAYS confirm first.
+To delete resources (after confirmation), use delete_automation, delete_script, or delete_dashboard.
 
 ## CRITICAL BEHAVIOR RULES
 - When the user asks you to CREATE or MODIFY something (dashboard, automation, script, config), DO IT IMMEDIATELY.
@@ -2226,10 +2241,12 @@ def get_compact_prompt():
     lang_instruction = get_lang_text("respond_instruction")
     show_yaml_rule = get_lang_text("show_yaml_rule")
     confirm_entity_rule = get_lang_text("confirm_entity_rule")
+    confirm_delete_rule = get_lang_text("confirm_delete_rule")
 
     return f"""You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, create automations, create dashboards.
 {confirm_entity_rule}
 {show_yaml_rule}
+{confirm_delete_rule}
 When users ask about specific devices, use search_entities. Use get_history for past data.
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
 {lang_instruction} Be concise."""
@@ -2241,6 +2258,7 @@ def get_compact_prompt_with_files():
     lang_instruction = get_lang_text("respond_instruction")
     show_yaml_rule = get_lang_text("show_yaml_rule")
     confirm_entity_rule = get_lang_text("confirm_entity_rule")
+    confirm_delete_rule = get_lang_text("confirm_delete_rule")
 
     return f"""You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.
 Use list_config_files to explore folders (e.g., 'lovelace', 'yaml'). Use read_config_file to read YAML/JSON files.
@@ -2249,6 +2267,7 @@ When users ask about files/folders, use list_config_files first to show what's a
 
 {show_yaml_rule}
 {confirm_entity_rule}
+{confirm_delete_rule}
 
 CRITICAL - Show changes clearly:
 When you MODIFY configs, show ONLY the changed sections in diff format:
@@ -2364,7 +2383,8 @@ def get_system_prompt() -> str:
     lang_instruction = get_lang_text("respond_instruction")
     show_yaml_rule = get_lang_text("show_yaml_rule")
     confirm_entity_rule = get_lang_text("confirm_entity_rule")
-    return get_config_structure_section() + get_config_includes_text() + base_prompt + f"\n\n{show_yaml_rule}\n{confirm_entity_rule}\n\n{lang_instruction}"
+    confirm_delete_rule = get_lang_text("confirm_delete_rule")
+    return get_config_structure_section() + get_config_includes_text() + base_prompt + f"\n\n{show_yaml_rule}\n{confirm_entity_rule}\n{confirm_delete_rule}\n\n{lang_instruction}"
 
 
 def get_openai_tools_for_provider():
