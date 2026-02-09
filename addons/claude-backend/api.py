@@ -3633,5 +3633,6 @@ if __name__ == "__main__":
     logger.info(f"Starting AI Assistant v{VERSION} on port {API_PORT}")
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
     logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
+    # get_ha_token() è già definita sopra, quindi qui è sicuro
     logger.info(f"HA Token: {'available' if get_ha_token() else 'NOT available'}")
     app.run(host="0.0.0.0", port=API_PORT, debug=DEBUG_MODE)
