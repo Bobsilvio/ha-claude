@@ -228,6 +228,7 @@ Once running, click **"AI Assistant"** in the Home Assistant sidebar!
 | `ai_model` | Manual model override (any provider) | auto |
 | `api_port` | Backend API port | `5000` |
 | `debug_mode` | Enable debug logging | `false` |
+| `enable_file_access` | Enable access to HA config files | `false` |
 
 ---
 

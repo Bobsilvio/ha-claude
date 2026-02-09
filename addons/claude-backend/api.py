@@ -36,6 +36,7 @@ if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
+ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
 logger = logging.getLogger(__name__)
@@ -798,25 +799,37 @@ HA_TOOLS_DESCRIPTION = [
 
 def get_anthropic_tools():
     """Convert tools to Anthropic format."""
+    tools = HA_TOOLS_DESCRIPTION
+    if not ENABLE_FILE_ACCESS:
+        config_edit_tools = set(INTENT_GROUPS.get("config_edit", []))
+        tools = [t for t in tools if t["name"] not in config_edit_tools]
     return [
         {"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
-        for t in HA_TOOLS_DESCRIPTION
+        for t in tools
     ]
 
 
 def get_openai_tools():
     """Convert tools to OpenAI function-calling format."""
+    tools = HA_TOOLS_DESCRIPTION
+    if not ENABLE_FILE_ACCESS:
+        config_edit_tools = set(INTENT_GROUPS.get("config_edit", []))
+        tools = [t for t in tools if t["name"] not in config_edit_tools]
     return [
         {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
-        for t in HA_TOOLS_DESCRIPTION
+        for t in tools
     ]
 
 
 def get_gemini_tools():
     """Convert tools to Google Gemini format."""
     from google.generativeai.types import FunctionDeclaration, Tool
+    tools = HA_TOOLS_DESCRIPTION
+    if not ENABLE_FILE_ACCESS:
+        config_edit_tools = set(INTENT_GROUPS.get("config_edit", []))
+        tools = [t for t in tools if t["name"] not in config_edit_tools]
     declarations = []
-    for t in HA_TOOLS_DESCRIPTION:
+    for t in tools:
         declarations.append(FunctionDeclaration(
             name=t["name"],
             description=t["description"],
@@ -2580,7 +2593,11 @@ def stream_chat_anthropic(messages, intent_info=None):
         # If ALL tools were blocked as redundant, force stop
         if redundant_blocked == len(tool_uses):
             logger.info("All tool calls were redundant - forcing final response")
-            messages.append({"role": "user", "content": tool_results})
+            if AI_PROVIDER in ("openai", "github"):
+                for tr in tool_results:
+                    messages.append({"role": "tool", "tool_call_id": tr["tool_use_id"], "content": tr["content"]})
+            else:
+                messages.append({"role": "user", "content": tool_results})
             messages.append({"role": "user", "content": [{"type": "text", "text": "You already have all the data needed. Respond to the user now with the results. Do not call any more tools."}]})
             continue
 
@@ -2610,7 +2627,11 @@ def stream_chat_anthropic(messages, intent_info=None):
                 yield {"type": "token", "content": full_text[i:i+4]}
             break
 
-        messages.append({"role": "user", "content": tool_results})
+        if AI_PROVIDER in ("openai", "github"):
+            for tr in tool_results:
+                messages.append({"role": "tool", "tool_call_id": tr["tool_use_id"], "content": tr["content"]})
+        else:
+            messages.append({"role": "user", "content": tool_results})
         # Loop back for next round
 
     messages.append({"role": "assistant", "content": full_text})

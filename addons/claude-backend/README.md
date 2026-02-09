@@ -87,6 +87,7 @@ max_retries: 3
 | ha_url | http://homeassistant:8123 | Home Assistant URL |
 | api_port | 5000 | Port for the API server |
 | debug_mode | false | Enable debug logging |
+| enable_file_access | false | Enable access to Home Assistant configuration files (read/write) |
 | polling_interval | 60 | Seconds between entity updates |
 | timeout | 30 | API request timeout in seconds |
 | max_retries | 3 | Number of retries for failed requests |
