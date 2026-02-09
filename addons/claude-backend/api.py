@@ -513,38 +513,48 @@ def get_ha_headers() -> dict:
 
 # ---- Initialize AI client ----
 
-ai_client = None
-api_key = get_api_key()
+def initialize_ai_client():
+    """Initialize or reinitialize the AI client based on current provider."""
+    global ai_client
 
-if AI_PROVIDER == "anthropic" and api_key:
-    import anthropic
-    ai_client = anthropic.Anthropic(api_key=api_key)
-    logger.info(f"Anthropic client initialized (model: {get_active_model()})")
-elif AI_PROVIDER == "openai" and api_key:
-    from openai import OpenAI
-    ai_client = OpenAI(api_key=api_key)
-    logger.info(f"OpenAI client initialized (model: {get_active_model()})")
-elif AI_PROVIDER == "google" and api_key:
-    import google.generativeai as genai
-    genai.configure(api_key=api_key)
-    ai_client = genai
-    logger.info(f"Google Gemini client initialized (model: {get_active_model()})")
-elif AI_PROVIDER == "nvidia" and api_key:
-    from openai import OpenAI
-    ai_client = OpenAI(
-        api_key=api_key,
-        base_url="https://integrate.api.nvidia.com/v1"
-    )
-    logger.info(f"NVIDIA NIM client initialized (model: {get_active_model()})")
-elif AI_PROVIDER == "github" and api_key:
-    from openai import OpenAI
-    ai_client = OpenAI(
-        api_key=api_key,
-        base_url="https://models.inference.ai.azure.com"
-    )
-    logger.info(f"GitHub Copilot client initialized (model: {get_active_model()})")
-else:
-    logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
+    api_key = get_api_key()
+
+    if AI_PROVIDER == "anthropic" and api_key:
+        import anthropic
+        ai_client = anthropic.Anthropic(api_key=api_key)
+        logger.info(f"Anthropic client initialized (model: {get_active_model()})")
+    elif AI_PROVIDER == "openai" and api_key:
+        from openai import OpenAI
+        ai_client = OpenAI(api_key=api_key)
+        logger.info(f"OpenAI client initialized (model: {get_active_model()})")
+    elif AI_PROVIDER == "google" and api_key:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        ai_client = genai
+        logger.info(f"Google Gemini client initialized (model: {get_active_model()})")
+    elif AI_PROVIDER == "nvidia" and api_key:
+        from openai import OpenAI
+        ai_client = OpenAI(
+            api_key=api_key,
+            base_url="https://integrate.api.nvidia.com/v1"
+        )
+        logger.info(f"NVIDIA NIM client initialized (model: {get_active_model()})")
+    elif AI_PROVIDER == "github" and api_key:
+        from openai import OpenAI
+        ai_client = OpenAI(
+            api_key=api_key,
+            base_url="https://models.inference.ai.azure.com"
+        )
+        logger.info(f"GitHub Copilot client initialized (model: {get_active_model()})")
+    else:
+        logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
+        ai_client = None
+
+    return ai_client
+
+
+ai_client = None
+initialize_ai_client()
 
 import pathlib
 
@@ -4801,6 +4811,108 @@ def api_status():
         "ha_connection_ok": ha_ok,
         "ha_response": ha_msg,
     })
+
+
+@app.route('/api/get_models')
+def api_get_models():
+    """Get available models for the current provider."""
+    try:
+        # Get current provider and model
+        current_provider = AI_PROVIDER
+        current_model = get_active_model()
+
+        # Get all available providers (those with API keys configured)
+        available_providers = []
+        if ANTHROPIC_API_KEY:
+            available_providers.append({"id": "anthropic", "name": "Anthropic Claude"})
+        if OPENAI_API_KEY:
+            available_providers.append({"id": "openai", "name": "OpenAI"})
+        if GOOGLE_API_KEY:
+            available_providers.append({"id": "google", "name": "Google Gemini"})
+        if NVIDIA_API_KEY:
+            available_providers.append({"id": "nvidia", "name": "NVIDIA NIM"})
+        if GITHUB_TOKEN:
+            available_providers.append({"id": "github", "name": "GitHub Models"})
+
+        # Get models for current provider
+        provider_models = PROVIDER_MODELS.get(current_provider, [])
+
+        # Convert technical model names to display names
+        available_models = []
+        for tech_name in provider_models:
+            # Find display name from MODEL_NAME_MAPPING (reverse lookup)
+            display_name = None
+            for display, tech in MODEL_NAME_MAPPING.items():
+                if tech == tech_name and display.startswith(PROVIDER_DEFAULTS.get(current_provider, {}).get("name", "")[:10]):
+                    display_name = display
+                    break
+
+            if display_name:
+                available_models.append({
+                    "technical_name": tech_name,
+                    "display_name": display_name,
+                    "is_current": tech_name == current_model
+                })
+
+        return jsonify({
+            "success": True,
+            "current_provider": current_provider,
+            "current_model": current_model,
+            "available_models": available_models,
+            "available_providers": available_providers
+        })
+    except Exception as e:
+        logger.error(f"Error getting models: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/set_model', methods=['POST'])
+def api_set_model():
+    """Change the active model and optionally provider."""
+    global AI_PROVIDER, AI_MODEL
+
+    try:
+        data = request.get_json()
+        new_model = data.get('model')
+        new_provider = data.get('provider')  # Optional
+
+        if not new_model:
+            return jsonify({"success": False, "error": "Model parameter required"}), 400
+
+        # If provider is specified, validate it
+        if new_provider:
+            if new_provider not in ["anthropic", "openai", "google", "nvidia", "github"]:
+                return jsonify({"success": False, "error": f"Invalid provider: {new_provider}"}), 400
+
+            # Check if provider has API key
+            old_provider = AI_PROVIDER
+            AI_PROVIDER = new_provider
+            if not get_api_key():
+                AI_PROVIDER = old_provider  # Restore
+                return jsonify({"success": False, "error": f"No API key configured for {new_provider}"}), 400
+
+        # Update model (can be display name or technical name)
+        if new_model in MODEL_NAME_MAPPING:
+            # It's a display name, convert to technical
+            AI_MODEL = MODEL_NAME_MAPPING[new_model]
+        else:
+            # Assume it's already technical name
+            AI_MODEL = new_model
+
+        # Reinitialize the AI client
+        initialize_ai_client()
+
+        logger.info(f"Model switched to: {AI_PROVIDER} / {get_active_model()}")
+
+        return jsonify({
+            "success": True,
+            "provider": AI_PROVIDER,
+            "model": get_active_model(),
+            "message": f"Switched to {PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get('name', AI_PROVIDER)} - {get_active_model()}"
+        })
+    except Exception as e:
+        logger.error(f"Error setting model: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/chat', methods=['POST'])
