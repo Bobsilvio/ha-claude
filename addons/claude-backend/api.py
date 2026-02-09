@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.22"
+VERSION = "3.0.23"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2971,7 +2971,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
 
     oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
 
-    # NVIDIA Kimi K2.5: enable thinking mode with optimal temperature
+    # NVIDIA Kimi K2.5: use instant mode (thinking mode not yet supported in streaming)
     kwargs = {
         "model": get_active_model(),
         "messages": oai_messages,
@@ -2979,17 +2979,12 @@ def chat_openai(messages: List[Dict]) -> tuple:
         "max_tokens": max_tok
     }
     if AI_PROVIDER == "nvidia":
-        kwargs["temperature"] = 1.0
+        kwargs["temperature"] = 0.6
+        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
     response = ai_client.chat.completions.create(**kwargs)
 
     msg = response.choices[0].message
-
-    # Include reasoning content if available (thinking mode)
-    if hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-        logger.info(f"OpenAI: Reasoning available ({len(msg.reasoning_content)} chars)")
-        original_content = msg.content or ""
-        msg.content = f"💭 **Ragionamento:**\n{msg.reasoning_content}\n\n---\n\n{original_content}"
 
     while msg.tool_calls:
         messages.append({"role": "assistant", "content": msg.content, "tool_calls": [
@@ -3009,7 +3004,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
         trimmed = trim_messages(messages)
         oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
 
-        # NVIDIA Kimi K2.5: enable thinking mode with optimal temperature
+        # NVIDIA Kimi K2.5: use instant mode
         kwargs = {
             "model": get_active_model(),
             "messages": oai_messages,
@@ -3017,16 +3012,11 @@ def chat_openai(messages: List[Dict]) -> tuple:
             "max_tokens": max_tok
         }
         if AI_PROVIDER == "nvidia":
-            kwargs["temperature"] = 1.0
+            kwargs["temperature"] = 0.6
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
         response = ai_client.chat.completions.create(**kwargs)
         msg = response.choices[0].message
-
-        # Include reasoning content if available
-        if hasattr(msg, 'reasoning_content') and msg.reasoning_content:
-            logger.info(f"OpenAI: Reasoning available in tool loop ({len(msg.reasoning_content)} chars)")
-            original_content = msg.content or ""
-            msg.content = f"💭 **Ragionamento:**\n{msg.reasoning_content}\n\n---\n\n{original_content}"
 
     return msg.content or "", messages
 
@@ -3199,8 +3189,7 @@ def stream_chat_openai(messages, intent_info=None):
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
 
-        # NVIDIA Kimi K2.5: enable thinking mode for better reasoning (default)
-        # Temperature 1.0 recommended for thinking mode
+        # NVIDIA Kimi K2.5: use instant mode (thinking mode causes streaming issues)
         kwargs = {
             "model": get_active_model(),
             "messages": oai_messages,
@@ -3209,22 +3198,20 @@ def stream_chat_openai(messages, intent_info=None):
             "stream": True
         }
         if AI_PROVIDER == "nvidia":
-            kwargs["temperature"] = 1.0
+            kwargs["temperature"] = 0.6
+            kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
+        logger.info(f"OpenAI: Calling API with model={kwargs['model']}, stream=True")
         response = ai_client.chat.completions.create(**kwargs)
+        logger.info("OpenAI: Response stream started")
 
         content_parts = []
-        reasoning_parts = []
         tool_calls_map = {}
 
         for chunk in response:
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
-
-            # Handle reasoning content (thinking mode)
-            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
-                reasoning_parts.append(delta.reasoning_content)
 
             if delta.content:
                 content_parts.append(delta.content)
@@ -3243,17 +3230,10 @@ def stream_chat_openai(messages, intent_info=None):
                             tool_calls_map[idx]["arguments"] += tc_delta.function.arguments
 
         accumulated = "".join(content_parts)
-        reasoning = "".join(reasoning_parts)
 
         if not tool_calls_map:
             # No tools - stream the final text now
-            # Include reasoning if present (thinking mode)
             full_text = accumulated
-            if reasoning:
-                logger.info(f"OpenAI: Reasoning available ({len(reasoning)} chars)")
-                # Prepend reasoning with a visual indicator
-                full_text = f"💭 **Ragionamento:**\n{reasoning}\n\n---\n\n{accumulated}"
-
             logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
             logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tools)} available tools")
             # Save assistant message to conversation
