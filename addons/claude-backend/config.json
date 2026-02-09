@@ -46,66 +46,18 @@
     "max_retries": "3"
   },
   "schema": {
-    "ai_provider": {
-      "type": "list(anthropic|openai|google|github)",
-      "name": "AI Provider",
-      "description": "Select your AI provider (Anthropic Claude, OpenAI, Google Gemini, or GitHub Models)"
-    },
-    "anthropic_api_key": {
-      "type": "password?",
-      "name": "Anthropic API Key",
-      "description": "API key from console.anthropic.com (required if provider=anthropic)"
-    },
-    "openai_api_key": {
-      "type": "password?",
-      "name": "OpenAI API Key",
-      "description": "API key from platform.openai.com (required if provider=openai)"
-    },
-    "google_api_key": {
-      "type": "password?",
-      "name": "Google API Key",
-      "description": "API key from aistudio.google.com (required if provider=google)"
-    },
-    "github_token": {
-      "type": "password?",
-      "name": "GitHub Token",
-      "description": "Personal Access Token from github.com/settings/tokens (required if provider=github)"
-    },
-    "github_model": {
-      "type": "list(gpt-4o|gpt-4o-mini|gpt-4.1|gpt-4.1-mini|gpt-4.1-nano|o1|o1-mini|o1-preview|o3|o3-mini|o4-mini|gpt-5|gpt-5-mini|gpt-5-nano|gpt-5-chat|Meta-Llama-3.1-405B-Instruct|Meta-Llama-3.1-8B-Instruct|Llama-3.3-70B-Instruct|Llama-4-Scout-17B-16E-Instruct|Llama-4-Maverick-17B-128E-Instruct-FP8|mistral-small-2503|mistral-medium-2505|Ministral-3B|Codestral-2501|Cohere-command-r-plus-08-2024|Cohere-command-r-08-2024|cohere-command-a|DeepSeek-R1|DeepSeek-R1-0528|DeepSeek-V3-0324|MAI-DS-R1|Phi-4|Phi-4-mini-instruct|Phi-4-reasoning|Phi-4-mini-reasoning|AI21-Jamba-1.5-Large|grok-3|grok-3-mini)?",
-      "name": "GitHub Model",
-      "description": "Select AI model when using GitHub Models provider (37+ models available)"
-    },
-    "api_port": {
-      "type": "str",
-      "name": "API Port",
-      "description": "Internal API port (default: 5000, advanced users only)"
-    },
-    "debug_mode": {
-      "type": "bool?",
-      "name": "Debug Mode",
-      "description": "Enable detailed logging for troubleshooting (creates larger logs)"
-    },
-    "enable_file_access": {
-      "type": "bool?",
-      "name": "Enable File Access",
-      "description": "Allow AI to read/write Home Assistant config files (automations, scripts, YAML). Required for advanced file operations."
-    },
-    "language": {
-      "type": "list(en|it|es|fr)?",
-      "name": "Language",
-      "description": "AI response language: English, Italian, Spanish, or French"
-    },
-    "timeout": {
-      "type": "str?",
-      "name": "Request Timeout",
-      "description": "API request timeout in seconds (default: 30, increase if responses are slow)"
-    },
-    "max_retries": {
-      "type": "str?",
-      "name": "Max Retries",
-      "description": "Maximum retry attempts for failed API calls (default: 3)"
-    }
+    "ai_provider": "list(anthropic|openai|google|github)",
+    "anthropic_api_key": "password?",
+    "openai_api_key": "password?",
+    "google_api_key": "password?",
+    "github_token": "password?",
+    "github_model": "list(gpt-4o|gpt-4o-mini|gpt-4.1|gpt-4.1-mini|gpt-4.1-nano|o1|o1-mini|o1-preview|o3|o3-mini|o4-mini|gpt-5|gpt-5-mini|gpt-5-nano|gpt-5-chat|Meta-Llama-3.1-405B-Instruct|Meta-Llama-3.1-8B-Instruct|Llama-3.3-70B-Instruct|Llama-4-Scout-17B-16E-Instruct|Llama-4-Maverick-17B-128E-Instruct-FP8|mistral-small-2503|mistral-medium-2505|Ministral-3B|Codestral-2501|Cohere-command-r-plus-08-2024|Cohere-command-r-08-2024|cohere-command-a|DeepSeek-R1|DeepSeek-R1-0528|DeepSeek-V3-0324|MAI-DS-R1|Phi-4|Phi-4-mini-instruct|Phi-4-reasoning|Phi-4-mini-reasoning|AI21-Jamba-1.5-Large|grok-3|grok-3-mini)?",
+    "api_port": "str",
+    "debug_mode": "bool?",
+    "enable_file_access": "bool?",
+    "language": "list(en|it|es|fr)?",
+    "timeout": "str?",
+    "max_retries": "str?"
   },
   "documentation": "https://github.com/Bobsilvio/ha-claude",
   "support": "https://github.com/Bobsilvio/ha-claude/issues",
