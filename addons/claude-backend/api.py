@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.7"
+VERSION = "3.0.8"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4020,7 +4020,8 @@ def get_chat_ui():
         function copyCode(button) {{
             const codeBlock = button.nextElementSibling;
             const code = codeBlock.textContent;
-            navigator.clipboard.writeText(code).then(() => {{
+
+            const showSuccess = () => {{
                 const originalText = button.textContent;
                 button.textContent = '✓ Copiato!';
                 button.classList.add('copied');
@@ -4028,7 +4029,34 @@ def get_chat_ui():
                     button.textContent = originalText;
                     button.classList.remove('copied');
                 }}, 2000);
-            }});
+            }};
+
+            // Try modern clipboard API first (requires HTTPS)
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(code).then(showSuccess).catch(() => {{
+                    // Fallback to older method for HTTP
+                    fallbackCopy(code, showSuccess);
+                }});
+            }} else {{
+                // Fallback for older browsers or HTTP
+                fallbackCopy(code, showSuccess);
+            }}
+        }}
+
+        function fallbackCopy(text, callback) {{
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {{
+                document.execCommand('copy');
+                callback();
+            }} catch (err) {{
+                console.error('Copy failed:', err);
+            }}
+            document.body.removeChild(textarea);
         }}
 
         function showThinking() {{
