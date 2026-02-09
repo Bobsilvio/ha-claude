@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.17"
+VERSION = "3.0.18"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -369,8 +369,12 @@ MODEL_NAME_MAPPING = {
     "GitHub: Grok-3 Mini 🆓": "grok-3-mini",
 }
 
-# Reverse mapping for display
-MODEL_DISPLAY_MAPPING = {v: k for k, v in MODEL_NAME_MAPPING.items()}
+# Reverse mapping for display (prefer emoji versions)
+MODEL_DISPLAY_MAPPING = {}
+for k, v in MODEL_NAME_MAPPING.items():
+    # Always override with emoji version if it has 🆓
+    if "🆓" in k or v not in MODEL_DISPLAY_MAPPING:
+        MODEL_DISPLAY_MAPPING[v] = k
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -3927,20 +3931,26 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     messages = conversations[session_id][:-1] + [{"role": "user", "content": api_content}]
 
     try:
-        if AI_PROVIDER in ("openai", "github"):
+        # Remember current conversation length to avoid duplicates
+        conv_length_before = len(conversations[session_id])
+
+        if AI_PROVIDER in ("openai", "github", "nvidia"):
             yield from stream_chat_openai(messages, intent_info=intent_info)
-            # Sync new assistant messages back to conversation (keeping original user message)
-            conversations[session_id].extend(messages[len(conversations[session_id]):])
+            # Sync ONLY new assistant messages (after the original user message)
+            new_messages = messages[conv_length_before:]
+            conversations[session_id].extend(new_messages)
         elif AI_PROVIDER == "anthropic":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_anthropic(clean_messages, intent_info=intent_info)
-            # Keep original user message, but add new assistant messages
-            conversations[session_id].extend(clean_messages[len(conversations[session_id]):])
+            # Sync ONLY new assistant messages
+            new_messages = clean_messages[conv_length_before:]
+            conversations[session_id].extend(new_messages)
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_google(clean_messages)
-            # Keep original user message, but add new assistant messages
-            conversations[session_id].extend(clean_messages[len(conversations[session_id]):])
+            # Sync ONLY new assistant messages
+            new_messages = clean_messages[conv_length_before:]
+            conversations[session_id].extend(new_messages)
         else:
             yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
             return
