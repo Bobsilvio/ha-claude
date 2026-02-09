@@ -1071,6 +1071,7 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "create_automation":
+            import yaml
             config = {
                 "alias": tool_input.get("alias", "New Automation"),
                 "description": tool_input.get("description", ""),
@@ -1081,7 +1082,15 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             }
             result = call_ha_api("POST", "config/automation/config/new", config)
             if isinstance(result, dict) and "error" not in result:
-                return json.dumps({"status": "success", "message": f"Automation '{config['alias']}' created!", "result": result}, ensure_ascii=False)
+                # Return the YAML so AI can show it to the user
+                created_yaml = yaml.dump(config, default_flow_style=False, allow_unicode=True)
+                return json.dumps({
+                    "status": "success",
+                    "message": f"Automation '{config['alias']}' created!",
+                    "yaml": created_yaml,
+                    "result": result,
+                    "IMPORTANT": "Show the user the YAML code you created."
+                }, ensure_ascii=False, default=str)
             return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "get_automations":
@@ -1408,10 +1417,20 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                 error_msg = ws_config.get("error", {}).get("message", str(ws_config))
                 return json.dumps({"status": "partial", "message": f"Dashboard registered but config failed: {error_msg}"}, default=str)
 
-            return json.dumps({"status": "success", "message": f"Dashboard '{title}' created! It appears in the sidebar at /{url_path}",
-                               "url_path": url_path, "views_count": len(views)}, ensure_ascii=False, default=str)
+            # Return the YAML so AI can show it to the user
+            import yaml
+            dashboard_yaml = yaml.dump({"views": views}, default_flow_style=False, allow_unicode=True)
+            return json.dumps({
+                "status": "success",
+                "message": f"Dashboard '{title}' created! It appears in the sidebar at /{url_path}",
+                "url_path": url_path,
+                "views_count": len(views),
+                "yaml": dashboard_yaml,
+                "IMPORTANT": "Show the user the dashboard YAML you created."
+            }, ensure_ascii=False, default=str)
 
         elif tool_name == "create_script":
+            import yaml
             script_id = tool_input.get("script_id", "")
             config = {
                 "alias": tool_input.get("alias", "New Script"),
@@ -1421,8 +1440,16 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             }
             result = call_ha_api("POST", f"config/script/config/{script_id}", config)
             if isinstance(result, dict) and "error" not in result:
-                return json.dumps({"status": "success", "message": f"Script '{config['alias']}' created (script.{script_id})",
-                                   "entity_id": f"script.{script_id}", "result": result}, ensure_ascii=False, default=str)
+                # Return the YAML so AI can show it to the user
+                created_yaml = yaml.dump(config, default_flow_style=False, allow_unicode=True)
+                return json.dumps({
+                    "status": "success",
+                    "message": f"Script '{config['alias']}' created (script.{script_id})",
+                    "entity_id": f"script.{script_id}",
+                    "yaml": created_yaml,
+                    "result": result,
+                    "IMPORTANT": "Show the user the YAML code you created."
+                }, ensure_ascii=False, default=str)
             return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
         # ===== DELETE OPERATIONS (WebSocket) =====
@@ -1760,8 +1787,12 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             return json.dumps({"error": f"Failed to get dashboard config: {error_msg}"}, default=str)
 
         elif tool_name == "update_dashboard":
+            import yaml
             url_path = tool_input.get("url_path", None)
             views = tool_input.get("views", [])
+            old_yaml = ""
+            new_yaml = ""
+
             # Auto-snapshot: save current dashboard config before modifying
             try:
                 snap_params = {}
@@ -1769,22 +1800,33 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
                     snap_params["url_path"] = url_path
                 old_config = call_ha_websocket("lovelace/config", **snap_params)
                 if old_config.get("success"):
+                    old_result = old_config.get("result", {})
+                    old_yaml = yaml.dump({"views": old_result.get("views", [])}, default_flow_style=False, allow_unicode=True)
+
                     snap_file = f"_dashboard_snapshot_{url_path or 'lovelace'}.json"
                     snap_path = os.path.join(SNAPSHOTS_DIR, datetime.now().strftime("%Y%m%d_%H%M%S") + snap_file)
                     os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
                     with open(snap_path, "w") as sf:
-                        json.dump({"url_path": url_path or "lovelace", "config": old_config.get("result", {})}, sf)
+                        json.dump({"url_path": url_path or "lovelace", "config": old_result}, sf)
                     logger.info(f"Dashboard snapshot saved: {snap_path}")
             except Exception as e:
                 logger.warning(f"Could not snapshot dashboard before update: {e}")
+
+            new_yaml = yaml.dump({"views": views}, default_flow_style=False, allow_unicode=True)
+
             params = {"config": {"views": views}}
             if url_path and url_path != "lovelace":
                 params["url_path"] = url_path
             result = call_ha_websocket("lovelace/config/save", **params)
             if result.get("success"):
-                return json.dumps({"status": "success",
-                                   "message": f"Dashboard '{url_path or 'lovelace'}' updated with {len(views)} view(s). A backup snapshot was saved.",
-                                   "views_count": len(views)}, ensure_ascii=False, default=str)
+                return json.dumps({
+                    "status": "success",
+                    "message": f"Dashboard '{url_path or 'lovelace'}' updated with {len(views)} view(s). A backup snapshot was saved.",
+                    "views_count": len(views),
+                    "old_yaml": old_yaml,
+                    "new_yaml": new_yaml,
+                    "IMPORTANT": "Show the user the before/after diff of the dashboard YAML."
+                }, ensure_ascii=False, default=str)
             error_msg = result.get("error", {}).get("message", str(result))
             return json.dumps({"error": f"Failed to update dashboard: {error_msg}"}, default=str)
 
@@ -2140,6 +2182,23 @@ SYSTEM_PROMPT_COMPACT_WITH_FILES = """You are a Home Assistant AI assistant. Con
 Use list_config_files to explore folders (e.g., 'lovelace', 'yaml'). Use read_config_file to read YAML/JSON files.
 Use get_automations, get_scripts, get_dashboards to list existing configs.
 When users ask about files/folders, use list_config_files first to show what's available.
+
+CRITICAL: When you CREATE or MODIFY automations, scripts, dashboards, or configs, ALWAYS show the YAML code:
+- For modifications: show **Prima (old):** and **Dopo (new):** in YAML code blocks
+- For new creations: show the complete YAML code created
+This helps users verify your work. Example:
+**Prima (old):**
+```yaml
+condition: []
+```
+**Dopo (new):**
+```yaml
+condition:
+  - condition: state
+    entity_id: light.room
+    state: "on"
+```
+
 Respond in the user's language. Be concise."""
 
 # Compact tool definitions for low-token providers
