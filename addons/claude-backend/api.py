@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.20"
+VERSION = "2.9.21"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -788,7 +788,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "delete_automation",
-        "description": "Delete an existing automation.",
+        "description": "Delete an existing automation. Works for both UI-created automations (via API) and YAML-based automations (removes from file). If removing from YAML, creates a snapshot first and requires Home Assistant restart.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -799,7 +799,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "delete_script",
-        "description": "Delete an existing script.",
+        "description": "Delete an existing script. Works for both UI-created scripts (via API) and YAML-based scripts (removes from file). If removing from YAML, creates a snapshot first and requires Home Assistant restart.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1436,15 +1436,117 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
 
         elif tool_name == "delete_automation":
             automation_id = tool_input.get("automation_id", "")
+            logger.info(f"delete_automation called: automation_id='{automation_id}'")
+
             # Need the object_id (without automation. prefix)
             object_id = automation_id.replace("automation.", "") if automation_id.startswith("automation.") else automation_id
+
+            # Try API first (for UI-created automations)
             result = call_ha_api("DELETE", f"config/automation/config/{object_id}")
-            return json.dumps({"status": "success", "message": f"Automation '{automation_id}' deleted."}, ensure_ascii=False, default=str)
+            if result and not isinstance(result, dict):
+                logger.info(f"Automation deleted via API: {automation_id}")
+                return json.dumps({"status": "success", "message": f"Automation '{automation_id}' deleted via API."}, ensure_ascii=False, default=str)
+
+            # If API failed, try removing from YAML file (for file-based automations)
+            logger.info(f"API delete failed, trying YAML file removal for: {automation_id}")
+            yaml_path = get_config_file_path("automation", "automations.yaml")
+
+            if not os.path.isfile(yaml_path):
+                return json.dumps({"error": f"Cannot delete automation: API failed and {yaml_path} not found."}, ensure_ascii=False)
+
+            try:
+                # Create snapshot before modifying
+                snapshot = create_snapshot("automations.yaml")
+
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    automations = yaml.safe_load(f) or []
+
+                if not isinstance(automations, list):
+                    return json.dumps({"error": "automations.yaml is not a list format"}, ensure_ascii=False)
+
+                # Find and remove the automation by ID or alias
+                found = False
+                original_count = len(automations)
+
+                # Try matching by ID first
+                automations = [a for a in automations if str(a.get("id", "")) != object_id]
+
+                # If no match by ID, try by alias (the display name)
+                if len(automations) == original_count:
+                    # Extract the name from the full automation_id if it looks like a title
+                    name_to_match = automation_id.replace("automation.", "").replace("_", " ")
+                    automations = [a for a in automations if a.get("alias", "").lower() != name_to_match.lower()]
+
+                if len(automations) < original_count:
+                    found = True
+                    # Write back to file
+                    with open(yaml_path, "w", encoding="utf-8") as f:
+                        yaml.dump(automations, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+                    logger.info(f"Automation deleted from YAML: {automation_id}")
+                    return json.dumps({
+                        "status": "success",
+                        "message": f"Automation '{automation_id}' removed from {yaml_path}. Restart Home Assistant to apply changes.",
+                        "snapshot": snapshot,
+                        "restart_required": True
+                    }, ensure_ascii=False, default=str)
+                else:
+                    return json.dumps({"error": f"Automation '{automation_id}' not found in {yaml_path}"}, ensure_ascii=False)
+
+            except Exception as e:
+                logger.error(f"Error deleting automation from YAML: {e}")
+                return json.dumps({"error": f"Failed to delete from YAML: {str(e)}"}, ensure_ascii=False)
 
         elif tool_name == "delete_script":
-            script_id = tool_input.get("script_id", "").replace("script.", "")
-            result = call_ha_api("DELETE", f"config/script/config/{script_id}")
-            return json.dumps({"status": "success", "message": f"Script '{script_id}' deleted."}, ensure_ascii=False, default=str)
+            script_id = tool_input.get("script_id", "")
+            logger.info(f"delete_script called: script_id='{script_id}'")
+
+            object_id = script_id.replace("script.", "") if script_id.startswith("script.") else script_id
+
+            # Try API first (for UI-created scripts)
+            result = call_ha_api("DELETE", f"config/script/config/{object_id}")
+            if result and not isinstance(result, dict):
+                logger.info(f"Script deleted via API: {script_id}")
+                return json.dumps({"status": "success", "message": f"Script '{script_id}' deleted via API."}, ensure_ascii=False, default=str)
+
+            # If API failed, try removing from YAML file
+            logger.info(f"API delete failed, trying YAML file removal for: {script_id}")
+            yaml_path = get_config_file_path("script", "scripts.yaml")
+
+            if not os.path.isfile(yaml_path):
+                return json.dumps({"error": f"Cannot delete script: API failed and {yaml_path} not found."}, ensure_ascii=False)
+
+            try:
+                # Create snapshot before modifying
+                snapshot = create_snapshot("scripts.yaml")
+
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    scripts = yaml.safe_load(f) or {}
+
+                if not isinstance(scripts, dict):
+                    return json.dumps({"error": "scripts.yaml is not a dict format"}, ensure_ascii=False)
+
+                # Remove the script by key
+                if object_id in scripts:
+                    del scripts[object_id]
+
+                    # Write back to file
+                    with open(yaml_path, "w", encoding="utf-8") as f:
+                        yaml.dump(scripts, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+                    logger.info(f"Script deleted from YAML: {script_id}")
+                    return json.dumps({
+                        "status": "success",
+                        "message": f"Script '{script_id}' removed from {yaml_path}. Restart Home Assistant to apply changes.",
+                        "snapshot": snapshot,
+                        "restart_required": True
+                    }, ensure_ascii=False, default=str)
+                else:
+                    return json.dumps({"error": f"Script '{script_id}' not found in {yaml_path}"}, ensure_ascii=False)
+
+            except Exception as e:
+                logger.error(f"Error deleting script from YAML: {e}")
+                return json.dumps({"error": f"Failed to delete from YAML: {str(e)}"}, ensure_ascii=False)
 
         # ===== AREA MANAGEMENT (WebSocket) =====
         elif tool_name == "manage_areas":
