@@ -396,8 +396,8 @@ def get_tool_description(tool_name: str) -> str:
     """Get user-friendly Italian description for a tool."""
     return TOOL_DESCRIPTIONS.get(tool_name, tool_name.replace('_', ' ').title())
 
-# Conversation persistence
-CONVERSATIONS_FILE = "/data/conversations.json"
+# Conversation persistence - use /config for persistence across addon rebuilds
+CONVERSATIONS_FILE = "/config/.storage/claude_conversations.json"
 
 
 def load_conversations():
@@ -431,7 +431,7 @@ load_conversations()
 
 # ---- Snapshot system for safe config editing ----
 
-SNAPSHOTS_DIR = "/data/snapshots"
+SNAPSHOTS_DIR = "/config/.storage/claude_snapshots"
 HA_CONFIG_DIR = "/config"  # Mapped via config.json "map": ["config:rw"]
 
 def create_snapshot(filename: str) -> dict:
@@ -3882,15 +3882,6 @@ def api_chat_abort():
     abort_streams[session_id] = True
     logger.info(f"Abort requested for session {session_id}")
     return jsonify({"status": "abort_requested"}), 200
-
-
-@app.route('/api/conversations', methods=['GET'])
-def api_conversations():
-    """List conversation sessions."""
-    sessions = {}
-    for sid, msgs in conversations.items():
-        sessions[sid] = {"message_count": len(msgs), "last_role": msgs[-1]["role"] if msgs else ""}
-    return jsonify(sessions), 200
 
 
 @app.route('/api/conversations/<session_id>/messages', methods=['GET'])
