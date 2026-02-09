@@ -3227,7 +3227,9 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
         logger.info(f"NVIDIA: Calling API with model={payload['model']}, thinking={NVIDIA_THINKING_MODE}, stream=True")
 
         try:
-            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=120)
+            # Increase timeout when thinking mode is enabled (reasoning takes longer)
+            timeout_seconds = 300 if NVIDIA_THINKING_MODE else 120
+            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=timeout_seconds)
             response.raise_for_status()
             logger.info("NVIDIA: Response stream started")
 

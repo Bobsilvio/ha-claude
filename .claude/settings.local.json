@@ -9,7 +9,10 @@
       "Bash(git restore:*)",
       "Bash(git commit:*)",
       "Bash(python3:*)",
-      "Bash(💰 PAID: Anthropic, OpenAI, Google\"\n- api.py: Updated MODEL_NAME_MAPPING to support both old names \\(retrocompat\\) and new names with emoji\n\nUser benefits:\n- Instantly see which models are free vs paid\n- Better decision-making when choosing models\n- No surprise costs\n\nModel indicators:\n🆓 FREE \\(with rate limits\\):\n  - NVIDIA: Kimi K2.5 🆓\n  - GitHub: All 40+ models 🆓\n\n💰 PAID \\(per-token\\):\n  - Claude: Sonnet 4, Opus 4, Haiku 4\n  - OpenAI: GPT-4o, o1, o3-mini\n  - Google: Gemini 2.0/2.5\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(💰 PAID: Anthropic, OpenAI, Google\"\n- api.py: Updated MODEL_NAME_MAPPING to support both old names \\(retrocompat\\) and new names with emoji\n\nUser benefits:\n- Instantly see which models are free vs paid\n- Better decision-making when choosing models\n- No surprise costs\n\nModel indicators:\n🆓 FREE \\(with rate limits\\):\n  - NVIDIA: Kimi K2.5 🆓\n  - GitHub: All 40+ models 🆓\n\n💰 PAID \\(per-token\\):\n  - Claude: Sonnet 4, Opus 4, Haiku 4\n  - OpenAI: GPT-4o, o1, o3-mini\n  - Google: Gemini 2.0/2.5\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.api.nvidia.com)",
+      "WebFetch(domain:build.nvidia.com)"
     ]
   }
 }
