@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.21"
+VERSION = "3.0.22"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4860,7 +4860,6 @@ if __name__ == "__main__":
         # Auto-fix: reset to provider default model
         default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "")
         if default_model:
-            global AI_MODEL
             AI_MODEL = default_model
             fix_msgs = {
                 "en": f"✅ AUTO-FIX: Model automatically changed to '{MODEL_DISPLAY_MAPPING.get(default_model, default_model)}' (default for {AI_PROVIDER})",
