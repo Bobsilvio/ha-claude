@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.36"
+VERSION = "3.0.37"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4848,57 +4848,7 @@ def api_status():
     })
 
 
-@app.route('/api/get_models')
-def api_get_models():
-    """Get available models for the current provider."""
-    try:
-        # Get current provider and model
-        current_provider = AI_PROVIDER
-        current_model = get_active_model()
 
-        # Get all available providers (those with API keys configured)
-        available_providers = []
-        if ANTHROPIC_API_KEY:
-            available_providers.append({"id": "anthropic", "name": "Anthropic Claude"})
-        if OPENAI_API_KEY:
-            available_providers.append({"id": "openai", "name": "OpenAI"})
-        if GOOGLE_API_KEY:
-            available_providers.append({"id": "google", "name": "Google Gemini"})
-        if NVIDIA_API_KEY:
-            available_providers.append({"id": "nvidia", "name": "NVIDIA NIM"})
-        if GITHUB_TOKEN:
-            available_providers.append({"id": "github", "name": "GitHub Models"})
-
-        # Get models for current provider
-        provider_models = PROVIDER_MODELS.get(current_provider, [])
-
-        # Convert technical model names to display names
-        available_models = []
-        for tech_name in provider_models:
-            # Find display name from MODEL_NAME_MAPPING (reverse lookup)
-            display_name = None
-            for display, tech in MODEL_NAME_MAPPING.items():
-                if tech == tech_name and display.startswith(PROVIDER_DEFAULTS.get(current_provider, {}).get("name", "")[:10]):
-                    display_name = display
-                    break
-
-            if display_name:
-                available_models.append({
-                    "technical_name": tech_name,
-                    "display_name": display_name,
-                    "is_current": tech_name == current_model
-                })
-
-        return jsonify({
-            "success": True,
-            "current_provider": current_provider,
-            "current_model": current_model,
-            "available_models": available_models,
-            "available_providers": available_providers
-        })
-    except Exception as e:
-        logger.error(f"Error getting models: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/set_model', methods=['POST'])
@@ -5059,30 +5009,57 @@ def api_conversation_delete(session_id):
         save_conversations()
     return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
 
-
-
-
-
 @app.route('/api/get_models', methods=['GET'])
 def api_get_models():
-    """Get available models for all providers with prefixed names."""
-    # Convert technical names to prefixed display names
-    prefixed_models = {}
-    for provider, models in PROVIDER_MODELS.items():
-        prefixed_models[provider] = [
-            MODEL_DISPLAY_MAPPING.get(model, model) for model in models
-        ]
+    """Get available models (chat + HA settings) without duplicate routes."""
+    # --- Providers disponibili (per HA settings) ---
+    available_providers = []
+    if ANTHROPIC_API_KEY:
+        available_providers.append({"id": "anthropic", "name": "Anthropic Claude"})
+    if OPENAI_API_KEY:
+        available_providers.append({"id": "openai", "name": "OpenAI"})
+    if GOOGLE_API_KEY:
+        available_providers.append({"id": "google", "name": "Google Gemini"})
+    if NVIDIA_API_KEY:
+        available_providers.append({"id": "nvidia", "name": "NVIDIA NIM"})
+    if GITHUB_TOKEN:
+        available_providers.append({"id": "github", "name": "GitHub Models"})
 
-    # Get current model in display format
+    # --- Tutti i modelli per provider (come li vuole la chat: display/prefissi) ---
+    models_display = {}
+    models_technical = {}
+    for provider, models in PROVIDER_MODELS.items():
+        models_technical[provider] = list(models)
+        models_display[provider] = [MODEL_DISPLAY_MAPPING.get(m, m) for m in models]
+
+    # --- Current model (sia tech che display) ---
     current_model_tech = get_active_model()
     current_model_display = MODEL_DISPLAY_MAPPING.get(current_model_tech, current_model_tech)
 
+    # --- Modelli del provider corrente (per HA settings: lista con flag current) ---
+    provider_models = PROVIDER_MODELS.get(AI_PROVIDER, [])
+    available_models = []
+    for tech_name in provider_models:
+        available_models.append({
+            "technical_name": tech_name,
+            "display_name": MODEL_DISPLAY_MAPPING.get(tech_name, tech_name),
+            "is_current": tech_name == current_model_tech
+        })
+
     return jsonify({
+        "success": True,
+
+        # compat chat (quello che già usa il tuo JS)
         "current_provider": AI_PROVIDER,
         "current_model": current_model_display,
-        "models": prefixed_models
-    }), 200
+        "models": models_display,
 
+        # extra per HA (più completo)
+        "current_model_technical": current_model_tech,
+        "models_technical": models_technical,
+        "available_providers": available_providers,
+        "available_models": available_models
+    }), 200
 
 @app.route("/health", methods=["GET"])
 def health():
