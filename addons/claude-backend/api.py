@@ -470,6 +470,33 @@ def get_api_key() -> str:
     return ""
 
 
+def get_max_tokens_param(max_tokens_value: int) -> dict:
+    """Get the correct max tokens parameter based on the model.
+
+    Newer models (o1, o3, o4, GPT-5, Grok-3) use 'max_completion_tokens' instead of 'max_tokens'.
+
+    Args:
+        max_tokens_value: The token limit value
+
+    Returns:
+        dict with either {"max_tokens": value} or {"max_completion_tokens": value}
+    """
+    model = get_active_model().lower()
+
+    # Models that require max_completion_tokens instead of max_tokens
+    new_api_models = [
+        "o1", "o3", "o4", "gpt-5", "grok-3"
+    ]
+
+    # Check if current model uses the new API parameter
+    uses_new_api = any(pattern in model for pattern in new_api_models)
+
+    if uses_new_api:
+        return {"max_completion_tokens": max_tokens_value}
+    else:
+        return {"max_tokens": max_tokens_value}
+
+
 def get_ha_token() -> str:
     """Get the Home Assistant supervisor token."""
     return SUPERVISOR_TOKEN
@@ -2994,7 +3021,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
         "model": get_active_model(),
         "messages": oai_messages,
         "tools": tools,
-        "max_tokens": max_tok
+        **get_max_tokens_param(max_tok)
     }
     if AI_PROVIDER == "nvidia":
         kwargs["temperature"] = 0.6
@@ -3027,7 +3054,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
             "model": get_active_model(),
             "messages": oai_messages,
             "tools": tools,
-            "max_tokens": max_tok
+            **get_max_tokens_param(max_tok)
         }
         if AI_PROVIDER == "nvidia":
             kwargs["temperature"] = 0.6
@@ -3373,11 +3400,13 @@ def stream_chat_openai(messages, intent_info=None):
             "model": get_active_model(),
             "messages": oai_messages,
             "tools": tools,
-            "max_tokens": max_tok,
+            **get_max_tokens_param(max_tok),
             "stream": True
         }
         if AI_PROVIDER == "nvidia":
             kwargs["temperature"] = 0.7
+            # Override with NVIDIA-specific max_tokens (always uses max_tokens, not max_completion_tokens)
+            kwargs.pop("max_completion_tokens", None)  # Remove if present
             kwargs["max_tokens"] = 8192
             # NVIDIA can be slower, use longer timeout
             kwargs["timeout"] = 120.0
