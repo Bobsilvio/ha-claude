@@ -24,6 +24,13 @@ Supports **4 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 - **YAML Diff View**: See exactly what changed with before/after comparison
 - **Smart Suggestions**: AI understands your devices and suggests improvements
 
+### 👁️ Vision Support *(New in v3.0!)*
+- **📸 Image Upload**: Send screenshots, photos, or dashboard images
+- **Visual Analysis**: AI can see and understand images
+- **Card Recreation**: "Create cards like this image" - AI analyzes and recreates layouts
+- **Smart Suggestions**: Show a dashboard, get improvement suggestions
+- **Multi-Provider**: Works with Claude, GPT-4o, Gemini vision models
+
 ### 📝 Configuration File Access *(New in v2.9)*
 - **Read/Write YAML**: Access automations, scripts, scenes, and custom configs
 - **File Explorer**: Browse your Home Assistant config directory
@@ -34,12 +41,14 @@ Supports **4 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 - **Chat History**: Keep last 10 conversations, switch between them
 - **Streaming Responses**: Real-time token-by-token output
 - **Tool Indicators**: See what the AI is doing (badges for each tool call)
+- **Copy Button**: One-click copy for all code blocks (YAML, JSON, Python)
 - **Persistent Storage**: Conversations survive addon restarts
 
-### 🌍 Multilingual Support *(New in v2.9.27)*
+### 🌍 Multilingual Support
 - **4 Languages**: English, Italian, Spanish, French
-- **Configurable**: Set preferred language in addon settings
-- **Consistent**: AI always responds in your chosen language
+- **AI Responses**: AI always responds in your chosen language (v2.9.27)
+- **Config UI Translations**: Settings labels and descriptions in all 4 languages (v3.0.2)
+- **Fully Localized**: Complete multilingual experience
 
 ### 🛠️ Dashboard Creation
 - **Lovelace Dashboards**: Create custom dashboards with cards
@@ -234,6 +243,16 @@ When **Enable File Access** is enabled, the AI can:
 
 ## 💡 Usage Examples
 
+### Vision / Image Upload *(New in v3.0!)*
+```
+📸 Upload an image, then ask:
+"Create dashboard cards like this image"
+"Analyze this layout and suggest improvements"
+"Recreate these cards for my energy sensors"
+"What cards are shown in this screenshot?"
+"Make a similar dashboard for my living room"
+```
+
 ### Device Control
 ```
 "Turn on the living room lights"
@@ -361,23 +380,50 @@ When modifying configs, the AI shows **before/after** with diff markers:
 
 ## 📜 Changelog
 
-### v2.9.27 (Latest)
-- ✨ **Multilingual support** (EN, IT, ES, FR)
-- ✨ **Improved YAML diff format** - show only changed sections
-- 🐛 Fixed conversation persistence path
-- 🐛 Fixed GitHub token limit with extended tool set
+### v3.0.6 (Latest)
+- ✨ **Copy button for code blocks** - one-click copy for YAML, JSON, Python
+- 🎨 Clean UI with visual feedback ("✓ Copiato!")
+
+### v3.0.5
+- 🐛 **CRITICAL FIX**: Vision messages now properly preserved through sanitization
+- Fixed "messages: at least one message is required" error with images
+
+### v3.0.4
+- 🐛 **CRITICAL FIX**: Vision responses now saved to conversation history
+- AI responses with images now display correctly
+
+### v3.0.3
+- 🐛 **CRITICAL FIX**: Fixed image upload error (base_prompt undefined)
+- Vision feature now fully functional
+
+### v3.0.2
+- 🌍 **Multilingual config UI** - translations for all settings (EN, IT, ES, FR)
+- 🎨 Added logo and icon for addon
+
+### v3.0.1
+- 🐛 **CRITICAL FIX**: Restored correct config.json schema format
+- Fixed addon store detection issues
+
+### v3.0.0 🎉
+- 👁️ **VISION SUPPORT** - Upload images and let AI analyze them!
+- 📸 Multi-provider image support (Claude, GPT-4o, Gemini)
+- 🖼️ Create dashboard cards from screenshots
+- ✨ Analyze layouts and suggest improvements
+
+### v2.9.29
+- 🔒 **Mandatory confirmation** for delete/modify operations
+- Enhanced safety for destructive actions
+
+### v2.9.28
+- ✨ **Auto-show YAML** after creation/modification
+- ✨ **Entity confirmation** before creating automations
+
+### v2.9.27
+- 🌍 **Multilingual AI responses** (EN, IT, ES, FR)
+- ✨ Improved YAML diff format
 
 ### v2.9.26
-- ✨ **Show YAML before/after** for all modifications
-- ✨ Enhanced tool responses with code display
-
-### v2.9.25
-- 🐛 **Fixed conversation persistence** - moved to `/config/.storage/`
-- ✨ Chat history now survives addon rebuilds
-
-### v2.9.24
-- ✨ **File access support** with 12-tool extended set for GitHub
-- ✨ Optimized token usage for GitHub Models
+- ✨ Show YAML before/after for all modifications
 
 [Full Changelog →](https://github.com/Bobsilvio/ha-claude/releases)
 
