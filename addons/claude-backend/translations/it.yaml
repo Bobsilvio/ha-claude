@@ -1,10 +1,10 @@
 configuration:
   ai_provider:
     name: Provider AI
-    description: Seleziona il provider AI (Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM o GitHub Models)
+    description: "Seleziona il provider AI. 🆓 GRATIS: NVIDIA, GitHub Models | 💰 A PAGAMENTO: Anthropic, OpenAI, Google"
   ai_model:
     name: Modello AI
-    description: "Seleziona il modello AI (in base al provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=Kimi K2.5, GitHub=40+ modelli)"
+    description: "Seleziona il modello AI (🆓 = gratuito con limiti). In base al provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=Kimi K2.5🆓, GitHub=40+ modelli🆓"
   anthropic_api_key:
     name: Chiave API Anthropic
     description: Chiave API da console.anthropic.com (salva anche se non in uso, per switch rapido)
