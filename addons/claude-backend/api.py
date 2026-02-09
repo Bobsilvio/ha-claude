@@ -26,14 +26,25 @@ VERSION = "3.0.8"
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 GITHUB_MODEL = os.getenv("GITHUB_MODEL", "")
 AI_MODEL = os.getenv("AI_MODEL", "")
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
+if ANTHROPIC_MODEL in ("null", "None", ""):
+    ANTHROPIC_MODEL = ""
+if OPENAI_MODEL in ("null", "None", ""):
+    OPENAI_MODEL = ""
+if GOOGLE_MODEL in ("null", "None", ""):
+    GOOGLE_MODEL = ""
+if GITHUB_MODEL in ("null", "None", ""):
+    GITHUB_MODEL = ""
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
@@ -280,7 +291,13 @@ def get_active_model() -> str:
     # ai_model (manual override) takes priority
     if AI_MODEL:
         return AI_MODEL
-    # For github provider, use the dropdown selection
+    # Provider-specific model selections
+    if AI_PROVIDER == "anthropic" and ANTHROPIC_MODEL:
+        return ANTHROPIC_MODEL
+    if AI_PROVIDER == "openai" and OPENAI_MODEL:
+        return OPENAI_MODEL
+    if AI_PROVIDER == "google" and GOOGLE_MODEL:
+        return GOOGLE_MODEL
     if AI_PROVIDER == "github" and GITHUB_MODEL:
         return GITHUB_MODEL
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")

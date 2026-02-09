@@ -5,12 +5,21 @@ configuration:
   anthropic_api_key:
     name: Anthropic API Key
     description: API key from console.anthropic.com (required if provider=anthropic)
+  anthropic_model:
+    name: Anthropic Model
+    description: Select Claude model (Sonnet, Opus, or Haiku)
   openai_api_key:
     name: OpenAI API Key
     description: API key from platform.openai.com (required if provider=openai)
+  openai_model:
+    name: OpenAI Model
+    description: Select OpenAI model (GPT-4o, GPT-4o-mini, o1, etc.)
   google_api_key:
     name: Google API Key
     description: API key from aistudio.google.com (required if provider=google)
+  google_model:
+    name: Google Model
+    description: Select Gemini model (2.0 Flash, 2.5 Pro, etc.)
   github_token:
     name: GitHub Token
     description: Personal Access Token from github.com/settings/tokens (required if provider=github)
