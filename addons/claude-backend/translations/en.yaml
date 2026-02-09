@@ -1,0 +1,37 @@
+configuration:
+  ai_provider:
+    name: AI Provider
+    description: Select your AI provider (Anthropic Claude, OpenAI, Google Gemini, or GitHub Models)
+  anthropic_api_key:
+    name: Anthropic API Key
+    description: API key from console.anthropic.com (required if provider=anthropic)
+  openai_api_key:
+    name: OpenAI API Key
+    description: API key from platform.openai.com (required if provider=openai)
+  google_api_key:
+    name: Google API Key
+    description: API key from aistudio.google.com (required if provider=google)
+  github_token:
+    name: GitHub Token
+    description: Personal Access Token from github.com/settings/tokens (required if provider=github)
+  github_model:
+    name: GitHub Model
+    description: Select AI model when using GitHub Models provider (40+ models available)
+  api_port:
+    name: API Port
+    description: Internal API port (default 5000, advanced users only)
+  debug_mode:
+    name: Debug Mode
+    description: Enable detailed logging for troubleshooting (creates larger logs)
+  enable_file_access:
+    name: Enable File Access
+    description: Allow AI to read/write Home Assistant config files (automations, scripts, YAML)
+  language:
+    name: Language
+    description: AI response language (English, Italian, Spanish, or French)
+  timeout:
+    name: Request Timeout
+    description: API request timeout in seconds (default 30, increase if responses are slow)
+  max_retries:
+    name: Max Retries
+    description: Maximum retry attempts for failed API calls (default 3)
