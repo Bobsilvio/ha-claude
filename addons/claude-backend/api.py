@@ -3708,7 +3708,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     intent_label = INTENT_LABELS.get(intent_name, "Elaboro")
     yield {"type": "status", "message": f"{intent_label}... ({tool_count if tool_count else all_tools_count} tools)"}
     
-    # Step 3: Build the message to send (with optional image)
+    # Step 3: Save original message and build enriched version for API
     if image_data:
         # Parse image data
         media_type, base64_data = parse_image_data(image_data)
@@ -3716,9 +3716,20 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             yield {"type": "error", "message": "Formato immagine non valido"}
             return
 
-        # Format message with image based on provider
+        # Save original message with image (without context text)
+        if AI_PROVIDER == "anthropic":
+            saved_content = format_message_with_image_anthropic(user_message, media_type, base64_data)
+        elif AI_PROVIDER in ("openai", "github"):
+            saved_content = format_message_with_image_openai(user_message, image_data)
+        elif AI_PROVIDER == "google":
+            saved_content = format_message_with_image_google(user_message, media_type, base64_data)
+        else:
+            saved_content = user_message
+
+        conversations[session_id].append({"role": "user", "content": saved_content})
+
+        # Build enriched version for API (with context)
         if smart_context:
-            # Shorter, more direct instructions when intent is clear
             if intent_info["specific_target"]:
                 text_content = f"{user_message}\n\n---\nDATI:\n{smart_context}"
             else:
@@ -3726,49 +3737,52 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         else:
             text_content = user_message
 
-        # Format based on provider
         if AI_PROVIDER == "anthropic":
-            message_content = format_message_with_image_anthropic(text_content, media_type, base64_data)
+            api_content = format_message_with_image_anthropic(text_content, media_type, base64_data)
         elif AI_PROVIDER in ("openai", "github"):
-            message_content = format_message_with_image_openai(text_content, image_data)
+            api_content = format_message_with_image_openai(text_content, image_data)
         elif AI_PROVIDER == "google":
-            message_content = format_message_with_image_google(text_content, media_type, base64_data)
+            api_content = format_message_with_image_google(text_content, media_type, base64_data)
         else:
-            message_content = text_content
+            api_content = text_content
 
-        conversations[session_id].append({"role": "user", "content": message_content})
         logger.info(f"Message with image: {text_content[:50]}... (media_type: {media_type})")
         yield {"type": "status", "message": "Elaborazione immagine..."}
     else:
-        # No image - original logic
+        # No image - save original message
+        conversations[session_id].append({"role": "user", "content": user_message})
+
+        # Build enriched version for API (with context)
         if smart_context:
-            # Shorter, more direct instructions when intent is clear
             if intent_info["specific_target"]:
-                enriched_message = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+                api_content = f"{user_message}\n\n---\nDATI:\n{smart_context}"
             else:
-                enriched_message = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
-            conversations[session_id].append({"role": "user", "content": enriched_message})
+                api_content = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
             # Log estimated token count
-            est_tokens = len(enriched_message) // 4  # ~4 chars per token
+            est_tokens = len(api_content) // 4  # ~4 chars per token
             logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
             yield {"type": "status", "message": "Contesto pre-caricato..."}
         else:
-            conversations[session_id].append({"role": "user", "content": user_message})
+            api_content = user_message
 
-    # Pass the actual conversation list so tool calls are persisted in-place
-    messages = conversations[session_id]
+    # Create a copy of messages for API with enriched last user message
+    messages = conversations[session_id][:-1] + [{"role": "user", "content": api_content}]
 
     try:
         if AI_PROVIDER in ("openai", "github"):
             yield from stream_chat_openai(messages, intent_info=intent_info)
+            # Sync new assistant messages back to conversation (keeping original user message)
+            conversations[session_id].extend(messages[len(conversations[session_id]):])
         elif AI_PROVIDER == "anthropic":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_anthropic(clean_messages, intent_info=intent_info)
-            conversations[session_id] = clean_messages
+            # Keep original user message, but add new assistant messages
+            conversations[session_id].extend(clean_messages[len(conversations[session_id]):])
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_google(clean_messages)
-            conversations[session_id] = clean_messages
+            # Keep original user message, but add new assistant messages
+            conversations[session_id].extend(clean_messages[len(conversations[session_id]):])
         else:
             yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
             return
