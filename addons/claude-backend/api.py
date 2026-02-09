@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.4"
+VERSION = "3.0.5"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2887,10 +2887,13 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
         if AI_PROVIDER in ("openai", "github") and role == "user" and isinstance(m.get("content"), list):
             if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in m.get("content", [])):
                 continue
-        # Only keep simple user/assistant text messages
+        # Keep user/assistant messages (text or with images)
         if role in ("user", "assistant"):
             content = m.get("content", "")
+            # Accept strings or arrays (arrays can contain images)
             if isinstance(content, str) and content:
+                clean.append({"role": role, "content": content})
+            elif isinstance(content, list) and content:
                 clean.append({"role": role, "content": content})
     
     # Limit total messages: keep only last 10
@@ -2901,13 +2904,15 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
     MAX_OLD_MSG = 1500
     for i in range(len(clean) - 2):
         content = clean[i].get("content", "")
-        # Strip previously injected smart context from old messages
-        if "\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO" in content:
-            # Keep only the user's original message (before the smart context separator)
-            content = content.split("\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO")[0]
-        if len(content) > MAX_OLD_MSG:
-            content = content[:MAX_OLD_MSG] + "... [old message truncated]"
-        clean[i] = {"role": clean[i]["role"], "content": content}
+        # Only truncate string content (skip arrays with images)
+        if isinstance(content, str):
+            # Strip previously injected smart context from old messages
+            if "\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO" in content:
+                # Keep only the user's original message (before the smart context separator)
+                content = content.split("\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO")[0]
+            if len(content) > MAX_OLD_MSG:
+                content = content[:MAX_OLD_MSG] + "... [old message truncated]"
+            clean[i] = {"role": clean[i]["role"], "content": content}
     
     return clean
 
