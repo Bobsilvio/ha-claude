@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.14"
+VERSION = "2.9.15"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -43,79 +43,81 @@ logger = logging.getLogger(__name__)
 
 logger.info(f"ENABLE_FILE_ACCESS: {ENABLE_FILE_ACCESS}")
 
-def get_ha_token() -> str:
-    """Get Home Assistant Supervisor token with multiple fallbacks."""
-    # 1. Environment variable (set by s6 run script)
-    token = os.getenv("SUPERVISOR_TOKEN", "")
-    if token:
-        return token
-    # 2. s6-overlay container environment file
-    try:
-        token_file = "/run/s6/container_environment/SUPERVISOR_TOKEN"
-        if os.path.isfile(token_file):
-            with open(token_file, "r") as f:
-                token = f.read().strip()
-                if token:
-                    return token
-    except Exception:
-        pass
-    # 3. bashio config approach (HA addon env)
-    try:
-        token_file2 = "/var/run/s6/container_environment/SUPERVISOR_TOKEN"
-        if os.path.isfile(token_file2):
-            with open(token_file2, "r") as f:
-                token = f.read().strip()
-                if token:
-                    return token
-    except Exception:
-        pass
-    return ""
+def get_system_prompt() -> str:
+    """Return the system prompt with dynamic config structure prepended."""
+    base_prompt = """You are an AI assistant integrated into Home Assistant. You help users manage their smart home.
 
+You can:
+1. **Query entities** - See device states (lights, sensors, switches, climate, covers, etc.)
+2. **Control devices** - Turn on/off lights, switches, set temperatures, etc.
+3. **Search entities** - Find specific devices or integrations by keyword
+4. **Entity history** - Check past values and trends ("what was the temperature yesterday?")
+5. **Advanced statistics** - Get min/max/mean/sum statistics for sensors over time periods
+6. **Scenes & scripts** - List, activate scenes, run scripts, create new scripts
+7. **Areas/rooms** - List, create, rename, delete areas. Assign entities to areas
+8. **Devices & entity registry** - List devices, rename entities, enable/disable entities, assign to areas
+9. **Create automations** - Build new automations with triggers, conditions, and actions
+10. **List & trigger automations** - See and run existing automations
+11. **Delete automations/scripts/dashboards** - Remove unwanted configurations
+12. **Notifications** - Send persistent notifications or push to mobile devices
+13. **Discover services & events** - See all available HA services and event types
+14. **Create & modify dashboards** - Create NEW dashboards or modify EXISTING ones with any card type
+15. **Check custom cards** - Verify which HACS custom cards are installed (card-mod, bubble-card, mushroom, etc.)
+16. **Shopping list** - View, add, and complete shopping list items
+17. **Backup** - Create full Home Assistant backups
+18. **Browse media** - Browse media content from players (music, photos, etc.)
+19. **Read/write config files** - Read and edit configuration.yaml, automations.yaml, YAML dashboards, packages, etc.
+20. **Validate config** - Check HA configuration for errors after editing
+21. **Snapshots** - Automatic backups before every file change, with restore capability
 
-def get_ha_headers() -> dict:
-    """Build HA API headers with current token."""
-    token = get_ha_token()
-    return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
+## Configuration File Management
+- Use **list_config_files** to explore the HA config directory
+- Use **read_config_file** to read any YAML/config file (including YAML-mode dashboards like ui-lovelace.yaml)
+- Use **write_config_file** to modify files (auto-creates a snapshot before writing)
+- Use **check_config** to validate after editing configuration.yaml
+- Use **list_snapshots** and **restore_snapshot** to manage/restore backups
 
-# ---- Provider defaults ----
+IMPORTANT for config editing:
+1. ALWAYS read the file first with read_config_file
+2. Make targeted changes (don't rewrite everything unless necessary)
+3. After writing configuration.yaml, ALWAYS call check_config to validate
+4. If validation fails, use restore_snapshot to undo changes
+5. Snapshots are created automatically before every write - inform the user about this safety net
 
-PROVIDER_DEFAULTS = {
-    "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
-    "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
-    "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
-    "github": {"model": "gpt-4o", "name": "GitHub Models"},
-}
+## Dashboard Management
+- Use **get_dashboards** to list all dashboards
+- Use **get_dashboard_config** to read an existing dashboard's full configuration
+- Use **update_dashboard** to modify an existing dashboard (replaces all views)
+- Use **create_dashboard** to create a brand new dashboard
+- Use **get_frontend_resources** to check which custom cards (HACS) are installed
+- Use **delete_dashboard** to remove a dashboard
 
-PROVIDER_MODELS = {
-    "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
-    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
-    "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
-    "github": [
-        # OpenAI
-        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
-        "o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini",
-        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-chat",
-        # Meta Llama
-        "Meta-Llama-3.1-405B-Instruct", "Meta-Llama-3.1-8B-Instruct",
-        "Llama-3.3-70B-Instruct", "Llama-4-Scout-17B-16E-Instruct",
-        "Llama-4-Maverick-17B-128E-Instruct-FP8",
-        # Mistral
-        "mistral-small-2503", "mistral-medium-2505", "Ministral-3B", "Codestral-2501",
-        # Cohere
-        "Cohere-command-r-plus-08-2024", "Cohere-command-r-08-2024", "cohere-command-a",
-        # DeepSeek
-        "DeepSeek-R1", "DeepSeek-R1-0528", "DeepSeek-V3-0324",
-        # Microsoft
-        "MAI-DS-R1", "Phi-4", "Phi-4-mini-instruct", "Phi-4-reasoning", "Phi-4-mini-reasoning",
-        # AI21
-        "AI21-Jamba-1.5-Large",
-        # xAI
-        "grok-3", "grok-3-mini",
-    ],
-}
+IMPORTANT: When modifying a dashboard, ALWAYS:
+1. First call get_dashboard_config to read the current config
+2. Modify the views/cards as needed
+3. Save with update_dashboard passing the complete views array
+
+### ENTITY RULE (CRITICAL)
+- NEVER invent or guess entity IDs. ALWAYS use search_entities first to find REAL entity IDs.
+- Only use entity IDs that appear in the search results.
+- If a search returns no results for a category, DO NOT include cards for that category.
+- Example: if search_entities("light") returns only light.soggiorno and light.camera, use ONLY those two.
+
+### Dashboard Layout (CRITICAL - never put cards in a flat vertical list!)
+Always create visually appealing layouts using grids and stacks:
+
+**Use grid cards to arrange items in columns:**
+{"type": "grid", "columns": 2, "square": false, "cards": [card1, card2, card3, card4]}
+
+**Use horizontal-stack for side-by-side cards:**
+{"type": "horizontal-stack", "cards": [card1, card2]}
+
+**Use vertical-stack to group related cards:**
+{"type": "vertical-stack", "cards": [headerCard, contentCard]}
+
+...existing code...
+    """
+    return get_config_structure_section() + base_prompt
 
 
 def get_active_model() -> str:
@@ -170,11 +172,51 @@ elif AI_PROVIDER == "github" and api_key:
 else:
     logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
 
+import pathlib
+
 # Conversation history
 conversations: Dict[str, List[Dict]] = {}
 
 # Abort flag per session (for stop button)
 abort_streams: Dict[str, bool] = {}
+
+# --- Dynamic config structure scan ---
+CONFIG_STRUCTURE_TEXT = ""
+
+def scan_config_structure(root_dir="/homeassistant", max_depth=2):
+    """Scan the config directory and return a formatted string of its structure."""
+    lines = []
+    def _scan(path, depth):
+        if depth > max_depth:
+            return
+        try:
+            entries = sorted(os.listdir(path))
+        except Exception:
+            return
+        for entry in entries:
+            if entry.startswith('.'):
+                continue
+            full = os.path.join(path, entry)
+            rel = os.path.relpath(full, root_dir)
+            prefix = "  " * depth + ("- " if depth else "")
+            if os.path.isdir(full):
+                lines.append(f"{prefix}{entry}/")
+                _scan(full, depth+1)
+            else:
+                lines.append(f"{prefix}{entry}")
+    _scan(root_dir, 0)
+    return "\n".join(lines)
+
+# Scan at startup
+try:
+    CONFIG_STRUCTURE_TEXT = scan_config_structure()
+    logger.info("Config structure scanned for prompt.")
+except Exception as e:
+    CONFIG_STRUCTURE_TEXT = "(Could not scan config: " + str(e) + ")"
+    logger.warning(f"Config structure scan failed: {e}")
+
+def get_config_structure_section():
+    return f"\nCurrent Home Assistant config structure (scanned at startup):\n\n{CONFIG_STRUCTURE_TEXT}\n"
 
 # User-friendly tool descriptions (Italian)
 TOOL_DESCRIPTIONS = {
@@ -1905,8 +1947,8 @@ HA_TOOLS_COMPACT = [
 def get_system_prompt() -> str:
     """Get system prompt appropriate for current provider."""
     if AI_PROVIDER == "github":
-        return SYSTEM_PROMPT_COMPACT
-    return SYSTEM_PROMPT
+        return get_config_structure_section() + SYSTEM_PROMPT_COMPACT
+    return get_config_structure_section() + base_prompt
 
 
 def get_openai_tools_for_provider():
@@ -2118,7 +2160,7 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
     response = ai_client.messages.create(
         model=get_active_model(),
         max_tokens=8192,
-        system=SYSTEM_PROMPT,
+        system=get_system_prompt(),
         tools=get_anthropic_tools(),
         messages=messages
     )
@@ -2138,7 +2180,7 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
         response = ai_client.messages.create(
             model=get_active_model(),
             max_tokens=8192,
-            system=SYSTEM_PROMPT,
+            system=get_system_prompt(),
             tools=get_anthropic_tools(),
             messages=messages
         )
@@ -2466,7 +2508,7 @@ def stream_chat_anthropic(messages, intent_info=None):
         focused_tools = get_tools_for_intent(intent_info, "anthropic")
         logger.info(f"Anthropic focused mode: {intent_info['intent']} ({len(focused_tools)} tools)")
     else:
-        focused_prompt = SYSTEM_PROMPT
+        focused_prompt = get_system_prompt()
         focused_tools = get_anthropic_tools()
 
     full_text = ""
@@ -2696,7 +2738,7 @@ def stream_chat_google(messages):
 
     model = ai_client.GenerativeModel(
         model_name=get_active_model(),
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=get_system_prompt(),
         tools=[get_gemini_tools()]
     )
 
