@@ -2556,7 +2556,11 @@ def stream_chat_anthropic(messages, intent_info=None):
         # Tools found - DON'T stream intermediate text, just show tool badges
         logger.info(f"Round {round_num+1}: {len(tool_uses)} tool(s), skipping intermediate text")
         assistant_content = final_message.content
-        messages.append({"role": "assistant", "content": assistant_content})
+        tool_calls = getattr(final_message, 'tool_calls', None)
+        assistant_msg = {"role": "assistant", "content": assistant_content}
+        if tool_calls:
+            assistant_msg["tool_calls"] = tool_calls
+        messages.append(assistant_msg)
 
         tool_results = []
         redundant_blocked = 0
