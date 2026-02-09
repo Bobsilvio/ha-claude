@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.33"
+VERSION = "3.0.34"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4223,6 +4223,41 @@ def get_chat_ui():
     status_color = "#4caf50" if configured else "#ff9800"
     status_text = provider_name if configured else f"{provider_name} (no key)"
 
+    # Multilingual UI messages
+    ui_messages = {
+        "en": {
+            "welcome": "👋 Hi! I'm your AI assistant for Home Assistant.",
+            "provider_model": f"Provider: <strong>{provider_name}</strong> | Model: <strong>{model_name}</strong>",
+            "capabilities": "I can control devices, create automations, and manage your smart home.",
+            "vision_feature": "<strong>🖼 New in v3.0:</strong> Now you can send me images!",
+            "analyzing": "Analyzing request"
+        },
+        "it": {
+            "welcome": "👋 Ciao! Sono il tuo assistente AI per Home Assistant.",
+            "provider_model": f"Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong>",
+            "capabilities": "Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.",
+            "vision_feature": "<strong>🖼 Novità v3.0:</strong> Ora puoi inviarmi immagini!",
+            "analyzing": "Analizzo la richiesta"
+        },
+        "es": {
+            "welcome": "👋 ¡Hola! Soy tu asistente AI para Home Assistant.",
+            "provider_model": f"Proveedor: <strong>{provider_name}</strong> | Modelo: <strong>{model_name}</strong>",
+            "capabilities": "Puedo controlar dispositivos, crear automatizaciones y gestionar tu hogar inteligente.",
+            "vision_feature": "<strong>🖼 Nuevo en v3.0:</strong> ¡Ahora puedes enviarme imágenes!",
+            "analyzing": "Analizando solicitud"
+        },
+        "fr": {
+            "welcome": "👋 Salut ! Je suis votre assistant IA pour Home Assistant.",
+            "provider_model": f"Fournisseur: <strong>{provider_name}</strong> | Modèle: <strong>{model_name}</strong>",
+            "capabilities": "Je peux contrôler des appareils, créer des automatisations et gérer votre maison intelligente.",
+            "vision_feature": "<strong>🖼 Nouveau dans v3.0:</strong> Vous pouvez maintenant m'envoyer des images!",
+            "analyzing": "Analyse de la demande"
+        }
+    }
+
+    # Get messages for current language
+    msgs = ui_messages.get(LANGUAGE, ui_messages["en"])
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -4322,10 +4357,10 @@ def get_chat_ui():
         <div class="main-content">
             <div class="chat-container" id="chat">
         <div class="message system">
-            \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
-            Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
-            Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.<br>
-            <strong>\U0001f5bc Novità v3.0:</strong> Ora puoi inviarmi immagini!
+            {msgs['welcome']}<br>
+            {msgs['provider_model']}<br>
+            {msgs['capabilities']}<br>
+            {msgs['vision_feature']}
         </div>
     </div>
 
@@ -4508,7 +4543,7 @@ def get_chat_ui():
             const div = document.createElement('div');
             div.className = 'message thinking';
             div.id = 'thinking';
-            div.innerHTML = 'Analizzo la richiesta<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            div.innerHTML = '{msgs['analyzing']}<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }}
@@ -4688,10 +4723,10 @@ def get_chat_ui():
                     }});
                 }} else {{
                     chat.innerHTML = `<div class="message system">
-                        \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
-                        Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
-                        Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.<br>
-                        <strong>\U0001f5bc Novità v3.0:</strong> Ora puoi inviarmi immagini!
+                        {msgs['welcome']}<br>
+                        {msgs['provider_model']}<br>
+                        {msgs['capabilities']}<br>
+                        {msgs['vision_feature']}
                     </div>`;
                     suggestionsEl.style.display = 'flex';
                 }}
@@ -4707,10 +4742,10 @@ def get_chat_ui():
             currentSessionId = Date.now().toString();
             localStorage.setItem('currentSessionId', currentSessionId);
             chat.innerHTML = `<div class="message system">
-                \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
-                Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
-                Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.<br>
-                <strong>\U0001f5bc Novità v3.0:</strong> Ora puoi inviarmi immagini!
+                {msgs['welcome']}<br>
+                {msgs['provider_model']}<br>
+                {msgs['capabilities']}<br>
+                {msgs['vision_feature']}
             </div>`;
             suggestionsEl.style.display = 'flex';
             removeImage();
