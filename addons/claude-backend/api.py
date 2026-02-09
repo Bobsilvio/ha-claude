@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.23"
+VERSION = "3.0.26"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -31,6 +31,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+NVIDIA_THINKING_MODE = os.getenv("NVIDIA_THINKING_MODE", "False").lower() == "true"
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
@@ -251,7 +252,14 @@ PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
-    "nvidia": ["moonshotai/kimi-k2.5"],
+    "nvidia": [
+        "moonshotai/kimi-k2.5",
+        "meta/llama-3.1-70b-instruct",
+        "meta/llama-3.1-405b-instruct",
+        "mistralai/mistral-large-2-instruct",
+        "microsoft/phi-4",
+        "nvidia/llama-3.1-nemotron-70b-instruct",
+    ],
     "github": [
         # OpenAI
         "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
@@ -289,8 +297,18 @@ MODEL_NAME_MAPPING = {
     "Google: Gemini 2.0 Flash": "gemini-2.0-flash",
     "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
     "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
-    "NVIDIA: Kimi K2.5": "moonshotai/kimi-k2.5",
-    "NVIDIA: Kimi K2.5 🆓": "moonshotai/kimi-k2.5",
+    "NVIDIA: Kimi K2.5 🧪": "moonshotai/kimi-k2.5",
+    "NVIDIA: Kimi K2.5 🧪🆓": "moonshotai/kimi-k2.5",
+    "NVIDIA: Llama 3.1 70B 🧪": "meta/llama-3.1-70b-instruct",
+    "NVIDIA: Llama 3.1 70B 🧪🆓": "meta/llama-3.1-70b-instruct",
+    "NVIDIA: Llama 3.1 405B 🧪": "meta/llama-3.1-405b-instruct",
+    "NVIDIA: Llama 3.1 405B 🧪🆓": "meta/llama-3.1-405b-instruct",
+    "NVIDIA: Mistral Large 2 🧪": "mistralai/mistral-large-2-instruct",
+    "NVIDIA: Mistral Large 2 🧪🆓": "mistralai/mistral-large-2-instruct",
+    "NVIDIA: Phi-4 🧪": "microsoft/phi-4",
+    "NVIDIA: Phi-4 🧪🆓": "microsoft/phi-4",
+    "NVIDIA: Nemotron 70B 🧪": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "NVIDIA: Nemotron 70B 🧪🆓": "nvidia/llama-3.1-nemotron-70b-instruct",
     "GitHub: GPT-4o": "gpt-4o",
     "GitHub: GPT-4o 🆓": "gpt-4o",
     "GitHub: GPT-4o-mini": "gpt-4o-mini",
@@ -402,7 +420,7 @@ def get_model_provider(model_name: str) -> str:
         return "openai"
     elif tech_name.startswith("gemini-"):
         return "google"
-    elif tech_name.startswith("moonshotai/"):
+    elif tech_name.startswith(("moonshotai/", "meta/", "mistralai/", "microsoft/", "nvidia/")):
         return "nvidia"
     return "unknown"
 
@@ -3200,7 +3218,7 @@ def stream_chat_openai(messages, intent_info=None):
         if AI_PROVIDER == "nvidia":
             kwargs["temperature"] = 1.0
             kwargs["max_tokens"] = 16384
-            kwargs["chat_template_kwargs"] = {"thinking": False}
+            kwargs["chat_template_kwargs"] = {"thinking": NVIDIA_THINKING_MODE}
 
         logger.info(f"OpenAI: Calling API with model={kwargs['model']}, stream=True")
         response = ai_client.chat.completions.create(**kwargs)

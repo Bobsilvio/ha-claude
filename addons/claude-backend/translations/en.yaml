@@ -4,7 +4,7 @@ configuration:
     description: "Select your AI provider. 🆓 FREE: NVIDIA, GitHub Models | 💳 PAID: Anthropic, OpenAI, Google"
   ai_model:
     name: AI Model
-    description: "Choose based on provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=Kimi K2.5🆓, GitHub=40+ models🆓"
+    description: "Choose based on provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=6 models🧪🆓 (Kimi/Llama/Mistral/Phi/Nemotron), GitHub=40+ models🆓"
   anthropic_api_key:
     name: Anthropic API Key
     description: API key from console.anthropic.com (save here even if not using, for quick switching)
@@ -17,6 +17,9 @@ configuration:
   nvidia_api_key:
     name: NVIDIA API Key
     description: API key from build.nvidia.com (free - save here even if not using, for quick switching)
+  nvidia_thinking_mode:
+    name: NVIDIA Thinking Mode
+    description: "Enable thinking mode for NVIDIA models (shows reasoning process, may be slower)"
   github_token:
     name: GitHub Token
     description: Personal Access Token from github.com/settings/tokens (save here even if not using, for quick switching)
