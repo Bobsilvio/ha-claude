@@ -5060,30 +5060,7 @@ def api_conversation_delete(session_id):
     return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
 
 
-@app.route('/api/set_model', methods=['POST'])
-def api_set_model():
-    """Change AI model at runtime."""
-    global AI_MODEL
-    data = request.get_json()
-    new_model = data.get("model", "")
-    if new_model:
-        # Normalize from prefixed name to technical name if needed
-        technical_model = normalize_model_name(new_model)
-        AI_MODEL = technical_model
-        logger.info(f"Model changed to: {technical_model} (from UI: {new_model})")
-
-        # Validate compatibility after change
-        is_valid, error_msg = validate_model_provider_compatibility()
-        if not is_valid:
-            logger.warning(error_msg)
-            return jsonify({
-                "status": "warning",
-                "model": MODEL_DISPLAY_MAPPING.get(technical_model, technical_model),
-                "warning": error_msg
-            }), 200
-
-        return jsonify({"status": "ok", "model": MODEL_DISPLAY_MAPPING.get(technical_model, technical_model)}), 200
-    return jsonify({"status": "error", "message": "No model specified"}), 400
+...existing code...
 
 
 @app.route('/api/get_models', methods=['GET'])
@@ -5190,7 +5167,6 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
-...existing code...
 if __name__ == "__main__":
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
     logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
