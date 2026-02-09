@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.17"
+VERSION = "2.9.18"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -119,6 +119,44 @@ Always create visually appealing layouts using grids and stacks:
 ...existing code...
     """
     return get_config_structure_section() + base_prompt
+
+
+# ---- Provider defaults ----
+
+PROVIDER_DEFAULTS = {
+    "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
+    "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
+    "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
+    "github": {"model": "gpt-4o", "name": "GitHub Models"},
+}
+
+PROVIDER_MODELS = {
+    "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
+    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
+    "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    "github": [
+        # OpenAI
+        "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
+        "o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini",
+        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-chat",
+        # Meta Llama
+        "Meta-Llama-3.1-405B-Instruct", "Meta-Llama-3.1-8B-Instruct",
+        "Llama-3.3-70B-Instruct", "Llama-4-Scout-17B-16E-Instruct",
+        "Llama-4-Maverick-17B-128E-Instruct-FP8",
+        # Mistral
+        "mistral-small-2503", "mistral-medium-2505", "Ministral-3B", "Codestral-2501",
+        # Cohere
+        "Cohere-command-r-plus-08-2024", "Cohere-command-r-08-2024", "cohere-command-a",
+        # DeepSeek
+        "DeepSeek-R1", "DeepSeek-R1-0528", "DeepSeek-V3-0324",
+        # Microsoft
+        "MAI-DS-R1", "Phi-4", "Phi-4-mini-instruct", "Phi-4-reasoning", "Phi-4-mini-reasoning",
+        # AI21
+        "AI21-Jamba-1.5-Large",
+        # xAI
+        "grok-3", "grok-3-mini",
+    ],
+}
 
 
 def get_active_model() -> str:
