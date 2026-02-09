@@ -18,8 +18,8 @@ configuration:
     name: NVIDIA API Key
     description: API key from build.nvidia.com (free - save here even if not using, for quick switching)
   nvidia_thinking_mode:
-    name: NVIDIA Thinking Mode (Not Yet Supported)
-    description: "⚠️ Feature not yet implemented - requires direct API integration. Coming in future update."
+    name: NVIDIA Thinking Mode
+    description: "Enable thinking mode to see AI's reasoning process (slower but more transparent)"
   github_token:
     name: GitHub Token
     description: Personal Access Token from github.com/settings/tokens (save here even if not using, for quick switching)

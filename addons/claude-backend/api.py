@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.28"
+VERSION = "3.0.29"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -3181,6 +3181,165 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 # ---- Streaming chat ----
 
 
+def stream_chat_nvidia_direct(messages, intent_info=None):
+    """Stream chat for NVIDIA using direct requests (not OpenAI SDK).
+    This allows using NVIDIA-specific parameters like chat_template_kwargs for thinking mode."""
+    trimmed = trim_messages(messages)
+
+    # Use focused tools/prompt if intent detected, else full
+    if intent_info and intent_info.get("tools"):
+        system_prompt = get_prompt_for_intent(intent_info)
+        tools = get_tools_for_intent(intent_info, AI_PROVIDER)
+        logger.info(f"NVIDIA focused mode: {intent_info['intent']} ({len(tools)} tools)")
+    else:
+        system_prompt = get_system_prompt()
+        tools = get_openai_tools_for_provider()
+
+    # Log available tools
+    tool_names = [t.get("function", {}).get("name", "unknown") for t in tools]
+    logger.info(f"NVIDIA tools available ({len(tools)}): {', '.join(tool_names)}")
+
+    full_text = ""
+    max_rounds = 5
+    tools_called_this_session = set()
+
+    for round_num in range(max_rounds):
+        oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
+
+        # Prepare NVIDIA API request
+        url = "https://integrate.api.nvidia.com/v1/chat/completions"
+        headers = {
+            "Authorization": f"Bearer {NVIDIA_API_KEY}",
+            "Accept": "text/event-stream",
+            "Content-Type": "application/json"
+        }
+
+        payload = {
+            "model": get_active_model(),
+            "messages": oai_messages,
+            "tools": tools,
+            "max_tokens": 8192,
+            "temperature": 0.7,
+            "stream": True,
+            "chat_template_kwargs": {"thinking": NVIDIA_THINKING_MODE}
+        }
+
+        logger.info(f"NVIDIA: Calling API with model={payload['model']}, thinking={NVIDIA_THINKING_MODE}, stream=True")
+
+        try:
+            response = requests.post(url, headers=headers, json=payload, stream=True, timeout=120)
+            response.raise_for_status()
+            logger.info("NVIDIA: Response stream started")
+
+            # Parse SSE stream manually
+            content_parts = []
+            tool_calls_map = {}
+
+            for line in response.iter_lines(decode_unicode=True):
+                if not line or not line.strip():
+                    continue
+
+                # SSE format: "data: {...}"
+                if line.startswith("data: "):
+                    data = line[6:]  # Remove "data: " prefix
+
+                    if data.strip() == "[DONE]":
+                        break
+
+                    try:
+                        chunk_data = json.loads(data)
+                        if not chunk_data.get("choices"):
+                            continue
+
+                        delta = chunk_data["choices"][0].get("delta", {})
+
+                        if delta.get("content"):
+                            content_parts.append(delta["content"])
+
+                        if delta.get("tool_calls"):
+                            for tc_delta in delta["tool_calls"]:
+                                idx = tc_delta.get("index", 0)
+                                if idx not in tool_calls_map:
+                                    tool_calls_map[idx] = {"id": "", "name": "", "arguments": ""}
+                                if tc_delta.get("id"):
+                                    tool_calls_map[idx]["id"] = tc_delta["id"]
+                                if tc_delta.get("function"):
+                                    if tc_delta["function"].get("name"):
+                                        tool_calls_map[idx]["name"] = tc_delta["function"]["name"]
+                                    if tc_delta["function"].get("arguments"):
+                                        tool_calls_map[idx]["arguments"] += tc_delta["function"]["arguments"]
+
+                    except json.JSONDecodeError:
+                        continue
+
+            accumulated = "".join(content_parts)
+
+            if not tool_calls_map:
+                # No tools - stream the final text
+                full_text = accumulated
+                logger.warning(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
+                messages.append({"role": "assistant", "content": full_text})
+                yield {"type": "clear"}
+                for i in range(0, len(full_text), 4):
+                    chunk = full_text[i:i+4]
+                    yield {"type": "token", "content": chunk}
+                break
+
+            # Build assistant message with tool calls
+            logger.info(f"Round {round_num+1}: {len(tool_calls_map)} tool(s), skipping intermediate text")
+            tc_list = []
+            for idx in sorted(tool_calls_map.keys()):
+                tc = tool_calls_map[idx]
+                tc_list.append({
+                    "id": tc["id"], "type": "function",
+                    "function": {"name": tc["name"], "arguments": tc["arguments"]}
+                })
+
+            messages.append({"role": "assistant", "content": accumulated, "tool_calls": tc_list})
+
+            # Execute tools (same logic as OpenAI)
+            tool_call_results = {}
+            for tc in tc_list:
+                fn_name = tc["function"]["name"]
+                if fn_name in tools_called_this_session:
+                    logger.info(f"Skipping already-called tool: {fn_name}")
+                    continue
+
+                tools_called_this_session.add(fn_name)
+                args_str = tc["function"]["arguments"]
+                tc_id = tc["id"]
+
+                yield {"type": "tool_call", "name": fn_name, "arguments": args_str}
+
+                try:
+                    args = json.loads(args_str) if args_str.strip() else {}
+                except json.JSONDecodeError:
+                    result_obj = {"error": f"Invalid JSON arguments: {args_str}"}
+                    tool_call_results[tc_id] = (fn_name, result_obj)
+                    continue
+
+                fn = TOOL_FUNCTIONS.get(fn_name)
+                if not fn:
+                    result_obj = {"error": f"Unknown tool: {fn_name}"}
+                else:
+                    result_obj = fn(**args)
+
+                tool_call_results[tc_id] = (fn_name, result_obj)
+                yield {"type": "tool_result", "name": fn_name, "result": result_obj}
+
+            # Add tool results to messages
+            for tc_id, (fn_name, result_obj) in tool_call_results.items():
+                messages.append({"role": "tool", "tool_call_id": tc_id, "name": fn_name, "content": json.dumps(result_obj)})
+
+        except Exception as e:
+            logger.error(f"NVIDIA API error: {e}")
+            error_msg = f"NVIDIA API error: {str(e)}"
+            messages.append({"role": "assistant", "content": error_msg})
+            yield {"type": "clear"}
+            yield {"type": "token", "content": error_msg}
+            break
+
+
 def stream_chat_openai(messages, intent_info=None):
     """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts.
     Uses intent_info to select focused tools and prompt when available."""
@@ -3977,7 +4136,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Remember current conversation length to avoid duplicates
         conv_length_before = len(conversations[session_id])
 
-        if AI_PROVIDER in ("openai", "github", "nvidia"):
+        if AI_PROVIDER == "nvidia":
+            yield from stream_chat_nvidia_direct(messages, intent_info=intent_info)
+            # Sync ONLY new assistant messages
+            new_messages = messages[conv_length_before:]
+            conversations[session_id].extend(new_messages)
+        elif AI_PROVIDER in ("openai", "github"):
             yield from stream_chat_openai(messages, intent_info=intent_info)
             # Sync ONLY new assistant messages (after the original user message)
             new_messages = messages[conv_length_before:]
