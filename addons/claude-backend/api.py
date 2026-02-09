@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.29"
+VERSION = "3.0.0"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -163,6 +163,74 @@ Always create visually appealing layouts using grids and stacks:
 ...existing code...
     """
     return get_config_structure_section() + get_config_includes_text() + base_prompt
+
+
+# ---- Image handling helpers (v3.0.0) ----
+
+def parse_image_data(data_uri: str) -> tuple:
+    """
+    Parse data URI to extract media type and base64 data.
+    Example: 'data:image/jpeg;base64,/9j/4AAQ...' -> ('image/jpeg', '/9j/4AAQ...')
+    """
+    if not data_uri or not data_uri.startswith('data:'):
+        return None, None
+
+    try:
+        # Format: data:image/jpeg;base64,<base64_data>
+        header, data = data_uri.split(',', 1)
+        media_type = header.split(';')[0].split(':')[1]
+        return media_type, data
+    except:
+        return None, None
+
+
+def format_message_with_image_anthropic(text: str, media_type: str, base64_data: str) -> list:
+    """
+    Format message with image for Anthropic Claude.
+    Returns content array with text and image blocks.
+    """
+    return [
+        {"type": "text", "text": text},
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": media_type,
+                "data": base64_data
+            }
+        }
+    ]
+
+
+def format_message_with_image_openai(text: str, data_uri: str) -> list:
+    """
+    Format message with image for OpenAI/GitHub.
+    Returns content array with text and image_url blocks.
+    """
+    return [
+        {"type": "text", "text": text},
+        {
+            "type": "image_url",
+            "image_url": {"url": data_uri}
+        }
+    ]
+
+
+def format_message_with_image_google(text: str, media_type: str, base64_data: str) -> list:
+    """
+    Format message with image for Google Gemini.
+    Returns parts array for Gemini format.
+    """
+    # Gemini uses inline_data format
+    return [
+        {"text": text},
+        {
+            "inline_data": {
+                "mime_type": media_type,
+                "data": base64_data
+            }
+        }
+    ]
 
 
 # ---- Provider defaults ----
@@ -3484,8 +3552,8 @@ def build_smart_context(user_message: str) -> str:
     return ""
 
 
-def stream_chat_with_ai(user_message: str, session_id: str = "default"):
-    """Stream chat events for all providers. Yields SSE event dicts.
+def stream_chat_with_ai(user_message: str, session_id: str = "default", image_data: str = None):
+    """Stream chat events for all providers with optional image support. Yields SSE event dicts.
     Uses LOCAL intent detection + smart context to minimize tokens sent to AI API."""
     if not ai_client:
         yield {"type": "error", "message": "API key non configurata"}
@@ -3524,20 +3592,52 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
     intent_label = INTENT_LABELS.get(intent_name, "Elaboro")
     yield {"type": "status", "message": f"{intent_label}... ({tool_count if tool_count else all_tools_count} tools)"}
     
-    # Step 3: Build the message to send
-    if smart_context:
-        # Shorter, more direct instructions when intent is clear
-        if intent_info["specific_target"]:
-            enriched_message = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+    # Step 3: Build the message to send (with optional image)
+    if image_data:
+        # Parse image data
+        media_type, base64_data = parse_image_data(image_data)
+        if not media_type or not base64_data:
+            yield {"type": "error", "message": "Formato immagine non valido"}
+            return
+
+        # Format message with image based on provider
+        if smart_context:
+            # Shorter, more direct instructions when intent is clear
+            if intent_info["specific_target"]:
+                text_content = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+            else:
+                text_content = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
         else:
-            enriched_message = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
-        conversations[session_id].append({"role": "user", "content": enriched_message})
-        # Log estimated token count
-        est_tokens = len(enriched_message) // 4  # ~4 chars per token
-        logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
-        yield {"type": "status", "message": "Contesto pre-caricato..."}
+            text_content = user_message
+
+        # Format based on provider
+        if AI_PROVIDER == "anthropic":
+            message_content = format_message_with_image_anthropic(text_content, media_type, base64_data)
+        elif AI_PROVIDER in ("openai", "github"):
+            message_content = format_message_with_image_openai(text_content, image_data)
+        elif AI_PROVIDER == "google":
+            message_content = format_message_with_image_google(text_content, media_type, base64_data)
+        else:
+            message_content = text_content
+
+        conversations[session_id].append({"role": "user", "content": message_content})
+        logger.info(f"Message with image: {text_content[:50]}... (media_type: {media_type})")
+        yield {"type": "status", "message": "Elaborazione immagine..."}
     else:
-        conversations[session_id].append({"role": "user", "content": user_message})
+        # No image - original logic
+        if smart_context:
+            # Shorter, more direct instructions when intent is clear
+            if intent_info["specific_target"]:
+                enriched_message = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+            else:
+                enriched_message = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
+            conversations[session_id].append({"role": "user", "content": enriched_message})
+            # Log estimated token count
+            est_tokens = len(enriched_message) // 4  # ~4 chars per token
+            logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
+            yield {"type": "status", "message": "Contesto pre-caricato..."}
+        else:
+            conversations[session_id].append({"role": "user", "content": user_message})
 
     # Pass the actual conversation list so tool calls are persisted in-place
     messages = conversations[session_id]
@@ -3570,7 +3670,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default"):
 
 
 def get_chat_ui():
-    """Generate the chat UI."""
+    """Generate the chat UI with image upload support."""
     provider_name = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("name", AI_PROVIDER)
     model_name = get_active_model()
     configured = bool(get_api_key())
@@ -3608,6 +3708,7 @@ def get_chat_ui():
         .message {{ max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-wrap: break-word; animation: fadeIn 0.3s ease; }}
         @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
         .message.user {{ background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }}
+        .message.user img {{ max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px; display: block; }}
         .message.assistant {{ background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
         .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 8px 0; font-size: 13px; }}
         .message.assistant code {{ background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }}
@@ -3621,7 +3722,12 @@ def get_chat_ui():
         .message.thinking .dots span:nth-child(2) {{ animation-delay: 0.2s; }}
         .message.thinking .dots span:nth-child(3) {{ animation-delay: 0.4s; }}
         @keyframes blink {{ 0%, 80%, 100% {{ opacity: 0; }} 40% {{ opacity: 1; }} }}
-        .input-area {{ padding: 12px 16px; background: white; border-top: 1px solid #e0e0e0; display: flex; gap: 8px; align-items: flex-end; }}
+        .input-area {{ padding: 12px 16px; background: white; border-top: 1px solid #e0e0e0; display: flex; flex-direction: column; gap: 8px; }}
+        .image-preview-container {{ display: none; padding: 8px; background: #f8f9fa; border-radius: 8px; position: relative; }}
+        .image-preview-container.visible {{ display: block; }}
+        .image-preview {{ max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #667eea; }}
+        .remove-image-btn {{ position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }}
+        .input-row {{ display: flex; gap: 8px; align-items: flex-end; }}
         .input-area textarea {{ flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 10px 16px; font-size: 14px; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.2s; }}
         .input-area textarea:focus {{ border-color: #667eea; }}
         .input-area button {{ background: #667eea; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }}
@@ -3629,6 +3735,8 @@ def get_chat_ui():
         .input-area button:disabled {{ background: #ccc; cursor: not-allowed; }}
         .input-area button.stop-btn {{ background: #ef4444; animation: pulse-stop 1s infinite; }}
         .input-area button.stop-btn:hover {{ background: #dc2626; }}
+        .input-area button.image-btn {{ background: #10b981; }}
+        .input-area button.image-btn:hover {{ background: #059669; }}
         @keyframes pulse-stop {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
@@ -3643,6 +3751,7 @@ def get_chat_ui():
         <h1>AI Assistant</h1>
         <span class="badge">v{VERSION}</span>
         <span class="badge">{model_name}</span>
+        <span class="badge">\U0001f5bc Vision</span>
         <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
         <div class="status">
             <div class="status-dot"></div>
@@ -3660,7 +3769,8 @@ def get_chat_ui():
         <div class="message system">
             \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
             Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
-            Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
+            Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.<br>
+            <strong>\U0001f5bc Novità v3.0:</strong> Ora puoi inviarmi immagini!
         </div>
     </div>
 
@@ -3674,11 +3784,21 @@ def get_chat_ui():
     </div>
 
     <div class="input-area">
-        <textarea id="input" rows="1" placeholder="Scrivi un messaggio..." onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
-        <button id="sendBtn" onclick="handleButtonClick()">
-            <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        </button>
+        <div id="imagePreviewContainer" class="image-preview-container">
+            <img id="imagePreview" class="image-preview" />
+            <button class="remove-image-btn" onclick="removeImage()" title="Rimuovi immagine">×</button>
+        </div>
+        <div class="input-row">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)" />
+            <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="Carica immagine">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <textarea id="input" rows="1" placeholder="Scrivi un messaggio..." onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+            <button id="sendBtn" onclick="handleButtonClick()">
+                <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+            </button>
+        </div>
     </div>
         </div>
     </div>
@@ -3691,9 +3811,38 @@ def get_chat_ui():
         const stopIcon = document.getElementById('stopIcon');
         const suggestionsEl = document.getElementById('suggestions');
         const chatList = document.getElementById('chatList');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
         let sending = false;
         let currentReader = null;
         let currentSessionId = localStorage.getItem('currentSessionId') || Date.now().toString();
+        let currentImage = null;  // Stores base64 image data
+
+        function handleImageSelect(event) {{
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Check file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {{
+                alert('L\\'immagine è troppo grande. Massimo 5MB.');
+                return;
+            }}
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {{
+                currentImage = e.target.result;
+                imagePreview.src = currentImage;
+                imagePreviewContainer.classList.add('visible');
+            }};
+            reader.readAsDataURL(file);
+        }}
+
+        function removeImage() {{
+            currentImage = null;
+            imageInput.value = '';
+            imagePreviewContainer.classList.remove('visible');
+        }}
 
         function setStopMode(active) {{
             if (active) {{
@@ -3732,11 +3881,19 @@ def get_chat_ui():
             if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
         }}
 
-        function addMessage(text, role) {{
+        function addMessage(text, role, imageData = null) {{
             const div = document.createElement('div');
             div.className = 'message ' + role;
-            if (role === 'assistant') {{ div.innerHTML = formatMarkdown(text); }}
-            else {{ div.textContent = text; }}
+            if (role === 'assistant') {{ 
+                div.innerHTML = formatMarkdown(text); 
+            }} else {{ 
+                div.textContent = text; 
+                if (imageData) {{
+                    const img = document.createElement('img');
+                    img.src = imageData;
+                    div.appendChild(img);
+                }}
+            }}
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }}
@@ -3776,14 +3933,30 @@ def get_chat_ui():
             input.value = '';
             input.style.height = 'auto';
             suggestionsEl.style.display = 'none';
-            addMessage(text, 'user');
+            
+            // Show user message with image if present
+            const imageToSend = currentImage;
+            addMessage(text, 'user', imageToSend);
             showThinking();
+            
             try {{
+                const payload = {{ 
+                    message: text, 
+                    session_id: currentSessionId 
+                }};
+                if (imageToSend) {{
+                    payload.image = imageToSend;
+                }}
+                
                 const resp = await fetch('api/chat/stream', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ message: text, session_id: currentSessionId }})
+                    body: JSON.stringify(payload)
                 }});
+                
+                // Clear image after sending
+                removeImage();
+                
                 removeThinking();
                 if (resp.headers.get('content-type')?.includes('text/event-stream')) {{
                     await handleStream(resp);
@@ -3802,7 +3975,7 @@ def get_chat_ui():
             setStopMode(false);
             sendBtn.disabled = false;
             currentReader = null;
-            loadChatList();  // Update chat list after message sent
+            loadChatList();
             input.focus();
         }}
 
@@ -3868,7 +4041,6 @@ def get_chat_ui():
                     console.error('Stream error:', streamErr);
                 }}
             }}
-            // Safety: if stream ended without final response, show a message
             removeThinking();
             if (!gotAnyEvent) {{
                 addMessage('\u274c Connessione interrotta. Riprova.', 'system');
@@ -3903,7 +4075,6 @@ def get_chat_ui():
             try {{
                 const resp = await fetch(`api/conversations/${{sessionId}}`);
                 if (resp.status === 404) {{
-                    // Session not found (e.g., after addon rebuild) - create new session
                     console.log('Session not found, creating new session');
                     newChat();
                     return;
@@ -3921,11 +4092,12 @@ def get_chat_ui():
                     chat.innerHTML = `<div class="message system">
                         \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
                         Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
-                        Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
+                        Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.<br>
+                        <strong>\U0001f5bc Novità v3.0:</strong> Ora puoi inviarmi immagini!
                     </div>`;
                     suggestionsEl.style.display = 'flex';
                 }}
-                loadChatList();  // Refresh list to update active state
+                loadChatList();
             }} catch(e) {{ console.error('Error loading conversation:', e); }}
         }}
 
@@ -3939,9 +4111,11 @@ def get_chat_ui():
             chat.innerHTML = `<div class="message system">
                 \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
                 Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
-                Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
+                Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.<br>
+                <strong>\U0001f5bc Novità v3.0:</strong> Ora puoi inviarmi immagini!
             </div>`;
             suggestionsEl.style.display = 'flex';
+            removeImage();
             loadChatList();
         }}
 
@@ -4004,17 +4178,21 @@ def api_chat():
 
 @app.route('/api/chat/stream', methods=['POST'])
 def api_chat_stream():
-    """Streaming chat endpoint using Server-Sent Events."""
+    """Streaming chat endpoint using Server-Sent Events with image support."""
     data = request.get_json()
     message = data.get("message", "").strip()
     session_id = data.get("session_id", "default")
+    image_data = data.get("image", None)  # Base64 image data
     if not message:
         return jsonify({"error": "Empty message"}), 400
-    logger.info(f"Stream [{AI_PROVIDER}]: {message}")
+    if image_data:
+        logger.info(f"Stream [{AI_PROVIDER}] with image: {message[:50]}...")
+    else:
+        logger.info(f"Stream [{AI_PROVIDER}]: {message}")
     abort_streams[session_id] = False  # Reset abort flag
 
     def generate():
-        for event in stream_chat_with_ai(message, session_id):
+        for event in stream_chat_with_ai(message, session_id, image_data):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return Response(
