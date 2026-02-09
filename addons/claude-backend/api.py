@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.32"
+VERSION = "3.0.33"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -5178,4 +5178,7 @@ if __name__ == "__main__":
             }
             logger.warning(fix_msgs.get(LANGUAGE, fix_msgs["en"]))
 
-    app.run(host="0.0.0.0", port=API_PORT, debug=DEBUG_MODE)
+    # Use Waitress production WSGI server instead of Flask development server
+    from waitress import serve
+    logger.info(f"Starting production server on 0.0.0.0:{API_PORT}")
+    serve(app, host="0.0.0.0", port=API_PORT, threads=6)
