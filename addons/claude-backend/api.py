@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.5"
+VERSION = "3.0.6"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -3792,7 +3792,11 @@ def get_chat_ui():
         .message.user {{ background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }}
         .message.user img {{ max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px; display: block; }}
         .message.assistant {{ background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
-        .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 8px 0; font-size: 13px; }}
+        .code-block {{ position: relative; margin: 8px 0; }}
+        .code-block .copy-button {{ position: absolute; top: 8px; right: 8px; background: #667eea; color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; opacity: 0.8; transition: all 0.2s; z-index: 1; }}
+        .code-block .copy-button:hover {{ opacity: 1; background: #5a6fd6; }}
+        .code-block .copy-button.copied {{ background: #10b981; }}
+        .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 0; font-size: 13px; }}
         .message.assistant code {{ background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }}
         .message.assistant pre code {{ background: none; padding: 0; }}
         .message.assistant strong {{ color: #333; }}
@@ -3981,11 +3985,25 @@ def get_chat_ui():
         }}
 
         function formatMarkdown(text) {{
-            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<pre><code>$2</code></pre>');
+            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">📋 Copia</button><pre><code>$2</code></pre></div>');
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
             text = text.replace(/\\n/g, '<br>');
             return text;
+        }}
+
+        function copyCode(button) {{
+            const codeBlock = button.nextElementSibling;
+            const code = codeBlock.textContent;
+            navigator.clipboard.writeText(code).then(() => {{
+                const originalText = button.textContent;
+                button.textContent = '✓ Copiato!';
+                button.classList.add('copied');
+                setTimeout(() => {{
+                    button.textContent = originalText;
+                    button.classList.remove('copied');
+                }}, 2000);
+            }});
         }}
 
         function showThinking() {{
