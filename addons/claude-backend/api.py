@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.27"
+VERSION = "3.0.28"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -3218,9 +3218,10 @@ def stream_chat_openai(messages, intent_info=None):
         if AI_PROVIDER == "nvidia":
             kwargs["temperature"] = 0.7
             kwargs["max_tokens"] = 8192
-            kwargs["chat_template_kwargs"] = {"thinking": NVIDIA_THINKING_MODE}
             # NVIDIA can be slower, use longer timeout
             kwargs["timeout"] = 120.0
+            # Note: chat_template_kwargs not supported by OpenAI SDK
+            # Thinking mode would require using requests library directly
 
         logger.info(f"OpenAI: Calling API with model={kwargs['model']}, stream=True")
         response = ai_client.chat.completions.create(**kwargs)

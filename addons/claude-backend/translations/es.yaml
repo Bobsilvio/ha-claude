@@ -18,8 +18,8 @@ configuration:
     name: Clave API NVIDIA
     description: Clave API de build.nvidia.com (gratuita - guarda aunque no uses, para cambio rápido)
   nvidia_thinking_mode:
-    name: Modo Thinking NVIDIA
-    description: "Habilita modo thinking para modelos NVIDIA (muestra proceso de razonamiento, puede ser más lento)"
+    name: Modo Thinking NVIDIA (Aún No Soportado)
+    description: "⚠️ Función aún no implementada - requiere integración API directa. Disponible en futuras actualizaciones."
   github_token:
     name: Token GitHub
     description: Personal Access Token de github.com/settings/tokens (guarda aunque no uses, para cambio rápido)
