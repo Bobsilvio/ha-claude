@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.18"
+VERSION = "2.9.19"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -42,7 +42,9 @@ SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN"
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
 logger = logging.getLogger(__name__)
 
-logger.info(f"ENABLE_FILE_ACCESS: {ENABLE_FILE_ACCESS}")
+logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT SET')}")
+logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
+logger.info(f"HA_CONFIG_DIR: /homeassistant")
 
 def get_system_prompt() -> str:
     """Return the system prompt with dynamic config structure prepended."""
@@ -899,6 +901,8 @@ def get_anthropic_tools():
     tools = HA_TOOLS_DESCRIPTION
     if not ENABLE_FILE_ACCESS:
         config_edit_tools = set(INTENT_GROUPS.get("config_edit", []))
+        filtered_count = len([t for t in tools if t["name"] in config_edit_tools])
+        logger.info(f"ENABLE_FILE_ACCESS=False: filtering {filtered_count} config_edit tools: {config_edit_tools}")
         tools = [t for t in tools if t["name"] not in config_edit_tools]
     return [
         {"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
@@ -911,6 +915,8 @@ def get_openai_tools():
     tools = HA_TOOLS_DESCRIPTION
     if not ENABLE_FILE_ACCESS:
         config_edit_tools = set(INTENT_GROUPS.get("config_edit", []))
+        filtered_count = len([t for t in tools if t["name"] in config_edit_tools])
+        logger.debug(f"OpenAI: filtering {filtered_count} config_edit tools")
         tools = [t for t in tools if t["name"] not in config_edit_tools]
     return [
         {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
@@ -1697,10 +1703,13 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
 
         elif tool_name == "list_config_files":
             subpath = tool_input.get("path", "")
+            logger.info(f"list_config_files called: subpath='{subpath}', ENABLE_FILE_ACCESS={ENABLE_FILE_ACCESS}")
             if ".." in subpath:
                 return json.dumps({"error": "Invalid path."})
             dirpath = os.path.join(HA_CONFIG_DIR, subpath) if subpath else HA_CONFIG_DIR
+            logger.info(f"list_config_files: checking directory '{dirpath}'")
             if not os.path.isdir(dirpath):
+                logger.error(f"list_config_files: directory not found: '{dirpath}'")
                 return json.dumps({"error": f"Directory '{subpath}' not found."})
             entries = []
             try:
@@ -3186,6 +3195,16 @@ def get_chat_ui():
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }}
+        .main-container {{ display: flex; flex: 1; overflow: hidden; }}
+        .sidebar {{ width: 250px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; }}
+        .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
+        .chat-list {{ flex: 1; overflow-y: auto; }}
+        .chat-item {{ padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; }}
+        .chat-item:hover {{ background: #f8f9fa; }}
+        .chat-item.active {{ background: #e8f0fe; border-left: 3px solid #667eea; }}
+        .chat-item-title {{ font-size: 13px; color: #333; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        .chat-item-info {{ font-size: 11px; color: #999; }}
+        .main-content {{ flex: 1; display: flex; flex-direction: column; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
         .header .badge {{ font-size: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
@@ -3240,7 +3259,13 @@ def get_chat_ui():
         </div>
     </div>
 
-    <div class="chat-container" id="chat">
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-header">📝 Conversazioni</div>
+            <div class="chat-list" id="chatList"></div>
+        </div>
+        <div class="main-content">
+            <div class="chat-container" id="chat">
         <div class="message system">
             \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
             Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
@@ -3264,6 +3289,8 @@ def get_chat_ui():
             <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
         </button>
     </div>
+        </div>
+    </div>
 
     <script>
         const chat = document.getElementById('chat');
@@ -3272,8 +3299,10 @@ def get_chat_ui():
         const sendIcon = document.getElementById('sendIcon');
         const stopIcon = document.getElementById('stopIcon');
         const suggestionsEl = document.getElementById('suggestions');
+        const chatList = document.getElementById('chatList');
         let sending = false;
         let currentReader = null;
+        let currentSessionId = localStorage.getItem('currentSessionId') || Date.now().toString();
 
         function setStopMode(active) {{
             if (active) {{
@@ -3362,7 +3391,7 @@ def get_chat_ui():
                 const resp = await fetch('api/chat/stream', {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
-                    body: JSON.stringify({{ message: text }})
+                    body: JSON.stringify({{ message: text, session_id: currentSessionId }})
                 }});
                 removeThinking();
                 if (resp.headers.get('content-type')?.includes('text/event-stream')) {{
@@ -3382,6 +3411,7 @@ def get_chat_ui():
             setStopMode(false);
             sendBtn.disabled = false;
             currentReader = null;
+            loadChatList();  // Update chat list after message sent
             input.focus();
         }}
 
@@ -3454,34 +3484,72 @@ def get_chat_ui():
             }}
         }}
 
-        async function loadHistory() {{
+        async function loadChatList() {{
             try {{
-                const resp = await fetch('api/conversations/default/messages');
+                const resp = await fetch('api/conversations');
                 const data = await resp.json();
+                chatList.innerHTML = '';
+                if (data.conversations && data.conversations.length > 0) {{
+                    data.conversations.forEach(conv => {{
+                        const item = document.createElement('div');
+                        item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
+                        item.innerHTML = `
+                            <div class="chat-item-title">${{conv.title}}</div>
+                            <div class="chat-item-info">${{conv.message_count}} messaggi</div>
+                        `;
+                        item.onclick = () => loadConversation(conv.id);
+                        chatList.appendChild(item);
+                    }});
+                }} else {{
+                    chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">Nessuna conversazione</div>';
+                }}
+            }} catch(e) {{ console.error('Error loading chat list:', e); }}
+        }}
+
+        async function loadConversation(sessionId) {{
+            currentSessionId = sessionId;
+            localStorage.setItem('currentSessionId', sessionId);
+            try {{
+                const resp = await fetch(`api/conversations/${{sessionId}}`);
+                const data = await resp.json();
+                chat.innerHTML = '';
                 if (data.messages && data.messages.length > 0) {{
                     suggestionsEl.style.display = 'none';
                     data.messages.forEach(m => {{
-                        addMessage(m.content, m.role);
+                        if (m.role === 'user' || m.role === 'assistant') {{
+                            addMessage(m.content, m.role);
+                        }}
                     }});
+                }} else {{
+                    chat.innerHTML = `<div class="message system">
+                        \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
+                        Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
+                        Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
+                    </div>`;
+                    suggestionsEl.style.display = 'flex';
                 }}
-            }} catch(e) {{ console.log('No history:', e); }}
+                loadChatList();  // Refresh list to update active state
+            }} catch(e) {{ console.error('Error loading conversation:', e); }}
+        }}
+
+        async function loadHistory() {{
+            await loadConversation(currentSessionId);
         }}
 
         async function newChat() {{
-            if (!confirm('Iniziare una nuova conversazione? La cronologia verrà cancellata.')) return;
-            try {{
-                await fetch('api/conversations/default', {{ method: 'DELETE' }});
-            }} catch(e) {{}}
-            // Clear UI
+            currentSessionId = Date.now().toString();
+            localStorage.setItem('currentSessionId', currentSessionId);
             chat.innerHTML = `<div class="message system">
                 \U0001f44b Ciao! Sono il tuo assistente AI per Home Assistant.<br>
                 Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong><br>
                 Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.
             </div>`;
             suggestionsEl.style.display = 'flex';
+            loadChatList();
         }}
 
         // Load history on page load
+        loadChatList();
         loadHistory();
         input.focus();
     </script>
@@ -3588,6 +3656,40 @@ def api_conversation_messages(session_id):
         if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
             display_msgs.append({"role": m["role"], "content": m["content"]})
     return jsonify({"session_id": session_id, "messages": display_msgs}), 200
+
+
+@app.route('/api/conversations', methods=['GET'])
+def api_conversations_list():
+    """List all conversation sessions with metadata."""
+    result = []
+    for sid, msgs in conversations.items():
+        if not msgs:
+            continue
+        # Extract first user message as title
+        title = "Nuova conversazione"
+        for msg in msgs:
+            if msg.get("role") == "user":
+                content = msg.get("content", "")
+                if isinstance(content, str):
+                    title = content[:50] + ("..." if len(content) > 50 else "")
+                    break
+        result.append({
+            "id": sid,
+            "title": title,
+            "message_count": len(msgs),
+            "last_updated": msgs[-1].get("timestamp", sid) if msgs else sid
+        })
+    # Sort by ID (timestamp) descending
+    result.sort(key=lambda x: x["id"], reverse=True)
+    return jsonify({"conversations": result[:10]}), 200  # Return last 10
+
+
+@app.route('/api/conversations/<session_id>', methods=['GET'])
+def api_conversation_get(session_id):
+    """Get a specific conversation session."""
+    if session_id in conversations:
+        return jsonify({"session_id": session_id, "messages": conversations[session_id]}), 200
+    return jsonify({"error": "Conversation not found"}), 404
 
 
 @app.route('/api/conversations/<session_id>', methods=['DELETE'])

@@ -38,6 +38,8 @@ export ENABLE_FILE_ACCESS
 export SUPERVISOR_TOKEN
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
+bashio::log.info "ENABLE_FILE_ACCESS: ${ENABLE_FILE_ACCESS}"
+bashio::log.info "DEBUG_MODE: ${DEBUG_MODE}"
 bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && echo 'yes' || echo 'NO - HA API will fail!')"
 bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
 
