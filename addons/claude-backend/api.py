@@ -4042,7 +4042,8 @@ def get_chat_ui():
 
         function copyCode(button) {{
             const codeBlock = button.nextElementSibling;
-            const code = codeBlock.textContent;
+            const codeElement = codeBlock.querySelector('code');
+            const code = codeElement ? (codeElement.innerText || codeElement.textContent) : codeBlock.textContent;
 
             const showSuccess = () => {{
                 const originalText = button.textContent;
