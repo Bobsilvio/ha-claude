@@ -1,7 +1,7 @@
 configuration:
   ai_provider:
     name: Proveedor de IA
-    description: "Selecciona tu proveedor de IA. 🆓 GRATIS: NVIDIA, GitHub Models | 💰 DE PAGO: Anthropic, OpenAI, Google"
+    description: "Selecciona tu proveedor de IA. 🆓 GRATIS: NVIDIA, GitHub Models | 💳 DE PAGO: Anthropic, OpenAI, Google"
   ai_model:
     name: Modelo de IA
     description: "Selecciona el modelo de IA (🆓 = gratis con límites). Según proveedor: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=Kimi K2.5🆓, GitHub=40+ modelos🆓"

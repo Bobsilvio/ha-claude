@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.18"
+VERSION = "3.0.19"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -244,14 +244,14 @@ PROVIDER_DEFAULTS = {
     "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
     "github": {"model": "gpt-4o", "name": "GitHub Models"},
-    "nvidia": {"model": "kimi-k2.5", "name": "NVIDIA NIM"},
+    "nvidia": {"model": "moonshotai/kimi-k2.5", "name": "NVIDIA NIM"},
 }
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
-    "nvidia": ["kimi-k2.5"],
+    "nvidia": ["moonshotai/kimi-k2.5"],
     "github": [
         # OpenAI
         "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
@@ -289,8 +289,8 @@ MODEL_NAME_MAPPING = {
     "Google: Gemini 2.0 Flash": "gemini-2.0-flash",
     "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
     "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
-    "NVIDIA: Kimi K2.5": "kimi-k2.5",
-    "NVIDIA: Kimi K2.5 🆓": "kimi-k2.5",
+    "NVIDIA: Kimi K2.5": "moonshotai/kimi-k2.5",
+    "NVIDIA: Kimi K2.5 🆓": "moonshotai/kimi-k2.5",
     "GitHub: GPT-4o": "gpt-4o",
     "GitHub: GPT-4o 🆓": "gpt-4o",
     "GitHub: GPT-4o-mini": "gpt-4o-mini",
@@ -402,7 +402,7 @@ def get_model_provider(model_name: str) -> str:
         return "openai"
     elif tech_name.startswith("gemini-"):
         return "google"
-    elif tech_name.startswith("kimi-"):
+    elif tech_name.startswith("moonshotai/"):
         return "nvidia"
     return "unknown"
 
