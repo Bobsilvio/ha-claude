@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.19"
+VERSION = "2.9.20"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -120,7 +120,7 @@ Always create visually appealing layouts using grids and stacks:
 
 ...existing code...
     """
-    return get_config_structure_section() + base_prompt
+    return get_config_structure_section() + get_config_includes_text() + base_prompt
 
 
 # ---- Provider defaults ----
@@ -272,6 +272,81 @@ except Exception as e:
 
 def get_config_structure_section():
     return f"\nCurrent Home Assistant config structure (scanned at startup):\n\n{CONFIG_STRUCTURE_TEXT}\n"
+
+# --- Configuration.yaml includes mapping ---
+CONFIG_INCLUDES = {}
+
+def parse_configuration_includes():
+    """Parse configuration.yaml and extract all !include directives."""
+    includes = {}
+    config_file = "/homeassistant/configuration.yaml"
+
+    if not os.path.isfile(config_file):
+        logger.warning("configuration.yaml not found")
+        return includes
+
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        for line in lines:
+            # Skip comments and empty lines
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+
+            # Look for patterns like "automation: !include automations.yaml"
+            if '!include' in line:
+                parts = line.split(':', 1)
+                if len(parts) == 2:
+                    key = parts[0].strip()
+                    include_part = parts[1].strip()
+
+                    # Extract the file path after !include
+                    if include_part.startswith('!include'):
+                        filepath = include_part.replace('!include', '').strip()
+                        # Remove quotes if present
+                        filepath = filepath.strip('"\'')
+                        includes[key] = filepath
+
+        logger.info(f"Parsed configuration.yaml includes: {includes}")
+        return includes
+    except Exception as e:
+        logger.error(f"Error parsing configuration.yaml: {e}")
+        return includes
+
+# Parse at startup
+CONFIG_INCLUDES = parse_configuration_includes()
+if CONFIG_INCLUDES:
+    logger.info(f"Configuration includes loaded: {len(CONFIG_INCLUDES)} files mapped")
+    for key, path in CONFIG_INCLUDES.items():
+        logger.info(f"  - {key}: {path}")
+else:
+    logger.warning("No includes found in configuration.yaml - using defaults")
+
+def get_config_file_path(key: str, default_filename: str) -> str:
+    """Get the full path for a config file using the includes mapping."""
+    if key in CONFIG_INCLUDES:
+        filepath = CONFIG_INCLUDES[key]
+        # Handle relative paths
+        if not filepath.startswith('/'):
+            filepath = os.path.join(HA_CONFIG_DIR, filepath)
+        return filepath
+    # Fallback to default
+    return os.path.join(HA_CONFIG_DIR, default_filename)
+
+def get_config_includes_text():
+    """Generate a formatted text of configuration includes for the AI."""
+    if not CONFIG_INCLUDES:
+        return ""
+
+    lines = ["## Configuration Files Mapping (from configuration.yaml):"]
+    for key, filepath in CONFIG_INCLUDES.items():
+        lines.append(f"- **{key}**: {filepath}")
+
+    lines.append("\nIMPORTANT: When working with automations, scripts, scenes, etc., use the file paths above.")
+    lines.append("Do NOT search for these files - they are pre-mapped for you.")
+    return "\n".join(lines) + "\n"
 
 # User-friendly tool descriptions (Italian)
 TOOL_DESCRIPTIONS = {
@@ -1033,7 +1108,7 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             new_yaml = ""
             
             # --- ATTEMPT 1: YAML file ---
-            yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
+            yaml_path = get_config_file_path("automation", "automations.yaml")
             if os.path.isfile(yaml_path):
                 try:
                     with open(yaml_path, "r", encoding="utf-8") as f:
@@ -1221,7 +1296,7 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             # Remove 'script.' prefix if present
             script_id = script_id.replace("script.", "") if script_id.startswith("script.") else script_id
 
-            yaml_path = os.path.join(HA_CONFIG_DIR, "scripts.yaml")
+            yaml_path = get_config_file_path("script", "scripts.yaml")
             if not os.path.isfile(yaml_path):
                 return json.dumps({"error": "scripts.yaml not found."})
 
@@ -2009,8 +2084,8 @@ HA_TOOLS_COMPACT = [
 def get_system_prompt() -> str:
     """Get system prompt appropriate for current provider."""
     if AI_PROVIDER == "github":
-        return get_config_structure_section() + SYSTEM_PROMPT_COMPACT
-    return get_config_structure_section() + base_prompt
+        return get_config_structure_section() + get_config_includes_text() + SYSTEM_PROMPT_COMPACT
+    return get_config_structure_section() + get_config_includes_text() + base_prompt
 
 
 def get_openai_tools_for_provider():
@@ -2877,7 +2952,7 @@ def build_smart_context(user_message: str) -> str:
 
             # If user mentions a specific automation name, include its config
             # Try YAML first, then REST API for UI-created automations
-            yaml_path = os.path.join(HA_CONFIG_DIR, "automations.yaml")
+            yaml_path = get_config_file_path("automation", "automations.yaml")
             found_in_yaml = False
             found_specific = False
             target_auto_id = None
@@ -2991,7 +3066,7 @@ def build_smart_context(user_message: str) -> str:
                 context_parts.append(f"## SCRIPT DISPONIBILI\n{json.dumps(script_entities, ensure_ascii=False, indent=1)}")
 
             # If user mentions a specific script name, include its YAML
-            yaml_path = os.path.join(HA_CONFIG_DIR, "scripts.yaml")
+            yaml_path = get_config_file_path("script", "scripts.yaml")
             if os.path.isfile(yaml_path):
                 try:
                     with open(yaml_path, "r", encoding="utf-8") as f:
