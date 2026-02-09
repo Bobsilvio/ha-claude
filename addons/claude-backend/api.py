@@ -2136,6 +2136,12 @@ When users ask about specific devices, use search_entities. Use get_history for 
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
 Respond in the user's language. Be concise."""
 
+SYSTEM_PROMPT_COMPACT_WITH_FILES = """You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.
+Use list_config_files to explore folders (e.g., 'lovelace', 'yaml'). Use read_config_file to read YAML/JSON files.
+Use get_automations, get_scripts, get_dashboards to list existing configs.
+When users ask about files/folders, use list_config_files first to show what's available.
+Respond in the user's language. Be concise."""
+
 # Compact tool definitions for low-token providers
 HA_TOOLS_COMPACT = [
     {
@@ -2182,22 +2188,63 @@ HA_TOOLS_COMPACT = [
     }
 ]
 
+# Extended tool set for GitHub with file access enabled
+# Balance between COMPACT (6 tools) and FULL (40 tools) to stay under 8k token limit
+HA_TOOLS_EXTENDED = HA_TOOLS_COMPACT + [
+    {
+        "name": "list_config_files",
+        "description": "List files and directories in Home Assistant config folder. Use empty path for root, or 'lovelace', 'yaml', etc.",
+        "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": []}
+    },
+    {
+        "name": "read_config_file",
+        "description": "Read content of a config file (YAML, JSON, etc). Returns file content as text.",
+        "parameters": {"type": "object", "properties": {"filename": {"type": "string"}}, "required": ["filename"]}
+    },
+    {
+        "name": "get_automations",
+        "description": "Get list of all automations with id, alias, state, and full config.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "get_scripts",
+        "description": "Get list of all scripts with id, name, and full config.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "get_dashboards",
+        "description": "Get list of all Lovelace dashboards.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "get_areas",
+        "description": "Get list of areas/rooms in Home Assistant.",
+        "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+]
+
 
 def get_system_prompt() -> str:
     """Get system prompt appropriate for current provider."""
     if AI_PROVIDER == "github":
-        return get_config_structure_section() + get_config_includes_text() + SYSTEM_PROMPT_COMPACT
+        # GitHub has 8k token limit - use minimal prompt with only includes mapping
+        compact_prompt = SYSTEM_PROMPT_COMPACT_WITH_FILES if ENABLE_FILE_ACCESS else SYSTEM_PROMPT_COMPACT
+        # Only include file mapping if file access is enabled, skip verbose config structure
+        if ENABLE_FILE_ACCESS and CONFIG_INCLUDES:
+            includes_compact = "Config files: " + ", ".join([f"{k}={v}" for k, v in list(CONFIG_INCLUDES.items())[:5]]) + "\n"
+            return includes_compact + compact_prompt
+        return compact_prompt
     return get_config_structure_section() + get_config_includes_text() + base_prompt
 
 
 def get_openai_tools_for_provider():
     """Get OpenAI-format tools appropriate for current provider."""
-    # If file access is explicitly enabled, always provide full tools (even for GitHub)
-    # Otherwise use compact tools for GitHub to save tokens
-    if AI_PROVIDER == "github" and not ENABLE_FILE_ACCESS:
+    if AI_PROVIDER == "github":
+        # GitHub Models has 8k token limit - use extended set if file access enabled, otherwise compact
+        tool_set = HA_TOOLS_EXTENDED if ENABLE_FILE_ACCESS else HA_TOOLS_COMPACT
         return [
             {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
-            for t in HA_TOOLS_COMPACT
+            for t in tool_set
         ]
     return get_openai_tools()
 
