@@ -1,10 +1,10 @@
 configuration:
   ai_provider:
     name: Provider AI
-    description: Seleziona il provider AI (Anthropic Claude, OpenAI, Google Gemini o GitHub Models)
+    description: Seleziona il provider AI (Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM o GitHub Models)
   ai_model:
     name: Modello AI
-    description: "Seleziona il modello AI (in base al provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, GitHub=40+ modelli)"
+    description: "Seleziona il modello AI (in base al provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=Kimi K2.5, GitHub=40+ modelli)"
   anthropic_api_key:
     name: Chiave API Anthropic
     description: Chiave API da console.anthropic.com (salva anche se non in uso, per switch rapido)
@@ -14,6 +14,9 @@ configuration:
   google_api_key:
     name: Chiave API Google
     description: Chiave API da aistudio.google.com (salva anche se non in uso, per switch rapido)
+  nvidia_api_key:
+    name: Chiave API NVIDIA
+    description: Chiave API da build.nvidia.com (gratuita - salva anche se non in uso, per switch rapido)
   github_token:
     name: Token GitHub
     description: Personal Access Token da github.com/settings/tokens (salva anche se non in uso, per switch rapido)

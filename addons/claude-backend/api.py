@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.13"
+VERSION = "3.0.16"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -30,6 +30,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
@@ -243,12 +244,14 @@ PROVIDER_DEFAULTS = {
     "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
     "github": {"model": "gpt-4o", "name": "GitHub Models"},
+    "nvidia": {"model": "kimi-k2.5", "name": "NVIDIA NIM"},
 }
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
+    "nvidia": ["kimi-k2.5"],
     "github": [
         # OpenAI
         "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
@@ -273,11 +276,121 @@ PROVIDER_MODELS = {
     ],
 }
 
+# Mapping user-friendly names (with prefixes) to technical model names
+MODEL_NAME_MAPPING = {
+    "Claude: Sonnet 4": "claude-sonnet-4-20250514",
+    "Claude: Opus 4": "claude-opus-4-20250514",
+    "Claude: Haiku 4": "claude-haiku-4-20250514",
+    "OpenAI: GPT-4o": "gpt-4o",
+    "OpenAI: GPT-4o-mini": "gpt-4o-mini",
+    "OpenAI: GPT-4-turbo": "gpt-4-turbo",
+    "OpenAI: o1": "o1",
+    "OpenAI: o3-mini": "o3-mini",
+    "Google: Gemini 2.0 Flash": "gemini-2.0-flash",
+    "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
+    "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
+    "NVIDIA: Kimi K2.5": "kimi-k2.5",
+    "GitHub: GPT-4o": "gpt-4o",
+    "GitHub: GPT-4o-mini": "gpt-4o-mini",
+    "GitHub: GPT-4.1": "gpt-4.1",
+    "GitHub: GPT-4.1-mini": "gpt-4.1-mini",
+    "GitHub: GPT-4.1-nano": "gpt-4.1-nano",
+    "GitHub: o1": "o1",
+    "GitHub: o1-mini": "o1-mini",
+    "GitHub: o1-preview": "o1-preview",
+    "GitHub: o3": "o3",
+    "GitHub: o3-mini": "o3-mini",
+    "GitHub: o4-mini": "o4-mini",
+    "GitHub: GPT-5": "gpt-5",
+    "GitHub: GPT-5-mini": "gpt-5-mini",
+    "GitHub: GPT-5-nano": "gpt-5-nano",
+    "GitHub: GPT-5-chat": "gpt-5-chat",
+    "GitHub: Llama 3.1 405B": "Meta-Llama-3.1-405B-Instruct",
+    "GitHub: Llama 3.1 8B": "Meta-Llama-3.1-8B-Instruct",
+    "GitHub: Llama 3.3 70B": "Llama-3.3-70B-Instruct",
+    "GitHub: Llama 4 Scout": "Llama-4-Scout-17B-16E-Instruct",
+    "GitHub: Llama 4 Maverick": "Llama-4-Maverick-17B-128E-Instruct-FP8",
+    "GitHub: Mistral Small 2503": "mistral-small-2503",
+    "GitHub: Mistral Medium 2505": "mistral-medium-2505",
+    "GitHub: Ministral 3B": "Ministral-3B",
+    "GitHub: Codestral 2501": "Codestral-2501",
+    "GitHub: Cohere Command R+": "Cohere-command-r-plus-08-2024",
+    "GitHub: Cohere Command R": "Cohere-command-r-08-2024",
+    "GitHub: Cohere Command A": "cohere-command-a",
+    "GitHub: DeepSeek R1": "DeepSeek-R1",
+    "GitHub: DeepSeek R1 0528": "DeepSeek-R1-0528",
+    "GitHub: DeepSeek V3": "DeepSeek-V3-0324",
+    "GitHub: MAI-DS-R1": "MAI-DS-R1",
+    "GitHub: Phi-4": "Phi-4",
+    "GitHub: Phi-4 Mini": "Phi-4-mini-instruct",
+    "GitHub: Phi-4 Reasoning": "Phi-4-reasoning",
+    "GitHub: Phi-4 Mini Reasoning": "Phi-4-mini-reasoning",
+    "GitHub: Jamba 1.5 Large": "AI21-Jamba-1.5-Large",
+    "GitHub: Grok-3": "grok-3",
+    "GitHub: Grok-3 Mini": "grok-3-mini",
+}
+
+# Reverse mapping for display
+MODEL_DISPLAY_MAPPING = {v: k for k, v in MODEL_NAME_MAPPING.items()}
+
+
+def normalize_model_name(model_name: str) -> str:
+    """Convert user-friendly model name to technical name."""
+    return MODEL_NAME_MAPPING.get(model_name, model_name)
+
+
+def get_model_provider(model_name: str) -> str:
+    """Get the provider prefix from a model name."""
+    if model_name.startswith("Claude:"):
+        return "anthropic"
+    elif model_name.startswith("OpenAI:"):
+        return "openai"
+    elif model_name.startswith("Google:"):
+        return "google"
+    elif model_name.startswith("NVIDIA:"):
+        return "nvidia"
+    elif model_name.startswith("GitHub:"):
+        return "github"
+    # Try to infer from technical name
+    tech_name = normalize_model_name(model_name)
+    if tech_name.startswith("claude-"):
+        return "anthropic"
+    elif tech_name in ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"]:
+        return "openai"
+    elif tech_name.startswith("gemini-"):
+        return "google"
+    elif tech_name.startswith("kimi-"):
+        return "nvidia"
+    return "unknown"
+
+
+def validate_model_provider_compatibility() -> tuple[bool, str]:
+    """Validate that the selected model is compatible with the selected provider."""
+    if not AI_MODEL:
+        return True, ""  # No model selected, use default
+
+    model_provider = get_model_provider(AI_MODEL)
+    if model_provider == "unknown":
+        return True, ""  # Can't determine, allow it
+
+    if model_provider != AI_PROVIDER:
+        # Multilingual warning messages
+        warnings = {
+            "en": f"⚠️ WARNING: You selected model '{AI_MODEL}' which is not compatible with provider '{AI_PROVIDER}'. Change provider or model.",
+            "it": f"⚠️ ATTENZIONE: Hai selezionato un modello '{AI_MODEL}' che non è compatibile con il provider '{AI_PROVIDER}'. Cambia provider o modello.",
+            "es": f"⚠️ ADVERTENCIA: Has seleccionado el modelo '{AI_MODEL}' que no es compatible con el proveedor '{AI_PROVIDER}'. Cambia proveedor o modelo.",
+            "fr": f"⚠️ ATTENTION: Vous avez sélectionné le modèle '{AI_MODEL}' qui n'est pas compatible avec le fournisseur '{AI_PROVIDER}'. Changez de fournisseur ou de modèle."
+        }
+        error_msg = warnings.get(LANGUAGE, warnings["en"])
+        return False, error_msg
+
+    return True, ""
+
 
 def get_active_model() -> str:
-    """Get the active model name."""
+    """Get the active model name (technical format)."""
     if AI_MODEL:
-        return AI_MODEL
+        return normalize_model_name(AI_MODEL)
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
 
 
@@ -289,6 +402,8 @@ def get_api_key() -> str:
         return OPENAI_API_KEY
     elif AI_PROVIDER == "google":
         return GOOGLE_API_KEY
+    elif AI_PROVIDER == "nvidia":
+        return NVIDIA_API_KEY
     elif AI_PROVIDER == "github":
         return GITHUB_TOKEN
     return ""
@@ -326,6 +441,13 @@ elif AI_PROVIDER == "google" and api_key:
     genai.configure(api_key=api_key)
     ai_client = genai
     logger.info(f"Google Gemini client initialized (model: {get_active_model()})")
+elif AI_PROVIDER == "nvidia" and api_key:
+    from openai import OpenAI
+    ai_client = OpenAI(
+        api_key=api_key,
+        base_url="https://integrate.api.nvidia.com/v1"
+    )
+    logger.info(f"NVIDIA NIM client initialized (model: {get_active_model()})")
 elif AI_PROVIDER == "github" and api_key:
     from openai import OpenAI
     ai_client = OpenAI(
@@ -2798,11 +2920,11 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
 
 
 def chat_openai(messages: List[Dict]) -> tuple:
-    """Chat with OpenAI. Returns (response_text, updated_messages)."""
+    """Chat with OpenAI/NVIDIA/GitHub. Returns (response_text, updated_messages)."""
     trimmed = trim_messages(messages)
     system_prompt = get_system_prompt()
     tools = get_openai_tools_for_provider()
-    max_tok = 4000 if AI_PROVIDER == "github" else 4096
+    max_tok = 4000 if AI_PROVIDER in ["github", "nvidia"] else 4096
 
     oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
 
@@ -2825,8 +2947,8 @@ def chat_openai(messages: List[Dict]) -> tuple:
             logger.info(f"Tool: {tc.function.name}")
             args = json.loads(tc.function.arguments)
             result = execute_tool(tc.function.name, args)
-            # Truncate tool results for GitHub to stay within token limits
-            if AI_PROVIDER == "github" and len(result) > 3000:
+            # Truncate tool results for GitHub/NVIDIA to stay within token limits
+            if AI_PROVIDER in ["github", "nvidia"] and len(result) > 3000:
                 result = result[:3000] + '... (truncated)'
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
@@ -2965,10 +3087,12 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
             final_text, messages = chat_openai(messages)
         elif AI_PROVIDER == "google":
             final_text, messages = chat_google(messages)
+        elif AI_PROVIDER == "nvidia":
+            final_text, messages = chat_openai(messages)  # Same format, different base_url
         elif AI_PROVIDER == "github":
             final_text, messages = chat_openai(messages)  # Same format, different base_url
         else:
-            return f"\u274c Provider '{AI_PROVIDER}' non supportato. Scegli: anthropic, openai, google, github."
+            return f"\u274c Provider '{AI_PROVIDER}' non supportato. Scegli: anthropic, openai, google, nvidia, github."
 
         conversations[session_id] = messages
         conversations[session_id].append({"role": "assistant", "content": final_text})
@@ -4334,8 +4458,13 @@ def get_chat_ui():
                     body: JSON.stringify({{model: model}})
                 }});
                 if (response.ok) {{
+                    const data = await response.json();
                     console.log('Model changed to:', model);
-                    // Optionally show a notification
+
+                    // Show warning if provider/model mismatch
+                    if (data.status === 'warning' && data.warning) {{
+                        alert(data.warning);
+                    }}
                 }}
             }} catch (error) {{
                 console.error('Error changing model:', error);
@@ -4504,19 +4633,43 @@ def api_set_model():
     data = request.get_json()
     new_model = data.get("model", "")
     if new_model:
-        AI_MODEL = new_model
-        logger.info(f"Model changed to: {new_model}")
-        return jsonify({"status": "ok", "model": get_active_model()}), 200
+        # Normalize from prefixed name to technical name if needed
+        technical_model = normalize_model_name(new_model)
+        AI_MODEL = technical_model
+        logger.info(f"Model changed to: {technical_model} (from UI: {new_model})")
+
+        # Validate compatibility after change
+        is_valid, error_msg = validate_model_provider_compatibility()
+        if not is_valid:
+            logger.warning(error_msg)
+            return jsonify({
+                "status": "warning",
+                "model": MODEL_DISPLAY_MAPPING.get(technical_model, technical_model),
+                "warning": error_msg
+            }), 200
+
+        return jsonify({"status": "ok", "model": MODEL_DISPLAY_MAPPING.get(technical_model, technical_model)}), 200
     return jsonify({"status": "error", "message": "No model specified"}), 400
 
 
 @app.route('/api/get_models', methods=['GET'])
 def api_get_models():
-    """Get available models for all providers."""
+    """Get available models for all providers with prefixed names."""
+    # Convert technical names to prefixed display names
+    prefixed_models = {}
+    for provider, models in PROVIDER_MODELS.items():
+        prefixed_models[provider] = [
+            MODEL_DISPLAY_MAPPING.get(model, model) for model in models
+        ]
+
+    # Get current model in display format
+    current_model_tech = get_active_model()
+    current_model_display = MODEL_DISPLAY_MAPPING.get(current_model_tech, current_model_tech)
+
     return jsonify({
         "current_provider": AI_PROVIDER,
-        "current_model": get_active_model(),
-        "models": PROVIDER_MODELS
+        "current_model": current_model_display,
+        "models": prefixed_models
     }), 200
 
 
@@ -4609,4 +4762,10 @@ if __name__ == "__main__":
     logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
     # get_ha_token() è già definita sopra, quindi qui è sicuro
     logger.info(f"HA Token: {'available' if get_ha_token() else 'NOT available'}")
+
+    # Validate provider/model compatibility
+    is_valid, error_msg = validate_model_provider_compatibility()
+    if not is_valid:
+        logger.warning(error_msg)
+
     app.run(host="0.0.0.0", port=API_PORT, debug=DEBUG_MODE)

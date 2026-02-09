@@ -20,7 +20,7 @@ Don't forget to follow me on social media:
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
-Supports **4 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google Gemini, and GitHub Models (GPT, Llama, Mistral, DeepSeek, Grok, Phi, Cohere and more).
+Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM (free Kimi K2.5), and GitHub Models (GPT, Llama, Mistral, DeepSeek, Grok, Phi, Cohere and more).
 
 [![GitHub Release](https://img.shields.io/github/v/release/Bobsilvio/ha-claude)](https://github.com/Bobsilvio/ha-claude/releases)
 [![License](https://img.shields.io/github/license/Bobsilvio/ha-claude)](LICENSE)
