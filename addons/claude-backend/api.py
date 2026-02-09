@@ -165,7 +165,7 @@ Always create visually appealing layouts using grids and stacks:
 **Use vertical-stack to group related cards:**
 {"type": "vertical-stack", "cards": [headerCard, contentCard]}
 
-...existing code...
+
     """
     return get_config_structure_section() + get_config_includes_text() + base_prompt
 
@@ -2757,7 +2757,7 @@ Always create visually appealing layouts using grids and stacks:
 **Use vertical-stack to group related cards:**
 {"type": "vertical-stack", "cards": [headerCard, contentCard]}
 
-...existing code...
+
     """
 
     if AI_PROVIDER == "github":
@@ -5060,7 +5060,7 @@ def api_conversation_delete(session_id):
     return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
 
 
-...existing code...
+
 
 
 @app.route('/api/get_models', methods=['GET'])
