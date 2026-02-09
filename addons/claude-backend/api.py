@@ -2192,7 +2192,9 @@ def get_system_prompt() -> str:
 
 def get_openai_tools_for_provider():
     """Get OpenAI-format tools appropriate for current provider."""
-    if AI_PROVIDER == "github":
+    # If file access is explicitly enabled, always provide full tools (even for GitHub)
+    # Otherwise use compact tools for GitHub to save tokens
+    if AI_PROVIDER == "github" and not ENABLE_FILE_ACCESS:
         return [
             {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
             for t in HA_TOOLS_COMPACT
@@ -3703,6 +3705,12 @@ def get_chat_ui():
             localStorage.setItem('currentSessionId', sessionId);
             try {{
                 const resp = await fetch(`api/conversations/${{sessionId}}`);
+                if (resp.status === 404) {{
+                    // Session not found (e.g., after addon rebuild) - create new session
+                    console.log('Session not found, creating new session');
+                    newChat();
+                    return;
+                }}
                 const data = await resp.json();
                 chat.innerHTML = '';
                 if (data.messages && data.messages.length > 0) {{
