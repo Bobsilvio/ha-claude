@@ -38,10 +38,10 @@ API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 
-logger.info(f"ENABLE_FILE_ACCESS: {ENABLE_FILE_ACCESS}")
-
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
 logger = logging.getLogger(__name__)
+
+logger.info(f"ENABLE_FILE_ACCESS: {ENABLE_FILE_ACCESS}")
 
 def get_ha_token() -> str:
     """Get Home Assistant Supervisor token with multiple fallbacks."""
