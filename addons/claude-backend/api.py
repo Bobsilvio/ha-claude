@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.6"
+VERSION = "3.0.7"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -523,13 +523,38 @@ def load_conversations():
 
 
 def save_conversations():
-    """Save conversations to persistent storage."""
+    """Save conversations to persistent storage (without image data to save space)."""
     try:
         os.makedirs(os.path.dirname(CONVERSATIONS_FILE), exist_ok=True)
         # Keep only last 10 sessions, 50 messages each
         trimmed = {}
         for sid, msgs in list(conversations.items())[-10:]:
-            trimmed[sid] = msgs[-50:]
+            # Strip image data from messages to reduce file size
+            cleaned_msgs = []
+            for msg in msgs[-50:]:
+                cleaned_msg = {"role": msg.get("role", "")}
+                content = msg.get("content", "")
+
+                # If content is an array (with images), extract only text
+                if isinstance(content, list):
+                    text_parts = []
+                    for block in content:
+                        if isinstance(block, dict) and block.get("type") == "text":
+                            text_parts.append(block.get("text", ""))
+                        elif isinstance(block, str):
+                            text_parts.append(block)
+                    cleaned_msg["content"] = "\n".join(text_parts) if text_parts else "[Image message]"
+                else:
+                    cleaned_msg["content"] = content
+
+                # Preserve tool_calls and other metadata
+                if "tool_calls" in msg:
+                    cleaned_msg["tool_calls"] = msg["tool_calls"]
+
+                cleaned_msgs.append(cleaned_msg)
+
+            trimmed[sid] = cleaned_msgs
+
         with open(CONVERSATIONS_FILE, "w") as f:
             json.dump(trimmed, f, ensure_ascii=False, default=str)
     except Exception as e:
