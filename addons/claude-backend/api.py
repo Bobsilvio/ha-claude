@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "2.9.16"
+VERSION = "2.9.17"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -37,6 +37,7 @@ if AI_MODEL in ("null", "None", ""):
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
+SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
 logger = logging.getLogger(__name__)
@@ -142,6 +143,20 @@ def get_api_key() -> str:
     elif AI_PROVIDER == "github":
         return GITHUB_TOKEN
     return ""
+
+
+def get_ha_token() -> str:
+    """Get the Home Assistant supervisor token."""
+    return SUPERVISOR_TOKEN
+
+
+def get_ha_headers() -> dict:
+    """Get headers for Home Assistant API calls."""
+    token = get_ha_token()
+    return {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
 
 
 # ---- Initialize AI client ----
