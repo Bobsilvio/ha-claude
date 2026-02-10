@@ -75,15 +75,15 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
     # Use focused tools/prompt if intent detected, else full
     if intent_info and intent_info.get("tools") is not None:
         system_prompt = intent.get_prompt_for_intent(intent_info)
-        tools = intent.get_tools_for_intent(intent_info, api.AI_PROVIDER)
-        logger.info(f"NVIDIA focused mode: {intent_info['intent']} ({len(tools)} tools)")
+        tool_defs = intent.get_tools_for_intent(intent_info, api.AI_PROVIDER)
+        logger.info(f"NVIDIA focused mode: {intent_info['intent']} ({len(tool_defs)} tools)")
     else:
         system_prompt = tools.get_system_prompt()
-        tools = tools.get_openai_tools_for_provider()
+        tool_defs = tools.get_openai_tools_for_provider()
 
     # Log available tools
-    tool_names = [t.get("function", {}).get("name", "unknown") for t in tools]
-    logger.info(f"NVIDIA tools available ({len(tools)}): {', '.join(tool_names)}")
+    tool_names = [t.get("function", {}).get("name", "unknown") for t in tool_defs]
+    logger.info(f"NVIDIA tools available ({len(tool_defs)}): {', '.join(tool_names)}")
 
     full_text = ""
     max_rounds = (intent_info or {}).get("max_rounds") or 5
@@ -109,8 +109,8 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             "chat_template_kwargs": {"thinking": api.NVIDIA_THINKING_MODE}
         }
         # Only include tools if we have some
-        if tools:
-            payload["tools"] = tools
+        if tool_defs:
+            payload["tools"] = tool_defs
 
         logger.info(f"NVIDIA: Calling API with model={payload['model']}, thinking={api.NVIDIA_THINKING_MODE}, stream=True")
 
@@ -246,15 +246,15 @@ def stream_chat_openai(messages, intent_info=None):
     # Use focused tools/prompt if intent detected, else full
     if intent_info and intent_info.get("tools") is not None:
         system_prompt = intent.get_prompt_for_intent(intent_info)
-        tools = intent.get_tools_for_intent(intent_info, api.AI_PROVIDER)
-        logger.info(f"OpenAI focused mode: {intent_info['intent']} ({len(tools)} tools)")
+        tool_defs = intent.get_tools_for_intent(intent_info, api.AI_PROVIDER)
+        logger.info(f"OpenAI focused mode: {intent_info['intent']} ({len(tool_defs)} tools)")
     else:
         system_prompt = tools.get_system_prompt()
-        tools = tools.get_openai_tools_for_provider()
+        tool_defs = tools.get_openai_tools_for_provider()
 
     # Log available tools for debugging
-    tool_names = [t.get("function", {}).get("name", "unknown") for t in tools]
-    logger.info(f"OpenAI tools available ({len(tools)}): {', '.join(tool_names)}")
+    tool_names = [t.get("function", {}).get("name", "unknown") for t in tool_defs]
+    logger.info(f"OpenAI tools available ({len(tool_defs)}): {', '.join(tool_names)}")
 
     max_tok = 4000 if api.AI_PROVIDER == "github" else 4096
     full_text = ""
@@ -289,8 +289,8 @@ def stream_chat_openai(messages, intent_info=None):
             "stream": True
         }
         # Only include tools if we have some (empty list = no tools for chat intent)
-        if tools:
-            kwargs["tools"] = tools
+        if tool_defs:
+            kwargs["tools"] = tool_defs
 
         if api.AI_PROVIDER == "nvidia":
             kwargs["temperature"] = 0.7
@@ -400,7 +400,7 @@ def stream_chat_openai(messages, intent_info=None):
             # No tools - stream the final text now
             full_text = accumulated
             logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
-            logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tools)} available tools")
+            logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tool_defs)} available tools")
             # Save assistant message to conversation
             messages.append({"role": "assistant", "content": full_text})
             yield {"type": "clear"}
