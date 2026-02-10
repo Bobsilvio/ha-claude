@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.60"
+VERSION = "3.0.61"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -433,9 +433,8 @@ def get_max_tokens_param(max_tokens_value: int) -> dict:
     Returns:
         dict with either {"max_tokens": value} or {"max_completion_tokens": value}
     """
-    # GitHub Models REST API uses max_tokens (per official docs).
-    # Using max_completion_tokens can cause request validation errors.
-    if AI_PROVIDER == "github":
+    # NVIDIA's OpenAI-compatible endpoint expects max_tokens.
+    if AI_PROVIDER == "nvidia":
         return {"max_tokens": max_tokens_value}
 
     model = get_active_model().lower()
@@ -452,6 +451,33 @@ def get_max_tokens_param(max_tokens_value: int) -> dict:
         return {"max_completion_tokens": max_tokens_value}
     else:
         return {"max_tokens": max_tokens_value}
+
+
+def _retry_with_swapped_max_token_param(kwargs: dict, max_tokens_value: int, api_err: Exception):
+    """Retry once by swapping max_tokens/max_completion_tokens when API says it's unsupported.
+
+    Some providers/models (including GitHub Models) require different parameter names depending on model.
+    Returns a response object on success, or None if no retry was attempted.
+    """
+    error_msg = str(api_err)
+
+    wants_max_completion = ("use 'max_completion_tokens'" in error_msg.lower())
+    wants_max_tokens = ("use 'max_tokens'" in error_msg.lower())
+
+    if not (wants_max_completion or wants_max_tokens):
+        return None
+
+    # Swap parameters
+    if wants_max_completion:
+        kwargs.pop("max_tokens", None)
+        kwargs["max_completion_tokens"] = max_tokens_value
+        logger.warning("Retrying after unsupported_parameter: switching to max_completion_tokens")
+    elif wants_max_tokens:
+        kwargs.pop("max_completion_tokens", None)
+        kwargs["max_tokens"] = max_tokens_value
+        logger.warning("Retrying after unsupported_parameter: switching to max_tokens")
+
+    return ai_client.chat.completions.create(**kwargs)
 
 
 def _github_model_variants(model: str) -> list[str]:
@@ -3095,7 +3121,15 @@ def chat_openai(messages: List[Dict]) -> tuple:
         response = ai_client.chat.completions.create(**kwargs)
     except Exception as api_err:
         error_msg = str(api_err)
-        if AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
+        if AI_PROVIDER == "github" and (
+            "unsupported parameter" in error_msg.lower() or "unsupported_parameter" in error_msg.lower()
+        ):
+            retry = _retry_with_swapped_max_token_param(kwargs, max_tok, api_err)
+            if retry is not None:
+                response = retry
+            else:
+                raise
+        elif AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
             bad_model = kwargs.get("model")
 
             # Try alternate model formats first (e.g., 'openai/gpt-4o' -> 'gpt-4o')
@@ -3528,7 +3562,19 @@ def stream_chat_openai(messages, intent_info=None):
             response = ai_client.chat.completions.create(**kwargs)
         except Exception as api_err:
             error_msg = str(api_err)
-            if AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
+            if AI_PROVIDER == "github" and (
+                "unsupported parameter" in error_msg.lower() or "unsupported_parameter" in error_msg.lower()
+            ):
+                try:
+                    retry = _retry_with_swapped_max_token_param(kwargs, max_tok, api_err)
+                    if retry is not None:
+                        yield {"type": "status", "message": "Parametri token non compatibili col modello, riprovo."}
+                        response = retry
+                    else:
+                        raise
+                except Exception:
+                    raise
+            elif AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
                 bad_model = kwargs.get("model")
 
                 # Try alternate model formats first (e.g., 'openai/gpt-4o' -> 'gpt-4o')
