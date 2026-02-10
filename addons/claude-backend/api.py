@@ -4,6 +4,7 @@ import os
 import json
 import logging
 import queue
+import re
 import time
 import threading
 from datetime import datetime, timedelta
@@ -27,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.30"
+VERSION = "3.1.31"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -65,6 +66,58 @@ logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT 
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
 logger.info(f"LANGUAGE: {LANGUAGE}")
+
+
+def _extract_http_error_code(error_text: str) -> Optional[int]:
+    if not error_text:
+        return None
+    m = re.search(r"Error code:\s*(\d{3})", error_text)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+    return None
+
+
+def _extract_remote_message(error_text: str) -> str:
+    """Best-effort extraction of a remote 'message' field from error strings."""
+    if not error_text:
+        return ""
+    # Common shapes:
+    # - {'error': {'message': '...'}}
+    # - {"error": {"message": "..."}}
+    for pat in (
+        r"['\"]message['\"]\s*:\s*['\"]([^'\"]+)['\"]",
+    ):
+        m = re.search(pat, error_text)
+        if m:
+            return (m.group(1) or "").strip()
+    return ""
+
+
+def humanize_provider_error(err: Exception, provider: str) -> str:
+    """Turn provider exceptions into short, user-friendly UI messages."""
+    raw = str(err) if err is not None else ""
+    code = _extract_http_error_code(raw)
+    remote_msg = _extract_remote_message(raw)
+    low = (remote_msg or raw).lower()
+
+    if provider == "github" and code == 403 and ("budget limit" in low or "reached its budget" in low):
+        return (
+            "GitHub Models: limite budget raggiunto per questo account. "
+            "Aumenta il budget/credito su GitHub oppure seleziona un altro provider/modello dal menu in alto."
+        )
+
+    if code == 401:
+        return "Autenticazione fallita (401). Verifica la chiave/token del provider selezionato."
+    if code == 403:
+        return "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token."
+    if code == 429:
+        return "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider."
+
+    # Fallback: keep the remote message if present, otherwise the raw error
+    return remote_msg or raw
 
 
 def load_runtime_selection() -> bool:
@@ -1685,7 +1738,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         save_conversations()
     except Exception as e:
         logger.error(f"Stream error ({AI_PROVIDER}): {e}")
-        yield {"type": "error", "message": str(e)}
+        yield {"type": "error", "message": humanize_provider_error(e, AI_PROVIDER)}
 
 
 
