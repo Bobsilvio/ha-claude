@@ -765,6 +765,9 @@ def get_chat_ui():
             const btn = document.getElementById('testNvidiaBtn');
             if (!btn) return;
 
+            const cursorKey = 'nvidiaTestCursor';
+            const cursor = parseInt(localStorage.getItem(cursorKey) || '0', 10) || 0;
+
             const oldText = btn.textContent;
             btn.disabled = true;
             btn.textContent = '⏳ Test...';
@@ -772,14 +775,21 @@ def get_chat_ui():
                 const response = await fetch(apiUrl('api/nvidia/test_models'), {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{max_models: 20}})
+                    body: JSON.stringify({{max_models: 20, cursor: cursor}})
                 }});
                 const data = await response.json().catch(() => ({{}}));
 
                 if (response.ok && data && data.success) {{
+                    if (typeof data.next_cursor === 'number') {{
+                        localStorage.setItem(cursorKey, String(data.next_cursor));
+                    }}
+                    if (typeof data.remaining === 'number' && data.remaining <= 0) {{
+                        localStorage.setItem(cursorKey, '0');
+                    }}
                     const parts = [];
                     parts.push(`Test NVIDIA: OK ${{data.ok}}, rimossi ${{data.removed}}, testati ${{data.tested}}/${{data.total}}`);
                     if (data.stopped_reason) parts.push(`(${{data.stopped_reason}})`);
+                    if (typeof data.timeouts === 'number' && data.timeouts > 0) parts.push(`— timeout: ${{data.timeouts}}`);
                     if (typeof data.remaining === 'number' && data.remaining > 0) parts.push(`— restanti: ${{data.remaining}} (ripremi per continuare)`);
                     addMessage('🔍 ' + parts.join(' '), 'system');
                 }} else {{

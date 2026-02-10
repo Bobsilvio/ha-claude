@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.21"
+VERSION = "3.1.22"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2108,19 +2108,29 @@ def api_nvidia_test_models():
     except Exception:
         max_models = 0
 
+    try:
+        cursor = int(body.get("cursor") or 0)
+    except Exception:
+        cursor = 0
+
     # Safety defaults: keep the request reasonably fast.
     if max_models <= 0:
         max_models = 20
     max_models = max(1, min(50, max_models))
 
     max_seconds = 25.0
-    per_model_timeout = 8
+    per_model_timeout = 10
 
     # Use a fresh live list when possible.
     all_models = _fetch_nvidia_models_live() or get_nvidia_models_cached() or PROVIDER_MODELS.get("nvidia", [])
     all_models = [m for m in (all_models or []) if isinstance(m, str) and m.strip()]
     # Remove already known-bad models.
     candidates = [m for m in all_models if m not in NVIDIA_MODEL_BLOCKLIST]
+
+    if cursor < 0:
+        cursor = 0
+    if candidates and cursor >= len(candidates):
+        cursor = 0
 
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
     headers = {
@@ -2133,8 +2143,13 @@ def api_nvidia_test_models():
     ok: list[str] = []
     removed: list[str] = []
     stopped_reason = None
+    timeouts = 0
+    errors = 0
 
-    for model_id in candidates:
+    idx = cursor
+
+    while idx < len(candidates):
+        model_id = candidates[idx]
         if len(tested) >= max_models:
             stopped_reason = f"limit modelli ({max_models})"
             break
@@ -2153,17 +2168,31 @@ def api_nvidia_test_models():
 
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=per_model_timeout)
+        except requests.exceptions.ReadTimeout:
+            # Don't abort the whole scan on a single slow model.
+            timeouts += 1
+            tested.append(model_id)
+            idx += 1
+            continue
         except Exception as e:
-            stopped_reason = f"errore rete: {type(e).__name__}"
-            break
+            errors += 1
+            tested.append(model_id)
+            idx += 1
+            # If we see repeated unknown network errors, stop to avoid looping forever.
+            if errors >= 3:
+                stopped_reason = f"errore rete: {type(e).__name__}"
+                break
+            continue
 
         if resp.status_code == 200:
             ok.append(model_id)
+            idx += 1
             continue
 
         if resp.status_code in (404, 400):
             blocklist_nvidia_model(model_id)
             removed.append(model_id)
+            idx += 1
             continue
 
         if resp.status_code == 429:
@@ -2177,7 +2206,8 @@ def api_nvidia_test_models():
         stopped_reason = f"HTTP {resp.status_code}"
         break
 
-    remaining = max(0, len(candidates) - len(tested))
+    next_cursor = idx
+    remaining = max(0, len(candidates) - next_cursor)
     return jsonify({
         "success": True,
         "tested": len(tested),
@@ -2187,6 +2217,8 @@ def api_nvidia_test_models():
         "blocklisted": bool(removed),
         "stopped_reason": stopped_reason,
         "remaining": remaining,
+        "next_cursor": next_cursor,
+        "timeouts": timeouts,
     }), 200
 
 @app.route("/health", methods=["GET"])
