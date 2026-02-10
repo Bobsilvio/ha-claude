@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.39"
+VERSION = "3.0.40"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1600,20 +1600,68 @@ def execute_tool(tool_name: str, tool_input: Dict) -> str:
             return json.dumps(svc_raw, ensure_ascii=False, default=str)
 
         elif tool_name == "search_entities":
-            query = tool_input.get("query", "").lower()
+            query = tool_input.get("query", "").lower().strip()
             states = get_all_states()
             matches = []
+            
+            # Build search index with scoring
+            search_results = []
+            
             for s in states:
                 eid = s.get("entity_id", "").lower()
                 fname = s.get("attributes", {}).get("friendly_name", "").lower()
-                if query in eid or query in fname:
-                    matches.append({
+                
+                score = 0
+                
+                # Check 1: Exact substring in entity_id (highest priority)
+                if query in eid:
+                    score += 100
+                
+                # Check 2: Exact substring in friendly_name
+                if query in fname:
+                    score += 95
+                
+                # Check 3: Tokenization (split by underscore/hyphen/space and match individual tokens)
+                # This allows "produzione" to match "yesterday_production" or "production_daily"
+                eid_tokens = [t.strip() for t in eid.replace(".", " ").replace("_", " ").replace("-", " ").split()]
+                fname_tokens = [t.strip() for t in fname.replace("_", " ").replace("-", " ").split()]
+                query_tokens = [t.strip() for t in query.replace("_", " ").replace("-", " ").split()]
+                
+                # Check if any query token matches any entity token (for better cross-language matching)
+                for qt in query_tokens:
+                    for et in eid_tokens:
+                        if len(qt) > 2 and len(et) > 2:
+                            # Fuzzy match: if first 3 chars match or Levenshtein distance < 2
+                            if qt[:3] == et[:3]:  # Quick prefix match
+                                score += 30
+                            elif abs(len(qt) - len(et)) <= 2 and (qt in et or et in qt):
+                                score += 25
+                    for et in fname_tokens:
+                        if len(qt) > 2 and len(et) > 2:
+                            if qt[:3] == et[:3]:
+                                score += 35  # Friendly name match is slightly higher
+                            elif abs(len(qt) - len(et)) <= 2 and (qt in et or et in qt):
+                                score += 30
+                
+                # Check 4: Partial match (substring anywhere)
+                if score == 0:
+                    if query in eid or query in fname:
+                        score += 10
+                
+                if score > 0:
+                    search_results.append({
                         "entity_id": s.get("entity_id"),
                         "state": s.get("state"),
-                        "friendly_name": s.get("attributes", {}).get("friendly_name", "")
+                        "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                        "score": score
                     })
+            
+            # Sort by score (descending) and take top results
+            search_results.sort(key=lambda x: (-x["score"], x["entity_id"]))
             max_results = 20 if AI_PROVIDER == "github" else 50
-            return json.dumps(matches[:max_results], ensure_ascii=False, default=str)
+            matches = [{k: v for k, v in item.items() if k != "score"} for item in search_results[:max_results]]
+            
+            return json.dumps(matches, ensure_ascii=False, default=str)
 
         elif tool_name == "get_events":
             events = call_ha_api("GET", "events")
