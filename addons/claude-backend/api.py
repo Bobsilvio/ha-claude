@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.17"
+VERSION = "3.1.18"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -203,6 +203,59 @@ GITHUB_MODEL_BLOCKLIST: set[str] = set()
 
 # NVIDIA models that returned 404/unknown at runtime (per current key)
 NVIDIA_MODEL_BLOCKLIST: set[str] = set()
+GITHUB_MODEL_BLOCKLIST: set[str] = set()  # may be used by providers
+
+MODEL_BLOCKLIST_FILE = "/config/.storage/claude_model_blocklist.json"
+
+
+def load_model_blocklists() -> None:
+    """Load persistent model blocklists from disk."""
+    global NVIDIA_MODEL_BLOCKLIST, GITHUB_MODEL_BLOCKLIST
+    try:
+        if os.path.isfile(MODEL_BLOCKLIST_FILE):
+            with open(MODEL_BLOCKLIST_FILE, "r") as f:
+                data = json.load(f) or {}
+            nvidia = data.get("nvidia") or []
+            github = data.get("github") or []
+            if isinstance(nvidia, list):
+                NVIDIA_MODEL_BLOCKLIST.update([m for m in nvidia if isinstance(m, str) and m.strip()])
+            if isinstance(github, list):
+                GITHUB_MODEL_BLOCKLIST.update([m for m in github if isinstance(m, str) and m.strip()])
+            if NVIDIA_MODEL_BLOCKLIST or GITHUB_MODEL_BLOCKLIST:
+                logger.info(
+                    f"Loaded model blocklists: nvidia={len(NVIDIA_MODEL_BLOCKLIST)}, github={len(GITHUB_MODEL_BLOCKLIST)}"
+                )
+    except Exception as e:
+        logger.warning(f"Could not load model blocklists: {e}")
+
+
+def save_model_blocklists() -> None:
+    """Persist model blocklists to disk."""
+    try:
+        os.makedirs(os.path.dirname(MODEL_BLOCKLIST_FILE), exist_ok=True)
+        payload = {
+            "nvidia": sorted(NVIDIA_MODEL_BLOCKLIST),
+            "github": sorted(GITHUB_MODEL_BLOCKLIST),
+        }
+        with open(MODEL_BLOCKLIST_FILE, "w") as f:
+            json.dump(payload, f, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"Could not save model blocklists: {e}")
+
+
+def blocklist_nvidia_model(model_id: str) -> None:
+    """Add a model to NVIDIA blocklist, persist it, and drop it from cache."""
+    if not isinstance(model_id, str) or not model_id.strip():
+        return
+    model_id = model_id.strip()
+    NVIDIA_MODEL_BLOCKLIST.add(model_id)
+    try:
+        cached = _NVIDIA_MODELS_CACHE.get("models") or []
+        if isinstance(cached, list) and model_id in cached:
+            _NVIDIA_MODELS_CACHE["models"] = [m for m in cached if m != model_id]
+    except Exception:
+        pass
+    save_model_blocklists()
 
 # Cache for NVIDIA /v1/models discovery (to keep UI in sync with what's available for the current key)
 _NVIDIA_MODELS_CACHE: dict[str, object] = {"ts": 0.0, "models": []}
@@ -244,16 +297,22 @@ def get_nvidia_models_cached() -> Optional[list[str]]:
     ts = float(_NVIDIA_MODELS_CACHE.get("ts") or 0.0)
     cached_models = _NVIDIA_MODELS_CACHE.get("models") or []
     if cached_models and (now - ts) < _NVIDIA_MODELS_CACHE_TTL_SECONDS:
+        if NVIDIA_MODEL_BLOCKLIST:
+            return [m for m in list(cached_models) if m not in NVIDIA_MODEL_BLOCKLIST]
         return list(cached_models)
 
     live = _fetch_nvidia_models_live()
     if live:
         _NVIDIA_MODELS_CACHE["ts"] = now
         _NVIDIA_MODELS_CACHE["models"] = list(live)
+        if NVIDIA_MODEL_BLOCKLIST:
+            return [m for m in live if m not in NVIDIA_MODEL_BLOCKLIST]
         return live
 
     # Fallback to stale cache if present
     if cached_models:
+        if NVIDIA_MODEL_BLOCKLIST:
+            return [m for m in list(cached_models) if m not in NVIDIA_MODEL_BLOCKLIST]
         return list(cached_models)
     return None
 
@@ -849,6 +908,9 @@ def save_conversations():
 
 # Load saved conversations on startup
 load_conversations()
+
+# Load persisted model blocklists on startup
+load_model_blocklists()
 
 # ---- Snapshot system for safe config editing ----
 

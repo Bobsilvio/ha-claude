@@ -389,7 +389,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             if status == 404:
                 bad_model = payload.get("model")
                 if bad_model:
-                    api.NVIDIA_MODEL_BLOCKLIST.add(bad_model)
+                    api.blocklist_nvidia_model(bad_model)
                 logger.warning(f"NVIDIA model not available (404): {bad_model}")
                 yield {"type": "status", "message": "⚠️ Modello NVIDIA non disponibile (404). L'ho rimosso dalla lista modelli."}
                 error_msg_text = f"NVIDIA: modello non disponibile: {bad_model or 'unknown'}"
