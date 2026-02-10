@@ -27,12 +27,15 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.4"
+VERSION = "3.1.5"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
 AI_MODEL = os.getenv("AI_MODEL", "")
+# Track the user's currently selected model (persists after set_model changes)
+SELECTED_MODEL = ""  # Will be set by /api/set_model and used by stream
+SELECTED_PROVIDER = ""  # Will be set by /api/set_model and used by stream
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
@@ -408,9 +411,17 @@ def validate_model_provider_compatibility() -> tuple[bool, str]:
 
 
 def get_active_model() -> str:
-    """Get the active model name (technical format)."""
+    """Get the active model name (technical format).
+    Prefers the user's selected model/provider if set, else falls back to global AI_MODEL."""
+    # Use SELECTED_MODEL if the user has made a selection
+    if SELECTED_MODEL and SELECTED_PROVIDER == AI_PROVIDER:
+        return normalize_model_name(SELECTED_MODEL)
+    
+    # Fall back to AI_MODEL (from config/env)
     if AI_MODEL:
         return normalize_model_name(AI_MODEL)
+    
+    # Last resort: use provider default
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
 
 
@@ -1497,15 +1508,18 @@ def api_status():
 
 @app.route('/api/set_model', methods=['POST'])
 def api_set_model():
-    global AI_PROVIDER, AI_MODEL, ai_client
+    global AI_PROVIDER, AI_MODEL, SELECTED_MODEL, SELECTED_PROVIDER, ai_client
 
     data = request.json or {}
 
     if "provider" in data:
         AI_PROVIDER = data["provider"]
+        SELECTED_PROVIDER = data["provider"]  # Persist the selection
 
     if "model" in data:
-        AI_MODEL = normalize_model_name(data["model"])
+        normalized = normalize_model_name(data["model"])
+        AI_MODEL = normalized
+        SELECTED_MODEL = normalized  # Persist the selection
 
     logger.info(f"Runtime model changed → {AI_PROVIDER} / {AI_MODEL}")
 
