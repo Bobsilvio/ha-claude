@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.8"
+VERSION = "3.1.9"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -376,6 +376,10 @@ def get_model_provider(model_name: str) -> str:
         return "github"
     # Try to infer from technical name
     tech_name = normalize_model_name(model_name)
+    # GitHub Models uses fully-qualified IDs like 'openai/gpt-4o'
+    # Treat those as GitHub provider models (not OpenAI direct).
+    if tech_name.startswith("openai/"):
+        return "github"
     if tech_name.startswith("claude-"):
         return "anthropic"
     elif tech_name in ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"]:
@@ -419,6 +423,9 @@ def get_active_model() -> str:
         # Extra check: ensure model is compatible with current provider
         model_provider = get_model_provider(model)
         if model_provider == AI_PROVIDER or model_provider == "unknown":
+            # Canonicalize a few common cross-provider formats
+            if AI_PROVIDER == "openai" and model.startswith("openai/"):
+                return model.split("/", 1)[1]
             return model
     
     # Fall back to AI_MODEL (from config/env)
@@ -427,6 +434,9 @@ def get_active_model() -> str:
         # Extra check: ensure model is compatible with current provider
         model_provider = get_model_provider(model)
         if model_provider == AI_PROVIDER or model_provider == "unknown":
+            # Canonicalize a few common cross-provider formats
+            if AI_PROVIDER == "openai" and model.startswith("openai/"):
+                return model.split("/", 1)[1]
             return model
     
     # Last resort: use provider default
@@ -563,7 +573,9 @@ def initialize_ai_client():
         logger.info(f"Anthropic client initialized (model: {get_active_model()})")
     elif AI_PROVIDER == "openai" and api_key:
         from openai import OpenAI
-        ai_client = OpenAI(api_key=api_key)
+        # Force the official OpenAI API base URL to avoid environment leakage
+        # (e.g., OPENAI_BASE_URL configured externally for GitHub Models).
+        ai_client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
         logger.info(f"OpenAI client initialized (model: {get_active_model()})")
     elif AI_PROVIDER == "google" and api_key:
         import google.generativeai as genai
@@ -1522,12 +1534,11 @@ def api_set_model():
 
     if "provider" in data:
         AI_PROVIDER = data["provider"]
-        # When changing provider: always reset selection and model to provider default
-        SELECTED_MODEL = ""
-        SELECTED_PROVIDER = ""
-        # CRITICAL: If no model specified, force AI_MODEL to provider default
-        # This prevents using old model from previous provider
+
+        # When changing provider without specifying a model: reset selection and use provider default.
         if "model" not in data:
+            SELECTED_MODEL = ""
+            SELECTED_PROVIDER = ""
             default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model")
             if default_model:
                 AI_MODEL = default_model
@@ -1535,9 +1546,33 @@ def api_set_model():
 
     if "model" in data:
         normalized = normalize_model_name(data["model"])
-        AI_MODEL = normalized
-        SELECTED_MODEL = normalized  # Persist the selection
-        SELECTED_PROVIDER = AI_PROVIDER  # Update provider to match
+
+        # If provider is explicitly set, enforce compatibility.
+        # This prevents states like provider=nvidia with model=openai/gpt-4o.
+        if "provider" in data:
+            model_provider = get_model_provider(normalized)
+            if model_provider not in ("unknown", AI_PROVIDER):
+                SELECTED_MODEL = ""
+                SELECTED_PROVIDER = ""
+                default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model")
+                if default_model:
+                    AI_MODEL = default_model
+                logger.warning(
+                    f"Ignoring incompatible model '{normalized}' for provider '{AI_PROVIDER}'. Using default '{AI_MODEL}'."
+                )
+            else:
+                AI_MODEL = normalized
+                SELECTED_MODEL = normalized
+                SELECTED_PROVIDER = AI_PROVIDER
+        else:
+            # If provider isn't provided, accept the model and infer provider when possible.
+            # (Keeps UI resilient if it only sends a model.)
+            inferred = get_model_provider(normalized)
+            if inferred != "unknown":
+                AI_PROVIDER = inferred
+            AI_MODEL = normalized
+            SELECTED_MODEL = normalized
+            SELECTED_PROVIDER = AI_PROVIDER
 
     logger.info(f"Runtime model changed → {AI_PROVIDER} / {AI_MODEL}")
 
