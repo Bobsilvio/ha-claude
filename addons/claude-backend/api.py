@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.37"
+VERSION = "3.0.38"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2815,20 +2815,26 @@ INTENT_TOOL_SETS = {
 INTENT_PROMPTS = {
     "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
 The automation config is provided in the DATI section of the user's message.
-RULES:
+CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
 1. FIRST, briefly confirm which automation you found: "Ho trovato l'automazione: [NAME] (id: [ID])"
-2. Then call update_automation ONCE with only the changed fields.
-3. Show a before/after diff of the changes.
+2. Describe WHAT EXACTLY will change in simple language
+3. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? Scrivi sì o no"
+4. WAIT FOR USER TO CONFIRM - DO NOT call update_automation until user says "sì" or "sa" (Italian yes)
+5. Only AFTER confirmation, call update_automation ONCE with the changes
+6. Show a before/after diff of what changed.
 - Respond in the user's language. Be concise.
 - NEVER call get_automations or read_config_file — the data is already provided.
 - If the automation in DATI doesn't match what the user asked for, tell them and ask for clarification. Do NOT modify the wrong automation.""",
 
     "modify_script": """You are a Home Assistant script editor. The user wants to modify a script.
 The script config is provided in the DATI section.
-RULES:
+CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
 1. FIRST, briefly confirm which script you found: "Ho trovato lo script: [NAME] (id: [ID])"
-2. Then call update_script ONCE with only the changed fields.
-3. Show a before/after diff.
+2. Describe WHAT EXACTLY will change in simple language
+3. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? Scrivi sì o no"
+4. WAIT FOR USER TO CONFIRM - DO NOT call update_script until user says "sì" or "si"
+5. Only AFTER confirmation, call update_script ONCE with the changes
+6. Show a before/after diff of what changed.
 - Respond in the user's language. Be concise.
 - NEVER call get_scripts or read_config_file — the data is already provided.
 - If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
@@ -2840,6 +2846,15 @@ Respond in the user's language. Be concise. Maximum 2 tool calls.""",
     "query_state": """You are a Home Assistant status assistant. Help the user check device states.
 Use search_entities or get_entity_state to find and report states.
 Respond in the user's language. Be concise.""",
+
+    "delete": """You are a Home Assistant deletion assistant. User wants to delete an automation, script, or dashboard.
+CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
+1. FIRST, identify what will be deleted: "Vuoi eliminare: [NAME] (id: [ID]). Questa azione è IRREVERSIBILE."
+2. ASK FOR EXPLICIT CONFIRMATION: "Digita 'elimina' per confermare l'eliminazione di [NAME], altrimenti digita 'no'"
+3. WAIT FOR CONFIRMATION - DO NOT call delete_automation/delete_script/delete_dashboard until user types "elimina"
+4. Only AFTER explicit confirmation, call the appropriate delete tool
+- Respond in the user's language. Be concise.
+- NEVER auto-confirm deletions. Deletions are IRREVERSIBLE.""",
 }
 
 
@@ -2862,7 +2877,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     
     if has_modify and (has_auto or has_specific_auto):
         return {"intent": "modify_automation", "tools": INTENT_TOOL_SETS["modify_automation"],
-                "prompt": INTENT_PROMPTS["modify_automation"], "specific_target": has_specific_auto}
+                "prompt": INTENT_PROMPTS["modify_automation"] + "\n\nIMPORTANT: Before calling update_automation, show the user which automation you will modify and ask for explicit confirmation. Provide modification details and ask: 'Confermi che devo modificare questa automazione? (sì/no)'", "specific_target": has_specific_auto}
     
     # --- MODIFY SCRIPT ---
     script_kw = ["script", "routine", "sequenza"]
@@ -2874,8 +2889,11 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                 "prompt": INTENT_PROMPTS["modify_script"], "specific_target": has_specific_script}
     
     # --- CREATE AUTOMATION ---
+    # Keywords for CREATE: "crea", "nuova", "un/una/un' automazione", "create", "new"
     create_kw = ["crea", "creare", "nuov", "create", "new", "aggiungi nuova"]
-    has_create = any(k in msg for k in create_kw)
+    # Additional patterns for implicit creation (e.g., "un automazione che...", "una automazione per...")
+    implicit_create_patterns = ["un automazione", "un'automazione", "una automazione", "una nuova automazione", "un nuovo automation"]
+    has_create = any(k in msg for k in create_kw) or any(p in msg for p in implicit_create_patterns)
     if has_create and has_auto:
         return {"intent": "create_automation", "tools": INTENT_TOOL_SETS["create_automation"],
                 "prompt": None, "specific_target": False}
@@ -3730,7 +3748,8 @@ def stream_chat_anthropic(messages, intent_info=None):
 
 def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     """Format a human-readable response from a successful write tool result.
-    This avoids needing another API round just to format the response."""
+    This avoids needing another API round just to format the response.
+    For UPDATE operations, shows before/after side-by-side with color highlighting."""
     parts = []
     
     msg = result_data.get("message", "")
@@ -3739,29 +3758,44 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     else:
         parts.append("✅ Operazione completata con successo!")
     
-    # Show diff for update tools
+    # Show diff for update tools (only for updates, not creates)
     old_yaml = result_data.get("old_yaml", "")
     new_yaml = result_data.get("new_yaml", "")
     
-    if old_yaml and new_yaml:
-        # Show compact diff: only changed sections
-        old_lines = set(old_yaml.strip().splitlines())
-        new_lines = set(new_yaml.strip().splitlines())
-        removed = old_lines - new_lines
-        added = new_lines - old_lines
+    if old_yaml and new_yaml and tool_name in ("update_automation", "update_script", "update_dashboard"):
+        # Build side-by-side comparison
+        old_lines = old_yaml.strip().splitlines()
+        new_lines = new_yaml.strip().splitlines()
         
-        if removed or added:
-            parts.append("\n**Modifiche:**")
-            if removed:
-                parts.append("\n**Prima (rimosso):**")
-                parts.append(f"```yaml\n{chr(10).join(sorted(removed))}\n```")
-            if added:
-                parts.append("\n**Dopo (aggiunto):**")
-                parts.append(f"```yaml\n{chr(10).join(sorted(added))}\n```")
-        else:
-            # Show full before/after if sets don't differ well (order changes)
-            parts.append(f"\n**Prima:**\n```yaml\n{old_yaml[:2000]}\n```")
-            parts.append(f"\n**Dopo:**\n```yaml\n{new_yaml[:2000]}\n```")
+        # Pad to same length
+        max_len = max(len(old_lines), len(new_lines))
+        old_lines += [""] * (max_len - len(old_lines))
+        new_lines += [""] * (max_len - len(new_lines))
+        
+        # Build table header
+        table_rows = []
+        table_rows.append("| ❌ PRIMA (rimosso) | ✅ DOPO (aggiunto) |")
+        table_rows.append("|---|---|")
+        
+        # Add each line pair to table
+        for old, new in zip(old_lines, new_lines):
+            # Escape pipes in content
+            old_escaped = old.replace("|", "\\|") if old else ""
+            new_escaped = new.replace("|", "\\|") if new else ""
+            
+            # Create code formatted cells
+            old_cell = f"`{old_escaped}`" if old else ""
+            new_cell = f"`{new_escaped}`" if new else ""
+            
+            table_rows.append(f"| {old_cell} | {new_cell} |")
+        
+        parts.append("\n**Confronto Prima/Dopo:**")
+        parts.append("\n" + "\n".join(table_rows))
+    
+    elif old_yaml and new_yaml:
+        # For CREATE operations, just show "Creato:"
+        parts.append("\n**YAML creato:**")
+        parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
     
     tip = result_data.get("tip", "")
     if tip:
@@ -3834,18 +3868,23 @@ def stream_chat_google(messages):
 
 MAX_SMART_CONTEXT = 10000  # Max chars to inject — keeps tokens under control
 
-def build_smart_context(user_message: str) -> str:
+def build_smart_context(user_message: str, intent: str = None) -> str:
     """Pre-load relevant context based on user's message intent.
     Works like VS Code: gathers all needed data BEFORE sending to AI,
     so Claude can respond with a single action instead of multiple tool rounds.
-    IMPORTANT: Context must be compact to avoid rate limits."""
+    IMPORTANT: Context must be compact to avoid rate limits.
+    CRITICAL: If intent is 'create_automation' or 'create_script', skip fuzzy matching
+    to avoid incorrectly injecting an existing automation/script to be modified."""
     msg_lower = user_message.lower()
     context_parts = []
+    
+    # Skip automation/script fuzzy matching if user is CREATING new (not modifying)
+    skip_automation_matching = (intent in ("create_automation", "create_script"))
 
     try:
         # --- AUTOMATION CONTEXT ---
         auto_keywords = ["automazione", "automation", "automazion", "trigger", "condizione", "condition"]
-        if any(k in msg_lower for k in auto_keywords):
+        if any(k in msg_lower for k in auto_keywords) and not skip_automation_matching:
             import yaml
             # Get automation list
             states = get_all_states()
@@ -4083,10 +4122,16 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     if session_id not in conversations:
         conversations[session_id] = []
 
-    # Step 1: Build smart context (loads only the relevant data)
-    smart_context = build_smart_context(user_message)
+    # Step 1: LOCAL intent detection FIRST (need this BEFORE building smart context)
+    # We do a preliminary detect to know if user is creating or modifying
+    intent_info = detect_intent(user_message, "")  # Empty context for first pass
+    intent_name = intent_info["intent"]
     
-    # Step 2: LOCAL intent detection — decide which tools and prompt to use
+    # Step 2: Build smart context NOW that we know the intent
+    # If user is creating new automation/script, skip fuzzy matching to avoid false automation injection
+    smart_context = build_smart_context(user_message, intent=intent_name)
+    
+    # Step 3: Re-detect intent WITH full smart context for accuracy
     intent_info = detect_intent(user_message, smart_context)
     intent_name = intent_info["intent"]
     tool_count = len(intent_info.get("tools") or [])
