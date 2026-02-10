@@ -12,6 +12,69 @@ import intent
 logger = logging.getLogger(__name__)
 
 
+def _is_request_too_large_error(err: Exception, error_msg: str) -> bool:
+    status = getattr(err, "status_code", None)
+    if status == 413:
+        return True
+    resp = getattr(err, "response", None)
+    if resp is not None and getattr(resp, "status_code", None) == 413:
+        return True
+    msg = (error_msg or "").lower()
+    return (
+        "413" in msg
+        or "tokens_limit_reached" in msg
+        or "request body too large" in msg
+        or "max size:" in msg and "tokens" in msg
+    )
+
+
+def _shrink_messages_for_small_limit(messages: list[dict], max_user_chars: int = 1600) -> bool:
+    """Best-effort shrink of the prompt to fit small models like o4-mini.
+
+    - Trim the message list further (keeping the most recent turns).
+    - Remove injected smart-context blocks from the last user message.
+    Returns True if any change was applied.
+    """
+    if not messages:
+        return False
+
+    changed = False
+
+    # Trim history aggressively (tool pairs are handled by intent.trim_messages).
+    try:
+        trimmed = intent.trim_messages(messages, max_messages=10)
+        # For github o4-mini we already reduce to 4 in intent.trim_messages; still guard here.
+        if len(trimmed) < len(messages):
+            messages[:] = trimmed
+            changed = True
+    except Exception:
+        pass
+
+    # Remove injected context from the last user message.
+    for i in range(len(messages) - 1, -1, -1):
+        m = messages[i]
+        if m.get("role") != "user" or not isinstance(m.get("content"), str):
+            continue
+        txt = m.get("content") or ""
+
+        # If api.py injected smart context, drop it.
+        for marker in ("\n\n---\nCONTESTO:\n", "\n\n---\nDATI:\n"):
+            if marker in txt:
+                txt = txt.split(marker, 1)[0].rstrip()
+                txt += "\n\n[Nota: contesto ridotto automaticamente per limiti del modello selezionato.]"
+                changed = True
+                break
+
+        if len(txt) > max_user_chars:
+            txt = txt[:max_user_chars].rstrip() + "\n\n...[testo troncato per limiti del modello]"
+            changed = True
+
+        m["content"] = txt
+        break
+
+    return changed
+
+
 def _is_rate_limit_error(err: Exception, error_msg: str) -> bool:
     """Return True if the exception looks like an HTTP 429 rate-limit.
 
@@ -453,6 +516,7 @@ def stream_chat_openai(messages, intent_info=None):
     }
 
     for round_num in range(max_rounds):
+        did_size_retry = False
         # Rate-limit prevention for GitHub Models: small delay before subsequent rounds
         if api.AI_PROVIDER == "github" and round_num > 0:
             delay = min(2 + round_num, 5)
@@ -555,6 +619,15 @@ def stream_chat_openai(messages, intent_info=None):
                 yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
                 time.sleep(10)
                 continue  # Retry this round
+            # Handle small-model prompt limits (e.g., GitHub o4-mini max request size)
+            elif api.AI_PROVIDER == "github" and _is_request_too_large_error(api_err, error_msg) and not did_size_retry:
+                did_size_retry = True
+                logger.warning(f"Prompt too large for GitHub model={kwargs.get('model')}: {error_msg}")
+                yield {"type": "status", "message": "Il modello selezionato ha un limite basso (prompt troppo grande). Riduco il contesto e riprovo..."}
+                if _shrink_messages_for_small_limit(messages):
+                    oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
+                    kwargs["messages"] = oai_messages
+                response = api.ai_client.chat.completions.create(**kwargs)
             else:
                 raise
         logger.info("OpenAI: Response stream started")

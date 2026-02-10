@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.31"
+VERSION = "3.1.32"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -109,12 +109,24 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
             "Aumenta il budget/credito su GitHub oppure seleziona un altro provider/modello dal menu in alto."
         )
 
+    if provider == "github" and (code == 413 or "tokens_limit_reached" in low or "request body too large" in low):
+        m = re.search(r"max size:\s*(\d+)\s*tokens", (remote_msg or raw), flags=re.IGNORECASE)
+        limit = m.group(1) if m else ""
+        extra = f" (max {limit} token)" if limit else ""
+        return (
+            "GitHub Models: richiesta troppo lunga per il modello selezionato" + extra + ". "
+            "Prova a fare una domanda più corta, oppure scegli un modello più grande dal menu in alto."
+        )
+
     if code == 401:
         return "Autenticazione fallita (401). Verifica la chiave/token del provider selezionato."
     if code == 403:
         return "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token."
     if code == 429:
         return "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider."
+
+    if code == 413:
+        return "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello."
 
     # Fallback: keep the remote message if present, otherwise the raw error
     return remote_msg or raw

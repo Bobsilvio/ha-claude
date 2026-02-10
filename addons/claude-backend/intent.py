@@ -304,6 +304,13 @@ def get_prompt_for_intent(intent_info: dict) -> str:
 def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
     """Trim conversation history, preserving tool_call/tool response pairs."""
     limit = 6 if api.AI_PROVIDER == "github" else max_messages
+    # GitHub o4-mini has a very small request size limit (~4000 tokens).
+    # Keep fewer turns to reduce the prompt size.
+    try:
+        if api.AI_PROVIDER == "github" and "o4-mini" in (api.get_active_model() or "").lower():
+            limit = 4
+    except Exception:
+        pass
     if len(messages) <= limit:
         return messages
     trimmed = messages[-limit:]
@@ -549,8 +556,15 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
     if context_parts:
         context = "\n\n".join(context_parts)
         # Cap total context size to avoid rate limits
-        if len(context) > MAX_SMART_CONTEXT:
-            context = context[:MAX_SMART_CONTEXT] + "\n... [CONTEXT TRUNCATED]"
+        limit = MAX_SMART_CONTEXT
+        try:
+            if api.AI_PROVIDER == "github" and "o4-mini" in (api.get_active_model() or "").lower():
+                # Smaller context for free/low-limit models
+                limit = 2500
+        except Exception:
+            pass
+        if len(context) > limit:
+            context = context[:limit] + "\n... [CONTEXT TRUNCATED]"
         logger.info(f"Smart context: injected {len(context)} chars of pre-loaded data")
         return context
     return ""
