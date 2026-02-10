@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.56"
+VERSION = "3.0.57"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -447,6 +447,23 @@ def get_max_tokens_param(max_tokens_value: int) -> dict:
         return {"max_completion_tokens": max_tokens_value}
     else:
         return {"max_tokens": max_tokens_value}
+
+
+def _github_model_variants(model: str) -> list[str]:
+    """Return model identifier variants for GitHub Models runtime.
+
+    GitHub's public catalog uses fully qualified IDs like 'openai/gpt-4o'.
+    Some runtime configurations expect the short form (e.g., 'gpt-4o').
+    We try both when we hit unknown_model.
+    """
+    if not model:
+        return []
+    variants = [model]
+    if "/" in model:
+        short = model.split("/", 1)[1]
+        if short and short not in variants:
+            variants.append(short)
+    return variants
 
 
 def get_ha_token() -> str:
@@ -3071,16 +3088,45 @@ def chat_openai(messages: List[Dict]) -> tuple:
         error_msg = str(api_err)
         if AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
             bad_model = kwargs.get("model")
-            if bad_model:
-                GITHUB_MODEL_BLOCKLIST.add(bad_model)
-            fallback_model = "openai/gpt-4o"
-            if bad_model != fallback_model:
-                logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
-                AI_MODEL = fallback_model
-                kwargs["model"] = fallback_model
-                response = ai_client.chat.completions.create(**kwargs)
+
+            # Try alternate model formats first (e.g., 'openai/gpt-4o' -> 'gpt-4o')
+            tried = []
+            for candidate in _github_model_variants(bad_model):
+                if candidate in tried:
+                    continue
+                tried.append(candidate)
+                if candidate == bad_model:
+                    continue
+                try:
+                    logger.warning(f"GitHub unknown_model for {bad_model}. Retrying with model={candidate}.")
+                    kwargs["model"] = candidate
+                    response = ai_client.chat.completions.create(**kwargs)
+                    break
+                except Exception as retry_err:
+                    if "unknown_model" in str(retry_err).lower():
+                        continue
+                    raise
             else:
-                raise
+                # Still unknown after variants: blocklist canonical ID (the one shown in UI)
+                if bad_model:
+                    GITHUB_MODEL_BLOCKLIST.add(bad_model)
+
+                # Final fallback attempts (both qualified and short)
+                fallback_candidates = ["openai/gpt-4o", "gpt-4o"]
+                for fallback_model in fallback_candidates:
+                    if bad_model == fallback_model:
+                        continue
+                    try:
+                        logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
+                        kwargs["model"] = fallback_model
+                        response = ai_client.chat.completions.create(**kwargs)
+                        break
+                    except Exception as fallback_err:
+                        if "unknown_model" in str(fallback_err).lower():
+                            continue
+                        raise
+                else:
+                    raise
         else:
             raise
 
@@ -3475,17 +3521,47 @@ def stream_chat_openai(messages, intent_info=None):
             error_msg = str(api_err)
             if AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
                 bad_model = kwargs.get("model")
-                if bad_model:
-                    GITHUB_MODEL_BLOCKLIST.add(bad_model)
-                fallback_model = "openai/gpt-4o"
-                if bad_model != fallback_model:
-                    logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
-                    yield {"type": "status", "message": "Modello non disponibile su GitHub, passo a GPT-4o."}
-                    AI_MODEL = fallback_model
-                    kwargs["model"] = fallback_model
-                    response = ai_client.chat.completions.create(**kwargs)
+
+                # Try alternate model formats first (e.g., 'openai/gpt-4o' -> 'gpt-4o')
+                tried = []
+                for candidate in _github_model_variants(bad_model):
+                    if candidate in tried:
+                        continue
+                    tried.append(candidate)
+                    if candidate == bad_model:
+                        continue
+                    try:
+                        logger.warning(f"GitHub unknown_model for {bad_model}. Retrying with model={candidate}.")
+                        yield {"type": "status", "message": "Modello GitHub non riconosciuto, riprovo con formato alternativo."}
+                        kwargs["model"] = candidate
+                        response = ai_client.chat.completions.create(**kwargs)
+                        break
+                    except Exception as retry_err:
+                        if "unknown_model" in str(retry_err).lower():
+                            continue
+                        raise
                 else:
-                    raise
+                    # Still unknown after variants: blocklist canonical ID (the one shown in UI)
+                    if bad_model:
+                        GITHUB_MODEL_BLOCKLIST.add(bad_model)
+
+                    # Final fallback attempts (both qualified and short)
+                    fallback_candidates = ["openai/gpt-4o", "gpt-4o"]
+                    for fallback_model in fallback_candidates:
+                        if bad_model == fallback_model:
+                            continue
+                        try:
+                            logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
+                            yield {"type": "status", "message": "Modello non disponibile su GitHub, passo a GPT-4o."}
+                            kwargs["model"] = fallback_model
+                            response = ai_client.chat.completions.create(**kwargs)
+                            break
+                        except Exception as fallback_err:
+                            if "unknown_model" in str(fallback_err).lower():
+                                continue
+                            raise
+                    else:
+                        raise
             else:
                 raise
         logger.info("OpenAI: Response stream started")
