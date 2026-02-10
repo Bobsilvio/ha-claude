@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.45"
+VERSION = "3.0.46"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4788,11 +4788,11 @@ def get_chat_ui():
                         const item = document.createElement('div');
                         item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
                         item.innerHTML = `
-                            <div style="flex: 1;" onclick="loadConversation('${conv.id}')">
+                            <div style="flex: 1;" onclick="loadConversation('${{conv.id}}')">
                                 <div class="chat-item-title">${{conv.title}}</div>
                                 <div class="chat-item-info">${{conv.message_count}} messaggi</div>
                             </div>
-                            <span class="chat-item-delete" onclick="deleteConversation(event, '${conv.id}')" title="Elimina chat">×</span>
+                            <span class="chat-item-delete" onclick="deleteConversation(event, '${{conv.id}}')" title="Elimina chat">×</span>
                         `;
                         chatList.appendChild(item);
                     }});
