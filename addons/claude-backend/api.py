@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.54"
+VERSION = "3.0.55"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -184,9 +184,12 @@ PROVIDER_DEFAULTS = {
     "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
     "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
-    "github": {"model": "gpt-4o", "name": "GitHub Models"},
+    "github": {"model": "openai/gpt-4o", "name": "GitHub Models"},
     "nvidia": {"model": "moonshotai/kimi-k2.5", "name": "NVIDIA NIM"},
 }
+
+# GitHub models that returned unknown_model at runtime (per current token)
+GITHUB_MODEL_BLOCKLIST: set[str] = set()
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
@@ -3038,6 +3041,7 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
 
 def chat_openai(messages: List[Dict]) -> tuple:
     """Chat with OpenAI/NVIDIA/GitHub. Returns (response_text, updated_messages)."""
+    global AI_MODEL
     trimmed = trim_messages(messages)
     system_prompt = get_system_prompt()
     tools = get_openai_tools_for_provider()
@@ -3056,7 +3060,24 @@ def chat_openai(messages: List[Dict]) -> tuple:
         kwargs["temperature"] = 0.6
         kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
 
-    response = ai_client.chat.completions.create(**kwargs)
+    try:
+        response = ai_client.chat.completions.create(**kwargs)
+    except Exception as api_err:
+        error_msg = str(api_err)
+        if AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
+            bad_model = kwargs.get("model")
+            if bad_model:
+                GITHUB_MODEL_BLOCKLIST.add(bad_model)
+            fallback_model = "openai/gpt-4o"
+            if bad_model != fallback_model:
+                logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
+                AI_MODEL = fallback_model
+                kwargs["model"] = fallback_model
+                response = ai_client.chat.completions.create(**kwargs)
+            else:
+                raise
+        else:
+            raise
 
     msg = response.choices[0].message
 
@@ -3400,6 +3421,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 def stream_chat_openai(messages, intent_info=None):
     """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts.
     Uses intent_info to select focused tools and prompt when available."""
+    global AI_MODEL
     trimmed = trim_messages(messages)
     
     # Use focused tools/prompt if intent detected, else full
@@ -3442,7 +3464,25 @@ def stream_chat_openai(messages, intent_info=None):
             # Thinking mode would require using requests library directly
 
         logger.info(f"OpenAI: Calling API with model={kwargs['model']}, stream=True")
-        response = ai_client.chat.completions.create(**kwargs)
+        try:
+            response = ai_client.chat.completions.create(**kwargs)
+        except Exception as api_err:
+            error_msg = str(api_err)
+            if AI_PROVIDER == "github" and "unknown_model" in error_msg.lower():
+                bad_model = kwargs.get("model")
+                if bad_model:
+                    GITHUB_MODEL_BLOCKLIST.add(bad_model)
+                fallback_model = "openai/gpt-4o"
+                if bad_model != fallback_model:
+                    logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
+                    yield {"type": "status", "message": "Modello non disponibile su GitHub, passo a GPT-4o."}
+                    AI_MODEL = fallback_model
+                    kwargs["model"] = fallback_model
+                    response = ai_client.chat.completions.create(**kwargs)
+                else:
+                    raise
+            else:
+                raise
         logger.info("OpenAI: Response stream started")
 
         content_parts = []
@@ -5316,17 +5356,20 @@ def api_get_models():
     models_display = {}
     models_technical = {}
     for provider, models in PROVIDER_MODELS.items():
-        models_technical[provider] = list(models)
+        filtered_models = list(models)
+        if provider == "github" and GITHUB_MODEL_BLOCKLIST:
+            filtered_models = [m for m in filtered_models if m not in GITHUB_MODEL_BLOCKLIST]
+        models_technical[provider] = list(filtered_models)
         # Use per-provider display mapping to avoid cross-provider conflicts
         prov_map = PROVIDER_DISPLAY.get(provider, {})
-        models_display[provider] = [prov_map.get(m, m) for m in models]
+        models_display[provider] = [prov_map.get(m, m) for m in filtered_models]
 
     # --- Current model (sia tech che display) ---
     current_model_tech = get_active_model()
     current_model_display = MODEL_DISPLAY_MAPPING.get(current_model_tech, current_model_tech)
 
     # --- Modelli del provider corrente (per HA settings: lista con flag current) ---
-    provider_models = PROVIDER_MODELS.get(AI_PROVIDER, [])
+    provider_models = models_technical.get(AI_PROVIDER, PROVIDER_MODELS.get(AI_PROVIDER, []))
     available_models = []
     for tech_name in provider_models:
         available_models.append({
