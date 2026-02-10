@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.62"
+VERSION = "3.0.63"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2920,7 +2920,8 @@ Respond in the user's language. Be concise. Maximum 2 tool calls.""",
 
     "query_state": """You are a Home Assistant status assistant. Help the user check device states.
 Use search_entities or get_entity_state to find and report states.
-Respond in the user's language. Be concise.""",
+Respond in the user's language. Be concise.
+IMPORTANT: Do not ask the user to repeat what they want. Use the tools and answer.""" + "\n" + get_lang_text("respond_instruction"),
 
     "delete": """You are a Home Assistant deletion assistant. User wants to delete an automation, script, or dashboard.
 CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
@@ -2931,6 +2932,67 @@ CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
 - Respond in the user's language. Be concise.
 - NEVER auto-confirm deletions. Deletions are IRREVERSIBLE.""",
 }
+
+
+def _score_query_state_candidate(user_message: str, entity_id: str, friendly_name: str) -> int:
+    msg = (user_message or "").lower()
+    eid = (entity_id or "").lower()
+    name = (friendly_name or "").lower()
+
+    score = 0
+
+    # Strong signals for "today production"
+    if "produzione_giornal" in eid or "today_production" in eid or "day_production" in eid:
+        score += 80
+    if "giornal" in eid or "oggi" in eid or "today" in eid:
+        score += 10
+
+    # PV / solar / production keywords
+    keywords = ["fotovolta", "solare", "solar", "pv", "produzione", "production", "energia", "energy"]
+    for k in keywords:
+        if k in msg and (k in eid or k in name):
+            score += 8
+        elif k in eid or k in name:
+            score += 2
+
+    # Prefer energy/production sensors
+    if eid.startswith("sensor."):
+        score += 3
+    if "power" in eid or "kw" in eid:
+        score += 2
+    if "energy" in eid or "kwh" in eid:
+        score += 6
+
+    # De-prioritize obvious false positives
+    if "ipv4" in eid or "ipv6" in eid or "address" in eid:
+        score -= 50
+    if eid.startswith("binary_sensor."):
+        score -= 10
+    if eid.startswith("button.") or eid.startswith("switch."):
+        score -= 8
+
+    return score
+
+
+def _format_query_state_answer(entity_id: str, state_data: dict) -> str:
+    state = state_data.get("state")
+    attrs = state_data.get("attributes") or {}
+    friendly_name = attrs.get("friendly_name") or entity_id
+    unit = attrs.get("unit_of_measurement") or ""
+
+    if state in (None, "unknown", "unavailable"):
+        if LANGUAGE == "it":
+            return f"Non riesco a leggere un valore disponibile per '{friendly_name}' ({entity_id})."
+        return f"I can't read an available value for '{friendly_name}' ({entity_id})."
+
+    value = f"{state}{(' ' + unit) if unit else ''}"
+    if LANGUAGE == "it":
+        return f"Oggi la produzione risulta: {value} (sensore: {friendly_name})."
+    if LANGUAGE == "es":
+        return f"La producción de hoy es: {value} (sensor: {friendly_name})."
+    if LANGUAGE == "fr":
+        return f"La production d'aujourd'hui est : {value} (capteur : {friendly_name})."
+    return f"Today's production is: {value} (sensor: {friendly_name})."
 
 
 def detect_intent(user_message: str, smart_context: str) -> dict:
@@ -3773,6 +3835,55 @@ def stream_chat_openai(messages, intent_info=None):
             for i in range(0, len(full_text), 4):
                 yield {"type": "token", "content": full_text[i:i+4]}
             break
+
+        # AUTO-STOP (query_state): after gathering data, answer directly to avoid extra LLM rounds
+        if intent_info and intent_info.get("intent") == "query_state":
+            candidates = []
+            # Pull candidates from tool results
+            for _tc_id, (fn_name, result) in tool_call_results.items():
+                if fn_name == "search_entities":
+                    try:
+                        items = json.loads(result)
+                        if isinstance(items, list):
+                            for it in items:
+                                if isinstance(it, dict) and it.get("entity_id"):
+                                    candidates.append({
+                                        "entity_id": it.get("entity_id"),
+                                        "friendly_name": it.get("friendly_name") or "",
+                                    })
+                    except Exception:
+                        pass
+
+            # If we found candidates, pick the best and fetch its state once
+            if candidates:
+                user_msg = ""
+                # last user message is usually at the end
+                for m in reversed(messages):
+                    if m.get("role") == "user" and isinstance(m.get("content"), str):
+                        user_msg = m.get("content")
+                        break
+
+                best = None
+                best_score = -10**9
+                for c in candidates:
+                    s = _score_query_state_candidate(user_msg, c.get("entity_id"), c.get("friendly_name"))
+                    if s > best_score:
+                        best_score = s
+                        best = c
+
+                if best and best.get("entity_id") and best_score >= 20:
+                    try:
+                        state_json = execute_tool("get_entity_state", {"entity_id": best["entity_id"]})
+                        state_data = json.loads(state_json) if isinstance(state_json, str) else {}
+                        full_text = _format_query_state_answer(best["entity_id"], state_data if isinstance(state_data, dict) else {})
+                        logger.info("Auto-stop: query_state answered locally to avoid extra API call")
+                        messages.append({"role": "assistant", "content": full_text})
+                        yield {"type": "clear"}
+                        for i in range(0, len(full_text), 4):
+                            yield {"type": "token", "content": full_text[i:i+4]}
+                        break
+                    except Exception as e:
+                        logger.warning(f"Auto-stop query_state failed: {e}")
 
     messages.append({"role": "assistant", "content": full_text})
     yield {"type": "done", "full_text": full_text}
