@@ -417,7 +417,7 @@ def get_chat_ui():
             const btn = document.createElement('button');
             btn.className = 'undo-button';
             btn.textContent = '↩︎ Ripristina backup';
-            btn.title = `Ripristina il backup (snapshot: ${snapshotId})`;
+            btn.title = 'Ripristina il backup (snapshot: ' + snapshotId + ')';
             btn.onclick = () => restoreSnapshot(snapshotId, btn);
             div.appendChild(btn);
         }}
