@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.6"
+VERSION = "3.1.7"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1523,11 +1523,13 @@ def api_set_model():
     if "provider" in data:
         AI_PROVIDER = data["provider"]
         SELECTED_PROVIDER = data["provider"]  # Persist the selection
-        # CRITICAL FIX: When changing provider, reset SELECTED_MODEL to avoid using model from old provider
-        # e.g., if switching from GitHub (openai/gpt-5) to NVIDIA, don't use openai/gpt-5 on NVIDIA
+        # CRITICAL FIX: When changing provider WITHOUT model, reset to provider defaults
+        # Otherwise old SELECTED_MODEL from previous provider stays active!
         if "model" not in data:
-            SELECTED_MODEL = ""  # Will fall back to AI_MODEL from config or provider default
-            # If no model specified, use provider default
+            SELECTED_MODEL = ""
+            # Temporarily also clear SELECTED_PROVIDER until a model is chosen
+            SELECTED_PROVIDER = ""
+            # Set AI_MODEL to provider default
             default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model")
             if default_model:
                 AI_MODEL = default_model
