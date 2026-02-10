@@ -727,6 +727,34 @@ def get_chat_ui():
                     if (!availableProviders.includes(providerId)) continue;
                     if (!data.models || !data.models[providerId] || data.models[providerId].length === 0) continue;
 
+                    // Special grouping for NVIDIA: split into tested vs to-test
+                    if (providerId === 'nvidia' && (Array.isArray(data.nvidia_models_tested) || Array.isArray(data.nvidia_models_to_test))) {{
+                        const tested = Array.isArray(data.nvidia_models_tested) ? data.nvidia_models_tested : [];
+                        const toTest = Array.isArray(data.nvidia_models_to_test) ? data.nvidia_models_to_test : [];
+
+                        const groups = [
+                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' ✅ Testati', models: tested }},
+                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' 🧪 Da testare', models: toTest }},
+                        ].filter(g => Array.isArray(g.models) && g.models.length > 0);
+
+                        for (const g of groups) {{
+                            const group = document.createElement('optgroup');
+                            group.label = g.label;
+                            g.models.forEach(model => {{
+                                const option = document.createElement('option');
+                                option.value = JSON.stringify({{model: model, provider: providerId}});
+                                const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub):\\s*/, '');
+                                option.textContent = displayName;
+                                if (model === currentModel && providerId === currentProvider) {{
+                                    option.selected = true;
+                                }}
+                                group.appendChild(option);
+                            }});
+                            select.appendChild(group);
+                        }}
+                        continue;
+                    }}
+
                     const group = document.createElement('optgroup');
                     group.label = PROVIDER_LABELS[providerId] || providerId;
 

@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.23"
+VERSION = "3.1.24"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -205,25 +205,39 @@ GITHUB_MODEL_BLOCKLIST: set[str] = set()
 NVIDIA_MODEL_BLOCKLIST: set[str] = set()
 GITHUB_MODEL_BLOCKLIST: set[str] = set()  # may be used by providers
 
+# NVIDIA models that have been successfully chat-tested (per current key)
+NVIDIA_MODEL_TESTED_OK: set[str] = set()
+
 MODEL_BLOCKLIST_FILE = "/config/.storage/claude_model_blocklist.json"
 
 
 def load_model_blocklists() -> None:
     """Load persistent model blocklists from disk."""
-    global NVIDIA_MODEL_BLOCKLIST, GITHUB_MODEL_BLOCKLIST
+    global NVIDIA_MODEL_BLOCKLIST, GITHUB_MODEL_BLOCKLIST, NVIDIA_MODEL_TESTED_OK
     try:
         if os.path.isfile(MODEL_BLOCKLIST_FILE):
             with open(MODEL_BLOCKLIST_FILE, "r") as f:
                 data = json.load(f) or {}
             nvidia = data.get("nvidia") or []
             github = data.get("github") or []
-            if isinstance(nvidia, list):
+
+            # Backward compatible formats:
+            # - {"nvidia": [..]} (legacy blocked-only)
+            # - {"nvidia": {"blocked": [..], "tested_ok": [..]}}
+            if isinstance(nvidia, dict):
+                blocked = nvidia.get("blocked") or []
+                tested_ok = nvidia.get("tested_ok") or []
+                if isinstance(blocked, list):
+                    NVIDIA_MODEL_BLOCKLIST.update([m for m in blocked if isinstance(m, str) and m.strip()])
+                if isinstance(tested_ok, list):
+                    NVIDIA_MODEL_TESTED_OK.update([m for m in tested_ok if isinstance(m, str) and m.strip()])
+            elif isinstance(nvidia, list):
                 NVIDIA_MODEL_BLOCKLIST.update([m for m in nvidia if isinstance(m, str) and m.strip()])
             if isinstance(github, list):
                 GITHUB_MODEL_BLOCKLIST.update([m for m in github if isinstance(m, str) and m.strip()])
-            if NVIDIA_MODEL_BLOCKLIST or GITHUB_MODEL_BLOCKLIST:
+            if NVIDIA_MODEL_BLOCKLIST or GITHUB_MODEL_BLOCKLIST or NVIDIA_MODEL_TESTED_OK:
                 logger.info(
-                    f"Loaded model blocklists: nvidia={len(NVIDIA_MODEL_BLOCKLIST)}, github={len(GITHUB_MODEL_BLOCKLIST)}"
+                    f"Loaded model lists: nvidia_blocked={len(NVIDIA_MODEL_BLOCKLIST)}, nvidia_tested_ok={len(NVIDIA_MODEL_TESTED_OK)}, github_blocked={len(GITHUB_MODEL_BLOCKLIST)}"
                 )
     except Exception as e:
         logger.warning(f"Could not load model blocklists: {e}")
@@ -234,7 +248,10 @@ def save_model_blocklists() -> None:
     try:
         os.makedirs(os.path.dirname(MODEL_BLOCKLIST_FILE), exist_ok=True)
         payload = {
-            "nvidia": sorted(NVIDIA_MODEL_BLOCKLIST),
+            "nvidia": {
+                "blocked": sorted(NVIDIA_MODEL_BLOCKLIST),
+                "tested_ok": sorted(NVIDIA_MODEL_TESTED_OK),
+            },
             "github": sorted(GITHUB_MODEL_BLOCKLIST),
         }
         with open(MODEL_BLOCKLIST_FILE, "w") as f:
@@ -243,12 +260,25 @@ def save_model_blocklists() -> None:
         logger.warning(f"Could not save model blocklists: {e}")
 
 
+def mark_nvidia_model_tested_ok(model_id: str) -> None:
+    """Mark a NVIDIA model as successfully tested and persist it."""
+    if not isinstance(model_id, str) or not model_id.strip():
+        return
+    model_id = model_id.strip()
+    if model_id in NVIDIA_MODEL_BLOCKLIST:
+        return
+    NVIDIA_MODEL_TESTED_OK.add(model_id)
+    save_model_blocklists()
+
+
 def blocklist_nvidia_model(model_id: str) -> None:
     """Add a model to NVIDIA blocklist, persist it, and drop it from cache."""
     if not isinstance(model_id, str) or not model_id.strip():
         return
     model_id = model_id.strip()
     NVIDIA_MODEL_BLOCKLIST.add(model_id)
+    if model_id in NVIDIA_MODEL_TESTED_OK:
+        NVIDIA_MODEL_TESTED_OK.discard(model_id)
     try:
         cached = _NVIDIA_MODELS_CACHE.get("models") or []
         if isinstance(cached, list) and model_id in cached:
@@ -1980,6 +2010,8 @@ def api_get_models():
     # --- Tutti i modelli per provider (come li vuole la chat: display/prefissi) ---
     models_display = {}
     models_technical = {}
+    nvidia_models_tested_display: list[str] = []
+    nvidia_models_to_test_display: list[str] = []
     for provider, models in PROVIDER_MODELS.items():
         filtered_models = list(models)
 
@@ -1991,12 +2023,22 @@ def api_get_models():
             if NVIDIA_MODEL_BLOCKLIST:
                 filtered_models = [m for m in filtered_models if m not in NVIDIA_MODEL_BLOCKLIST]
 
+            # Partition into tested vs not-yet-tested (keep only currently available models)
+            tested_ok = [m for m in filtered_models if m in NVIDIA_MODEL_TESTED_OK]
+            to_test = [m for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
+            filtered_models = tested_ok + to_test
+
         if provider == "github" and GITHUB_MODEL_BLOCKLIST:
             filtered_models = [m for m in filtered_models if m not in GITHUB_MODEL_BLOCKLIST]
         models_technical[provider] = list(filtered_models)
         # Use per-provider display mapping to avoid cross-provider conflicts
         prov_map = PROVIDER_DISPLAY.get(provider, {})
         models_display[provider] = [prov_map.get(m, m) for m in filtered_models]
+
+        if provider == "nvidia":
+            # Provide explicit groups for UI (display names)
+            nvidia_models_tested_display = [prov_map.get(m, m) for m in filtered_models if m in NVIDIA_MODEL_TESTED_OK]
+            nvidia_models_to_test_display = [prov_map.get(m, m) for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
 
     # --- Current model (sia tech che display) ---
     current_model_tech = get_active_model()
@@ -2019,6 +2061,10 @@ def api_get_models():
         "current_provider": AI_PROVIDER,
         "current_model": current_model_display,
         "models": models_display,
+
+        # NVIDIA UI grouping: tested models first, then not-yet-tested
+        "nvidia_models_tested": nvidia_models_tested_display,
+        "nvidia_models_to_test": nvidia_models_to_test_display,
 
         # extra per HA (più completo)
         "current_model_technical": current_model_tech,
@@ -2083,6 +2129,8 @@ def api_nvidia_test_model():
 
         data = resp.json() if resp.content else {}
         ok = bool(isinstance(data, dict) and (data.get("choices") or data.get("id")))
+        if ok:
+            mark_nvidia_model_tested_ok(model_id)
         return jsonify({"success": ok, "blocklisted": False, "model": model_id}), 200
 
     except Exception as e:
@@ -2191,6 +2239,7 @@ def api_nvidia_test_models():
 
         if resp.status_code == 200:
             ok.append(model_id)
+            mark_nvidia_model_tested_ok(model_id)
             idx += 1
             continue
 
