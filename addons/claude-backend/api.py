@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.18"
+VERSION = "3.1.19"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2026,6 +2026,67 @@ def api_get_models():
         "available_providers": available_providers,
         "available_models": available_models
     }), 200
+
+
+@app.route('/api/nvidia/test_model', methods=['POST'])
+def api_nvidia_test_model():
+    """Quick NVIDIA chat test for the currently selected model.
+
+    Uses a minimal non-streaming /v1/chat/completions call with a short prompt.
+    If the model returns 404 (not available) or 400 (not chat-compatible), it is blocklisted.
+    """
+    if not NVIDIA_API_KEY:
+        return jsonify({"success": False, "error": "NVIDIA API key non configurata."}), 400
+
+    model_id = get_active_model()
+    if not isinstance(model_id, str) or not model_id.strip():
+        return jsonify({"success": False, "error": "Modello NVIDIA non valido."}), 400
+
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": model_id,
+        "messages": [{"role": "user", "content": "ciao"}],
+        "stream": False,
+        "max_tokens": 32,
+        "temperature": 0.2,
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=15)
+
+        if resp.status_code >= 400:
+            if resp.status_code in (404, 400):
+                blocklist_nvidia_model(model_id)
+                reason = "non disponibile (404)" if resp.status_code == 404 else "non compatibile con chat (400)"
+                return jsonify({
+                    "success": False,
+                    "blocklisted": True,
+                    "model": model_id,
+                    "message": f"Modello NVIDIA {reason}: {model_id}. Rimosso dalla lista.",
+                }), 200
+
+            return jsonify({
+                "success": False,
+                "blocklisted": False,
+                "model": model_id,
+                "message": f"Test NVIDIA fallito (HTTP {resp.status_code}).",
+            }), 200
+
+        data = resp.json() if resp.content else {}
+        ok = bool(isinstance(data, dict) and (data.get("choices") or data.get("id")))
+        return jsonify({"success": ok, "blocklisted": False, "model": model_id}), 200
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "blocklisted": False,
+            "model": model_id,
+            "message": f"Test NVIDIA errore: {type(e).__name__}: {e}",
+        }), 200
 
 @app.route("/health", methods=["GET"])
 def health():

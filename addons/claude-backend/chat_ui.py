@@ -174,6 +174,7 @@ def get_chat_ui():
         <h1>AI Assistant</h1>
         <span class="badge">v{api.VERSION}</span>
         <select id="modelSelect" onchange="changeModel(this.value)" title="Cambia modello"></select>
+        <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="Test veloce NVIDIA (può richiedere qualche secondo)" style="display:none">🔍 Test NVIDIA</button>
         <!-- Populated by JavaScript -->
         <span class="badge">\U0001f5bc Vision</span>
         <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
@@ -703,6 +704,11 @@ def get_chat_ui():
                     currentProviderId = currentProvider;
                 }}
 
+                const testBtn = document.getElementById('testNvidiaBtn');
+                if (testBtn) {{
+                    testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';
+                }}
+
                 console.log('[loadModels] Provider:', currentProvider, 'Current model:', currentModel);
 
                 // Clear existing options
@@ -755,6 +761,40 @@ def get_chat_ui():
             }}
         }}
 
+        async function testNvidiaModel() {{
+            const btn = document.getElementById('testNvidiaBtn');
+            if (!btn) return;
+
+            const oldText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Test...';
+            try {{
+                const response = await fetch(apiUrl('api/nvidia/test_model'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{}})
+                }});
+                const data = await response.json().catch(() => ({{}}));
+
+                if (response.ok && data && data.success) {{
+                    addMessage(`✅ NVIDIA OK: ${{data.model}}`, 'system');
+                }} else {{
+                    const msg = (data && (data.message || data.error)) || ('Test NVIDIA fallito (' + response.status + ')');
+                    addMessage('⚠️ ' + msg, 'system');
+                }}
+
+                // If the backend removed a model from the list, refresh dropdown
+                if (data && data.blocklisted) {{
+                    await loadModels();
+                }}
+            }} catch (e) {{
+                addMessage('⚠️ Test NVIDIA fallito: ' + (e && e.message ? e.message : String(e)), 'system');
+            }} finally {{
+                btn.disabled = false;
+                btn.textContent = oldText;
+            }}
+        }}
+
         // Change model (with automatic provider switch)
         async function changeModel(value) {{
             try {{
@@ -769,6 +809,10 @@ def get_chat_ui():
                     console.log('Model changed to:', parsed.model, 'Provider:', parsed.provider);
                     // Keep UI state in sync so the thinking message matches the selected provider
                     currentProviderId = parsed.provider;
+                    const testBtn = document.getElementById('testNvidiaBtn');
+                    if (testBtn) {{
+                        testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';
+                    }}
                     // Show notification
                     const providerName = PROVIDER_LABELS[parsed.provider] || parsed.provider;
                     addMessage(`🔄 Passato a ${{providerName}} → ${{parsed.model}}`, 'system');
