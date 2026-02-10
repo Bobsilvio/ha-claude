@@ -132,8 +132,15 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "get_automations",
-        "description": "Get all existing automations with their YAML source. Returns the list of automations AND the content of automations.yaml. To modify an automation, use update_automation instead of write_config_file.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "description": "Find existing automations. Optionally pass a query to search by alias/entity. Returns a compact list of matches to keep responses small. To modify an automation, use update_automation.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Optional search text (room name, device name, entity_id fragment, alias keywords)."},
+                "limit": {"type": "integer", "description": "Max results to return (default 10).", "minimum": 1, "maximum": 50}
+            },
+            "required": []
+        }
     },
     {
         "name": "update_automation",
@@ -638,13 +645,99 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "get_automations":
+            query = tool_input.get("query") if isinstance(tool_input, dict) else None
+            query = (query or "").strip()
+            limit = tool_input.get("limit") if isinstance(tool_input, dict) else None
+            try:
+                limit = int(limit) if limit is not None else 10
+            except Exception:
+                limit = 10
+            limit = max(1, min(limit, 50))
+
+            # If a query is provided, search automations.yaml for compact matches
+            if query:
+                q = query.lower()
+                matches = []
+                total_yaml = None
+                try:
+                    import yaml
+
+                    yaml_path = api.get_config_file_path("automation", "automations.yaml")
+                    if yaml_path and os.path.isfile(yaml_path):
+                        with open(yaml_path, "r", encoding="utf-8") as f:
+                            automations_yaml = yaml.safe_load(f) or []
+                        if isinstance(automations_yaml, list):
+                            total_yaml = len(automations_yaml)
+                            for a in automations_yaml:
+                                if not isinstance(a, dict):
+                                    continue
+                                alias = str(a.get("alias", "") or "")
+                                aid = str(a.get("id", "") or "")
+                                hay = (yaml.safe_dump(a, allow_unicode=True, sort_keys=False) or "").lower()
+                                if q in alias.lower() or (aid and q in aid.lower()) or q in hay:
+                                    matches.append({
+                                        "id": aid,
+                                        "alias": alias,
+                                        "yaml": yaml.safe_dump(a, allow_unicode=True, sort_keys=False),
+                                    })
+                                    if len(matches) >= limit:
+                                        break
+                except Exception:
+                    pass
+
+                # Fallback: search states list by friendly_name/entity_id
+                if not matches:
+                    states = api.get_all_states()
+                    autos = [s for s in states if s.get("entity_id", "").startswith("automation.")]
+                    for s in autos:
+                        eid = str(s.get("entity_id", "") or "")
+                        fn = str(s.get("attributes", {}).get("friendly_name", "") or "")
+                        aid = str(s.get("attributes", {}).get("id", "") or "")
+                        if q in eid.lower() or q in fn.lower() or (aid and q in aid.lower()):
+                            matches.append({
+                                "entity_id": eid,
+                                "state": s.get("state"),
+                                "friendly_name": fn,
+                                "id": aid,
+                                "last_triggered": s.get("attributes", {}).get("last_triggered", ""),
+                            })
+                            if len(matches) >= limit:
+                                break
+
+                return json.dumps(
+                    {
+                        "query": query,
+                        "matched": len(matches),
+                        "total": total_yaml,
+                        "automations": matches,
+                        "edit_hint": "If you want to modify one, use update_automation with its id.",
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+
+            # No query: return the full list (compact fields)
             states = api.get_all_states()
             autos = [s for s in states if s.get("entity_id", "").startswith("automation.")]
-            result = [{"entity_id": a.get("entity_id"), "state": a.get("state"),
-                       "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
-                       "id": a.get("attributes", {}).get("id", ""),
-                       "last_triggered": a.get("attributes", {}).get("last_triggered", "")} for a in autos]
-            return json.dumps({"automations": result, "edit_hint": "To edit an automation, use update_automation with the automation's id and the changes you want to make."}, ensure_ascii=False, default=str)
+            result = [
+                {
+                    "entity_id": a.get("entity_id"),
+                    "state": a.get("state"),
+                    "friendly_name": a.get("attributes", {}).get("friendly_name", ""),
+                    "id": a.get("attributes", {}).get("id", ""),
+                    "last_triggered": a.get("attributes", {}).get("last_triggered", ""),
+                }
+                for a in autos
+            ]
+            return json.dumps(
+                {
+                    "total": len(result),
+                    "automations": result,
+                    "edit_hint": "To edit an automation, use update_automation with the automation's id and the changes you want to make.",
+                },
+                ensure_ascii=False,
+                default=str,
+            )
 
         elif tool_name == "update_automation":
             import yaml
@@ -2062,8 +2155,15 @@ HA_TOOLS_EXTENDED = HA_TOOLS_COMPACT + [
     },
     {
         "name": "get_automations",
-        "description": "Get list of all automations with id, alias, state, and full config.",
-        "parameters": {"type": "object", "properties": {}, "required": []}
+        "description": "Find existing automations. Optionally pass a query to search by alias/entity. Returns a compact list of matches.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50}
+            },
+            "required": []
+        }
     },
     {
         "name": "get_scripts",

@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 # Tool sets by intent category
 INTENT_TOOL_SETS = {
     "chat": [],  # No tools needed for greetings/chitchat
+    "find_automation": ["get_automations"],
     "modify_automation": ["update_automation"],
     "modify_script": ["update_script"],
     "create_automation": ["create_automation", "search_entities"],
@@ -36,6 +37,15 @@ INTENT_TOOL_SETS = {
 INTENT_PROMPTS = {
     "chat": """Sei un assistente amichevole per Home Assistant. L'utente sta semplicemente salutando o chiacchierando.
 Rispondi in modo breve e cordiale. Non chiamare nessun tool.""",
+
+    "find_automation": """You are a Home Assistant automation finder.
+The user is asking whether an automation already exists.
+CRITICAL: Do NOT guess.
+You MUST call get_automations ONCE with a short query extracted from the user message (room/device name, entity_id fragment, alias keywords).
+Then answer:
+- If you find matches: list the best 1-5 matches (id + alias) and ask which one they mean.
+- If you find none: say you couldn't find it and propose next step (search by entity names or create a new automation).
+Be concise and respond in the user's language.""",
 
     "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
 The automation config is provided in the DATI section of the user's message.
@@ -214,6 +224,20 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
 
     # --- CREATE AUTOMATION ---
     has_create = any(k in msg for k in create_kw)
+
+    # --- FIND AUTOMATION (existence check) ---
+    # Common in Italian: "c'è un'automazione che..." is NOT a create request.
+    # Keep this heuristic simple and conservative.
+    if has_auto and not has_create:
+        if ("c'e" in msg) or ("c’è" in msg) or ("c'è" in msg) or ("esiste" in msg) or ("ci sono" in msg):
+            return {
+                "intent": "find_automation",
+                "tools": INTENT_TOOL_SETS["find_automation"],
+                "prompt": INTENT_PROMPTS["find_automation"],
+                "specific_target": False,
+                "max_rounds": 2,
+            }
+
     if has_create and has_auto:
         return {"intent": "create_automation", "tools": INTENT_TOOL_SETS["create_automation"],
                 "prompt": None, "specific_target": False}
