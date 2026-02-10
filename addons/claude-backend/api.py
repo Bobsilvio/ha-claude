@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.57"
+VERSION = "3.0.58"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -512,9 +512,13 @@ def initialize_ai_client():
         from openai import OpenAI
         ai_client = OpenAI(
             api_key=api_key,
-            base_url="https://models.inference.ai.azure.com"
+            base_url="https://models.github.ai/inference",
+            default_headers={
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
         )
-        logger.info(f"GitHub Copilot client initialized (model: {get_active_model()})")
+        logger.info(f"GitHub Models client initialized (model: {get_active_model()})")
     else:
         logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
         ai_client = None
