@@ -779,7 +779,7 @@ def get_chat_ui():
                 if (response.ok && data && data.success) {{
                     const parts = [];
                     parts.push(`Test NVIDIA: OK ${{data.ok}}, rimossi ${{data.removed}}, testati ${{data.tested}}/${{data.total}}`);
-                    if (data.stopped_reason) parts.push(`(${data.stopped_reason})`);
+                    if (data.stopped_reason) parts.push(`(${{data.stopped_reason}})`);
                     if (typeof data.remaining === 'number' && data.remaining > 0) parts.push(`— restanti: ${{data.remaining}} (ripremi per continuare)`);
                     addMessage('🔍 ' + parts.join(' '), 'system');
                 }} else {{
