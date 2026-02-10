@@ -639,6 +639,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             updated_via = None
             old_yaml = ""
             new_yaml = ""
+            snapshot = None
+            reload_result = None
 
             # --- ATTEMPT 1: YAML file ---
             yaml_path = api.get_config_file_path("automation", "automations.yaml")
@@ -658,12 +660,27 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
                         if found is not None:
                             old_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
+                            # Determine which key variants the existing automation uses
+                            trig_key = "triggers" if "triggers" in found else "trigger"
                             cond_key = "conditions" if "conditions" in found else "condition"
-                            # Remap condition↔conditions in changes to match existing key
+                            act_key = "actions" if "actions" in found else "action"
+
+                            # Remap trigger/condition/action keys in changes to match existing key style
+                            if "trigger" in changes and trig_key == "triggers":
+                                changes["triggers"] = changes.pop("trigger")
+                            elif "triggers" in changes and trig_key == "trigger":
+                                changes["trigger"] = changes.pop("triggers")
+
                             if "condition" in changes and cond_key == "conditions":
                                 changes["conditions"] = changes.pop("condition")
                             elif "conditions" in changes and cond_key == "condition":
                                 changes["condition"] = changes.pop("conditions")
+
+                            if "action" in changes and act_key == "actions":
+                                changes["actions"] = changes.pop("action")
+                            elif "actions" in changes and act_key == "action":
+                                changes["action"] = changes.pop("actions")
+
                             for key, value in changes.items():
                                 found[key] = value
                             if add_condition:
@@ -673,11 +690,28 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                                     found[cond_key] = [found[cond_key]]
                                 found[cond_key].append(add_condition)
                             new_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
-                            snapshot = api.create_snapshot("automations.yaml")
+
+                            # Snapshot the actual file path (supports configuration.yaml include mapping)
+                            try:
+                                rel_snapshot_path = None
+                                if isinstance(yaml_path, str) and yaml_path.startswith(api.HA_CONFIG_DIR + "/"):
+                                    rel_snapshot_path = os.path.relpath(yaml_path, api.HA_CONFIG_DIR)
+                                else:
+                                    rel_snapshot_path = os.path.basename(yaml_path)
+                                snapshot = api.create_snapshot(rel_snapshot_path)
+                            except Exception:
+                                snapshot = api.create_snapshot("automations.yaml")
+
                             automations[found_idx] = found
                             with open(yaml_path, "w", encoding="utf-8") as f:
                                 yaml.dump(automations, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
                             updated_via = "yaml"
+
+                            # Apply changes immediately: reload automations after file update
+                            try:
+                                reload_result = api.call_ha_api("POST", "services/automation/reload", {})
+                            except Exception as e:
+                                reload_result = {"error": str(e)}
                 except Exception as e:
                     logger.warning(f"YAML update attempt failed: {e}")
 
@@ -738,8 +772,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "updated_via": updated_via,
                 "old_yaml": old_yaml,
                 "new_yaml": new_yaml,
-                "snapshot": snapshot.get("snapshot_id", "") if updated_via == "yaml" else "N/A (REST API)",
-                "tip": "Changes applied immediately via REST API. No reload needed." if updated_via == "rest_api" else "Call services/automation/reload to apply changes.",
+                "snapshot": snapshot.get("snapshot_id", "") if (updated_via == "yaml" and isinstance(snapshot, dict)) else "N/A (REST API)",
+                "reload_result": reload_result if updated_via == "yaml" else "N/A (REST API)",
+                "tip": "Changes applied immediately via REST API. No reload needed." if updated_via == "rest_api" else "Automations reloaded automatically after YAML update.",
                 "IMPORTANT": "DONE. Show the user the before/after diff and stop. Do NOT call any more tools."
             }, ensure_ascii=False, default=str)
 
