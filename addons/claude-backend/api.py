@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.22"
+VERSION = "3.1.23"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2059,9 +2059,14 @@ def api_nvidia_test_model():
         resp = requests.post(url, headers=headers, json=payload, timeout=15)
 
         if resp.status_code >= 400:
-            if resp.status_code in (404, 400):
+            if resp.status_code in (404, 400, 422):
                 blocklist_nvidia_model(model_id)
-                reason = "non disponibile (404)" if resp.status_code == 404 else "non compatibile con chat (400)"
+                if resp.status_code == 404:
+                    reason = "non disponibile (404)"
+                elif resp.status_code == 400:
+                    reason = "non compatibile con chat (400)"
+                else:
+                    reason = "non compatibile con chat (422)"
                 return jsonify({
                     "success": False,
                     "blocklisted": True,
@@ -2189,7 +2194,7 @@ def api_nvidia_test_models():
             idx += 1
             continue
 
-        if resp.status_code in (404, 400):
+        if resp.status_code in (404, 400, 422):
             blocklist_nvidia_model(model_id)
             removed.append(model_id)
             idx += 1
