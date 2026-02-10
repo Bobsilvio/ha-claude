@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.55"
+VERSION = "3.0.56"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -206,6 +206,7 @@ PROVIDER_MODELS = {
     "github": [
         # OpenAI (via Azure)
         "openai/gpt-4o", "openai/gpt-4o-mini",
+        "openai/gpt-5", "openai/gpt-5-chat", "openai/gpt-5-mini", "openai/gpt-5-nano",
         "openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano",
         "openai/o1", "openai/o1-mini", "openai/o1-preview",
         "openai/o3", "openai/o3-mini", "openai/o4-mini",
@@ -263,6 +264,10 @@ MODEL_NAME_MAPPING = {
     # GitHub Models - IDs use publisher/model-name format
     "GitHub: GPT-4o": "openai/gpt-4o",
     "GitHub: GPT-4o-mini": "openai/gpt-4o-mini",
+    "GitHub: GPT-5": "openai/gpt-5",
+    "GitHub: GPT-5-chat": "openai/gpt-5-chat",
+    "GitHub: GPT-5-mini": "openai/gpt-5-mini",
+    "GitHub: GPT-5-nano": "openai/gpt-5-nano",
     "GitHub: GPT-4.1": "openai/gpt-4.1",
     "GitHub: GPT-4.1-mini": "openai/gpt-4.1-mini",
     "GitHub: GPT-4.1-nano": "openai/gpt-4.1-nano",
