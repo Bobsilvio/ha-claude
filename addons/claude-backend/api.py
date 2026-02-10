@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.49"
+VERSION = "3.0.50"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4343,18 +4343,19 @@ def get_chat_ui():
         .chat-item.active {{ background: #e8f0fe; border-left: 3px solid #667eea; }}
         .chat-item-title {{ font-size: 13px; color: #333; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
         .chat-item-info {{ font-size: 11px; color: #999; }}
-        .chat-item-delete {{ color: #ef4444; font-size: 18px; padding: 4px 8px; opacity: 0; transition: opacity 0.2s; cursor: pointer; flex-shrink: 0; }}
+        .chat-item-delete {{ color: #ef4444; font-size: 16px; padding: 4px 8px; opacity: 0.6; transition: all 0.2s; cursor: pointer; flex-shrink: 0; background: none; border: none; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }}
         .chat-item:hover .chat-item-delete {{ opacity: 1; }}
-        .chat-item-delete:hover {{ color: #dc2626; }}
+        .chat-item-delete:hover {{ color: #dc2626; background: rgba(239,68,68,0.1); }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
         .header .badge {{ font-size: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
         .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
         .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
-        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 200px; }}
+        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 240px; }}
         .model-selector:hover {{ background: rgba(255,255,255,0.35); }}
         .model-selector option {{ background: #2c3e50; color: white; }}
+        .model-selector optgroup {{ background: #1a252f; color: #aaa; font-style: normal; font-weight: 600; padding: 4px 0; }}
         .header .status {{ margin-left: auto; font-size: 12px; display: flex; align-items: center; gap: 6px; }}
         .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {status_color}; animation: pulse 2s infinite; }}
         @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
@@ -4770,7 +4771,7 @@ def get_chat_ui():
                                 <div class="chat-item-title">${{conv.title}}</div>
                                 <div class="chat-item-info">${{conv.message_count}} messaggi</div>
                             </div>
-                            <span class="chat-item-delete" onclick="deleteConversation(event, '${{conv.id}}')" title="Elimina chat">×</span>
+                            <span class="chat-item-delete" onclick="deleteConversation(event, '${{conv.id}}')" title="Elimina chat">🗑</span>
                         `;
                         chatList.appendChild(item);
                     }});
@@ -4846,7 +4847,16 @@ def get_chat_ui():
             loadChatList();
         }}
 
-        // Load models and populate dropdown
+        // Provider name mapping for optgroups
+        const PROVIDER_LABELS = {{
+            'anthropic': '🧠 Anthropic Claude',
+            'openai': '⚡ OpenAI',
+            'google': '✨ Google Gemini',
+            'nvidia': '🎯 NVIDIA NIM',
+            'github': '🚀 GitHub Models'
+        }};
+
+        // Load models and populate dropdown with ALL providers
         async function loadModels() {{
             try {{
                 const response = await fetch('/api/get_models');
@@ -4854,52 +4864,60 @@ def get_chat_ui():
                 console.log('[loadModels] API response:', data);
                 
                 const select = document.getElementById('modelSelect');
-                const provider = data.current_provider;
+                const currentProvider = data.current_provider;
                 const currentModel = data.current_model;
                 
-                console.log('[loadModels] Provider:', provider, 'Current model:', currentModel);
+                console.log('[loadModels] Provider:', currentProvider, 'Current model:', currentModel);
 
                 // Clear existing options
                 select.innerHTML = '';
 
-                // Add models for current provider
-                if (data.models && data.models[provider]) {{
-                    console.log('[loadModels] Models for provider:', data.models[provider]);
-                    data.models[provider].forEach(model => {{
+                // Add models for ALL available providers, grouped by optgroup
+                const providerOrder = ['anthropic', 'openai', 'google', 'nvidia', 'github'];
+                const availableProviders = data.available_providers ? data.available_providers.map(p => p.id) : [currentProvider];
+                
+                for (const providerId of providerOrder) {{
+                    if (!availableProviders.includes(providerId)) continue;
+                    if (!data.models || !data.models[providerId] || data.models[providerId].length === 0) continue;
+                    
+                    const group = document.createElement('optgroup');
+                    group.label = PROVIDER_LABELS[providerId] || providerId;
+                    
+                    data.models[providerId].forEach(model => {{
                         const option = document.createElement('option');
-                        option.value = model;
-                        option.textContent = model;
-                        if (model === currentModel) {{
+                        option.value = JSON.stringify({{model: model, provider: providerId}});
+                        // Show just the model name without provider prefix
+                        const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub):\s*/, '');
+                        option.textContent = displayName;
+                        if (model === currentModel && providerId === currentProvider) {{
                             option.selected = true;
                         }}
-                        select.appendChild(option);
+                        group.appendChild(option);
                     }});
-                    console.log('[loadModels] Added', data.models[provider].length, 'models to dropdown');
-                }} else {{
-                    console.error('[loadModels] No models found for provider:', provider);
-                    console.error('[loadModels] Available providers in data.models:', Object.keys(data.models || {{}}));
+                    
+                    select.appendChild(group);
                 }}
+                console.log('[loadModels] Loaded models for', availableProviders.length, 'providers');
             }} catch (error) {{
                 console.error('[loadModels] Error loading models:', error);
             }}
         }}
 
-        // Change model
-        async function changeModel(model) {{
+        // Change model (with automatic provider switch)
+        async function changeModel(value) {{
             try {{
+                const parsed = JSON.parse(value);
                 const response = await fetch('/api/set_model', {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{model: model}})
+                    body: JSON.stringify({{model: parsed.model, provider: parsed.provider}})
                 }});
                 if (response.ok) {{
                     const data = await response.json();
-                    console.log('Model changed to:', model);
-
-                    // Show warning if provider/model mismatch
-                    if (data.status === 'warning' && data.warning) {{
-                        alert(data.warning);
-                    }}
+                    console.log('Model changed to:', parsed.model, 'Provider:', parsed.provider);
+                    // Show notification
+                    const providerName = PROVIDER_LABELS[parsed.provider] || parsed.provider;
+                    addMessage(`🔄 Passato a ${{providerName}} → ${{parsed.model}}`, 'system');
                 }}
             }} catch (error) {{
                 console.error('Error changing model:', error);
@@ -5220,7 +5238,14 @@ def api_conversation_get(session_id):
         display_msgs = []
         for m in msgs:
             if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
-                display_msgs.append({"role": m["role"], "content": m["content"]})
+                msg_data = {"role": m["role"], "content": m["content"]}
+                # Include model/provider metadata for assistant messages
+                if m.get("role") == "assistant":
+                    if m.get("model"):
+                        msg_data["model"] = m["model"]
+                    if m.get("provider"):
+                        msg_data["provider"] = m["provider"]
+                display_msgs.append(msg_data)
         return jsonify({"session_id": session_id, "messages": display_msgs}), 200
     return jsonify({"error": "Conversation not found"}), 404
 
