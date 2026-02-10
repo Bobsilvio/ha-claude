@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.63"
+VERSION = "3.0.64"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -3110,6 +3110,10 @@ def get_prompt_for_intent(intent_info: dict) -> str:
     """Get system prompt for intent. Returns focused prompt if available, else full."""
     prompt = intent_info.get("prompt")
     if prompt:
+        # Enforce configured LANGUAGE even in focused prompts
+        lang_instruction = get_lang_text("respond_instruction")
+        if lang_instruction and lang_instruction not in prompt:
+            return prompt + "\n\n" + lang_instruction
         return prompt
     return get_system_prompt()
 
@@ -5416,7 +5420,7 @@ def api_status():
 
 @app.route('/api/set_model', methods=['POST'])
 def api_set_model():
-    global AI_PROVIDER, AI_MODEL
+    global AI_PROVIDER, AI_MODEL, ai_client
 
     data = request.json or {}
 
@@ -5427,6 +5431,18 @@ def api_set_model():
         AI_MODEL = normalize_model_name(data["model"])
 
     logger.info(f"Runtime model changed → {AI_PROVIDER} / {AI_MODEL}")
+
+    # Reinitialize client so provider switches don't keep a stale client instance
+    try:
+        initialize_ai_client()
+    except Exception as e:
+        logger.exception(f"Failed to reinitialize AI client after model/provider change: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to initialize AI client for selected provider/model",
+            "provider": AI_PROVIDER,
+            "model": AI_MODEL,
+        }), 500
 
     return jsonify({
         "success": True,
