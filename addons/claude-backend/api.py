@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.58"
+VERSION = "3.0.59"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -433,6 +433,11 @@ def get_max_tokens_param(max_tokens_value: int) -> dict:
     Returns:
         dict with either {"max_tokens": value} or {"max_completion_tokens": value}
     """
+    # GitHub Models REST API uses max_tokens (per official docs).
+    # Using max_completion_tokens can cause request validation errors.
+    if AI_PROVIDER == "github":
+        return {"max_tokens": max_tokens_value}
+
     model = get_active_model().lower()
 
     # Models that require max_completion_tokens instead of max_tokens
