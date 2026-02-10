@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.38"
+VERSION = "3.0.39"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -48,6 +48,20 @@ logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT 
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
 logger.info(f"LANGUAGE: {LANGUAGE}")
+
+# Load multilingual keywords for intent detection
+KEYWORDS = {}
+try:
+    keywords_file = os.path.join(os.path.dirname(__file__), "keywords.json")
+    if os.path.isfile(keywords_file):
+        with open(keywords_file, "r", encoding="utf-8") as f:
+            keywords_data = json.load(f)
+            KEYWORDS = keywords_data.get("keywords", {})
+        logger.info(f"Loaded keywords for {len(KEYWORDS)} languages: {list(KEYWORDS.keys())}")
+    else:
+        logger.warning(f"keywords.json not found at {keywords_file}")
+except Exception as e:
+    logger.error(f"Error loading keywords.json: {e}")
 
 # Language-specific text
 LANGUAGE_TEXT = {
@@ -2860,17 +2874,29 @@ CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
 
 def detect_intent(user_message: str, smart_context: str) -> dict:
     """Detect user intent locally from the message and available context.
+    Uses multilingual keywords from keywords.json based on LANGUAGE setting.
     Returns: {"intent": str, "tools": list[str], "prompt": str|None, "specific_target": bool}
     If intent is clear + specific target found, use focused mode (fewer tools, shorter prompt).
     Otherwise fall back to full mode."""
     msg = user_message.lower()
     
+    # Get keywords for current language, fallback to English if not available
+    lang_keywords = KEYWORDS.get(LANGUAGE, KEYWORDS.get("en", {}))
+    
+    # Extract keywords for different categories
+    create_kw = lang_keywords.get("create", [])
+    modify_kw = lang_keywords.get("modify", [])
+    auto_kw = lang_keywords.get("automation", [])
+    script_kw = lang_keywords.get("script", [])
+    dash_kw = lang_keywords.get("dashboard", [])
+    control_kw = lang_keywords.get("control", [])
+    query_kw = lang_keywords.get("query", [])
+    history_kw = lang_keywords.get("history", [])
+    delete_kw = lang_keywords.get("delete", [])
+    config_kw = lang_keywords.get("config", [])
+    
     # --- MODIFY AUTOMATION (most common case) ---
-    modify_auto_kw = ["modifica", "cambia", "aggiorna", "escludi", "aggiungi", "rimuovi", "togli",
-                       "modific", "cambiar", "aggiornar", "escluder", "aggiung", "rimuov",
-                       "exclude", "change", "modify", "update", "remove", "add", "fix"]
-    auto_kw = ["automazione", "automation", "automazion"]
-    has_modify = any(k in msg for k in modify_auto_kw)
+    has_modify = any(k in msg for k in modify_kw)
     has_auto = any(k in msg for k in auto_kw)
     # Also detect if smart context found a specific automation
     has_specific_auto = "## AUTOMAZIONE" in smart_context if smart_context else False
@@ -2880,7 +2906,6 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                 "prompt": INTENT_PROMPTS["modify_automation"] + "\n\nIMPORTANT: Before calling update_automation, show the user which automation you will modify and ask for explicit confirmation. Provide modification details and ask: 'Confermi che devo modificare questa automazione? (sì/no)'", "specific_target": has_specific_auto}
     
     # --- MODIFY SCRIPT ---
-    script_kw = ["script", "routine", "sequenza"]
     has_script = any(k in msg for k in script_kw)
     has_specific_script = "## SCRIPT" in smart_context if smart_context else False
     
@@ -2889,11 +2914,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                 "prompt": INTENT_PROMPTS["modify_script"], "specific_target": has_specific_script}
     
     # --- CREATE AUTOMATION ---
-    # Keywords for CREATE: "crea", "nuova", "un/una/un' automazione", "create", "new"
-    create_kw = ["crea", "creare", "nuov", "create", "new", "aggiungi nuova"]
-    # Additional patterns for implicit creation (e.g., "un automazione che...", "una automazione per...")
-    implicit_create_patterns = ["un automazione", "un'automazione", "una automazione", "una nuova automazione", "un nuovo automation"]
-    has_create = any(k in msg for k in create_kw) or any(p in msg for p in implicit_create_patterns)
+    has_create = any(k in msg for k in create_kw)
     if has_create and has_auto:
         return {"intent": "create_automation", "tools": INTENT_TOOL_SETS["create_automation"],
                 "prompt": None, "specific_target": False}
@@ -2904,7 +2925,6 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                 "prompt": None, "specific_target": False}
     
     # --- DASHBOARD ---
-    dash_kw = ["dashboard", "lovelace", "scheda", "card", "pannello"]
     has_dash = any(k in msg for k in dash_kw)
     if has_dash and has_create:
         return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
@@ -2914,34 +2934,26 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                 "prompt": None, "specific_target": False}
     
     # --- DEVICE CONTROL ---
-    control_kw = ["accendi", "spegni", "accend", "spegn", "turn on", "turn off",
-                  "imposta", "alza", "abbassa", "apri", "chiudi", "attiva", "disattiva"]
     if any(k in msg for k in control_kw):
         return {"intent": "control_device", "tools": INTENT_TOOL_SETS["control_device"],
                 "prompt": INTENT_PROMPTS["control_device"], "specific_target": False}
     
     # --- QUERY STATE ---
-    query_kw = ["stato", "status", "come sta", "è acceso", "è spento", "quanto", "temperatura",
-                "valore", "che ore", "quanti gradi"]
     if any(k in msg for k in query_kw):
         return {"intent": "query_state", "tools": INTENT_TOOL_SETS["query_state"],
                 "prompt": INTENT_PROMPTS["query_state"], "specific_target": False}
     
     # --- HISTORY ---
-    history_kw = ["storico", "storia", "history", "ieri", "yesterday", "trend", "andamento",
-                  "media", "massimo", "minimo", "statistich"]
     if any(k in msg for k in history_kw):
         return {"intent": "query_history", "tools": INTENT_TOOL_SETS["query_history"],
                 "prompt": None, "specific_target": False}
     
     # --- DELETE ---
-    delete_kw = ["elimina", "cancella", "rimuovi", "delete", "remove"]
     if any(k in msg for k in delete_kw) and (has_auto or has_script or has_dash):
         return {"intent": "delete", "tools": INTENT_TOOL_SETS["delete"],
                 "prompt": None, "specific_target": False}
     
     # --- CONFIG EDIT ---
-    config_kw = ["configuration.yaml", "config", "yaml", "configurazione", "snapshot"]
     if any(k in msg for k in config_kw):
         return {"intent": "config_edit", "tools": INTENT_TOOL_SETS["config_edit"],
                 "prompt": None, "specific_target": False}

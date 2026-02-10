@@ -1,0 +1,56 @@
+{
+  "keywords": {
+    "it": {
+      "create": ["crea", "creare", "nuov", "create", "new", "aggiungi nuova", "un automazione", "un'automazione", "una automazione", "una nuova automazione"],
+      "modify": ["modifica", "cambia", "aggiorna", "escludi", "aggiungi", "rimuovi", "togli", "modific", "cambiar", "aggiornar", "escluder", "aggiung", "rimuov", "exclude", "change", "modify", "update", "remove", "add", "fix"],
+      "control": ["accendi", "spegni", "accend", "spegn", "turn on", "turn off", "imposta", "alza", "abbassa", "apri", "chiudi", "attiva", "disattiva"],
+      "query": ["stato", "status", "come sta", "è acceso", "è spento", "quanto", "temperatura", "valore", "che ore", "quanti gradi"],
+      "history": ["storico", "storia", "history", "ieri", "yesterday", "trend", "andamento", "media", "massimo", "minimo", "statistich"],
+      "delete": ["elimina", "cancella", "rimuovi", "delete", "remove"],
+      "config": ["configuration.yaml", "config", "yaml", "configurazione", "snapshot"],
+      "automation": ["automazione", "automation", "automazion"],
+      "script": ["script", "routine", "sequenza"],
+      "dashboard": ["dashboard", "lovelace", "scheda", "card", "pannello"],
+      "stop_words": ["questa", "questo", "quella", "quello", "della", "delle", "dello", "degli", "dalla", "dalle", "stessa", "stesso", "altra", "altro", "prima", "dopo", "quando", "perché", "quindi", "anche", "ancora", "molto", "troppo", "sempre", "dovremmo", "dovrebbe", "potrebbe", "voglio", "vorrei", "puoi", "fammi", "invia", "manda", "notifica"]
+    },
+    "en": {
+      "create": ["create", "new", "add new", "make", "build", "setup", "configure"],
+      "modify": ["modify", "change", "update", "edit", "alter", "adjust", "remove", "add", "fix", "improve"],
+      "control": ["turn on", "turn off", "switch", "enable", "disable", "set", "raise", "lower", "open", "close", "activate", "deactivate"],
+      "query": ["status", "state", "check", "what is", "how much", "temperature", "value", "time", "degrees"],
+      "history": ["history", "yesterday", "trends", "average", "maximum", "minimum", "statistics", "data"],
+      "delete": ["delete", "remove", "erase", "eliminate", "destroy"],
+      "config": ["configuration", "config", "yaml", "settings", "snapshot"],
+      "automation": ["automation", "automate"],
+      "script": ["script", "routine", "sequence", "workflow"],
+      "dashboard": ["dashboard", "lovelace", "card", "panel", "view"],
+      "stop_words": ["this", "that", "with", "from", "have", "which", "there", "their", "would", "should", "could", "very", "too", "always", "want", "please", "send", "notification", "the", "a", "an", "of"]
+    },
+    "es": {
+      "create": ["crea", "crear", "nuevo", "nueva", "añade", "añadir", "haz", "hacer", "configura", "configurar"],
+      "modify": ["modifica", "modificar", "cambia", "cambiar", "actualiza", "actualizar", "edita", "editar", "altera", "alterar", "ajusta", "ajustar", "elimina", "eliminar", "añade", "añadir", "arregla", "arreglar"],
+      "control": ["enciende", "encender", "apaga", "apagar", "activa", "activar", "desactiva", "desactivar", "abre", "abrir", "cierra", "cerrar", "sube", "baja", "establece", "establecer"],
+      "query": ["estado", "estados", "status", "cómo está", "está encendido", "está apagado", "cuánto", "temperatura", "valor", "qué hora", "cuántos grados"],
+      "history": ["historial", "historia", "ayer", "yesterday", "tendencia", "tendencias", "media", "máximo", "mínimo", "estadísticas", "datos"],
+      "delete": ["elimina", "eliminar", "borra", "borrar", "cancela", "cancelar", "elimina", "quita", "quitar"],
+      "config": ["configuración", "config", "yaml", "configurar", "snapshot"],
+      "automation": ["automatización", "automation", "automática"],
+      "script": ["script", "rutina", "secuencia", "flujo"],
+      "dashboard": ["dashboard", "tablero", "tarjeta", "panel", "vista"],
+      "stop_words": ["este", "ese", "aquello", "del", "de la", "desde", "la", "el", "un", "una", "por", "para", "con", "sin", "que", "es", "son", "está", "están", "muy", "mucho", "siempre", "quiero", "quisiera", "por favor", "envía", "enviar", "notificación"]
+    },
+    "fr": {
+      "create": ["crée", "créer", "créé", "nouveau", "nouvelle", "ajoute", "ajouter", "fais", "faire", "configure", "configurer", "établis", "établir"],
+      "modify": ["modifie", "modifier", "change", "changer", "mets à jour", "mettre à jour", "édite", "éditer", "altère", "altérer", "ajuste", "ajuster", "supprime", "supprimer", "ajoute", "ajouter", "répare", "réparer"],
+      "control": ["allume", "allumer", "éteins", "éteindre", "active", "activer", "désactive", "désactiver", "ouvre", "ouvrir", "ferme", "fermer", "monte", "descend", "établis", "établir"],
+      "query": ["état", "états", "statut", "comment va", "est allumé", "est éteint", "combien", "température", "valeur", "quelle heure", "combien de degrés"],
+      "history": ["historique", "hier", "yesterday", "tendance", "tendances", "moyenne", "maximum", "minimum", "statistiques", "données"],
+      "delete": ["supprime", "supprimer", "efface", "effacer", "annule", "annuler", "enlève", "enlever"],
+      "config": ["configuration", "config", "yaml", "configurer", "snapshot"],
+      "automation": ["automatisation", "automation", "automatique"],
+      "script": ["script", "routine", "séquence", "flux"],
+      "dashboard": ["tableau de bord", "dashboard", "carte", "panneau", "vue"],
+      "stop_words": ["ce", "cet", "cette", "celui", "du", "de", "la", "le", "un", "une", "par", "pour", "avec", "sans", "que", "est", "sont", "très", "beaucoup", "toujours", "je veux", "je voudrais", "s'il vous plaît", "envoie", "envoyer", "notification"]
+    }
+  }
+}
