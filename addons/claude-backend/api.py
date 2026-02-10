@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.40"
+VERSION = "3.0.41"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -40,6 +40,9 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
+
+# Custom system prompt override (can be set dynamically via API)
+CUSTOM_SYSTEM_PROMPT = None
 
 logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,6 +112,10 @@ def get_lang_text(key: str) -> str:
 
 def get_system_prompt() -> str:
     """Return the system prompt with dynamic config structure prepended."""
+    # If custom system prompt is set, use it directly
+    if CUSTOM_SYSTEM_PROMPT is not None:
+        return CUSTOM_SYSTEM_PROMPT
+    
     base_prompt = """You are an AI assistant integrated into Home Assistant. You help users manage their smart home.
 
 You can:
@@ -2749,6 +2756,10 @@ HA_TOOLS_EXTENDED = HA_TOOLS_COMPACT + [
 
 def get_system_prompt() -> str:
     """Get system prompt appropriate for current provider."""
+    # If custom system prompt is set, use it directly
+    if CUSTOM_SYSTEM_PROMPT is not None:
+        return CUSTOM_SYSTEM_PROMPT
+    
     base_prompt = """You are an AI assistant integrated into Home Assistant. You help users manage their smart home.
 
 You can:
@@ -4862,15 +4873,20 @@ def get_chat_ui():
             try {{
                 const response = await fetch('/api/get_models');
                 const data = await response.json();
+                console.log('[loadModels] API response:', data);
+                
                 const select = document.getElementById('modelSelect');
                 const provider = data.current_provider;
                 const currentModel = data.current_model;
+                
+                console.log('[loadModels] Provider:', provider, 'Current model:', currentModel);
 
                 // Clear existing options
                 select.innerHTML = '';
 
                 // Add models for current provider
-                if (data.models[provider]) {{
+                if (data.models && data.models[provider]) {{
+                    console.log('[loadModels] Models for provider:', data.models[provider]);
                     data.models[provider].forEach(model => {{
                         const option = document.createElement('option');
                         option.value = model;
@@ -4880,9 +4896,13 @@ def get_chat_ui():
                         }}
                         select.appendChild(option);
                     }});
+                    console.log('[loadModels] Added', data.models[provider].length, 'models to dropdown');
+                }} else {{
+                    console.error('[loadModels] No models found for provider:', provider);
+                    console.error('[loadModels] Available providers in data.models:', Object.keys(data.models || {{}}));
                 }}
             }} catch (error) {{
-                console.error('Error loading models:', error);
+                console.error('[loadModels] Error loading models:', error);
             }}
         }}
 
@@ -5002,6 +5022,118 @@ def api_set_model():
         })
     except Exception as e:
         logger.error(f"Error setting model: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/config', methods=['GET'])
+def api_get_config():
+    """Get current runtime configuration."""
+    return jsonify({
+        "success": True,
+        "config": {
+            "ai_provider": AI_PROVIDER,
+            "ai_model": get_active_model(),
+            "language": LANGUAGE,
+            "debug_mode": DEBUG_MODE,
+            "enable_file_access": ENABLE_FILE_ACCESS,
+            "version": VERSION
+        }
+    })
+
+
+@app.route('/api/config', methods=['POST'])
+def api_set_config():
+    """Update runtime configuration dynamically."""
+    global LANGUAGE, DEBUG_MODE, ENABLE_FILE_ACCESS
+    
+    try:
+        data = request.get_json()
+        updated = []
+        
+        # Update language
+        if 'language' in data:
+            new_lang = data['language'].lower()
+            if new_lang in ['en', 'it', 'es', 'fr']:
+                LANGUAGE = new_lang
+                updated.append(f"language={LANGUAGE}")
+                logger.info(f"Language changed to: {LANGUAGE}")
+            else:
+                return jsonify({"success": False, "error": f"Invalid language: {new_lang}. Supported: en, it, es, fr"}), 400
+        
+        # Update debug mode
+        if 'debug_mode' in data:
+            DEBUG_MODE = bool(data['debug_mode'])
+            updated.append(f"debug_mode={DEBUG_MODE}")
+            logger.info(f"Debug mode changed to: {DEBUG_MODE}")
+            logging.getLogger().setLevel(logging.DEBUG if DEBUG_MODE else logging.INFO)
+        
+        # Update file access
+        if 'enable_file_access' in data:
+            ENABLE_FILE_ACCESS = bool(data['enable_file_access'])
+            updated.append(f"enable_file_access={ENABLE_FILE_ACCESS}")
+            logger.info(f"File access changed to: {ENABLE_FILE_ACCESS}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Configuration updated: {', '.join(updated)}",
+            "config": {
+                "language": LANGUAGE,
+                "debug_mode": DEBUG_MODE,
+                "enable_file_access": ENABLE_FILE_ACCESS
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error updating config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/system_prompt', methods=['GET'])
+def api_get_system_prompt():
+    """Get the current system prompt."""
+    try:
+        prompt = get_system_prompt()
+        return jsonify({
+            "success": True,
+            "system_prompt": prompt,
+            "length": len(prompt)
+        })
+    except Exception as e:
+        logger.error(f"Error getting system prompt: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/system_prompt', methods=['POST'])
+def api_set_system_prompt():
+    """Override the system prompt dynamically. Use 'reset' to restore default."""
+    global CUSTOM_SYSTEM_PROMPT
+    
+    try:
+        data = request.get_json()
+        new_prompt = data.get('system_prompt')
+        
+        if not new_prompt:
+            return jsonify({"success": False, "error": "system_prompt parameter required"}), 400
+        
+        if new_prompt.lower() == 'reset':
+            CUSTOM_SYSTEM_PROMPT = None
+            logger.info("System prompt reset to default")
+            return jsonify({
+                "success": True,
+                "message": "System prompt reset to default",
+                "system_prompt": get_system_prompt()
+            })
+        
+        CUSTOM_SYSTEM_PROMPT = new_prompt
+        logger.info(f"System prompt overridden ({len(new_prompt)} chars)")
+        
+        return jsonify({
+            "success": True,
+            "message": "System prompt updated successfully",
+            "system_prompt": CUSTOM_SYSTEM_PROMPT,
+            "length": len(CUSTOM_SYSTEM_PROMPT)
+        })
+    except Exception as e:
+        logger.error(f"Error setting system prompt: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
