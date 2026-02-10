@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.7"
+VERSION = "3.1.8"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1522,22 +1522,22 @@ def api_set_model():
 
     if "provider" in data:
         AI_PROVIDER = data["provider"]
-        SELECTED_PROVIDER = data["provider"]  # Persist the selection
-        # CRITICAL FIX: When changing provider WITHOUT model, reset to provider defaults
-        # Otherwise old SELECTED_MODEL from previous provider stays active!
+        # When changing provider: always reset selection and model to provider default
+        SELECTED_MODEL = ""
+        SELECTED_PROVIDER = ""
+        # CRITICAL: If no model specified, force AI_MODEL to provider default
+        # This prevents using old model from previous provider
         if "model" not in data:
-            SELECTED_MODEL = ""
-            # Temporarily also clear SELECTED_PROVIDER until a model is chosen
-            SELECTED_PROVIDER = ""
-            # Set AI_MODEL to provider default
             default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model")
             if default_model:
                 AI_MODEL = default_model
+            logger.info(f"Provider changed to {AI_PROVIDER}, reset to default model: {AI_MODEL}")
 
     if "model" in data:
         normalized = normalize_model_name(data["model"])
         AI_MODEL = normalized
         SELECTED_MODEL = normalized  # Persist the selection
+        SELECTED_PROVIDER = AI_PROVIDER  # Update provider to match
 
     logger.info(f"Runtime model changed → {AI_PROVIDER} / {AI_MODEL}")
 
