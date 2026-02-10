@@ -206,7 +206,6 @@ PROVIDER_MODELS = {
         "openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano",
         "openai/o1", "openai/o1-mini", "openai/o1-preview",
         "openai/o3", "openai/o3-mini", "openai/o4-mini",
-        "openai/gpt-5", "openai/gpt-5-mini", "openai/gpt-5-nano", "openai/gpt-5-chat",
         # Meta Llama
         "meta/meta-llama-3.1-405b-instruct", "meta/meta-llama-3.1-8b-instruct",
         "meta/llama-3.3-70b-instruct",
@@ -270,10 +269,6 @@ MODEL_NAME_MAPPING = {
     "GitHub: o3": "openai/o3",
     "GitHub: o3-mini": "openai/o3-mini",
     "GitHub: o4-mini": "openai/o4-mini",
-    "GitHub: GPT-5": "openai/gpt-5",
-    "GitHub: GPT-5-mini": "openai/gpt-5-mini",
-    "GitHub: GPT-5-nano": "openai/gpt-5-nano",
-    "GitHub: GPT-5-chat": "openai/gpt-5-chat",
     "GitHub: Llama 3.1 405B": "meta/meta-llama-3.1-405b-instruct",
     "GitHub: Llama 3.1 8B": "meta/meta-llama-3.1-8b-instruct",
     "GitHub: Llama 3.3 70B": "meta/llama-3.3-70b-instruct",
@@ -4440,9 +4435,8 @@ def get_chat_ui():
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
         <span class="badge">v{VERSION}</span>
-        <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="Cambia modello">
-            <!-- Populated by JavaScript -->
-        </select>
+        <select id="modelSelect" onchange="changeModel(this.value)" title="Cambia modello"></select>
+        <!-- Populated by JavaScript -->
         <span class="badge">\U0001f5bc Vision</span>
         <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
         <div class="status">
@@ -4536,6 +4530,14 @@ def get_chat_ui():
             imagePreviewContainer.classList.remove('visible');
         }}
 
+        function apiUrl(path) {{
+            // Keep paths relative so HA Ingress routes to this add-on
+            if (path.startsWith('/')) {{
+                return path.slice(1);
+            }}
+            return path;
+        }}
+
         function setStopMode(active) {{
             if (active) {{
                 sendBtn.classList.add('stop-btn');
@@ -4552,7 +4554,7 @@ def get_chat_ui():
         async function handleButtonClick() {{
             if (sending) {{
                 try {{
-                    await fetch('api/chat/abort', {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: '{{}}' }});
+                    await fetch(apiUrl('api/chat/abort'), {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: '{{}}' }});
                     if (currentReader) {{ currentReader.cancel(); currentReader = null; }}
                 }} catch(e) {{ console.error('Abort error:', e); }}
                 removeThinking();
@@ -4689,7 +4691,7 @@ def get_chat_ui():
                     payload.image = imageToSend;
                 }}
                 
-                const resp = await fetch('api/chat/stream', {{
+                const resp = await fetch(apiUrl('api/chat/stream'), {{
                     method: 'POST',
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify(payload)
@@ -4790,7 +4792,7 @@ def get_chat_ui():
 
         async function loadChatList() {{
             try {{
-                const resp = await fetch('api/conversations');
+                const resp = await fetch(apiUrl('api/conversations'));
                 const data = await resp.json();
                 chatList.innerHTML = '';
                 if (data.conversations && data.conversations.length > 0) {{
@@ -4816,7 +4818,7 @@ def get_chat_ui():
             event.stopPropagation();
             if (!confirm('Eliminare questa conversazione?')) return;
             try {{
-                const resp = await fetch(`api/conversations/${{sessionId}}`, {{ method: 'DELETE' }});
+                const resp = await fetch(apiUrl(`api/conversations/${{sessionId}}`), {{ method: 'DELETE' }});
                 if (resp.ok) {{
                     if (sessionId === currentSessionId) {{
                         newChat();
@@ -4831,7 +4833,7 @@ def get_chat_ui():
             currentSessionId = sessionId;
             localStorage.setItem('currentSessionId', sessionId);
             try {{
-                const resp = await fetch(`api/conversations/${{sessionId}}`);
+                const resp = await fetch(apiUrl(`api/conversations/${{sessionId}}`));
                 if (resp.status === 404) {{
                     console.log('Session not found, creating new session');
                     newChat();
@@ -4890,7 +4892,10 @@ def get_chat_ui():
         // Load models and populate dropdown with ALL providers
         async function loadModels() {{
             try {{
-                const response = await fetch('/api/get_models');
+                const response = await fetch(apiUrl('api/get_models'));
+                if (!response.ok) {{
+                    throw new Error('get_models failed: ' + response.status);
+                }}
                 const data = await response.json();
                 console.log('[loadModels] API response:', data);
                 
@@ -4905,7 +4910,12 @@ def get_chat_ui():
 
                 // Add models for ALL available providers, grouped by optgroup
                 const providerOrder = ['anthropic', 'openai', 'google', 'nvidia', 'github'];
-                const availableProviders = data.available_providers ? data.available_providers.map(p => p.id) : [currentProvider];
+                let availableProviders = data.available_providers && data.available_providers.length
+                    ? data.available_providers.map(p => p.id)
+                    : Object.keys(data.models || {{}});
+                if (!availableProviders.length && currentProvider) {{
+                    availableProviders = [currentProvider];
+                }}
                 
                 for (const providerId of providerOrder) {{
                     if (!availableProviders.includes(providerId)) continue;
@@ -4928,6 +4938,17 @@ def get_chat_ui():
                     
                     select.appendChild(group);
                 }}
+                if (!select.options.length) {{
+                    const option = document.createElement('option');
+                    option.textContent = 'Nessun modello disponibile';
+                    option.disabled = true;
+                    option.selected = true;
+                    select.appendChild(option);
+                    if (!window._modelsEmptyNotified) {{
+                        addMessage('⚠️ Nessun modello disponibile. Verifica le API key dei provider.', 'system');
+                        window._modelsEmptyNotified = true;
+                    }}
+                }}
                 console.log('[loadModels] Loaded models for', availableProviders.length, 'providers');
             }} catch (error) {{
                 console.error('[loadModels] Error loading models:', error);
@@ -4938,7 +4959,7 @@ def get_chat_ui():
         async function changeModel(value) {{
             try {{
                 const parsed = JSON.parse(value);
-                const response = await fetch('/api/set_model', {{
+                const response = await fetch(apiUrl('api/set_model'), {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
                     body: JSON.stringify({{model: parsed.model, provider: parsed.provider}})
@@ -5005,51 +5026,24 @@ def api_status():
 
 @app.route('/api/set_model', methods=['POST'])
 def api_set_model():
-    """Change the active model and optionally provider."""
     global AI_PROVIDER, AI_MODEL
 
-    try:
-        data = request.get_json()
-        new_model = data.get('model')
-        new_provider = data.get('provider')  # Optional
+    data = request.json or {}
 
-        if not new_model:
-            return jsonify({"success": False, "error": "Model parameter required"}), 400
+    if "provider" in data:
+        AI_PROVIDER = data["provider"]
 
-        # If provider is specified, validate it
-        if new_provider:
-            if new_provider not in ["anthropic", "openai", "google", "nvidia", "github"]:
-                return jsonify({"success": False, "error": f"Invalid provider: {new_provider}"}), 400
+    if "model" in data:
+        AI_MODEL = normalize_model_name(data["model"])
 
-            # Check if provider has API key
-            old_provider = AI_PROVIDER
-            AI_PROVIDER = new_provider
-            if not get_api_key():
-                AI_PROVIDER = old_provider  # Restore
-                return jsonify({"success": False, "error": f"No API key configured for {new_provider}"}), 400
+    logger.info(f"Runtime model changed → {AI_PROVIDER} / {AI_MODEL}")
 
-        # Update model (can be display name or technical name)
-        if new_model in MODEL_NAME_MAPPING:
-            # It's a display name, convert to technical
-            AI_MODEL = MODEL_NAME_MAPPING[new_model]
-        else:
-            # Assume it's already technical name
-            AI_MODEL = new_model
+    return jsonify({
+        "success": True,
+        "provider": AI_PROVIDER,
+        "model": AI_MODEL
+    })
 
-        # Reinitialize the AI client
-        initialize_ai_client()
-
-        logger.info(f"Model switched to: {AI_PROVIDER} / {get_active_model()}")
-
-        return jsonify({
-            "success": True,
-            "provider": AI_PROVIDER,
-            "model": get_active_model(),
-            "message": f"Switched to {PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get('name', AI_PROVIDER)} - {get_active_model()}"
-        })
-    except Exception as e:
-        logger.error(f"Error setting model: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/config', methods=['GET'])
@@ -5164,7 +5158,7 @@ def api_set_system_prompt():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/chat', methods=['POST'])
+@app.route('api/chat', methods=['POST'])
 def api_chat():
     """Chat endpoint."""
     data = request.get_json()
