@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.43"
+VERSION = "3.0.44"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4221,46 +4221,38 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
         if AI_PROVIDER == "nvidia":
             yield from stream_chat_nvidia_direct(messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages
-            new_messages = messages[conv_length_before:]
-            conversations[session_id].extend(new_messages)
-            # Add model/provider metadata to new assistant messages
-            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
-                if conversations[session_id][i].get("role") == "assistant":
-                    conversations[session_id][i]["model"] = get_active_model()
-                    conversations[session_id][i]["provider"] = AI_PROVIDER
+            # Sync ONLY new assistant messages (skip the enriched user message we created)
+            for msg in messages[conv_length_before:]:
+                if msg.get("role") == "assistant":
+                    msg["model"] = get_active_model()
+                    msg["provider"] = AI_PROVIDER
+                    conversations[session_id].append(msg)
         elif AI_PROVIDER in ("openai", "github"):
             yield from stream_chat_openai(messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages (after the original user message)
-            new_messages = messages[conv_length_before:]
-            conversations[session_id].extend(new_messages)
-            # Add model/provider metadata to new assistant messages
-            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
-                if conversations[session_id][i].get("role") == "assistant":
-                    conversations[session_id][i]["model"] = get_active_model()
-                    conversations[session_id][i]["provider"] = AI_PROVIDER
+            # Sync ONLY new assistant messages (skip the enriched user message we created)
+            for msg in messages[conv_length_before:]:
+                if msg.get("role") == "assistant":
+                    msg["model"] = get_active_model()
+                    msg["provider"] = AI_PROVIDER
+                    conversations[session_id].append(msg)
         elif AI_PROVIDER == "anthropic":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_anthropic(clean_messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages
-            new_messages = clean_messages[conv_length_before:]
-            conversations[session_id].extend(new_messages)
-            # Add model/provider metadata to new assistant messages
-            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
-                if conversations[session_id][i].get("role") == "assistant":
-                    conversations[session_id][i]["model"] = get_active_model()
-                    conversations[session_id][i]["provider"] = AI_PROVIDER
+            # Sync ONLY new assistant messages (skip the enriched user message we created)
+            for msg in clean_messages[conv_length_before:]:
+                if msg.get("role") == "assistant":
+                    msg["model"] = get_active_model()
+                    msg["provider"] = AI_PROVIDER
+                    conversations[session_id].append(msg)
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_google(clean_messages)
-            # Sync ONLY new assistant messages
-            new_messages = clean_messages[conv_length_before:]
-            conversations[session_id].extend(new_messages)
-            # Add model/provider metadata to new assistant messages
-            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
-                if conversations[session_id][i].get("role") == "assistant":
-                    conversations[session_id][i]["model"] = get_active_model()
-                    conversations[session_id][i]["provider"] = AI_PROVIDER
+            # Sync ONLY new assistant messages (skip the enriched user message we created)
+            for msg in clean_messages[conv_length_before:]:
+                if msg.get("role") == "assistant":
+                    msg["model"] = get_active_model()
+                    msg["provider"] = AI_PROVIDER
+                    conversations[session_id].append(msg)
         else:
             yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
             return
@@ -4369,11 +4361,14 @@ def get_chat_ui():
         .sidebar {{ width: 250px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; }}
         .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
         .chat-list {{ flex: 1; overflow-y: auto; }}
-        .chat-item {{ padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; }}
+        .chat-item {{ padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }}
         .chat-item:hover {{ background: #f8f9fa; }}
         .chat-item.active {{ background: #e8f0fe; border-left: 3px solid #667eea; }}
         .chat-item-title {{ font-size: 13px; color: #333; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
         .chat-item-info {{ font-size: 11px; color: #999; }}
+        .chat-item-delete {{ color: #ef4444; font-size: 18px; padding: 4px 8px; opacity: 0; transition: opacity 0.2s; cursor: pointer; flex-shrink: 0; }}
+        .chat-item:hover .chat-item-delete {{ opacity: 1; }}
+        .chat-item-delete:hover {{ color: #dc2626; }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
@@ -4794,16 +4789,33 @@ def get_chat_ui():
                         const item = document.createElement('div');
                         item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
                         item.innerHTML = `
-                            <div class="chat-item-title">${{conv.title}}</div>
-                            <div class="chat-item-info">${{conv.message_count}} messaggi</div>
+                            <div style="flex: 1;" onclick="loadConversation('${conv.id}')">
+                                <div class="chat-item-title">${{conv.title}}</div>
+                                <div class="chat-item-info">${{conv.message_count}} messaggi</div>
+                            </div>
+                            <span class="chat-item-delete" onclick="deleteConversation(event, '${conv.id}')" title="Elimina chat">×</span>
                         `;
-                        item.onclick = () => loadConversation(conv.id);
                         chatList.appendChild(item);
                     }});
                 }} else {{
                     chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">Nessuna conversazione</div>';
                 }}
             }} catch(e) {{ console.error('Error loading chat list:', e); }}
+        }}
+
+        async function deleteConversation(event, sessionId) {{
+            event.stopPropagation();
+            if (!confirm('Eliminare questa conversazione?')) return;
+            try {{
+                const resp = await fetch(`api/conversations/${{sessionId}}`, {{ method: 'DELETE' }});
+                if (resp.ok) {{
+                    if (sessionId === currentSessionId) {{
+                        newChat();
+                    }} else {{
+                        loadChatList();
+                    }}
+                }}
+            }} catch(e) {{ console.error('Error deleting conversation:', e); }}
         }}
 
         async function loadConversation(sessionId) {{
