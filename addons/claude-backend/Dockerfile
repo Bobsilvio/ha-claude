@@ -23,6 +23,7 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy API application
 COPY api.py .
+COPY server.py .
 COPY tools.py .
 COPY intent.py .
 COPY providers_openai.py .
