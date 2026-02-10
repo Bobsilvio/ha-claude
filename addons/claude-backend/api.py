@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.5"
+VERSION = "3.1.6"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -413,13 +413,21 @@ def validate_model_provider_compatibility() -> tuple[bool, str]:
 def get_active_model() -> str:
     """Get the active model name (technical format).
     Prefers the user's selected model/provider if set, else falls back to global AI_MODEL."""
-    # Use SELECTED_MODEL if the user has made a selection
+    # Use SELECTED_MODEL if the user has made a selection AND provider matches
     if SELECTED_MODEL and SELECTED_PROVIDER == AI_PROVIDER:
-        return normalize_model_name(SELECTED_MODEL)
+        model = normalize_model_name(SELECTED_MODEL)
+        # Extra check: ensure model is compatible with current provider
+        model_provider = get_model_provider(model)
+        if model_provider == AI_PROVIDER or model_provider == "unknown":
+            return model
     
     # Fall back to AI_MODEL (from config/env)
     if AI_MODEL:
-        return normalize_model_name(AI_MODEL)
+        model = normalize_model_name(AI_MODEL)
+        # Extra check: ensure model is compatible with current provider
+        model_provider = get_model_provider(model)
+        if model_provider == AI_PROVIDER or model_provider == "unknown":
+            return model
     
     # Last resort: use provider default
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
@@ -1515,6 +1523,14 @@ def api_set_model():
     if "provider" in data:
         AI_PROVIDER = data["provider"]
         SELECTED_PROVIDER = data["provider"]  # Persist the selection
+        # CRITICAL FIX: When changing provider, reset SELECTED_MODEL to avoid using model from old provider
+        # e.g., if switching from GitHub (openai/gpt-5) to NVIDIA, don't use openai/gpt-5 on NVIDIA
+        if "model" not in data:
+            SELECTED_MODEL = ""  # Will fall back to AI_MODEL from config or provider default
+            # If no model specified, use provider default
+            default_model = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model")
+            if default_model:
+                AI_MODEL = default_model
 
     if "model" in data:
         normalized = normalize_model_name(data["model"])
