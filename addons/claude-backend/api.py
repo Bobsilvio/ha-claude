@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.44"
+VERSION = "3.0.45"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -3368,22 +3368,21 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 try:
                     args = json.loads(args_str) if args_str.strip() else {}
                 except json.JSONDecodeError:
-                    result_obj = {"error": f"Invalid JSON arguments: {args_str}"}
-                    tool_call_results[tc_id] = (fn_name, result_obj)
+                    result = json.dumps({"error": f"Invalid JSON arguments: {args_str}"})
+                    tool_call_results[tc_id] = (fn_name, result)
                     continue
 
-                fn = TOOL_FUNCTIONS.get(fn_name)
-                if not fn:
-                    result_obj = {"error": f"Unknown tool: {fn_name}"}
-                else:
-                    result_obj = fn(**args)
-
-                tool_call_results[tc_id] = (fn_name, result_obj)
-                yield {"type": "tool_result", "name": fn_name, "result": result_obj}
+                # Execute tool using the standard execute_tool function
+                logger.info(f"NVIDIA: Executing tool '{fn_name}' with args: {args}")
+                result = execute_tool(fn_name, args)
+                logger.info(f"NVIDIA: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
+                
+                tool_call_results[tc_id] = (fn_name, result)
+                yield {"type": "tool_result", "name": fn_name, "result": result}
 
             # Add tool results to messages
-            for tc_id, (fn_name, result_obj) in tool_call_results.items():
-                messages.append({"role": "tool", "tool_call_id": tc_id, "name": fn_name, "content": json.dumps(result_obj)})
+            for tc_id, (fn_name, result) in tool_call_results.items():
+                messages.append({"role": "tool", "tool_call_id": tc_id, "name": fn_name, "content": result})
 
         except Exception as e:
             logger.error(f"NVIDIA API error: {e}")
