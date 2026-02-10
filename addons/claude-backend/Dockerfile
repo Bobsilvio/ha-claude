@@ -23,6 +23,12 @@ RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt
 
 # Copy API application
 COPY api.py .
+COPY tools.py .
+COPY intent.py .
+COPY providers_openai.py .
+COPY providers_anthropic.py .
+COPY providers_google.py .
+COPY chat_ui.py .
 COPY keywords.json .
 
 # Copy rootfs (s6-overlay v3 service structure)
