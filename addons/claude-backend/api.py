@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.48"
+VERSION = "3.0.49"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -226,6 +226,10 @@ PROVIDER_MODELS = {
     ],
 }
 
+# Debug: Log GitHub models at startup
+print(f"[STARTUP] GitHub models in PROVIDER_MODELS: {len(PROVIDER_MODELS.get('github', []))} models")
+print(f"[STARTUP] First 5 GitHub models: {PROVIDER_MODELS.get('github', [])[:5]}")
+
 # Mapping user-friendly names (with prefixes) to technical model names
 MODEL_NAME_MAPPING = {
     "Claude: Sonnet 4": "claude-sonnet-4-20250514",
@@ -302,6 +306,11 @@ for k, v in MODEL_NAME_MAPPING.items():
     # Always override with emoji version if it has 🆓
     if "🆓" in k or v not in MODEL_DISPLAY_MAPPING:
         MODEL_DISPLAY_MAPPING[v] = k
+
+# Debug: Check GitHub models in display mapping
+github_models_in_mapping = [k for k, v in MODEL_DISPLAY_MAPPING.items() if k in PROVIDER_MODELS.get("github", [])]
+print(f"[STARTUP] GitHub models in MODEL_DISPLAY_MAPPING: {len(github_models_in_mapping)} models")
+print(f"[STARTUP] First 5 GitHub display mappings: {[(m, MODEL_DISPLAY_MAPPING.get(m)) for m in PROVIDER_MODELS.get('github', [])[:5]]}")
 
 
 def normalize_model_name(model_name: str) -> str:
@@ -5246,6 +5255,10 @@ def api_get_models():
     for provider, models in PROVIDER_MODELS.items():
         models_technical[provider] = list(models)
         models_display[provider] = [MODEL_DISPLAY_MAPPING.get(m, m) for m in models]
+        print(f"[DEBUG] Provider: {provider}, Technical models count: {len(models)}, Display models count: {len(models_display[provider])}")
+        if provider == "github":
+            print(f"[DEBUG] GitHub technical models (first 5): {list(models)[:5]}")
+            print(f"[DEBUG] GitHub display models (first 5): {models_display[provider][:5]}")
 
     # --- Current model (sia tech che display) ---
     current_model_tech = get_active_model()
