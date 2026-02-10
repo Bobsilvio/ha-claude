@@ -1,5 +1,6 @@
 """Chat UI HTML generation for Home Assistant AI assistant."""
 
+import json
 import api
 
 
