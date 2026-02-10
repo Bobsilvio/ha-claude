@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.59"
+VERSION = "3.0.60"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -4492,6 +4492,9 @@ def get_chat_ui():
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }}
         .main-container {{ display: flex; flex: 1; overflow: hidden; }}
         .sidebar {{ width: 250px; min-width: 150px; max-width: 500px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; resize: horizontal; overflow-x: hidden; position: relative; }}
+        .splitter {{ width: 8px; flex: 0 0 8px; cursor: col-resize; background: transparent; }}
+        .splitter:hover {{ background: rgba(0,0,0,0.06); }}
+        body.resizing, body.resizing * {{ cursor: col-resize !important; user-select: none !important; }}
         .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
         .chat-list {{ flex: 1; overflow-y: auto; }}
         .chat-item {{ padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }}
@@ -4580,6 +4583,7 @@ def get_chat_ui():
             <div class="sidebar-header">📝 Conversazioni</div>
             <div class="chat-list" id="chatList"></div>
         </div>
+        <div class="splitter" id="sidebarSplitter" title="Trascina per ridimensionare"></div>
         <div class="main-content">
             <div class="chat-container" id="chat">
         <div class="message system">
@@ -4630,10 +4634,54 @@ def get_chat_ui():
         const imageInput = document.getElementById('imageInput');
         const imagePreview = document.getElementById('imagePreview');
         const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+        const sidebarEl = document.querySelector('.sidebar');
+        const splitterEl = document.getElementById('sidebarSplitter');
         let sending = false;
         let currentReader = null;
         let currentSessionId = localStorage.getItem('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
+
+        function initSidebarResize() {{
+            if (!sidebarEl || !splitterEl) return;
+
+            const minWidth = 150;
+            const maxWidth = 500;
+            const storageKey = 'chatSidebarWidth';
+
+            const saved = parseInt(localStorage.getItem(storageKey) || '', 10);
+            if (!Number.isNaN(saved)) {{
+                const w = Math.max(minWidth, Math.min(maxWidth, saved));
+                sidebarEl.style.width = w + 'px';
+            }}
+
+            let dragging = false;
+            let startX = 0;
+            let startWidth = 0;
+
+            splitterEl.addEventListener('mousedown', (e) => {{
+                dragging = true;
+                startX = e.clientX;
+                startWidth = sidebarEl.getBoundingClientRect().width;
+                document.body.classList.add('resizing');
+                e.preventDefault();
+            }});
+
+            window.addEventListener('mousemove', (e) => {{
+                if (!dragging) return;
+                const dx = e.clientX - startX;
+                let next = startWidth + dx;
+                next = Math.max(minWidth, Math.min(maxWidth, next));
+                sidebarEl.style.width = next + 'px';
+            }});
+
+            window.addEventListener('mouseup', () => {{
+                if (!dragging) return;
+                dragging = false;
+                document.body.classList.remove('resizing');
+                const finalW = Math.round(sidebarEl.getBoundingClientRect().width);
+                localStorage.setItem(storageKey, String(finalW));
+            }});
+        }}
 
         function handleImageSelect(event) {{
             const file = event.target.files[0];
@@ -5107,6 +5155,7 @@ def get_chat_ui():
         }}
 
         // Load history on page load
+        initSidebarResize();
         loadModels();
         loadChatList();
         loadHistory();
