@@ -3369,19 +3369,18 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
     while i < len(messages):
         m = messages[i]
         role = m.get("role", "")
+        skip = False
         
         # Skip tool-role messages for Anthropic (it uses tool_result inside user messages)
         if AI_PROVIDER == "anthropic" and role == "tool":
-            i += 1
-            continue
+            skip = True
             
         # Skip assistant messages with tool_calls format (OpenAI format) for Anthropic
-        if AI_PROVIDER == "anthropic" and role == "assistant" and m.get("tool_calls"):
-            i += 1
-            continue
+        elif AI_PROVIDER == "anthropic" and role == "assistant" and m.get("tool_calls"):
+            skip = True
             
         # For Anthropic: Skip assistant messages with tool_use blocks if not followed by tool_result
-        if AI_PROVIDER == "anthropic" and role == "assistant":
+        elif AI_PROVIDER == "anthropic" and role == "assistant":
             content = m.get("content", "")
             if isinstance(content, list):
                 has_tool_use = any(isinstance(c, dict) and c.get("type") == "tool_use" for c in content)
@@ -3395,17 +3394,15 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
                             next_has_result = any(isinstance(c, dict) and c.get("type") == "tool_result" for c in next_content)
                     if not next_has_result:
                         # Skip this orphaned tool_use message
-                        i += 1
-                        continue
+                        skip = True
             
         # Skip Anthropic-format tool_result messages for OpenAI/GitHub
-        if AI_PROVIDER in ("openai", "github") and role == "user" and isinstance(m.get("content"), list):
+        elif AI_PROVIDER in ("openai", "github") and role == "user" and isinstance(m.get("content"), list):
             if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in m.get("content", [])):
-                i += 1
-                continue
+                skip = True
                 
-        # Keep user/assistant messages (text or with images)
-        if role in ("user", "assistant"):
+        # Keep user/assistant messages (text or with images) if not skipped
+        if not skip and role in ("user", "assistant"):
             content = m.get("content", "")
             # Accept strings or arrays (arrays can contain images)
             if isinstance(content, str) and content:
