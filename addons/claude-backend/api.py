@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.19"
+VERSION = "3.1.20"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -2087,6 +2087,107 @@ def api_nvidia_test_model():
             "model": model_id,
             "message": f"Test NVIDIA errore: {type(e).__name__}: {e}",
         }), 200
+
+
+@app.route('/api/nvidia/test_models', methods=['POST'])
+def api_nvidia_test_models():
+    """General NVIDIA model scan.
+
+    Tries multiple model IDs (from /v1/models when available) using a minimal non-streaming
+    chat completion. Models that return 404/400 are blocklisted and removed from the list.
+
+    This endpoint is intentionally bounded (time + max models per run) to avoid long UI hangs
+    and rate-limit issues. Users can run it again to continue.
+    """
+    if not NVIDIA_API_KEY:
+        return jsonify({"success": False, "error": "NVIDIA API key non configurata."}), 400
+
+    body = request.get_json(silent=True) or {}
+    try:
+        max_models = int(body.get("max_models") or 0)
+    except Exception:
+        max_models = 0
+
+    # Safety defaults: keep the request reasonably fast.
+    if max_models <= 0:
+        max_models = 20
+    max_models = max(1, min(50, max_models))
+
+    max_seconds = 25.0
+    per_model_timeout = 8
+
+    # Use a fresh live list when possible.
+    all_models = _fetch_nvidia_models_live() or get_nvidia_models_cached() or PROVIDER_MODELS.get("nvidia", [])
+    all_models = [m for m in (all_models or []) if isinstance(m, str) and m.strip()]
+    # Remove already known-bad models.
+    candidates = [m for m in all_models if m not in NVIDIA_MODEL_BLOCKLIST]
+
+    url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {NVIDIA_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    started = time.time()
+    tested: list[str] = []
+    ok: list[str] = []
+    removed: list[str] = []
+    stopped_reason = None
+
+    for model_id in candidates:
+        if len(tested) >= max_models:
+            stopped_reason = f"limit modelli ({max_models})"
+            break
+        if (time.time() - started) > max_seconds:
+            stopped_reason = f"timeout ({int(max_seconds)}s)"
+            break
+
+        tested.append(model_id)
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": "ciao"}],
+            "stream": False,
+            "max_tokens": 16,
+            "temperature": 0.0,
+        }
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=per_model_timeout)
+        except Exception as e:
+            stopped_reason = f"errore rete: {type(e).__name__}"
+            break
+
+        if resp.status_code == 200:
+            ok.append(model_id)
+            continue
+
+        if resp.status_code in (404, 400):
+            blocklist_nvidia_model(model_id)
+            removed.append(model_id)
+            continue
+
+        if resp.status_code == 429:
+            stopped_reason = "rate limit (429)"
+            break
+
+        if resp.status_code in (401, 403):
+            stopped_reason = f"auth/permessi (HTTP {resp.status_code})"
+            break
+
+        stopped_reason = f"HTTP {resp.status_code}"
+        break
+
+    remaining = max(0, len(candidates) - len(tested))
+    return jsonify({
+        "success": True,
+        "tested": len(tested),
+        "total": len(candidates),
+        "ok": len(ok),
+        "removed": len(removed),
+        "blocklisted": bool(removed),
+        "stopped_reason": stopped_reason,
+        "remaining": remaining,
+    }), 200
 
 @app.route("/health", methods=["GET"])
 def health():

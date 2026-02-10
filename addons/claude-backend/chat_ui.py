@@ -769,24 +769,25 @@ def get_chat_ui():
             btn.disabled = true;
             btn.textContent = '⏳ Test...';
             try {{
-                const response = await fetch(apiUrl('api/nvidia/test_model'), {{
+                const response = await fetch(apiUrl('api/nvidia/test_models'), {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{}})
+                    body: JSON.stringify({{max_models: 20}})
                 }});
                 const data = await response.json().catch(() => ({{}}));
 
                 if (response.ok && data && data.success) {{
-                    addMessage(`✅ NVIDIA OK: ${{data.model}}`, 'system');
+                    const parts = [];
+                    parts.push(`Test NVIDIA: OK ${{data.ok}}, rimossi ${{data.removed}}, testati ${{data.tested}}/${{data.total}}`);
+                    if (data.stopped_reason) parts.push(`(${data.stopped_reason})`);
+                    if (typeof data.remaining === 'number' && data.remaining > 0) parts.push(`— restanti: ${{data.remaining}} (ripremi per continuare)`);
+                    addMessage('🔍 ' + parts.join(' '), 'system');
                 }} else {{
                     const msg = (data && (data.message || data.error)) || ('Test NVIDIA fallito (' + response.status + ')');
                     addMessage('⚠️ ' + msg, 'system');
                 }}
 
-                // If the backend removed a model from the list, refresh dropdown
-                if (data && data.blocklisted) {{
-                    await loadModels();
-                }}
+                if (data && data.blocklisted) await loadModels();
             }} catch (e) {{
                 addMessage('⚠️ Test NVIDIA fallito: ' + (e && e.message ? e.message : String(e)), 'system');
             }} finally {{
