@@ -58,6 +58,7 @@ def get_chat_ui():
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Model: <strong>{model_name}</strong>",
             "capabilities": "I can control devices, create automations, and manage your smart home.",
             "vision_feature": "<strong>🖼 New in v3.0:</strong> Now you can send me images!",
+            "o4mini_tokens_hint": "ℹ️ Note: o4-mini has a ~4000 token limit. Context and history are reduced automatically.",
             "analyzing": analyzing_msg
         },
         "it": {
@@ -65,6 +66,7 @@ def get_chat_ui():
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong>",
             "capabilities": "Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.",
             "vision_feature": "<strong>🖼 Novità v3.0:</strong> Ora puoi inviarmi immagini!",
+            "o4mini_tokens_hint": "ℹ️ Nota: o4-mini ha un limite di ~4000 token. Contesto e cronologia vengono ridotti automaticamente.",
             "analyzing": analyzing_msg
         },
         "es": {
@@ -72,6 +74,7 @@ def get_chat_ui():
             "provider_model": f"Proveedor: <strong>{provider_name}</strong> | Modelo: <strong>{model_name}</strong>",
             "capabilities": "Puedo controlar dispositivos, crear automatizaciones y gestionar tu hogar inteligente.",
             "vision_feature": "<strong>🖼 Nuevo en v3.0:</strong> ¡Ahora puedes enviarme imágenes!",
+            "o4mini_tokens_hint": "ℹ️ Nota: o4-mini tiene un límite de ~4000 tokens. El contexto y el historial se reducen automáticamente.",
             "analyzing": analyzing_msg
         },
         "fr": {
@@ -79,12 +82,15 @@ def get_chat_ui():
             "provider_model": f"Fournisseur: <strong>{provider_name}</strong> | Modèle: <strong>{model_name}</strong>",
             "capabilities": "Je peux contrôler des appareils, créer des automatisations et gérer votre maison intelligente.",
             "vision_feature": "<strong>🖼 Nouveau dans v3.0:</strong> Vous pouvez maintenant m'envoyer des images!",
+            "o4mini_tokens_hint": "ℹ️ Note : o4-mini a une limite d’environ 4000 tokens. Le contexte et l’historique sont réduits automatiquement.",
             "analyzing": analyzing_msg
         }
     }
 
     # Get messages for current language
     msgs = ui_messages.get(api.LANGUAGE, ui_messages["en"])
+
+    o4mini_tokens_hint_js = json.dumps(msgs.get("o4mini_tokens_hint", ""))
 
     return f"""<!DOCTYPE html>
 <html>
@@ -917,6 +923,7 @@ def get_chat_ui():
                 if (response.ok) {{
                     const data = await response.json();
                     console.log('Model changed to:', parsed.model, 'Provider:', parsed.provider);
+                    const O4MINI_TOKENS_HINT = {o4mini_tokens_hint_js};
                     // Keep UI state in sync so the thinking message matches the selected provider
                     currentProviderId = parsed.provider;
                     const testBtn = document.getElementById('testNvidiaBtn');
@@ -926,6 +933,10 @@ def get_chat_ui():
                     // Show notification
                     const providerName = PROVIDER_LABELS[parsed.provider] || parsed.provider;
                     addMessage(`🔄 Passato a ${{providerName}} → ${{parsed.model}}`, 'system');
+                    const modelLower = String(parsed.model || '').toLowerCase();
+                    if (parsed.provider === 'github' && modelLower.includes('o4-mini') && O4MINI_TOKENS_HINT) {{
+                        addMessage(O4MINI_TOKENS_HINT, 'system');
+                    }}
                     // Refresh dropdown state from server (ensures UI stays consistent)
                     loadModels();
                 }}

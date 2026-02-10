@@ -104,29 +104,31 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
     low = (remote_msg or raw).lower()
 
     if provider == "github" and code == 403 and ("budget limit" in low or "reached its budget" in low):
-        return (
-            "GitHub Models: limite budget raggiunto per questo account. "
-            "Aumenta il budget/credito su GitHub oppure seleziona un altro provider/modello dal menu in alto."
+        return get_lang_text("err_github_budget_limit") or (
+            "GitHub Models: budget limit reached. Increase budget/credit or switch model/provider."
         )
 
     if provider == "github" and (code == 413 or "tokens_limit_reached" in low or "request body too large" in low):
         m = re.search(r"max size:\s*(\d+)\s*tokens", (remote_msg or raw), flags=re.IGNORECASE)
         limit = m.group(1) if m else ""
-        extra = f" (max {limit} token)" if limit else ""
-        return (
-            "GitHub Models: richiesta troppo lunga per il modello selezionato" + extra + ". "
-            "Prova a fare una domanda più corta, oppure scegli un modello più grande dal menu in alto."
-        )
+        limit_part = f" (max {limit} token)" if limit else ""
+        tpl = get_lang_text("err_github_request_too_large")
+        if tpl:
+            try:
+                return tpl.format(limit_part=limit_part)
+            except Exception:
+                return tpl
+        return "GitHub Models: request too long for selected model." + limit_part
 
     if code == 401:
-        return "Autenticazione fallita (401). Verifica la chiave/token del provider selezionato."
+        return get_lang_text("err_http_401") or "Authentication failed (401)."
     if code == 403:
-        return "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token."
+        return get_lang_text("err_http_403") or "Access denied (403)."
     if code == 429:
-        return "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider."
+        return get_lang_text("err_http_429") or "Rate limit (429)."
 
     if code == 413:
-        return "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello."
+        return get_lang_text("err_http_413") or "Request too large (413)."
 
     # Fallback: keep the remote message if present, otherwise the raw error
     return remote_msg or raw
@@ -202,7 +204,14 @@ LANGUAGE_TEXT = {
         "show_yaml_rule": "CRITICAL: After CREATING or MODIFYING automations/scripts/dashboards, you MUST show the YAML code to the user in your response. Never skip this step.",
         "confirm_entity_rule": "CRITICAL: Before creating automations, ALWAYS use search_entities first to find the correct entity_id, then confirm with the user if multiple matches are found.",
         "confirm_delete_rule": "CRITICAL DESTRUCTIVE: Before DELETING or MODIFYING an automation/script/dashboard, you MUST:\n1. Use get_automations/get_scripts/get_dashboards to list all options\n2. Identify with CERTAINTY which one the user wants to delete/modify (by name/alias)\n3. Show the user WHICH ONE you will delete/modify\n4. ASK for EXPLICIT CONFIRMATION before proceeding\n5. NEVER delete/modify without confirmation - it's an IRREVERSIBLE operation",
-        "example_vs_create_rule": "CRITICAL INTENT: Distinguish between 'show example' vs 'actually create':\n- If user asks for an \"example\", \"show me\", \"how to\", \"demo\" → respond with YAML code ONLY, do NOT call create_automation/create_script\n- If user explicitly asks to \"create\", \"save\", \"add\", \"make it real\" → call create_automation/create_script\n- When in doubt, show the YAML code first and ask if they want to create it"
+        "example_vs_create_rule": "CRITICAL INTENT: Distinguish between 'show example' vs 'actually create':\n- If user asks for an \"example\", \"show me\", \"how to\", \"demo\" → respond with YAML code ONLY, do NOT call create_automation/create_script\n- If user explicitly asks to \"create\", \"save\", \"add\", \"make it real\" → call create_automation/create_script\n- When in doubt, show the YAML code first and ask if they want to create it",
+
+        "err_github_budget_limit": "GitHub Models: budget limit reached for this account. Increase your GitHub budget/credit or pick another provider/model from the dropdown.",
+        "err_github_request_too_large": "GitHub Models: the request is too long for the selected model{limit_part}. Try a shorter question or pick a larger model from the dropdown.",
+        "err_http_401": "Authentication failed (401). Check the provider API key/token.",
+        "err_http_403": "Access denied (403). The model may not be available for this account/token.",
+        "err_http_413": "Request too large (413). Reduce message/context length or switch model.",
+        "err_http_429": "Rate limit (429). Wait a few seconds and retry, or switch model/provider."
     },
     "it": {
         "before": "Prima",
@@ -211,7 +220,14 @@ LANGUAGE_TEXT = {
         "show_yaml_rule": "CRITICO: Dopo aver CREATO o MODIFICATO automazioni/script/dashboard, DEVI sempre mostrare il codice YAML all'utente nella tua risposta. Non saltare mai questo passaggio.",
         "confirm_entity_rule": "CRITICO: Prima di creare automazioni, USA SEMPRE search_entities per trovare il corretto entity_id, poi conferma con l'utente se ci sono più risultati.",
         "confirm_delete_rule": "CRITICO DISTRUTTIVO: Prima di ELIMINARE o MODIFICARE un'automazione/script/dashboard, DEVI:\n1. Usare get_automations/get_scripts/get_dashboards per elencare tutte le opzioni\n2. Identificare con CERTEZZA quale l'utente vuole eliminare/modificare (per nome/alias)\n3. Mostrare all'utente QUALE eliminerai/modificherai\n4. CHIEDERE CONFERMA ESPLICITA prima di procedere\n5. NON eliminare/modificare MAI senza conferma - è un'operazione IRREVERSIBILE",
-        "example_vs_create_rule": "CRITICO INTENTO: Distingui tra 'mostra esempio' e 'crea effettivamente':\n- Se l'utente chiede un \"esempio\", \"mostrami\", \"fammi vedere\", \"come si fa\" → rispondi con il codice YAML SOLAMENTE, NON chiamare create_automation/create_script\n- Se l'utente chiede esplicitamente di \"creare\", \"salvare\", \"aggiungere\", \"rendilo reale\" → chiama create_automation/create_script\n- In caso di dubbio, mostra prima il codice YAML e chiedi se vuole crearlo effettivamente"
+        "example_vs_create_rule": "CRITICO INTENTO: Distingui tra 'mostra esempio' e 'crea effettivamente':\n- Se l'utente chiede un \"esempio\", \"mostrami\", \"fammi vedere\", \"come si fa\" → rispondi con il codice YAML SOLAMENTE, NON chiamare create_automation/create_script\n- Se l'utente chiede esplicitamente di \"creare\", \"salvare\", \"aggiungere\", \"rendilo reale\" → chiama create_automation/create_script\n- In caso di dubbio, mostra prima il codice YAML e chiedi se vuole crearlo effettivamente",
+
+        "err_github_budget_limit": "GitHub Models: limite budget raggiunto per questo account. Aumenta il budget/credito su GitHub oppure seleziona un altro provider/modello dal menu in alto.",
+        "err_github_request_too_large": "GitHub Models: richiesta troppo lunga per il modello selezionato{limit_part}. Prova a fare una domanda più corta, oppure scegli un modello più grande dal menu in alto.",
+        "err_http_401": "Autenticazione fallita (401). Verifica la chiave/token del provider selezionato.",
+        "err_http_403": "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token.",
+        "err_http_413": "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello.",
+        "err_http_429": "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider."
     },
     "es": {
         "before": "Antes",
@@ -220,7 +236,14 @@ LANGUAGE_TEXT = {
         "show_yaml_rule": "CRÍTICO: Después de CREAR o MODIFICAR automatizaciones/scripts/dashboards, DEBES mostrar el código YAML al usuario en tu respuesta. Nunca omitas este paso.",
         "confirm_entity_rule": "CRÍTICO: Antes de crear automatizaciones, USA SIEMPRE search_entities para encontrar el entity_id correcto, luego confirma con el usuario si hay múltiples resultados.",
         "confirm_delete_rule": "CRÍTICO DESTRUCTIVO: Antes de ELIMINAR o MODIFICAR una automatización/script/dashboard, DEBES:\n1. Usar get_automations/get_scripts/get_dashboards para listar todas las opciones\n2. Identificar con CERTEZA cuál quiere eliminar/modificar el usuario (por nombre/alias)\n3. Mostrar al usuario CUÁL eliminarás/modificarás\n4. PEDIR CONFIRMACIÓN EXPLÍCITA antes de proceder\n5. NUNCA eliminar/modificar sin confirmación - es una operación IRREVERSIBLE",
-        "example_vs_create_rule": "CRÍTICO INTENCIÓN: Distingue entre 'mostrar ejemplo' y 'crear realmente':\n- Si el usuario pide un \"ejemplo\", \"muéstrame\", \"cómo se hace\", \"demo\" → responde con código YAML SOLAMENTE, NO llames create_automation/create_script\n- Si el usuario pide explícitamente \"crear\", \"guardar\", \"añadir\", \"hazlo real\" → llama create_automation/create_script\n- En caso de duda, muestra primero el código YAML y pregunta si quiere crearlo realmente"
+        "example_vs_create_rule": "CRÍTICO INTENCIÓN: Distingue entre 'mostrar ejemplo' y 'crear realmente':\n- Si el usuario pide un \"ejemplo\", \"muéstrame\", \"cómo se hace\", \"demo\" → responde con código YAML SOLAMENTE, NO llames create_automation/create_script\n- Si el usuario pide explícitamente \"crear\", \"guardar\", \"añadir\", \"hazlo real\" → llama create_automation/create_script\n- En caso de duda, muestra primero el código YAML y pregunta si quiere crearlo realmente",
+
+        "err_github_budget_limit": "GitHub Models: se ha alcanzado el límite de presupuesto de esta cuenta. Aumenta el presupuesto/crédito en GitHub o elige otro proveedor/modelo en el desplegable.",
+        "err_github_request_too_large": "GitHub Models: la solicitud es demasiado larga para el modelo seleccionado{limit_part}. Prueba con una pregunta más corta o elige un modelo más grande en el desplegable.",
+        "err_http_401": "Autenticación fallida (401). Verifica la clave/token del proveedor.",
+        "err_http_403": "Acceso denegado (403). El modelo puede no estar disponible para esta cuenta/token.",
+        "err_http_413": "Solicitud demasiado grande (413). Reduce el mensaje/contexto o cambia de modelo.",
+        "err_http_429": "Límite de tasa (429). Espera unos segundos y reintenta, o cambia de modelo/proveedor."
     },
     "fr": {
         "before": "Avant",
@@ -229,7 +252,14 @@ LANGUAGE_TEXT = {
         "show_yaml_rule": "CRITIQUE: Après avoir CRÉÉ ou MODIFIÉ des automatisations/scripts/dashboards, tu DOIS toujours montrer le code YAML à l'utilisateur dans ta réponse. Ne saute jamais cette étape.",
         "confirm_entity_rule": "CRITIQUE: Avant de créer des automatisations, UTILISE TOUJOURS search_entities pour trouver le bon entity_id, puis confirme avec l'utilisateur s'il y a plusieurs résultats.",
         "confirm_delete_rule": "CRITIQUE DESTRUCTIF: Avant de SUPPRIMER ou MODIFIER une automatisation/script/dashboard, tu DOIS:\n1. Utiliser get_automations/get_scripts/get_dashboards pour lister toutes les options\n2. Identifier avec CERTITUDE laquelle l'utilisateur veut supprimer/modifier (par nom/alias)\n3. Montrer à l'utilisateur LAQUELLE tu vas supprimer/modifier\n4. DEMANDER une CONFIRMATION EXPLICITE avant de procéder\n5. NE JAMAIS supprimer/modifier sans confirmation - c'est une opération IRRÉVERSIBLE",
-        "example_vs_create_rule": "CRITIQUE INTENTION: Distingue entre 'montrer exemple' et 'créer réellement':\n- Si l'utilisateur demande un \"exemple\", \"montre-moi\", \"comment faire\", \"démo\" → réponds avec le code YAML SEULEMENT, NE PAS appeler create_automation/create_script\n- Si l'utilisateur demande explicitement de \"créer\", \"sauvegarder\", \"ajouter\", \"rends-le réel\" → appelle create_automation/create_script\n- En cas de doute, montre d'abord le code YAML et demande s'il veut le créer réellement"
+        "example_vs_create_rule": "CRITIQUE INTENTION: Distingue entre 'montrer exemple' et 'créer réellement':\n- Si l'utilisateur demande un \"exemple\", \"montre-moi\", \"comment faire\", \"démo\" → réponds avec le code YAML SEULEMENT, NE PAS appeler create_automation/create_script\n- Si l'utilisateur demande explicitement de \"créer\", \"sauvegarder\", \"ajouter\", \"rends-le réel\" → appelle create_automation/create_script\n- En cas de doute, montre d'abord le code YAML et demande s'il veut le créer réellement",
+
+        "err_github_budget_limit": "GitHub Models : limite de budget atteinte pour ce compte. Augmente le budget/crédit GitHub ou choisis un autre fournisseur/modèle dans la liste déroulante.",
+        "err_github_request_too_large": "GitHub Models : la requête est trop longue pour le modèle sélectionné{limit_part}. Essaie une question plus courte ou choisis un modèle plus grand dans la liste déroulante.",
+        "err_http_401": "Échec d'authentification (401). Vérifie la clé/le jeton du fournisseur.",
+        "err_http_403": "Accès refusé (403). Le modèle peut ne pas être disponible pour ce compte/jeton.",
+        "err_http_413": "Requête trop volumineuse (413). Réduis le message/le contexte ou change de modèle.",
+        "err_http_429": "Limite de débit (429). Attends quelques secondes et réessaie, ou change de modèle/fournisseur."
     }
 }
 
