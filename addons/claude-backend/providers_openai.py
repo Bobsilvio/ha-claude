@@ -12,6 +12,26 @@ import intent
 logger = logging.getLogger(__name__)
 
 
+def _is_rate_limit_error(err: Exception, error_msg: str) -> bool:
+    """Return True if the exception looks like an HTTP 429 rate-limit.
+
+    Important: do NOT match the substring 'rate' blindly (e.g. 'integrate').
+    """
+    status = getattr(err, "status_code", None)
+    if status == 429:
+        return True
+    resp = getattr(err, "response", None)
+    if resp is not None and getattr(resp, "status_code", None) == 429:
+        return True
+    msg = (error_msg or "").lower()
+    return (
+        "429" in msg
+        or "too many requests" in msg
+        or "rate limit" in msg
+        or "ratelimit" in msg
+    )
+
+
 # ---- Helper functions (moved from api.py) ----
 
 def _normalize_tool_args(args: object) -> str:
@@ -65,6 +85,120 @@ def _retry_with_swapped_max_token_param(kwargs: dict, max_tokens_value: int, api
     return api.ai_client.chat.completions.create(**kwargs)
 
 
+def _repair_tool_call_sequence(messages: list[dict]) -> bool:
+    """Repair message history when an assistant tool_calls message is missing tool replies.
+
+    OpenAI requires: assistant(role=assistant, tool_calls=[...]) MUST be followed by
+    tool messages responding to each tool_call_id before the next user/assistant message.
+
+    This can happen if a previous stream was aborted mid-round.
+    Returns True if it modified the list.
+    """
+    if not messages:
+        return False
+
+    modified = False
+    repaired: list[dict] = []
+    pending: dict[str, bool] = {}
+
+    def flush_pending():
+        nonlocal modified
+        if not pending:
+            return
+        for tool_call_id in list(pending.keys()):
+            repaired.append({
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": json.dumps({
+                    "error": "Missing tool response (auto-repaired). Please re-run the request if needed."
+                }, ensure_ascii=False),
+            })
+            modified = True
+        pending.clear()
+
+    for m in messages:
+        role = m.get("role")
+        # If we see a non-tool message while tools are pending, we must close them.
+        if pending and role != "tool":
+            flush_pending()
+
+        repaired.append(m)
+
+        if role == "assistant" and m.get("tool_calls"):
+            for tc in (m.get("tool_calls") or []):
+                tc_id = (tc or {}).get("id")
+                if isinstance(tc_id, str) and tc_id:
+                    pending[tc_id] = True
+        elif role == "tool":
+            tc_id = m.get("tool_call_id")
+            if isinstance(tc_id, str) and tc_id in pending:
+                pending.pop(tc_id, None)
+
+    # If conversation ends with pending tools, also flush.
+    if pending:
+        flush_pending()
+
+    if modified:
+        messages[:] = repaired
+    return modified
+
+
+def _safe_execute_tool(fn_name: str, args: dict) -> str:
+    """Execute HA tool and never raise; returns a JSON string on errors."""
+    try:
+        return tools.execute_tool(fn_name, args)
+    except Exception as e:
+        logger.exception(f"Tool execution failed: {fn_name}: {e}")
+        return json.dumps({"error": f"Tool '{fn_name}' failed: {str(e)}"}, ensure_ascii=False)
+
+
+def _last_user_text(messages: list[dict]) -> str:
+    for m in reversed(messages or []):
+        if m.get("role") == "user" and isinstance(m.get("content"), str):
+            txt = m.get("content") or ""
+            if txt.strip():
+                return txt
+    return ""
+
+
+def _normalize_entity_id_for_query_state(messages: list[dict], raw_entity_id: str) -> str:
+    """Normalize entity_id for get_entity_state.
+
+    If model passes a bare token like 'epcube' (no domain), we try search_entities
+    and pick the best candidate using the query_state scoring.
+    """
+    if not raw_entity_id or not isinstance(raw_entity_id, str):
+        return raw_entity_id
+    if "." in raw_entity_id:
+        return raw_entity_id
+
+    try:
+        search_raw = _safe_execute_tool("search_entities", {"query": raw_entity_id})
+        items = json.loads(search_raw) if search_raw else []
+    except Exception:
+        items = []
+
+    if not isinstance(items, list) or not items:
+        return raw_entity_id
+
+    user_msg = _last_user_text(messages)
+    best = None
+    best_score = -10**9
+    for it in items:
+        if not isinstance(it, dict) or not it.get("entity_id"):
+            continue
+        score = intent._score_query_state_candidate(user_msg, it.get("entity_id"), it.get("friendly_name") or "")
+        if score > best_score:
+            best_score = score
+            best = it
+
+    if best and best.get("entity_id") and best_score >= 20:
+        fixed = best.get("entity_id")
+        logger.warning(f"Normalized entity_id '{raw_entity_id}' -> '{fixed}' (score={best_score})")
+        return fixed
+    return raw_entity_id
+
+
 # ---- NVIDIA Direct Streaming ----
 
 def stream_chat_nvidia_direct(messages, intent_info=None):
@@ -87,7 +221,14 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
     full_text = ""
     max_rounds = (intent_info or {}).get("max_rounds") or 5
-    tools_called_this_session = set()
+    # Cache read-only tool results to avoid redundant calls
+    tool_cache: dict[str, str] = {}
+    read_only_tools = {
+        "get_automations", "get_scripts", "get_dashboards",
+        "get_dashboard_config", "read_config_file",
+        "list_config_files", "get_frontend_resources",
+        "search_entities", "get_entity_state", "get_entities",
+    }
 
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
@@ -191,11 +332,6 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             tool_call_results = {}
             for tc in tc_list:
                 fn_name = tc["function"]["name"]
-                if fn_name in tools_called_this_session:
-                    logger.info(f"Skipping already-called tool: {fn_name}")
-                    continue
-
-                tools_called_this_session.add(fn_name)
                 args_str = tc["function"]["arguments"]
                 tc_id = tc["id"]
 
@@ -208,10 +344,29 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                     tool_call_results[tc_id] = (fn_name, result)
                     continue
 
+                # Normalize entity_id for query_state when model passes a bare token like 'epcube'
+                if fn_name == "get_entity_state" and isinstance(args, dict):
+                    raw_eid = args.get("entity_id")
+                    if isinstance(raw_eid, str) and raw_eid and "." not in raw_eid:
+                        args["entity_id"] = _normalize_entity_id_for_query_state(messages, raw_eid)
+
+                sig = _tool_signature(fn_name, args)
+
+                # Reuse cached results for read-only tools with identical args
+                if fn_name in read_only_tools and sig in tool_cache:
+                    logger.warning(f"Reusing cached tool result: {fn_name} {sig}")
+                    result = tool_cache[sig]
+                    tool_call_results[tc_id] = (fn_name, result)
+                    yield {"type": "tool_result", "name": fn_name, "result": result}
+                    continue
+
                 # Execute tool using the standard execute_tool function
                 logger.info(f"NVIDIA: Executing tool '{fn_name}' with args: {args}")
-                result = tools.execute_tool(fn_name, args)
+                result = _safe_execute_tool(fn_name, args)
                 logger.info(f"NVIDIA: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
+
+                if fn_name in read_only_tools:
+                    tool_cache[sig] = result
 
                 tool_call_results[tc_id] = (fn_name, result)
                 yield {"type": "tool_result", "name": fn_name, "result": result}
@@ -220,16 +375,39 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             for tc_id, (fn_name, result) in tool_call_results.items():
                 messages.append({"role": "tool", "tool_call_id": tc_id, "name": fn_name, "content": result})
 
-        except Exception as e:
+        except requests.HTTPError as e:
+            status = e.response.status_code if getattr(e, "response", None) is not None else None
             error_msg = str(e)
-            # FIX: Handle 429 rate limit errors with backoff
-            if "429" in error_msg or "rate" in error_msg.lower():
+
+            if status == 429 or _is_rate_limit_error(e, error_msg):
                 logger.warning(f"NVIDIA rate limit hit at round {round_num+1}: {error_msg}")
-                yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
+                yield {"type": "status", "message": "Rate limit NVIDIA raggiunto, attendo..."}
                 time.sleep(10)
                 continue
-            logger.error(f"NVIDIA API error: {e}")
+
+            # 404 on /chat/completions is commonly returned when the model ID is not available for this key.
+            if status == 404:
+                bad_model = payload.get("model")
+                if bad_model:
+                    api.NVIDIA_MODEL_BLOCKLIST.add(bad_model)
+                logger.warning(f"NVIDIA model not available (404): {bad_model}")
+                yield {"type": "status", "message": "⚠️ Modello NVIDIA non disponibile (404). L'ho rimosso dalla lista modelli."}
+                error_msg_text = f"NVIDIA: modello non disponibile: {bad_model or 'unknown'}"
+                messages.append({"role": "assistant", "content": error_msg_text})
+                yield {"type": "clear"}
+                yield {"type": "token", "content": error_msg_text}
+                break
+
+            logger.error(f"NVIDIA API HTTP error ({status}): {e}")
+            error_msg_text = f"NVIDIA API error: {error_msg}"
+            messages.append({"role": "assistant", "content": error_msg_text})
+            yield {"type": "clear"}
+            yield {"type": "token", "content": error_msg_text}
+            break
+
+        except Exception as e:
             error_msg_text = f"NVIDIA API error: {str(e)}"
+            logger.error(error_msg_text)
             messages.append({"role": "assistant", "content": error_msg_text})
             yield {"type": "clear"}
             yield {"type": "token", "content": error_msg_text}
@@ -241,6 +419,9 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 def stream_chat_openai(messages, intent_info=None):
     """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts.
     Uses intent_info to select focused tools and prompt when available."""
+    # Repair conversation state if a previous run was aborted mid tool-call.
+    _repair_tool_call_sequence(messages)
+
     trimmed = intent.trim_messages(messages)
 
     # Use focused tools/prompt if intent detected, else full
@@ -305,6 +486,14 @@ def stream_chat_openai(messages, intent_info=None):
             response = api.ai_client.chat.completions.create(**kwargs)
         except Exception as api_err:
             error_msg = str(api_err)
+            # Repair common invalid_request_error: missing tool messages after tool_calls
+            if "tool_calls" in error_msg and "must be followed by tool messages" in error_msg:
+                if _repair_tool_call_sequence(messages):
+                    logger.warning("Repaired dangling tool_calls in history; retrying request once.")
+                    yield {"type": "status", "message": "Ho riparato lo stato dei tool, riprovo..."}
+                    response = api.ai_client.chat.completions.create(**kwargs)
+                else:
+                    raise
             if api.AI_PROVIDER == "github" and (
                 "unsupported parameter" in error_msg.lower() or "unsupported_parameter" in error_msg.lower()
             ):
@@ -360,8 +549,8 @@ def stream_chat_openai(messages, intent_info=None):
                             raise
                     else:
                         raise
-            # FIX: Handle 429 rate limit errors with backoff (was missing!)
-            elif "429" in error_msg or "rate" in error_msg.lower():
+            # FIX: Handle 429 rate limit errors with backoff (without matching 'integrate')
+            elif _is_rate_limit_error(api_err, error_msg):
                 logger.warning(f"Rate limit hit at round {round_num+1}: {error_msg}")
                 yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
                 time.sleep(10)
@@ -432,6 +621,12 @@ def stream_chat_openai(messages, intent_info=None):
             except json.JSONDecodeError:
                 args = {}
 
+            # Normalize entity_id for query_state when model passes a bare token like 'epcube'
+            if fn_name == "get_entity_state" and isinstance(args, dict):
+                raw_eid = args.get("entity_id")
+                if isinstance(raw_eid, str) and raw_eid and "." not in raw_eid:
+                    args["entity_id"] = _normalize_entity_id_for_query_state(messages, raw_eid)
+
             sig = _tool_signature(fn_name, args)
 
             # Reuse cached results for read-only tools with identical args
@@ -445,7 +640,7 @@ def stream_chat_openai(messages, intent_info=None):
             # Execute tool
             yield {"type": "tool", "name": fn_name, "description": tools.get_tool_description(fn_name)}
             logger.info(f"OpenAI: Executing tool '{fn_name}' with args: {args}")
-            result = tools.execute_tool(fn_name, args)
+            result = _safe_execute_tool(fn_name, args)
             logger.info(f"OpenAI: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
 
             # Truncate large results to prevent token overflow

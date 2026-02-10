@@ -11,6 +11,49 @@ import intent
 logger = logging.getLogger(__name__)
 
 
+def _is_rate_limit_error(error_msg: str) -> bool:
+    """Return True if error message indicates rate limiting."""
+    msg = (error_msg or "").lower()
+    return (
+        "429" in msg
+        or "too many requests" in msg
+        or "rate limit" in msg
+        or "ratelimit" in msg
+    )
+
+
+def _humanize_anthropic_error(error_msg: str) -> str:
+    """Return a user-friendly message for common Anthropic errors."""
+    msg = error_msg or ""
+    low = msg.lower()
+
+    # Low credit / billing
+    if "credit balance is too low" in low or "plans & billing" in low or "purchase credits" in low:
+        return {
+            "en": "Anthropic: insufficient credits. Open Plans & Billing to add credits, or switch provider.",
+            "it": "Anthropic: credito insufficiente. Vai su Plans & Billing per acquistare crediti, oppure cambia provider.",
+            "es": "Anthropic: crédito insuficiente. Ve a Plans & Billing para añadir créditos o cambia de proveedor.",
+            "fr": "Anthropic: crédit insuffisant. Ouvrez Plans & Billing pour ajouter du crédit, ou changez de fournisseur.",
+        }.get(api.LANGUAGE, "Anthropic: insufficient credits. Open Plans & Billing to add credits, or switch provider.")
+
+    # Invalid/expired key
+    if "authentication" in low or "invalid api key" in low or "x-api-key" in low or "unauthorized" in low:
+        return {
+            "en": "Anthropic: API key invalid or missing. Check your Anthropic API key in the add-on settings.",
+            "it": "Anthropic: API key non valida o mancante. Controlla la chiave Anthropic nelle impostazioni dell’add-on.",
+            "es": "Anthropic: API key inválida o ausente. Revisa la clave de Anthropic en la configuración del add-on.",
+            "fr": "Anthropic: clé API invalide ou manquante. Vérifiez la clé Anthropic dans les paramètres de l’add-on.",
+        }.get(api.LANGUAGE, "Anthropic: API key invalid or missing. Check your Anthropic API key in the add-on settings.")
+
+    # Fallback: keep it short
+    return {
+        "en": "Anthropic error. Please retry or switch provider.",
+        "it": "Errore Anthropic. Riprova oppure cambia provider.",
+        "es": "Error de Anthropic. Reintenta o cambia de proveedor.",
+        "fr": "Erreur Anthropic. Réessayez ou changez de fournisseur.",
+    }.get(api.LANGUAGE, "Anthropic error. Please retry or switch provider.")
+
+
 def stream_chat_anthropic(messages, intent_info=None):
     """Stream chat for Anthropic with real token streaming and tool event emission.
     Uses intent_info to select focused tools and prompt when available."""
@@ -99,13 +142,17 @@ def stream_chat_anthropic(messages, intent_info=None):
                 final_message = stream.get_final_message()
         except Exception as api_err:
             error_msg = str(api_err)
-            if "429" in error_msg or "rate" in error_msg.lower():
+            if _is_rate_limit_error(error_msg):
                 logger.warning(f"Rate limit hit at round {round_num+1}: {error_msg}")
                 yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
                 time.sleep(10)  # Wait and retry this round
                 continue
-            else:
-                raise
+
+            # For common billing/auth issues, show a clean message instead of raw SDK payload
+            user_msg = _humanize_anthropic_error(error_msg)
+            logger.error(f"Anthropic API error: {error_msg}")
+            yield {"type": "error", "message": user_msg}
+            break
 
         accumulated_text = "".join(content_parts)
 

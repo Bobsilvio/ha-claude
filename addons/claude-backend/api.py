@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.11"
+VERSION = "3.1.16"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -201,6 +201,62 @@ PROVIDER_DEFAULTS = {
 # GitHub models that returned unknown_model at runtime (per current token)
 GITHUB_MODEL_BLOCKLIST: set[str] = set()
 
+# NVIDIA models that returned 404/unknown at runtime (per current key)
+NVIDIA_MODEL_BLOCKLIST: set[str] = set()
+
+# Cache for NVIDIA /v1/models discovery (to keep UI in sync with what's available for the current key)
+_NVIDIA_MODELS_CACHE: dict[str, object] = {"ts": 0.0, "models": []}
+_NVIDIA_MODELS_CACHE_TTL_SECONDS = 10 * 60
+
+
+def _fetch_nvidia_models_live() -> Optional[list[str]]:
+    """Fetch available NVIDIA models from the OpenAI-compatible endpoint.
+
+    Returns a sorted list of model IDs, or None if unavailable.
+    """
+    if not NVIDIA_API_KEY:
+        return None
+    try:
+        url = "https://integrate.api.nvidia.com/v1/models"
+        headers = {"Authorization": f"Bearer {NVIDIA_API_KEY}"}
+        resp = requests.get(url, headers=headers, timeout=10)
+        resp.raise_for_status()
+        data = resp.json() if resp.content else {}
+        models: list[str] = []
+        for item in (data.get("data") or []):
+            if isinstance(item, dict):
+                mid = item.get("id") or item.get("model")
+                if isinstance(mid, str) and mid.strip():
+                    models.append(mid.strip())
+        models = sorted(set(models))
+        return models or None
+    except Exception as e:
+        logger.warning(f"NVIDIA: unable to fetch /v1/models ({type(e).__name__}): {e}")
+        return None
+
+
+def get_nvidia_models_cached() -> Optional[list[str]]:
+    """Return cached NVIDIA model IDs, refreshing periodically."""
+    if not NVIDIA_API_KEY:
+        return None
+
+    now = time.time()
+    ts = float(_NVIDIA_MODELS_CACHE.get("ts") or 0.0)
+    cached_models = _NVIDIA_MODELS_CACHE.get("models") or []
+    if cached_models and (now - ts) < _NVIDIA_MODELS_CACHE_TTL_SECONDS:
+        return list(cached_models)
+
+    live = _fetch_nvidia_models_live()
+    if live:
+        _NVIDIA_MODELS_CACHE["ts"] = now
+        _NVIDIA_MODELS_CACHE["models"] = list(live)
+        return live
+
+    # Fallback to stale cache if present
+    if cached_models:
+        return list(cached_models)
+    return None
+
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
     "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
@@ -260,17 +316,16 @@ MODEL_NAME_MAPPING = {
     "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
     "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
     "NVIDIA: Kimi K2.5 🧪": "moonshotai/kimi-k2.5",
-    "NVIDIA: Kimi K2.5 🧪🆓": "moonshotai/kimi-k2.5",
     "NVIDIA: Llama 3.1 70B 🧪": "meta/llama-3.1-70b-instruct",
-    "NVIDIA: Llama 3.1 70B 🧪🆓": "meta/llama-3.1-70b-instruct",
+    
     "NVIDIA: Llama 3.1 405B 🧪": "meta/llama-3.1-405b-instruct",
-    "NVIDIA: Llama 3.1 405B 🧪🆓": "meta/llama-3.1-405b-instruct",
+    
     "NVIDIA: Mistral Large 2 🧪": "mistralai/mistral-large-2-instruct",
-    "NVIDIA: Mistral Large 2 🧪🆓": "mistralai/mistral-large-2-instruct",
+    
     "NVIDIA: Phi-4 🧪": "microsoft/phi-4",
-    "NVIDIA: Phi-4 🧪🆓": "microsoft/phi-4",
+    
     "NVIDIA: Nemotron 70B 🧪": "nvidia/llama-3.1-nemotron-70b-instruct",
-    "NVIDIA: Nemotron 70B 🧪🆓": "nvidia/llama-3.1-nemotron-70b-instruct",
+    
     # GitHub Models - IDs use publisher/model-name format
     "GitHub: GPT-4o": "openai/gpt-4o",
     "GitHub: GPT-4o-mini": "openai/gpt-4o-mini",
@@ -330,10 +385,8 @@ for _display_name, _tech_name in MODEL_NAME_MAPPING.items():
         if _display_name.startswith(_prefix):
             if _prov not in PROVIDER_DISPLAY:
                 PROVIDER_DISPLAY[_prov] = {}
-            # Prefer emoji versions for NVIDIA (🧪🆓), but use clean names for others
+            # Use a stable display name per provider
             if _tech_name not in PROVIDER_DISPLAY[_prov]:
-                PROVIDER_DISPLAY[_prov][_tech_name] = _display_name
-            elif _prov == "nvidia" and "🆓" in _display_name:
                 PROVIDER_DISPLAY[_prov][_tech_name] = _display_name
             break
 
@@ -1867,6 +1920,15 @@ def api_get_models():
     models_technical = {}
     for provider, models in PROVIDER_MODELS.items():
         filtered_models = list(models)
+
+        # Live discovery for NVIDIA (per-key availability)
+        if provider == "nvidia":
+            live_models = get_nvidia_models_cached()
+            if live_models:
+                filtered_models = list(live_models)
+            if NVIDIA_MODEL_BLOCKLIST:
+                filtered_models = [m for m in filtered_models if m not in NVIDIA_MODEL_BLOCKLIST]
+
         if provider == "github" and GITHUB_MODEL_BLOCKLIST:
             filtered_models = [m for m in filtered_models if m not in GITHUB_MODEL_BLOCKLIST]
         models_technical[provider] = list(filtered_models)

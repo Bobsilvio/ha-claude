@@ -11,42 +11,45 @@ def get_chat_ui():
     status_color = "#4caf50" if configured else "#ff9800"
     status_text = provider_name if configured else f"{provider_name} (no key)"
 
-    # Multilingual UI messages with provider-specific analyzing messages
+    # NOTE: The "thinking" message is also computed dynamically in the browser,
+    # because provider/model can change at runtime via /api/set_model.
     provider_analyzing = {
         "anthropic": {
             "en": "🧠 Claude is thinking deeply...",
             "it": "🧠 Claude sta pensando...",
             "es": "🧠 Claude está pensando...",
-            "fr": "🧠 Claude réfléchit..."
+            "fr": "🧠 Claude réfléchit...",
         },
         "openai": {
             "en": "⚡ GPT is processing your request...",
             "it": "⚡ GPT sta elaborando...",
             "es": "⚡ GPT está procesando...",
-            "fr": "⚡ GPT traite votre demande..."
+            "fr": "⚡ GPT traite votre demande...",
         },
         "google": {
             "en": "✨ Gemini is analyzing...",
             "it": "✨ Gemini sta analizzando...",
             "es": "✨ Gemini está analizando...",
-            "fr": "✨ Gemini analyse..."
+            "fr": "✨ Gemini analyse...",
         },
         "github": {
             "en": "🚀 GitHub AI is working on it...",
             "it": "🚀 GitHub AI sta lavorando...",
             "es": "🚀 GitHub AI está trabajando...",
-            "fr": "🚀 GitHub AI travaille..."
+            "fr": "🚀 GitHub AI travaille...",
         },
         "nvidia": {
             "en": "🎯 NVIDIA AI is computing...",
             "it": "🎯 NVIDIA AI sta calcolando...",
             "es": "🎯 NVIDIA AI está computando...",
-            "fr": "🎯 NVIDIA AI calcule..."
-        }
+            "fr": "🎯 NVIDIA AI calcule...",
+        },
     }
 
-    # Get provider-specific analyzing message
-    analyzing_msg = provider_analyzing.get(api.AI_PROVIDER, provider_analyzing["openai"]).get(api.LANGUAGE, provider_analyzing[api.AI_PROVIDER]["en"])
+    analyzing_msg = provider_analyzing.get(api.AI_PROVIDER, provider_analyzing["openai"]).get(
+        api.LANGUAGE,
+        provider_analyzing.get(api.AI_PROVIDER, provider_analyzing["openai"]).get("en"),
+    )
 
     ui_messages = {
         "en": {
@@ -241,6 +244,19 @@ def get_chat_ui():
         let currentReader = null;
         let currentSessionId = localStorage.getItem('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
+        let currentProviderId = '{api.AI_PROVIDER}';
+
+        const ANALYZING_BY_PROVIDER = {{
+            'anthropic': {json.dumps(provider_analyzing['anthropic'].get(api.LANGUAGE, provider_analyzing['anthropic']['en']))},
+            'openai': {json.dumps(provider_analyzing['openai'].get(api.LANGUAGE, provider_analyzing['openai']['en']))},
+            'google': {json.dumps(provider_analyzing['google'].get(api.LANGUAGE, provider_analyzing['google']['en']))},
+            'github': {json.dumps(provider_analyzing['github'].get(api.LANGUAGE, provider_analyzing['github']['en']))},
+            'nvidia': {json.dumps(provider_analyzing['nvidia'].get(api.LANGUAGE, provider_analyzing['nvidia']['en']))}
+        }};
+
+        function getAnalyzingMsg() {{
+            return ANALYZING_BY_PROVIDER[currentProviderId] || ANALYZING_BY_PROVIDER['openai'];
+        }}
 
         function initSidebarResize() {{
             if (!sidebarEl || !splitterEl) return;
@@ -432,7 +448,7 @@ def get_chat_ui():
             const div = document.createElement('div');
             div.className = 'message thinking';
             div.id = 'thinking';
-            div.innerHTML = '{msgs['analyzing']}<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            div.innerHTML = getAnalyzingMsg() + '<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }}
@@ -682,6 +698,10 @@ def get_chat_ui():
                 const currentProvider = data.current_provider;
                 const currentModel = data.current_model;
 
+                if (currentProvider) {{
+                    currentProviderId = currentProvider;
+                }}
+
                 console.log('[loadModels] Provider:', currentProvider, 'Current model:', currentModel);
 
                 // Clear existing options
@@ -746,9 +766,13 @@ def get_chat_ui():
                 if (response.ok) {{
                     const data = await response.json();
                     console.log('Model changed to:', parsed.model, 'Provider:', parsed.provider);
+                    // Keep UI state in sync so the thinking message matches the selected provider
+                    currentProviderId = parsed.provider;
                     // Show notification
                     const providerName = PROVIDER_LABELS[parsed.provider] || parsed.provider;
                     addMessage(`🔄 Passato a ${{providerName}} → ${{parsed.model}}`, 'system');
+                    // Refresh dropdown state from server (ensures UI stays consistent)
+                    loadModels();
                 }}
             }} catch (error) {{
                 console.error('Error changing model:', error);
