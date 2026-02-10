@@ -5158,7 +5158,7 @@ def api_set_system_prompt():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('api/chat', methods=['POST'])
+@app.route('/api/chat', methods=['POST'])
 def api_chat():
     """Chat endpoint."""
     data = request.get_json()
