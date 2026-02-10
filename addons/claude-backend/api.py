@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.61"
+VERSION = "3.0.62"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -478,6 +478,18 @@ def _retry_with_swapped_max_token_param(kwargs: dict, max_tokens_value: int, api
         logger.warning("Retrying after unsupported_parameter: switching to max_tokens")
 
     return ai_client.chat.completions.create(**kwargs)
+
+
+def _normalize_tool_args(args: object) -> str:
+    """Return a stable string representation for tool-call arguments."""
+    try:
+        return json.dumps(args, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    except Exception:
+        return str(args)
+
+
+def _tool_signature(fn_name: str, args: object) -> str:
+    return f"{fn_name}:{_normalize_tool_args(args)}"
 
 
 def _github_model_variants(model: str) -> list[str]:
@@ -3175,6 +3187,14 @@ def chat_openai(messages: List[Dict]) -> tuple:
 
     msg = response.choices[0].message
 
+    tool_cache: dict[str, str] = {}
+    read_only_tools = {
+        "get_automations", "get_scripts", "get_dashboards",
+        "get_dashboard_config", "read_config_file",
+        "list_config_files", "get_frontend_resources",
+        "search_entities", "get_entity_state", "get_entities",
+    }
+
     while msg.tool_calls:
         messages.append({"role": "assistant", "content": msg.content, "tool_calls": [
             {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
@@ -3184,7 +3204,15 @@ def chat_openai(messages: List[Dict]) -> tuple:
         for tc in msg.tool_calls:
             logger.info(f"Tool: {tc.function.name}")
             args = json.loads(tc.function.arguments)
-            result = execute_tool(tc.function.name, args)
+            fn_name = tc.function.name
+            sig = _tool_signature(fn_name, args)
+            if fn_name in read_only_tools and sig in tool_cache:
+                logger.warning(f"Reusing cached tool result: {fn_name} {sig}")
+                result = tool_cache[sig]
+            else:
+                result = execute_tool(fn_name, args)
+                if fn_name in read_only_tools:
+                    tool_cache[sig] = result
             # Truncate tool results for GitHub/NVIDIA to stay within token limits
             if AI_PROVIDER in ["github", "nvidia"] and len(result) > 3000:
                 result = result[:3000] + '... (truncated)'
@@ -3534,9 +3562,24 @@ def stream_chat_openai(messages, intent_info=None):
     max_tok = 4000 if AI_PROVIDER == "github" else 4096
     full_text = ""
     max_rounds = 5
-    tools_called_this_session = set()
+    # Cache read-only tool results to avoid redundant calls (and reduce extra rounds / rate limits)
+    tool_cache: dict[str, str] = {}
+
+    read_only_tools = {
+        "get_automations", "get_scripts", "get_dashboards",
+        "get_dashboard_config", "read_config_file",
+        "list_config_files", "get_frontend_resources",
+        "search_entities", "get_entity_state", "get_entities",
+    }
 
     for round_num in range(max_rounds):
+        # Rate-limit prevention for GitHub Models: small delay before subsequent rounds
+        if AI_PROVIDER == "github" and round_num > 0:
+            delay = min(2 + round_num, 5)
+            logger.info(f"Rate-limit prevention (GitHub): waiting {delay}s before round {round_num+1}")
+            yield {"type": "status", "message": f"Rate limit GitHub: attendo {delay}s..."}
+            time.sleep(delay)
+
         oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
 
         # NVIDIA Kimi K2.5: configure thinking mode
@@ -3675,28 +3718,39 @@ def stream_chat_openai(messages, intent_info=None):
         tool_call_results = {}  # Map tc_id -> (fn_name, result)
         for tc in tc_list:
             fn_name = tc["function"]["name"]
-            # Block redundant read-only tool calls
-            redundant_read_tools = {"get_automations", "get_scripts", "get_dashboards",
-                                    "get_dashboard_config", "read_config_file",
-                                    "list_config_files", "get_frontend_resources",
-                                    "search_entities", "get_entity_state"}
-            if fn_name in redundant_read_tools and fn_name in tools_called_this_session:
-                logger.warning(f"Blocked redundant tool call: {fn_name}")
-                messages.append({"role": "tool", "tool_call_id": tc["id"],
-                                 "content": json.dumps({"note": f"Skipped: {fn_name} already called. Use existing data. Respond NOW."})})
+
+            # Parse args safely
+            args_str = tc["function"].get("arguments") or "{}"
+            try:
+                args = json.loads(args_str) if args_str.strip() else {}
+            except json.JSONDecodeError:
+                args = {}
+
+            sig = _tool_signature(fn_name, args)
+
+            # Reuse cached results for read-only tools with identical args
+            if fn_name in read_only_tools and sig in tool_cache:
+                logger.warning(f"Reusing cached tool result: {fn_name} {sig}")
+                result = tool_cache[sig]
+                messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
+                tool_call_results[tc["id"]] = (fn_name, result)
                 continue
+
+            # Execute tool
             yield {"type": "tool", "name": fn_name, "description": get_tool_description(fn_name)}
-            args = json.loads(tc["function"]["arguments"])
             logger.info(f"OpenAI: Executing tool '{fn_name}' with args: {args}")
             result = execute_tool(fn_name, args)
             logger.info(f"OpenAI: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
-            tools_called_this_session.add(fn_name)
+
             # Truncate large results to prevent token overflow
             max_len = 3000 if AI_PROVIDER == "github" else 8000
             if len(result) > max_len:
                 result = result[:max_len] + '\n... [TRUNCATED - ' + str(len(result)) + ' chars total]'
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})
             tool_call_results[tc["id"]] = (fn_name, result)
+
+            if fn_name in read_only_tools:
+                tool_cache[sig] = result
 
         # AUTO-STOP: If a write tool succeeded, format response directly
         WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
