@@ -6,10 +6,8 @@ import logging
 import requests
 
 import api
-from tools import (get_system_prompt, get_openai_tools_for_provider, get_tool_description,
-                   execute_tool)
-from intent import (get_tools_for_intent, get_prompt_for_intent, trim_messages,
-                    _score_query_state_candidate, _format_query_state_answer)
+import tools
+import intent
 
 logger = logging.getLogger(__name__)
 
@@ -72,16 +70,16 @@ def _retry_with_swapped_max_token_param(kwargs: dict, max_tokens_value: int, api
 def stream_chat_nvidia_direct(messages, intent_info=None):
     """Stream chat for NVIDIA using direct requests (not OpenAI SDK).
     This allows using NVIDIA-specific parameters like chat_template_kwargs for thinking mode."""
-    trimmed = trim_messages(messages)
+    trimmed = intent.trim_messages(messages)
 
     # Use focused tools/prompt if intent detected, else full
     if intent_info and intent_info.get("tools") is not None:
-        system_prompt = get_prompt_for_intent(intent_info)
-        tools = get_tools_for_intent(intent_info, api.AI_PROVIDER)
+        system_prompt = intent.get_prompt_for_intent(intent_info)
+        tools = intent.get_tools_for_intent(intent_info, api.AI_PROVIDER)
         logger.info(f"NVIDIA focused mode: {intent_info['intent']} ({len(tools)} tools)")
     else:
-        system_prompt = get_system_prompt()
-        tools = get_openai_tools_for_provider()
+        system_prompt = tools.get_system_prompt()
+        tools = tools.get_openai_tools_for_provider()
 
     # Log available tools
     tool_names = [t.get("function", {}).get("name", "unknown") for t in tools]
@@ -92,7 +90,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
     tools_called_this_session = set()
 
     for round_num in range(max_rounds):
-        oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
+        oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
 
         # Prepare NVIDIA API request
         url = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -212,7 +210,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
                 # Execute tool using the standard execute_tool function
                 logger.info(f"NVIDIA: Executing tool '{fn_name}' with args: {args}")
-                result = execute_tool(fn_name, args)
+                result = tools.execute_tool(fn_name, args)
                 logger.info(f"NVIDIA: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
 
                 tool_call_results[tc_id] = (fn_name, result)
@@ -243,16 +241,16 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 def stream_chat_openai(messages, intent_info=None):
     """Stream chat for OpenAI/GitHub with real token streaming. Yields SSE event dicts.
     Uses intent_info to select focused tools and prompt when available."""
-    trimmed = trim_messages(messages)
+    trimmed = intent.trim_messages(messages)
 
     # Use focused tools/prompt if intent detected, else full
     if intent_info and intent_info.get("tools") is not None:
-        system_prompt = get_prompt_for_intent(intent_info)
-        tools = get_tools_for_intent(intent_info, api.AI_PROVIDER)
+        system_prompt = intent.get_prompt_for_intent(intent_info)
+        tools = intent.get_tools_for_intent(intent_info, api.AI_PROVIDER)
         logger.info(f"OpenAI focused mode: {intent_info['intent']} ({len(tools)} tools)")
     else:
-        system_prompt = get_system_prompt()
-        tools = get_openai_tools_for_provider()
+        system_prompt = tools.get_system_prompt()
+        tools = tools.get_openai_tools_for_provider()
 
     # Log available tools for debugging
     tool_names = [t.get("function", {}).get("name", "unknown") for t in tools]
@@ -281,7 +279,7 @@ def stream_chat_openai(messages, intent_info=None):
             yield {"type": "status", "message": f"Rate limit GitHub: attendo {delay}s..."}
             time.sleep(delay)
 
-        oai_messages = [{"role": "system", "content": system_prompt}] + trim_messages(messages)
+        oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
 
         # NVIDIA Kimi K2.5: configure thinking mode
         kwargs = {
@@ -445,9 +443,9 @@ def stream_chat_openai(messages, intent_info=None):
                 continue
 
             # Execute tool
-            yield {"type": "tool", "name": fn_name, "description": get_tool_description(fn_name)}
+            yield {"type": "tool", "name": fn_name, "description": tools.get_tool_description(fn_name)}
             logger.info(f"OpenAI: Executing tool '{fn_name}' with args: {args}")
-            result = execute_tool(fn_name, args)
+            result = tools.execute_tool(fn_name, args)
             logger.info(f"OpenAI: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
 
             # Truncate large results to prevent token overflow
@@ -512,16 +510,16 @@ def stream_chat_openai(messages, intent_info=None):
                 best = None
                 best_score = -10**9
                 for c in candidates:
-                    s = _score_query_state_candidate(user_msg, c.get("entity_id"), c.get("friendly_name"))
+                    s = intent._score_query_state_candidate(user_msg, c.get("entity_id"), c.get("friendly_name"))
                     if s > best_score:
                         best_score = s
                         best = c
 
                 if best and best.get("entity_id") and best_score >= 20:
                     try:
-                        state_json = execute_tool("get_entity_state", {"entity_id": best["entity_id"]})
+                        state_json = tools.execute_tool("get_entity_state", {"entity_id": best["entity_id"]})
                         state_data = json.loads(state_json) if isinstance(state_json, str) else {}
-                        full_text = _format_query_state_answer(best["entity_id"], state_data if isinstance(state_data, dict) else {})
+                        full_text = intent._format_query_state_answer(best["entity_id"], state_data if isinstance(state_data, dict) else {})
                         logger.info("Auto-stop: query_state answered locally to avoid extra API call")
                         messages.append({"role": "assistant", "content": full_text})
                         yield {"type": "clear"}

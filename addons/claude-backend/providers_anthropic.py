@@ -5,8 +5,8 @@ import time
 import logging
 
 import api
-from tools import get_system_prompt, get_anthropic_tools, get_tool_description, execute_tool
-from intent import get_tools_for_intent, get_prompt_for_intent, _score_query_state_candidate, _format_query_state_answer
+import tools
+import intent
 
 logger = logging.getLogger(__name__)
 
@@ -18,12 +18,12 @@ def stream_chat_anthropic(messages, intent_info=None):
 
     # Use focused tools/prompt if intent detected, else full
     if intent_info and intent_info.get("tools") is not None:
-        focused_prompt = get_prompt_for_intent(intent_info)
-        focused_tools = get_tools_for_intent(intent_info, "anthropic")
+        focused_prompt = intent.get_prompt_for_intent(intent_info)
+        focused_tools = intent.get_tools_for_intent(intent_info, "anthropic")
         logger.info(f"Anthropic focused mode: {intent_info['intent']} ({len(focused_tools)} tools)")
     else:
-        focused_prompt = get_system_prompt()
-        focused_tools = get_anthropic_tools()
+        focused_prompt = tools.get_system_prompt()
+        focused_tools = tools.get_anthropic_tools()
 
     # Log available tools for debugging
     tool_names = [t.get("name", "unknown") for t in focused_tools]
@@ -149,8 +149,8 @@ def stream_chat_anthropic(messages, intent_info=None):
                 continue
 
             logger.info(f"Anthropic: Executing tool '{tool['name']}' with input: {tool['input']}")
-            yield {"type": "tool", "name": tool["name"], "description": get_tool_description(tool["name"])}
-            result = execute_tool(tool["name"], tool["input"])
+            yield {"type": "tool", "name": tool["name"], "description": tools.get_tool_description(tool["name"])}
+            result = tools.execute_tool(tool["name"], tool["input"])
             logger.info(f"Anthropic: Tool '{tool['name']}' returned {len(result)} chars: {result[:300]}...")
             tools_called_this_session.add(tool_key)
             # Truncate large tool results to prevent token overflow

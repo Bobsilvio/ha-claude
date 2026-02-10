@@ -263,20 +263,19 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
 
 def get_tools_for_intent(intent_info: dict, provider: str = "anthropic") -> list:
     """Get tool definitions filtered by intent. Returns full tools if intent is generic."""
-    from tools import (HA_TOOLS_DESCRIPTION, get_anthropic_tools,
-                       get_openai_tools_for_provider)
+    import tools as _tools
 
     tool_names = intent_info.get("tools")
     if tool_names is None:
         # Generic: return all tools
         if provider == "anthropic":
-            return get_anthropic_tools()
+            return _tools.get_anthropic_tools()
         elif provider in ("openai", "github", "nvidia"):
-            return get_openai_tools_for_provider()
-        return get_anthropic_tools()
+            return _tools.get_openai_tools_for_provider()
+        return _tools.get_anthropic_tools()
 
     # Filter to only relevant tools (empty list → empty result for chat intent)
-    filtered = [t for t in HA_TOOLS_DESCRIPTION if t["name"] in tool_names]
+    filtered = [t for t in _tools.HA_TOOLS_DESCRIPTION if t["name"] in tool_names]
 
     if provider == "anthropic":
         return [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]} for t in filtered]
@@ -287,7 +286,7 @@ def get_tools_for_intent(intent_info: dict, provider: str = "anthropic") -> list
 
 def get_prompt_for_intent(intent_info: dict) -> str:
     """Get system prompt for intent. Returns focused prompt if available, else full."""
-    from tools import get_system_prompt
+    import tools as _tools
 
     # Ensure dynamic prompts are initialized
     _init_dynamic_prompts()
@@ -299,7 +298,7 @@ def get_prompt_for_intent(intent_info: dict) -> str:
         if lang_instruction and lang_instruction not in prompt:
             return prompt + "\n\n" + lang_instruction
         return prompt
-    return get_system_prompt()
+    return _tools.get_system_prompt()
 
 
 def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:

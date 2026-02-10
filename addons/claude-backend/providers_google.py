@@ -5,7 +5,7 @@ import time
 import logging
 
 import api
-from tools import get_system_prompt, get_gemini_tools, execute_tool
+import tools
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +16,8 @@ def stream_chat_google(messages):
 
     model = api.ai_client.GenerativeModel(
         model_name=api.get_active_model(),
-        system_instruction=get_system_prompt(),
-        tools=[get_gemini_tools()]
+        system_instruction=tools.get_system_prompt(),
+        tools=[tools.get_gemini_tools()]
     )
 
     gemini_history = []
@@ -41,7 +41,7 @@ def stream_chat_google(messages):
                 logger.info(f"Tool: {fn.name}")
                 yield {"type": "tool", "name": fn.name}
                 args = dict(fn.args) if fn.args else {}
-                result = execute_tool(fn.name, args)
+                result = tools.execute_tool(fn.name, args)
                 function_responses.append(
                     api.ai_client.protos.Part(function_response=api.ai_client.protos.FunctionResponse(
                         name=fn.name,
