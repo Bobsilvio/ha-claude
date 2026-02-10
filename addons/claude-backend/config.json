@@ -1,6 +1,6 @@
 {
   "name": "AI Assistant for Home Assistant",
-  "version": "3.0.51",
+  "version": "3.0.52",
   "slug": "claude-backend",
   "description": "AI-powered smart home assistant with Claude, ChatGPT, Gemini, NVIDIA NIM and GitHub Models (40+ AI models)",
   "url": "https://github.com/Bobsilvio/ha-claude",
@@ -49,7 +49,7 @@
   },
   "schema": {
     "ai_provider": "list(anthropic|openai|google|nvidia|github)",
-    "ai_model": "list(Claude: Sonnet 4|Claude: Opus 4|Claude: Haiku 4|OpenAI: GPT-4o|OpenAI: GPT-4o-mini|OpenAI: GPT-4-turbo|OpenAI: o1|OpenAI: o3-mini|Google: Gemini 2.0 Flash|Google: Gemini 2.5 Pro|Google: Gemini 2.5 Flash|NVIDIA: Kimi K2.5 🧪🆓|NVIDIA: Llama 3.1 70B 🧪🆓|NVIDIA: Llama 3.1 405B 🧪🆓|NVIDIA: Mistral Large 2 🧪🆓|NVIDIA: Phi-4 🧪🆓|NVIDIA: Nemotron 70B 🧪🆓|GitHub: Claude 3.5 Sonnet|GitHub: Claude 3 Opus|GitHub: Claude 3 Sonnet|GitHub: Claude 3 Haiku|GitHub: Claude 3.5 Haiku|GitHub: GPT-4o|GitHub: GPT-4o-mini|GitHub: GPT-4.1|GitHub: GPT-4.1-mini|GitHub: GPT-4.1-nano|GitHub: o1|GitHub: o1-mini|GitHub: o1-preview|GitHub: o3|GitHub: o3-mini|GitHub: o4-mini|GitHub: GPT-5|GitHub: GPT-5-mini|GitHub: GPT-5-nano|GitHub: GPT-5-chat|GitHub: Llama 3.1 405B|GitHub: Llama 3.1 8B|GitHub: Llama 3.3 70B|GitHub: Llama 4 Scout|GitHub: Llama 4 Maverick|GitHub: Mistral Small 2503|GitHub: Mistral Medium 2505|GitHub: Ministral 3B|GitHub: Codestral 2501|GitHub: Cohere Command R+|GitHub: Cohere Command R|GitHub: Cohere Command A|GitHub: DeepSeek R1|GitHub: DeepSeek R1 0528|GitHub: DeepSeek V3|GitHub: MAI-DS-R1|GitHub: Phi-4|GitHub: Phi-4 Mini|GitHub: Phi-4 Reasoning|GitHub: Phi-4 Mini Reasoning|GitHub: Jamba 1.5 Large|GitHub: Grok-3|GitHub: Grok-3 Mini)?",
+    "ai_model": "list(Claude: Sonnet 4|Claude: Opus 4|Claude: Haiku 4|OpenAI: GPT-4o|OpenAI: GPT-4o-mini|OpenAI: GPT-4-turbo|OpenAI: o1|OpenAI: o3-mini|Google: Gemini 2.0 Flash|Google: Gemini 2.5 Pro|Google: Gemini 2.5 Flash|NVIDIA: Kimi K2.5 🧪🆓|NVIDIA: Llama 3.1 70B 🧪🆓|NVIDIA: Llama 3.1 405B 🧪🆓|NVIDIA: Mistral Large 2 🧪🆓|NVIDIA: Phi-4 🧪🆓|NVIDIA: Nemotron 70B 🧪🆓|GitHub: GPT-4o|GitHub: GPT-4o-mini|GitHub: GPT-4.1|GitHub: GPT-4.1-mini|GitHub: GPT-4.1-nano|GitHub: o1|GitHub: o1-mini|GitHub: o1-preview|GitHub: o3|GitHub: o3-mini|GitHub: o4-mini|GitHub: GPT-5|GitHub: GPT-5-mini|GitHub: GPT-5-nano|GitHub: GPT-5-chat|GitHub: Llama 3.1 405B|GitHub: Llama 3.1 8B|GitHub: Llama 3.3 70B|GitHub: Llama 4 Scout|GitHub: Llama 4 Maverick|GitHub: Llama 3.2 11B Vision|GitHub: Llama 3.2 90B Vision|GitHub: Mistral Small 2503|GitHub: Mistral Medium 2505|GitHub: Ministral 3B|GitHub: Codestral 2501|GitHub: Cohere Command R+|GitHub: Cohere Command R|GitHub: Cohere Command A|GitHub: DeepSeek R1|GitHub: DeepSeek R1 0528|GitHub: DeepSeek V3|GitHub: MAI-DS-R1|GitHub: Phi-4|GitHub: Phi-4 Mini|GitHub: Phi-4 Reasoning|GitHub: Phi-4 Mini Reasoning|GitHub: Phi-4 Multimodal|GitHub: Jamba 1.5 Large|GitHub: Grok-3|GitHub: Grok-3 Mini)?",
     "anthropic_api_key": "password?",
     "openai_api_key": "password?",
     "google_api_key": "password?",
