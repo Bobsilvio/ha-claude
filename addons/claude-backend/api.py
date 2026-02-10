@@ -27,7 +27,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.26"
+VERSION = "3.1.29"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -51,6 +51,10 @@ ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
+# Persisted runtime selection (preferred over add-on configuration).
+# This enables choosing the agent/model from the chat dropdown only.
+RUNTIME_SELECTION_FILE = "/config/.storage/claude_runtime_selection.json"
+
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
 
@@ -61,6 +65,54 @@ logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT 
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
 logger.info(f"LANGUAGE: {LANGUAGE}")
+
+
+def load_runtime_selection() -> bool:
+    """Load persisted provider/model selection from disk.
+
+    Returns True if a valid selection was loaded.
+    """
+    global AI_PROVIDER, AI_MODEL, SELECTED_MODEL, SELECTED_PROVIDER
+    try:
+        if not os.path.isfile(RUNTIME_SELECTION_FILE):
+            return False
+        with open(RUNTIME_SELECTION_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f) or {}
+        provider = (data.get("provider") or "").strip().lower()
+        model = (data.get("model") or "").strip()
+        if not provider or not model:
+            return False
+
+        # Accept only known providers; model is expected to be a technical id.
+        if provider not in ("anthropic", "openai", "google", "nvidia", "github"):
+            return False
+
+        AI_PROVIDER = provider
+        AI_MODEL = model
+        SELECTED_PROVIDER = provider
+        SELECTED_MODEL = model
+        logger.info(f"Loaded runtime selection: {AI_PROVIDER} / {AI_MODEL}")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not load runtime selection: {e}")
+        return False
+
+
+def save_runtime_selection(provider: str, model: str) -> bool:
+    """Persist provider/model selection to disk."""
+    try:
+        os.makedirs(os.path.dirname(RUNTIME_SELECTION_FILE), exist_ok=True)
+        payload = {
+            "provider": (provider or "").strip().lower(),
+            "model": (model or "").strip(),
+            "updated_at": datetime.now().isoformat(),
+        }
+        with open(RUNTIME_SELECTION_FILE, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
+        return True
+    except Exception as e:
+        logger.warning(f"Could not save runtime selection: {e}")
+        return False
 
 # Load multilingual keywords for intent detection
 KEYWORDS = {}
@@ -404,16 +456,12 @@ MODEL_NAME_MAPPING = {
     "Google: Gemini 2.0 Flash": "gemini-2.0-flash",
     "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
     "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
-    "NVIDIA: Kimi K2.5 🧪": "moonshotai/kimi-k2.5",
-    "NVIDIA: Llama 3.1 70B 🧪": "meta/llama-3.1-70b-instruct",
-    
-    "NVIDIA: Llama 3.1 405B 🧪": "meta/llama-3.1-405b-instruct",
-    
-    "NVIDIA: Mistral Large 2 🧪": "mistralai/mistral-large-2-instruct",
-    
-    "NVIDIA: Phi-4 🧪": "microsoft/phi-4",
-    
-    "NVIDIA: Nemotron 70B 🧪": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "NVIDIA: Kimi K2.5": "moonshotai/kimi-k2.5",
+    "NVIDIA: Llama 3.1 70B": "meta/llama-3.1-70b-instruct",
+    "NVIDIA: Llama 3.1 405B": "meta/llama-3.1-405b-instruct",
+    "NVIDIA: Mistral Large 2": "mistralai/mistral-large-2-instruct",
+    "NVIDIA: Phi-4": "microsoft/phi-4",
+    "NVIDIA: Nemotron 70B": "nvidia/llama-3.1-nemotron-70b-instruct",
     
     # GitHub Models - IDs use publisher/model-name format
     "GitHub: GPT-4o": "openai/gpt-4o",
@@ -750,6 +798,8 @@ def initialize_ai_client():
 
 
 ai_client = None
+# Prefer persisted selection (set by /api/set_model) over add-on configuration
+load_runtime_selection()
 initialize_ai_client()
 
 import pathlib
@@ -1467,8 +1517,14 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
         parts.append(f"\nℹ️ {tip}")
     
     snapshot = result_data.get("snapshot", "")
-    if snapshot and snapshot != "N/A (REST API)":
-        parts.append(f"\n💾 Snapshot creato: `{snapshot}`")
+    snapshot_id = ""
+    if isinstance(snapshot, dict):
+        snapshot_id = (snapshot.get("snapshot_id") or "").strip()
+    elif isinstance(snapshot, str):
+        snapshot_id = snapshot.strip()
+
+    if snapshot_id and snapshot_id != "N/A (REST API)":
+        parts.append(f"\n💾 Snapshot creato: `{snapshot_id}`")
     
     return "\n".join(parts)
 
@@ -1732,6 +1788,12 @@ def api_set_model():
             "provider": AI_PROVIDER,
             "model": AI_MODEL,
         }), 500
+
+    # Persist selection so it becomes the single source of truth
+    try:
+        save_runtime_selection(AI_PROVIDER, AI_MODEL)
+    except Exception:
+        pass
 
     return jsonify({
         "success": True,
@@ -2057,6 +2119,9 @@ def api_get_models():
     return jsonify({
         "success": True,
 
+        # First-run onboarding: chat should prompt user to pick an agent once
+        "needs_first_selection": not os.path.isfile(RUNTIME_SELECTION_FILE),
+
         # compat chat (quello che già usa il tuo JS)
         "current_provider": AI_PROVIDER,
         "current_model": current_model_display,
@@ -2072,6 +2137,32 @@ def api_get_models():
         "available_providers": available_providers,
         "available_models": available_models
     }), 200
+
+
+@app.route('/api/snapshots/restore', methods=['POST'])
+def api_snapshots_restore():
+    """Restore a snapshot created by the add-on (undo).
+
+    The frontend uses this to provide a one-click "Ripristina backup" under write-tool messages.
+    """
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        snapshot_id = (data.get("snapshot_id") or "").strip()
+        if not snapshot_id:
+            return jsonify({"error": "snapshot_id is required"}), 400
+
+        raw = tools.execute_tool("restore_snapshot", {"snapshot_id": snapshot_id, "reload": True})
+        try:
+            result = json.loads(raw) if isinstance(raw, str) else {"status": "success", "result": raw}
+        except Exception:
+            result = {"error": raw}
+
+        if isinstance(result, dict) and result.get("status") == "success":
+            return jsonify(result), 200
+        return jsonify(result if isinstance(result, dict) else {"error": str(result)}), 400
+    except Exception as e:
+        logger.error(f"Snapshot restore error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/api/nvidia/test_model', methods=['POST'])

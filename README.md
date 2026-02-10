@@ -100,11 +100,11 @@ In Home Assistant:
 ### 3️⃣ Configure
 
 1. Open addon **Configuration** tab
-2. Select **AI Provider** (anthropic, openai, google, or github)
-3. Enter your **API Key** (see [provider setup](#-provider-setup) below)
-4. (Optional) Select **Language**: en, it, es, or fr
-5. (Optional) Enable **File Access** to allow config file operations
-6. **Save** and **Start** the addon
+2. Paste **at least one provider key** (Anthropic / OpenAI / Google / NVIDIA / GitHub)
+3. (Optional) Select **Language**: en, it, es, or fr
+4. (Optional) Enable **File Access** to allow config file operations
+5. **Save** and **Start** the addon
+6. Open **AI Assistant** from the sidebar and pick an **agent/model** from the top dropdown (your choice is saved automatically)
 
 ### 4️⃣ Access
 
@@ -128,17 +128,8 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 7. **Copy token** (starts with `github_pat_...`)
 
 **Configure Addon:**
-- AI Provider: `github`
-- GitHub Token: paste token
-- GitHub Model: choose from dropdown (e.g., `gpt-4o-mini`)
-
-**Popular Models:**
-| Model | Requests/day (free) | Best For |
-|-------|-------------------|----------|
-| `gpt-4o-mini` | 150 | Daily use, fast responses |
-| `gpt-4o` | 50 | Quality, complex tasks |
-| `DeepSeek-V3-0324` | 8 | Advanced reasoning |
-| `grok-3-mini` | 30 | xAI, balanced |
+1. Paste the **GitHub Token** in the add-on configuration
+2. In the chat UI, select **GitHub Models** and choose a model from the dropdown
 
 ---
 
@@ -160,8 +151,8 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 - Typical home use: **$1-5/month**
 
 **Configure Addon:**
-- AI Provider: `anthropic`
-- Anthropic API Key: paste key
+1. Paste the **Anthropic API Key** in the add-on configuration
+2. In the chat UI, select **Anthropic** and choose a model from the dropdown
 
 ---
 
@@ -185,8 +176,8 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 - Typical home use: **$1-3/month** with GPT-4o-mini
 
 **Configure Addon:**
-- AI Provider: `openai`
-- OpenAI API Key: paste key
+1. Paste the **OpenAI API Key** in the add-on configuration
+2. In the chat UI, select **OpenAI** and choose a model from the dropdown
 
 ---
 
@@ -204,8 +195,21 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 **Free Tier:** 15 RPM, 1M TPM, 1500 requests/day — **completely free!**
 
 **Configure Addon:**
-- AI Provider: `google`
-- Google API Key: paste key
+1. Paste the **Google API Key** in the add-on configuration
+2. In the chat UI, select **Google** and choose a model from the dropdown
+
+---
+
+### 🟩 NVIDIA NIM
+
+> OpenAI-compatible API via NVIDIA NIM.
+
+**Get API Key:**
+- Create an API key in NVIDIA's developer portal for NIM.
+
+**Configure Addon:**
+1. Paste the **NVIDIA API Key** in the add-on configuration
+2. In the chat UI, select **NVIDIA NIM** and choose a model from the dropdown
 
 ---
 
@@ -225,12 +229,12 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 
 | Option | Description | Default | Required |
 |--------|-------------|---------|----------|
-| **AI Provider** | Provider selection (anthropic/openai/google/github) | `anthropic` | ✅ |
 | **Anthropic API Key** | Claude API key from console.anthropic.com | - | If using Claude |
 | **OpenAI API Key** | OpenAI API key from platform.openai.com | - | If using OpenAI |
 | **Google API Key** | Gemini API key from aistudio.google.com | - | If using Gemini |
+| **NVIDIA API Key** | NVIDIA NIM API key | - | If using NVIDIA |
+| **NVIDIA Thinking Mode** | Enable extra reasoning tokens (when supported) | `false` | ❌ |
 | **GitHub Token** | Personal Access Token from GitHub | - | If using GitHub |
-| **GitHub Model** | Model selection for GitHub provider | `gpt-4o` | If using GitHub |
 | **Language** | AI response language (en/it/es/fr) | `en` | ❌ |
 | **Enable File Access** | Allow AI to read/write config files | `false` | ❌ |
 | **Debug Mode** | Enable detailed logging | `false` | ❌ |
@@ -377,7 +381,7 @@ When modifying configs, the AI shows **before/after** with diff markers:
 - Check key format (starts with correct prefix)
 
 ### Model not responding / rate limits
-- GitHub Models free tier has daily limits (check table above)
+- GitHub Models free tier has daily limits (check the GitHub Models dashboard / provider docs)
 - Try switching to a different model
 - Wait a few minutes if rate limited
 - Consider upgrading to paid tier
@@ -393,57 +397,6 @@ When modifying configs, the AI shows **before/after** with diff markers:
 - Check file permissions on `/config/.storage/`
 - Try sending a message to trigger save
 - Restart addon if conversations don't persist
-
----
-
-## 📜 Changelog
-
-### v3.0.6 (Latest)
-- ✨ **Copy button for code blocks** - one-click copy for YAML, JSON, Python
-- 🎨 Clean UI with visual feedback ("✓ Copiato!")
-
-### v3.0.5
-- 🐛 **CRITICAL FIX**: Vision messages now properly preserved through sanitization
-- Fixed "messages: at least one message is required" error with images
-
-### v3.0.4
-- 🐛 **CRITICAL FIX**: Vision responses now saved to conversation history
-- AI responses with images now display correctly
-
-### v3.0.3
-- 🐛 **CRITICAL FIX**: Fixed image upload error (base_prompt undefined)
-- Vision feature now fully functional
-
-### v3.0.2
-- 🌍 **Multilingual config UI** - translations for all settings (EN, IT, ES, FR)
-- 🎨 Added logo and icon for addon
-
-### v3.0.1
-- 🐛 **CRITICAL FIX**: Restored correct config.json schema format
-- Fixed addon store detection issues
-
-### v3.0.0 🎉
-- 👁️ **VISION SUPPORT** - Upload images and let AI analyze them!
-- 📸 Multi-provider image support (Claude, GPT-4o, Gemini)
-- 🖼️ Create dashboard cards from screenshots
-- ✨ Analyze layouts and suggest improvements
-
-### v2.9.29
-- 🔒 **Mandatory confirmation** for delete/modify operations
-- Enhanced safety for destructive actions
-
-### v2.9.28
-- ✨ **Auto-show YAML** after creation/modification
-- ✨ **Entity confirmation** before creating automations
-
-### v2.9.27
-- 🌍 **Multilingual AI responses** (EN, IT, ES, FR)
-- ✨ Improved YAML diff format
-
-### v2.9.26
-- ✨ Show YAML before/after for all modifications
-
-[Full Changelog →](https://github.com/Bobsilvio/ha-claude/releases)
 
 ---
 

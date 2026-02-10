@@ -1,144 +1,66 @@
-# Claude AI Backend Add-on for Home Assistant
+# AI Assistant for Home Assistant (Add-on)
 
-✨ **Complete all-in-one add-on** that automatically installs the Claude custom component AND runs the backend API.
+This add-on provides the **AI Assistant web UI** (via Home Assistant Ingress) and the **backend API** that can read states, call services, and optionally edit configuration files.
 
-## What This Add-on Does
+**No Home Assistant long-lived token is required**: the add-on uses the Supervisor-managed Home Assistant API access.
 
-1. ✓ Deploys the Claude custom component automatically
-2. ✓ Starts the backend Flask API on port 5000
-3. ✓ Reloads Home Assistant to register the component
-4. ✓ Ready to use in seconds!
+## What you get
 
-## Installation (4 Simple Steps)
+- Sidebar chat UI with streaming responses
+- Multi-provider agents: **Anthropic**, **OpenAI**, **Google Gemini**, **NVIDIA NIM**, **GitHub Models**
+- Optional **File Access** with automatic snapshots + restore
 
-### Step 1: Add Repository
-1. **Settings** → **Add-ons & backups** → **Add-on store**
-2. Click **⋮** (menu) in top-right
-3. **Repositories**
-4. Add: `https://github.com/Bobsilvio/ha-claude`
-5. **Create**
+## Installation
 
-### Step 2: Install Add-on
-1. **Settings** → **Add-ons**
-2. Search for **"Claude AI Backend"**
-3. Click **Install**
-
-### Step 3: Configure
-1. Click on **"Claude AI Backend"**
-2. Go to **Configuration** tab
-3. Add your **Home Assistant Long-lived Token**:
-   - Go to Settings → Developer Tools → Long-lived Access Tokens
-   - Click **Create Token**
-   - Name it "Claude Backend"
-   - Copy token
-   - Paste in add-on configuration
-4. Click **Save**
-
-### Step 4: Start
-1. Click **Start**
-2. Watch logs - you'll see:
-   ```
-   ✓ Component deployed
-   ✓ Home Assistant reloaded
-   ✓ Claude AI Backend is ready!
-   ```
-3. Done! 🎉
-
-## Configure Claude Integration
-
-The component is now installed. Create the integration:
-
-1. **Settings** → **Devices & Services** → **Integrations**
-2. Click **Create Integration**
-3. Search for **"Claude"**
-4. **API Endpoint**: `http://localhost:5000`
-5. **Model**: Choose your preference (Haiku/Sonnet/Opus)
-6. **Submit**
-
-**You're ready to use Claude!** 🚀
+1. Add repository: **Settings → Add-ons & Backups → Add-on Store → ⋮ → Repositories**
+2. Add: `https://github.com/Bobsilvio/ha-claude`
+3. Install **AI Assistant for Home Assistant**
 
 ## Configuration
 
-### Basic Configuration
+1. Open the add-on **Configuration** tab
+2. Paste **at least one provider key** (Anthropic / OpenAI / Google / NVIDIA / GitHub)
+3. (Optional) Set **Language** and enable **File Access**
+4. **Save** and **Start**
 
-```yaml
-ha_token: "your_long_lived_token_here"
-api_port: 5000
-debug_mode: false
-```
+## First run (important)
 
-### Advanced Configuration
-
-```yaml
-ha_token: "your_long_lived_token_here"
-ha_url: "http://homeassistant:8123"
-api_port: 5000
-debug_mode: true
-polling_interval: 60
-timeout: 30
-max_retries: 3
-```
+Open **AI Assistant** from the sidebar and select an **agent/model** from the dropdown at the top.
+The selection is saved automatically and persists across restarts.
 
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| ha_token | - | Your Home Assistant long-lived access token (required) |
-| ha_url | http://homeassistant:8123 | Home Assistant URL |
-| api_port | 5000 | Port for the API server |
+| anthropic_api_key | - | Anthropic API key |
+| openai_api_key | - | OpenAI API key |
+| google_api_key | - | Google Gemini API key |
+| nvidia_api_key | - | NVIDIA NIM API key |
+| nvidia_thinking_mode | false | Extra reasoning tokens (when supported) |
+| github_token | - | GitHub fine-grained token for GitHub Models |
+| language | en | UI/assistant language (en/it/es/fr) |
+| enable_file_access | false | Allow read/write of files under `/config` |
 | debug_mode | false | Enable debug logging |
-| enable_file_access | false | Enable access to Home Assistant configuration files (read/write) |
-| polling_interval | 60 | Seconds between entity updates |
-| timeout | 30 | API request timeout in seconds |
-| max_retries | 3 | Number of retries for failed requests |
-
-## Getting Your Token
-
-1. Go to Home Assistant Settings
-2. Select "Developer Tools"
-3. Go to "Long-lived Access Tokens" tab
-4. Click "Create Token"
-5. Give it a name (e.g., "Claude Backend")
-6. Copy the token
-7. Paste in add-on configuration
+| timeout | 30 | Provider request timeout (seconds) |
+| max_retries | 3 | Retry attempts for transient failures |
 
 ## Troubleshooting
 
-### Add-on won't start
-- Check logs: Settings → Add-ons → Claude AI Backend → Logs
-- Ensure HA_TOKEN is set correctly
-- Check internet connectivity
+### Sidebar item not visible
+- Restart Home Assistant
+- Ensure the add-on is **Running**
+- Check add-on logs
 
-### "Cannot connect to API" error in Claude Integration
-- Verify add-on is running: Settings → Add-ons → Claude AI Backend → Status shows "Running"
-- Check logs for errors
-- Try API health check: `curl http://localhost:5000/health`
+### 401 / Home Assistant API issues
+- The Supervisor token is managed automatically
+- Open `/api/status` to check `ha_connection_ok`
+- Restart the add-on and re-check logs
 
-### Integration can't connect to Home Assistant
-- Check HA_TOKEN is valid (re-create if needed)
-- Verify HA URL is correct in configuration
-- Check port 8123 is accessible
-
-## Architecture
-
-```
-┌─────────────────────────────────────┐
-│  Home Assistant (Core)              │
-│  ├── Claude Integration (Component) │
-│  │   └── Calls API on :5000        │
-│  │                                 │
-│  └── Claude AI Backend (Add-on)     │
-│      └── Runs on :5000             │
-│          └── Controls HA via API   │
-└─────────────────────────────────────┘
-```
+### File Access not working
+- Set **enable_file_access: true**, save, restart the add-on
+- Verify files exist under `/config/`
 
 ## Support
 
-- GitHub Issues: https://github.com/Bobsilvio/ha-claude/issues
+- Issues: https://github.com/Bobsilvio/ha-claude/issues
 - Documentation: https://github.com/Bobsilvio/ha-claude
-- Home Assistant Community: https://community.home-assistant.io/
-
-## License
-
-MIT License - See LICENSE file in main repository

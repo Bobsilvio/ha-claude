@@ -1418,6 +1418,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             views = tool_input.get("views", [])
             old_yaml = ""
             new_yaml = ""
+            snapshot_id = ""
 
             # Auto-snapshot: save current dashboard config before modifying
             try:
@@ -1429,12 +1430,24 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     old_result = old_config.get("result", {})
                     old_yaml = yaml.dump({"views": old_result.get("views", [])}, default_flow_style=False, allow_unicode=True)
 
-                    snap_file = f"_dashboard_snapshot_{url_path or 'lovelace'}.json"
-                    snap_path = os.path.join(api.SNAPSHOTS_DIR, datetime.now().strftime("%Y%m%d_%H%M%S") + snap_file)
+                    # Create a restoreable snapshot (stored in SNAPSHOTS_DIR with .meta)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    safe_url = (url_path or "lovelace").replace("/", "__").replace("\\", "__")
+                    snapshot_id = f"{timestamp}_dashboard__{safe_url}"
+                    snapshot_path = os.path.join(api.SNAPSHOTS_DIR, snapshot_id)
                     os.makedirs(api.SNAPSHOTS_DIR, exist_ok=True)
-                    with open(snap_path, "w") as sf:
-                        json.dump({"url_path": url_path or "lovelace", "config": old_result}, sf)
-                    logger.info(f"Dashboard snapshot saved: {snap_path}")
+                    with open(snapshot_path, "w", encoding="utf-8") as sf:
+                        json.dump({"url_path": url_path or "lovelace", "config": old_result}, sf, ensure_ascii=False)
+                    with open(snapshot_path + ".meta", "w", encoding="utf-8") as mf:
+                        json.dump({
+                            "snapshot_id": snapshot_id,
+                            "timestamp": timestamp,
+                            "kind": "lovelace_dashboard",
+                            "url_path": url_path or "lovelace",
+                            # Keep original_file for list_snapshots compatibility
+                            "original_file": f"lovelace:{url_path or 'lovelace'}",
+                        }, mf, ensure_ascii=False)
+                    logger.info(f"Dashboard snapshot saved: {snapshot_id}")
             except Exception as e:
                 logger.warning(f"Could not snapshot dashboard before update: {e}")
 
@@ -1451,6 +1464,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "views_count": len(views),
                     "old_yaml": old_yaml,
                     "new_yaml": new_yaml,
+                    "snapshot": snapshot_id or "",
                     "IMPORTANT": "Show the user the before/after diff of the dashboard YAML."
                 }, ensure_ascii=False, default=str)
             error_msg = result.get("error", {}).get("message", str(result))
@@ -1592,32 +1606,121 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "restore_snapshot":
             snapshot_id = tool_input.get("snapshot_id", "")
+            reload_after = tool_input.get("reload", True)
+            snapshot_id = (snapshot_id or "").strip()
+            if not snapshot_id:
+                return json.dumps({"error": "snapshot_id is required."}, ensure_ascii=False)
+            if snapshot_id != os.path.basename(snapshot_id) or ".." in snapshot_id or "/" in snapshot_id or "\\" in snapshot_id:
+                return json.dumps({"error": "Invalid snapshot_id."}, ensure_ascii=False)
             snapshot_path = os.path.join(api.SNAPSHOTS_DIR, snapshot_id)
             meta_path = snapshot_path + ".meta"
             if not os.path.isfile(snapshot_path):
                 return json.dumps({"error": f"Snapshot '{snapshot_id}' not found. Use list_snapshots."})
-            # Read metadata to find original file
-            original_file = ""
+
+            meta = {}
             if os.path.isfile(meta_path):
-                with open(meta_path, "r") as mf:
-                    meta = json.load(mf)
-                original_file = meta.get("original_file", "")
-            else:
+                try:
+                    with open(meta_path, "r", encoding="utf-8") as mf:
+                        meta = json.load(mf) or {}
+                except Exception:
+                    meta = {}
+
+            kind = meta.get("kind") or "file"
+
+            # --- Dashboard snapshots (lovelace) ---
+            if kind == "lovelace_dashboard":
+                try:
+                    with open(snapshot_path, "r", encoding="utf-8") as sf:
+                        snap = json.load(sf) or {}
+                except Exception as e:
+                    return json.dumps({"error": f"Invalid dashboard snapshot content: {e}"}, ensure_ascii=False)
+
+                url_path = snap.get("url_path") or meta.get("url_path") or "lovelace"
+                config_to_restore = snap.get("config")
+                if not isinstance(config_to_restore, dict):
+                    return json.dumps({"error": "Dashboard snapshot has no valid config."}, ensure_ascii=False)
+
+                # Snapshot current state before overwriting
+                try:
+                    snap_params = {}
+                    if url_path and url_path != "lovelace":
+                        snap_params["url_path"] = url_path
+                    current = api.call_ha_websocket("lovelace/config", **snap_params)
+                    if current.get("success"):
+                        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        safe_url = (url_path or "lovelace").replace("/", "__").replace("\\", "__")
+                        pre_snapshot_id = f"{timestamp}_dashboard__{safe_url}"
+                        pre_snapshot_path = os.path.join(api.SNAPSHOTS_DIR, pre_snapshot_id)
+                        os.makedirs(api.SNAPSHOTS_DIR, exist_ok=True)
+                        with open(pre_snapshot_path, "w", encoding="utf-8") as psf:
+                            json.dump({"url_path": url_path or "lovelace", "config": current.get("result", {})}, psf, ensure_ascii=False)
+                        with open(pre_snapshot_path + ".meta", "w", encoding="utf-8") as pmf:
+                            json.dump({
+                                "snapshot_id": pre_snapshot_id,
+                                "timestamp": timestamp,
+                                "kind": "lovelace_dashboard",
+                                "url_path": url_path or "lovelace",
+                                "original_file": f"lovelace:{url_path or 'lovelace'}",
+                            }, pmf, ensure_ascii=False)
+                except Exception:
+                    pass
+
+                params = {"config": config_to_restore}
+                if url_path and url_path != "lovelace":
+                    params["url_path"] = url_path
+                result = api.call_ha_websocket("lovelace/config/save", **params)
+                if result.get("success"):
+                    return json.dumps({
+                        "status": "success",
+                        "message": f"Dashboard '{url_path or 'lovelace'}' restored from snapshot '{snapshot_id}'.",
+                        "restored_file": f"lovelace:{url_path or 'lovelace'}",
+                        "reload_result": result,
+                    }, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                return json.dumps({"error": f"Failed to restore dashboard snapshot: {error_msg}"}, ensure_ascii=False, default=str)
+
+            # --- File snapshots (default) ---
+            original_file = meta.get("original_file", "") if isinstance(meta, dict) else ""
+            if not original_file:
                 # Try to reconstruct from snapshot name
                 parts = snapshot_id.split("_", 2)
                 if len(parts) >= 3:
                     original_file = parts[2].replace("__", "/")
             if not original_file:
-                return json.dumps({"error": "Cannot determine original file from snapshot."})
+                return json.dumps({"error": "Cannot determine original file from snapshot."}, ensure_ascii=False)
+
+            # Security: prevent path traversal
+            if ".." in original_file or original_file.startswith("/") or original_file.startswith("\\"):
+                return json.dumps({"error": "Invalid original file in snapshot metadata."}, ensure_ascii=False)
+
             # Create a snapshot of current state before restoring
             api.create_snapshot(original_file)
-            # Restore
+
+            # Restore file
             import shutil
             dest = os.path.join(api.HA_CONFIG_DIR, original_file)
+            os.makedirs(os.path.dirname(dest) if os.path.dirname(dest) else api.HA_CONFIG_DIR, exist_ok=True)
             shutil.copy2(snapshot_path, dest)
-            return json.dumps({"status": "success",
-                               "message": f"Restored '{original_file}' from snapshot '{snapshot_id}'. A new snapshot of the overwritten file was created.",
-                               "restored_file": original_file}, ensure_ascii=False, default=str)
+
+            reload_result = None
+            if reload_after:
+                try:
+                    lower = original_file.lower()
+                    if "automation" in lower or lower.endswith("automations.yaml"):
+                        reload_result = api.call_ha_api("POST", "services/automation/reload", {})
+                    elif "script" in lower or lower.endswith("scripts.yaml"):
+                        reload_result = api.call_ha_api("POST", "services/script/reload", {})
+                    elif "lovelace" in lower or "dashboard" in lower or lower.endswith("ui-lovelace.yaml"):
+                        reload_result = api.call_ha_api("POST", "services/lovelace/reload", {})
+                except Exception as e:
+                    reload_result = {"error": str(e)}
+
+            return json.dumps({
+                "status": "success",
+                "message": f"Restored '{original_file}' from snapshot '{snapshot_id}'. A new snapshot of the overwritten file was created.",
+                "restored_file": original_file,
+                "reload_result": reload_result,
+            }, ensure_ascii=False, default=str)
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:

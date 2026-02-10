@@ -222,7 +222,8 @@ def stream_chat_anthropic(messages, intent_info=None):
 
         # AUTO-STOP: If a write tool succeeded, format response directly — no more API calls needed
         WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
-                       "create_automation", "create_script", "create_dashboard", "update_dashboard"}
+                   "create_automation", "create_script", "create_dashboard", "update_dashboard",
+                   "write_config_file"}
         auto_stop = False
         for tool in tool_uses:
             if tool["name"] in WRITE_TOOLS:

@@ -166,6 +166,9 @@ def get_chat_ui():
         .suggestion:hover {{ background: #667eea; color: white; border-color: #667eea; }}
         .tool-badge {{ display: inline-block; background: #e8f0fe; color: #1967d2; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
         .status-badge {{ display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
+        .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
+        .undo-button:hover {{ opacity: 0.9; }}
+        .undo-button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
     </style>
 </head>
 <body>
@@ -176,7 +179,6 @@ def get_chat_ui():
         <select id="modelSelect" onchange="changeModel(this.value)" title="Cambia modello"></select>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="Test veloce NVIDIA (può richiedere qualche secondo)" style="display:none">🔍 Test NVIDIA</button>
         <!-- Populated by JavaScript -->
-        <span class="badge">\U0001f5bc Vision</span>
         <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
         <div class="status">
             <div class="status-dot"></div>
@@ -383,6 +385,12 @@ def get_chat_ui():
                     content = modelBadge + content;
                 }}
                 div.innerHTML = content;
+
+                // If this assistant message contains a snapshot id, add an undo button
+                const snap = extractSnapshotId(text);
+                if (snap) {{
+                    appendUndoButton(div, snap);
+                }}
             }} else {{
                 div.textContent = text;
                 if (imageData) {{
@@ -393,6 +401,55 @@ def get_chat_ui():
             }}
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
+        }}
+
+        function extractSnapshotId(text) {{
+            if (!text || typeof text !== 'string') return '';
+            // Matches: "Snapshot creato: `SNAPSHOT_ID`"
+            const m = text.match(/Snapshot creato:\\s*`([^`]+)`/i);
+            return m ? (m[1] || '').trim() : '';
+        }}
+
+        function appendUndoButton(div, snapshotId) {{
+            if (!div || !snapshotId) return;
+            if (div.querySelector('.undo-button')) return;
+
+            const btn = document.createElement('button');
+            btn.className = 'undo-button';
+            btn.textContent = '↩︎ Ripristina backup';
+            btn.title = `Ripristina il backup (snapshot: ${snapshotId})`;
+            btn.onclick = () => restoreSnapshot(snapshotId, btn);
+            div.appendChild(btn);
+        }}
+
+        async function restoreSnapshot(snapshotId, btn) {{
+            if (!snapshotId) return;
+            if (!confirm('Vuoi ripristinare il backup? Questa operazione annulla la modifica appena fatta.')) return;
+
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ Ripristino...';
+            try {{
+                const resp = await fetch(apiUrl('api/snapshots/restore'), {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ snapshot_id: snapshotId }})
+                }});
+                const data = await resp.json().catch(() => ({{}}));
+                if (resp.ok && data && data.status === 'success') {{
+                    btn.textContent = '✓ Ripristinato';
+                    addMessage('✅ Backup ripristinato. Se necessario, aggiorna la pagina Lovelace o verifica l’automazione/script.', 'system');
+                }} else {{
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                    const msg = (data && (data.error || data.message)) ? (data.error || data.message) : 'Ripristino fallito.';
+                    addMessage('❌ ' + msg, 'system');
+                }}
+            }} catch (e) {{
+                btn.disabled = false;
+                btn.textContent = originalText;
+                addMessage('❌ Errore ripristino: ' + e.message, 'system');
+            }}
         }}
 
         function formatMarkdown(text) {{
@@ -570,6 +627,14 @@ def get_chat_ui():
                                 addMessage('\u274c ' + evt.message, 'system');
                             }} else if (evt.type === 'done') {{
                                 removeThinking();
+
+                                // After streaming completes, attach undo button if snapshot id is present
+                                if (div && fullText) {{
+                                    const snap = extractSnapshotId(fullText);
+                                    if (snap) {{
+                                        appendUndoButton(div, snap);
+                                    }}
+                                }}
                             }}
                             chat.scrollTop = chat.scrollHeight;
                         }} catch(e) {{}}
@@ -700,6 +765,12 @@ def get_chat_ui():
                 const currentProvider = data.current_provider;
                 const currentModel = data.current_model;
 
+                // First-time onboarding: prompt user to pick an agent once
+                if (data.needs_first_selection && !window._firstSelectionPrompted) {{
+                    addMessage('👆 Seleziona un agente dal menu in alto per iniziare. Potrai cambiarlo in qualsiasi momento.', 'system');
+                    window._firstSelectionPrompted = true;
+                }}
+
                 if (currentProvider) {{
                     currentProviderId = currentProvider;
                 }}
@@ -734,7 +805,7 @@ def get_chat_ui():
 
                         const groups = [
                             {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' ✅ Testati', models: tested }},
-                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' 🧪 Da testare', models: toTest }},
+                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' Da testare', models: toTest }},
                         ].filter(g => Array.isArray(g.models) && g.models.length > 0);
 
                         for (const g of groups) {{
