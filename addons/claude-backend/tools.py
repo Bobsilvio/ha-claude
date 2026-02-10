@@ -675,10 +675,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                                 aid = str(a.get("id", "") or "")
                                 hay = (yaml.safe_dump(a, allow_unicode=True, sort_keys=False) or "").lower()
                                 if q in alias.lower() or (aid and q in aid.lower()) or q in hay:
+                                    y = yaml.safe_dump(a, allow_unicode=True, sort_keys=False) or ""
+                                    if len(y) > 2500:
+                                        y = y[:2500] + "\n... [TRUNCATED]"
                                     matches.append({
                                         "id": aid,
                                         "alias": alias,
-                                        "yaml": yaml.safe_dump(a, allow_unicode=True, sort_keys=False),
+                                        "yaml": y,
                                     })
                                     if len(matches) >= limit:
                                         break
@@ -729,9 +732,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 }
                 for a in autos
             ]
+
+            total = len(result)
+            result = result[:limit]
             return json.dumps(
                 {
-                    "total": len(result),
+                    "total": total,
+                    "returned": len(result),
                     "automations": result,
                     "edit_hint": "To edit an automation, use update_automation with the automation's id and the changes you want to make.",
                 },

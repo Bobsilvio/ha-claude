@@ -224,6 +224,46 @@ def _last_user_text(messages: list[dict]) -> str:
     return ""
 
 
+def _infer_search_query_from_messages(messages: list[dict]) -> str:
+    """Infer a compact search query from recent user messages.
+    This is used as a safety net for small-context models when they call search-like tools
+    without providing arguments."""
+    try:
+        stop_words = set((api.KEYWORDS.get(api.LANGUAGE, {}) or {}).get("stop_words", []) or [])
+    except Exception:
+        stop_words = set()
+
+    candidates: list[str] = []
+    for m in reversed(messages or []):
+        if m.get("role") != "user":
+            continue
+        text = m.get("content")
+        if not isinstance(text, str):
+            continue
+        t = text.strip()
+        if len(t) < 12:
+            continue
+        candidates.append(t)
+        if len(candidates) >= 2:
+            break
+
+    if not candidates:
+        t = _last_user_text(messages)
+        candidates = [t] if t else []
+    if not candidates:
+        return ""
+
+    text = candidates[0].lower()
+    text = re.sub(r"[^a-z0-9àèéìòù\s._-]", " ", text)
+    words = [w for w in text.split() if len(w) > 3 and w not in stop_words]
+    if not words:
+        return ""
+
+    # Prefer longer/more specific tokens, keep short
+    words = sorted(set(words), key=lambda w: (-len(w), w))
+    return " ".join(words[:4])
+
+
 def _normalize_entity_id_for_query_state(messages: list[dict], raw_entity_id: str) -> str:
     """Normalize entity_id for get_entity_state.
 
@@ -693,6 +733,14 @@ def stream_chat_openai(messages, intent_info=None):
                 args = json.loads(args_str) if args_str.strip() else {}
             except json.JSONDecodeError:
                 args = {}
+
+            # Safety net for GitHub small-context models: avoid huge get_automations payloads
+            if api.AI_PROVIDER == "github" and fn_name == "get_automations" and isinstance(args, dict):
+                if not args.get("query"):
+                    inferred = _infer_search_query_from_messages(messages)
+                    if inferred:
+                        args["query"] = inferred
+                        args.setdefault("limit", 10)
 
             # Normalize entity_id for query_state when model passes a bare token like 'epcube'
             if fn_name == "get_entity_state" and isinstance(args, dict):
