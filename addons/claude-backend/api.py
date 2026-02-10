@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.46"
+VERSION = "3.0.47"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -201,6 +201,8 @@ PROVIDER_MODELS = {
         "nvidia/llama-3.1-nemotron-70b-instruct",
     ],
     "github": [
+        # Anthropic Claude
+        "claude-3.5-sonnet", "claude-3-opus", "claude-3-sonnet", "claude-3-haiku", "claude-3.5-haiku",
         # OpenAI
         "gpt-4o", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini", "gpt-4.1-nano",
         "o1", "o1-mini", "o1-preview", "o3", "o3-mini", "o4-mini",
@@ -249,6 +251,16 @@ MODEL_NAME_MAPPING = {
     "NVIDIA: Phi-4 🧪🆓": "microsoft/phi-4",
     "NVIDIA: Nemotron 70B 🧪": "nvidia/llama-3.1-nemotron-70b-instruct",
     "NVIDIA: Nemotron 70B 🧪🆓": "nvidia/llama-3.1-nemotron-70b-instruct",
+    "GitHub: Claude 3.5 Sonnet": "claude-3.5-sonnet",
+    "GitHub: Claude 3.5 Sonnet 🆓": "claude-3.5-sonnet",
+    "GitHub: Claude 3 Opus": "claude-3-opus",
+    "GitHub: Claude 3 Opus 🆓": "claude-3-opus",
+    "GitHub: Claude 3 Sonnet": "claude-3-sonnet",
+    "GitHub: Claude 3 Sonnet 🆓": "claude-3-sonnet",
+    "GitHub: Claude 3 Haiku": "claude-3-haiku",
+    "GitHub: Claude 3 Haiku 🆓": "claude-3-haiku",
+    "GitHub: Claude 3.5 Haiku": "claude-3.5-haiku",
+    "GitHub: Claude 3.5 Haiku 🆓": "claude-3.5-haiku",
     "GitHub: GPT-4o": "gpt-4o",
     "GitHub: GPT-4o 🆓": "gpt-4o",
     "GitHub: GPT-4o-mini": "gpt-4o-mini",
