@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.42"
+VERSION = "3.0.43"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -709,6 +709,13 @@ def save_conversations():
                 # Preserve tool_calls and other metadata
                 if "tool_calls" in msg:
                     cleaned_msg["tool_calls"] = msg["tool_calls"]
+                
+                # Preserve model/provider info for assistant messages
+                if msg.get("role") == "assistant":
+                    if "model" in msg:
+                        cleaned_msg["model"] = msg["model"]
+                    if "provider" in msg:
+                        cleaned_msg["provider"] = msg["provider"]
 
                 cleaned_msgs.append(cleaned_msg)
 
@@ -4217,23 +4224,43 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # Sync ONLY new assistant messages
             new_messages = messages[conv_length_before:]
             conversations[session_id].extend(new_messages)
+            # Add model/provider metadata to new assistant messages
+            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
+                if conversations[session_id][i].get("role") == "assistant":
+                    conversations[session_id][i]["model"] = get_active_model()
+                    conversations[session_id][i]["provider"] = AI_PROVIDER
         elif AI_PROVIDER in ("openai", "github"):
             yield from stream_chat_openai(messages, intent_info=intent_info)
             # Sync ONLY new assistant messages (after the original user message)
             new_messages = messages[conv_length_before:]
             conversations[session_id].extend(new_messages)
+            # Add model/provider metadata to new assistant messages
+            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
+                if conversations[session_id][i].get("role") == "assistant":
+                    conversations[session_id][i]["model"] = get_active_model()
+                    conversations[session_id][i]["provider"] = AI_PROVIDER
         elif AI_PROVIDER == "anthropic":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_anthropic(clean_messages, intent_info=intent_info)
             # Sync ONLY new assistant messages
             new_messages = clean_messages[conv_length_before:]
             conversations[session_id].extend(new_messages)
+            # Add model/provider metadata to new assistant messages
+            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
+                if conversations[session_id][i].get("role") == "assistant":
+                    conversations[session_id][i]["model"] = get_active_model()
+                    conversations[session_id][i]["provider"] = AI_PROVIDER
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from stream_chat_google(clean_messages)
             # Sync ONLY new assistant messages
             new_messages = clean_messages[conv_length_before:]
             conversations[session_id].extend(new_messages)
+            # Add model/provider metadata to new assistant messages
+            for i in range(len(conversations[session_id]) - len(new_messages), len(conversations[session_id])):
+                if conversations[session_id][i].get("role") == "assistant":
+                    conversations[session_id][i]["model"] = get_active_model()
+                    conversations[session_id][i]["provider"] = AI_PROVIDER
         else:
             yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
             return
@@ -4258,35 +4285,71 @@ def get_chat_ui():
     status_color = "#4caf50" if configured else "#ff9800"
     status_text = provider_name if configured else f"{provider_name} (no key)"
 
-    # Multilingual UI messages
+    # Multilingual UI messages with provider-specific analyzing messages
+    provider_analyzing = {
+        "anthropic": {
+            "en": "🧠 Claude is thinking deeply...",
+            "it": "🧠 Claude sta pensando...",
+            "es": "🧠 Claude está pensando...",
+            "fr": "🧠 Claude réfléchit..."
+        },
+        "openai": {
+            "en": "⚡ GPT is processing your request...",
+            "it": "⚡ GPT sta elaborando...",
+            "es": "⚡ GPT está procesando...",
+            "fr": "⚡ GPT traite votre demande..."
+        },
+        "google": {
+            "en": "✨ Gemini is analyzing...",
+            "it": "✨ Gemini sta analizzando...",
+            "es": "✨ Gemini está analizando...",
+            "fr": "✨ Gemini analyse..."
+        },
+        "github": {
+            "en": "🚀 GitHub AI is working on it...",
+            "it": "🚀 GitHub AI sta lavorando...",
+            "es": "🚀 GitHub AI está trabajando...",
+            "fr": "🚀 GitHub AI travaille..."
+        },
+        "nvidia": {
+            "en": "🎯 NVIDIA AI is computing...",
+            "it": "🎯 NVIDIA AI sta calcolando...",
+            "es": "🎯 NVIDIA AI está computando...",
+            "fr": "🎯 NVIDIA AI calcule..."
+        }
+    }
+    
+    # Get provider-specific analyzing message
+    analyzing_msg = provider_analyzing.get(AI_PROVIDER, provider_analyzing["openai"]).get(LANGUAGE, provider_analyzing[AI_PROVIDER]["en"])
+    
     ui_messages = {
         "en": {
             "welcome": "👋 Hi! I'm your AI assistant for Home Assistant.",
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Model: <strong>{model_name}</strong>",
             "capabilities": "I can control devices, create automations, and manage your smart home.",
             "vision_feature": "<strong>🖼 New in v3.0:</strong> Now you can send me images!",
-            "analyzing": "Analyzing request"
+            "analyzing": analyzing_msg
         },
         "it": {
             "welcome": "👋 Ciao! Sono il tuo assistente AI per Home Assistant.",
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong>",
             "capabilities": "Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.",
             "vision_feature": "<strong>🖼 Novità v3.0:</strong> Ora puoi inviarmi immagini!",
-            "analyzing": "Analizzo la richiesta"
+            "analyzing": analyzing_msg
         },
         "es": {
             "welcome": "👋 ¡Hola! Soy tu asistente AI para Home Assistant.",
             "provider_model": f"Proveedor: <strong>{provider_name}</strong> | Modelo: <strong>{model_name}</strong>",
             "capabilities": "Puedo controlar dispositivos, crear automatizaciones y gestionar tu hogar inteligente.",
             "vision_feature": "<strong>🖼 Nuevo en v3.0:</strong> ¡Ahora puedes enviarme imágenes!",
-            "analyzing": "Analizando solicitud"
+            "analyzing": analyzing_msg
         },
         "fr": {
             "welcome": "👋 Salut ! Je suis votre assistant IA pour Home Assistant.",
             "provider_model": f"Fournisseur: <strong>{provider_name}</strong> | Modèle: <strong>{model_name}</strong>",
             "capabilities": "Je peux contrôler des appareils, créer des automatisations et gérer votre maison intelligente.",
             "vision_feature": "<strong>🖼 Nouveau dans v3.0:</strong> Vous pouvez maintenant m'envoyer des images!",
-            "analyzing": "Analyse de la demande"
+            "analyzing": analyzing_msg
         }
     }
 
@@ -4506,11 +4569,17 @@ def get_chat_ui():
             if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
         }}
 
-        function addMessage(text, role, imageData = null) {{
+        function addMessage(text, role, imageData = null, metadata = null) {{
             const div = document.createElement('div');
             div.className = 'message ' + role;
             if (role === 'assistant') {{ 
-                div.innerHTML = formatMarkdown(text); 
+                let content = formatMarkdown(text);
+                // Add model badge if metadata is available
+                if (metadata && (metadata.model || metadata.provider)) {{
+                    const modelBadge = `<div style="font-size: 11px; color: #999; margin-bottom: 6px; opacity: 0.8;">🤖 ${{metadata.provider || 'AI'}} | ${{metadata.model || 'unknown'}}</div>`;
+                    content = modelBadge + content;
+                }}
+                div.innerHTML = content;
             }} else {{ 
                 div.textContent = text; 
                 if (imageData) {{
@@ -4753,7 +4822,8 @@ def get_chat_ui():
                     suggestionsEl.style.display = 'none';
                     data.messages.forEach(m => {{
                         if (m.role === 'user' || m.role === 'assistant') {{
-                            addMessage(m.content, m.role);
+                            const metadata = (m.role === 'assistant' && (m.model || m.provider)) ? {{ model: m.model, provider: m.provider }} : null;
+                            addMessage(m.content, m.role, null, metadata);
                         }}
                     }});
                 }} else {{
@@ -5109,11 +5179,20 @@ def api_chat_abort():
 def api_conversation_messages(session_id):
     """Get all messages for a conversation session."""
     msgs = conversations.get(session_id, [])
-    # Return only user/assistant text messages for UI display
+    # Return only user/assistant text messages for UI display (filter empty content)
     display_msgs = []
     for m in msgs:
-        if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
-            display_msgs.append({"role": m["role"], "content": m["content"]})
+        content = m.get("content", "")
+        # Skip messages with empty content or only whitespace
+        if m.get("role") in ("user", "assistant") and isinstance(content, str) and content.strip():
+            msg_data = {"role": m["role"], "content": content}
+            # Include model/provider info for assistant messages
+            if m.get("role") == "assistant":
+                if "model" in m:
+                    msg_data["model"] = m["model"]
+                if "provider" in m:
+                    msg_data["provider"] = m["provider"]
+            display_msgs.append(msg_data)
     return jsonify({"session_id": session_id, "messages": display_msgs}), 200
 
 
