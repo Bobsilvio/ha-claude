@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.0.50"
+VERSION = "3.0.51"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -226,9 +226,7 @@ PROVIDER_MODELS = {
     ],
 }
 
-# Debug: Log GitHub models at startup
-print(f"[STARTUP] GitHub models in PROVIDER_MODELS: {len(PROVIDER_MODELS.get('github', []))} models")
-print(f"[STARTUP] First 5 GitHub models: {PROVIDER_MODELS.get('github', [])[:5]}")
+
 
 # Mapping user-friendly names (with prefixes) to technical model names
 MODEL_NAME_MAPPING = {
@@ -300,22 +298,51 @@ MODEL_NAME_MAPPING = {
     "GitHub: Grok-3 Mini": "grok-3-mini",
 }
 
-# Reverse mapping for display (prefer emoji versions)
-MODEL_DISPLAY_MAPPING = {}
-for k, v in MODEL_NAME_MAPPING.items():
-    # Always override with emoji version if it has 🆓
-    if "🆓" in k or v not in MODEL_DISPLAY_MAPPING:
-        MODEL_DISPLAY_MAPPING[v] = k
+# Per-provider reverse mapping: {provider: {technical_name: display_name}}
+# This avoids conflicts when same technical model exists in multiple providers (e.g., gpt-4o in OpenAI and GitHub)
+PROVIDER_DISPLAY = {}  # provider -> {tech_name -> display_name}
+_PREFIX_TO_PROVIDER = {
+    "Claude:": "anthropic",
+    "OpenAI:": "openai",
+    "Google:": "google",
+    "NVIDIA:": "nvidia",
+    "GitHub:": "github",
+}
+for _display_name, _tech_name in MODEL_NAME_MAPPING.items():
+    for _prefix, _prov in _PREFIX_TO_PROVIDER.items():
+        if _display_name.startswith(_prefix):
+            if _prov not in PROVIDER_DISPLAY:
+                PROVIDER_DISPLAY[_prov] = {}
+            # Prefer emoji versions for NVIDIA (🧪🆓), but use clean names for others
+            if _tech_name not in PROVIDER_DISPLAY[_prov]:
+                PROVIDER_DISPLAY[_prov][_tech_name] = _display_name
+            elif _prov == "nvidia" and "🆓" in _display_name:
+                PROVIDER_DISPLAY[_prov][_tech_name] = _display_name
+            break
 
-# Debug: Check GitHub models in display mapping
-github_models_in_mapping = [k for k, v in MODEL_DISPLAY_MAPPING.items() if k in PROVIDER_MODELS.get("github", [])]
-print(f"[STARTUP] GitHub models in MODEL_DISPLAY_MAPPING: {len(github_models_in_mapping)} models")
-print(f"[STARTUP] First 5 GitHub display mappings: {[(m, MODEL_DISPLAY_MAPPING.get(m)) for m in PROVIDER_MODELS.get('github', [])[:5]]}")
+# Legacy flat mapping (for backward compatibility)
+MODEL_DISPLAY_MAPPING = {}
+for _prov_models in PROVIDER_DISPLAY.values():
+    for _tech, _disp in _prov_models.items():
+        if _tech not in MODEL_DISPLAY_MAPPING:
+            MODEL_DISPLAY_MAPPING[_tech] = _disp
 
 
 def normalize_model_name(model_name: str) -> str:
-    """Convert user-friendly model name to technical name."""
-    return MODEL_NAME_MAPPING.get(model_name, model_name)
+    """Convert user-friendly model name to technical name.
+    Handles legacy names with emoji badges (🆓, 🧪) for backward compatibility."""
+    # Direct lookup
+    if model_name in MODEL_NAME_MAPPING:
+        return MODEL_NAME_MAPPING[model_name]
+    
+    # Try stripping emoji badges (🆓, 🧪) for backward compat with old configs
+    import re
+    cleaned = re.sub(r'[\s]*[🆓🧪]+[\s]*$', '', model_name).strip()
+    if cleaned and cleaned in MODEL_NAME_MAPPING:
+        return MODEL_NAME_MAPPING[cleaned]
+    
+    # Not found, return as-is (assume it's already a technical name)
+    return model_name
 
 
 def get_model_provider(model_name: str) -> str:
@@ -4335,7 +4362,7 @@ def get_chat_ui():
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }}
         .main-container {{ display: flex; flex: 1; overflow: hidden; }}
-        .sidebar {{ width: 250px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; }}
+        .sidebar {{ width: 250px; min-width: 150px; max-width: 500px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; resize: horizontal; overflow-x: hidden; position: relative; }}
         .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
         .chat-list {{ flex: 1; overflow-y: auto; }}
         .chat-item {{ padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }}
@@ -4887,7 +4914,7 @@ def get_chat_ui():
                         const option = document.createElement('option');
                         option.value = JSON.stringify({{model: model, provider: providerId}});
                         // Show just the model name without provider prefix
-                        const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub):\s*/, '');
+                        const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub):\\s*/, '');
                         option.textContent = displayName;
                         if (model === currentModel && providerId === currentProvider) {{
                             option.selected = true;
@@ -5233,12 +5260,25 @@ def api_conversations_list():
 def api_conversation_get(session_id):
     """Get a specific conversation session."""
     if session_id in conversations:
-        # Filter to only return displayable messages (user/assistant with string content)
+        # Filter to only return displayable messages (user/assistant with non-empty string content)
         msgs = conversations.get(session_id, [])
         display_msgs = []
         for m in msgs:
-            if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str):
-                msg_data = {"role": m["role"], "content": m["content"]}
+            content = m.get("content", "")
+            # For multimodal messages, extract text content
+            if isinstance(content, list):
+                # Extract text from content blocks (Anthropic format: [{type:text, text:...}])
+                text_parts = []
+                for block in content:
+                    if isinstance(block, dict):
+                        if block.get("type") == "text":
+                            text_parts.append(block.get("text", ""))
+                        elif isinstance(block.get("text"), str):
+                            text_parts.append(block["text"])
+                content = "\n".join(text_parts) if text_parts else ""
+            
+            if m.get("role") in ("user", "assistant") and isinstance(content, str) and content.strip():
+                msg_data = {"role": m["role"], "content": content}
                 # Include model/provider metadata for assistant messages
                 if m.get("role") == "assistant":
                     if m.get("model"):
@@ -5279,11 +5319,9 @@ def api_get_models():
     models_technical = {}
     for provider, models in PROVIDER_MODELS.items():
         models_technical[provider] = list(models)
-        models_display[provider] = [MODEL_DISPLAY_MAPPING.get(m, m) for m in models]
-        print(f"[DEBUG] Provider: {provider}, Technical models count: {len(models)}, Display models count: {len(models_display[provider])}")
-        if provider == "github":
-            print(f"[DEBUG] GitHub technical models (first 5): {list(models)[:5]}")
-            print(f"[DEBUG] GitHub display models (first 5): {models_display[provider][:5]}")
+        # Use per-provider display mapping to avoid cross-provider conflicts
+        prov_map = PROVIDER_DISPLAY.get(provider, {})
+        models_display[provider] = [prov_map.get(m, m) for m in models]
 
     # --- Current model (sia tech che display) ---
     current_model_tech = get_active_model()
