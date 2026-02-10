@@ -628,6 +628,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "update_automation":
             import yaml
+            import difflib
             automation_id = tool_input.get("automation_id", "")
             changes = tool_input.get("changes", {})
             add_condition = tool_input.get("add_condition", None)
@@ -641,6 +642,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             new_yaml = ""
             snapshot = None
             reload_result = None
+            diff_unified = ""
 
             # --- ATTEMPT 1: YAML file ---
             yaml_path = api.get_config_file_path("automation", "automations.yaml")
@@ -766,16 +768,31 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                                        "IMPORTANT": "STOP. Inform the user about the error. Do NOT try other tools."})
 
             msg_parts = [f"Automation updated via {'YAML file' if updated_via == 'yaml' else 'HA REST API (UI-created automation)'}.",]
+
+            try:
+                if isinstance(old_yaml, str) and isinstance(new_yaml, str) and old_yaml and new_yaml:
+                    diff_lines = difflib.unified_diff(
+                        old_yaml.splitlines(),
+                        new_yaml.splitlines(),
+                        fromfile="before.yaml",
+                        tofile="after.yaml",
+                        lineterm="",
+                    )
+                    diff_unified = "\n".join(diff_lines)
+            except Exception:
+                diff_unified = ""
+
             return json.dumps({
                 "status": "success",
                 "message": " ".join(msg_parts),
                 "updated_via": updated_via,
                 "old_yaml": old_yaml,
                 "new_yaml": new_yaml,
+                "diff_unified": diff_unified,
                 "snapshot": snapshot.get("snapshot_id", "") if (updated_via == "yaml" and isinstance(snapshot, dict)) else "N/A (REST API)",
                 "reload_result": reload_result if updated_via == "yaml" else "N/A (REST API)",
                 "tip": "Changes applied immediately via REST API. No reload needed." if updated_via == "rest_api" else "Automations reloaded automatically after YAML update.",
-                "IMPORTANT": "DONE. Show the user the before/after diff and stop. Do NOT call any more tools."
+                "IMPORTANT": "DONE. Show the user old_yaml and new_yaml AND the diff_unified (lines -/+). Stop. Do NOT call any more tools."
             }, ensure_ascii=False, default=str)
 
         elif tool_name == "trigger_automation":
