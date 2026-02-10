@@ -588,10 +588,30 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             return json.dumps(result, ensure_ascii=False, default=str)
 
         elif tool_name == "call_service":
-            domain = tool_input.get("domain", "")
-            service = tool_input.get("service", "")
+            domain = str(tool_input.get("domain", "") or "").strip()
+            service = str(tool_input.get("service", "") or "").strip()
             data = tool_input.get("data", {})
+            if not isinstance(data, dict):
+                data = {}
+
+            if not domain or not service:
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "error": "Missing required arguments: 'domain' and 'service'.",
+                        "example": {
+                            "domain": "light",
+                            "service": "turn_on",
+                            "data": {"entity_id": "light.living_room"},
+                        },
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+
             result = api.call_ha_api("POST", f"services/{domain}/{service}", data)
+            if isinstance(result, dict) and result.get("error"):
+                return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
             return json.dumps({"status": "success", "result": result}, ensure_ascii=False, default=str)
 
         elif tool_name == "create_automation":
