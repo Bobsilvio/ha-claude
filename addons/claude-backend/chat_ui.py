@@ -92,6 +92,208 @@ def get_chat_ui():
 
     o4mini_tokens_hint_js = json.dumps(msgs.get("o4mini_tokens_hint", ""))
 
+    # --- Comprehensive UI strings for JS (multilingual) ---
+    ui_js_all = {
+        "en": {
+            "change_model": "Change model",
+            "nvidia_test_title": "Quick NVIDIA test (may take a few seconds)",
+            "nvidia_test_btn": "Test NVIDIA",
+            "new_chat_title": "New conversation",
+            "new_chat_btn": "New chat",
+            "conversations": "Conversations",
+            "drag_resize": "Drag to resize",
+            "remove_image": "Remove image",
+            "upload_image": "Upload image",
+            "input_placeholder": "Write a message...",
+            "image_too_large": "Image is too large. Max 5MB.",
+            "restore_backup": "Restore backup",
+            "restore_backup_title": "Restore backup (snapshot: {id})",
+            "confirm_restore": "Do you want to restore the backup? This will undo the last change.",
+            "restoring": "Restoring...",
+            "restored": "Restored",
+            "backup_restored": "Backup restored. If needed, refresh the Lovelace page or check the automation/script.",
+            "restore_failed": "Restore failed.",
+            "error_restore": "Restore error: ",
+            "copy_btn": "Copy",
+            "copied": "Copied!",
+            "request_failed": "Request failed ({status}): {body}",
+            "unexpected_response": "Unexpected response from server.",
+            "error_prefix": "Error: ",
+            "connection_lost": "Connection lost. Try again.",
+            "messages_count": "messages",
+            "delete_chat": "Delete chat",
+            "no_conversations": "No conversations",
+            "confirm_delete": "Delete this conversation?",
+            "select_agent": "Select an agent from the top menu to start. You can change it at any time.",
+            "nvidia_tested": "Tested",
+            "nvidia_to_test": "To test",
+            "no_models": "No models available",
+            "no_models_msg": "No models available. Check the provider API keys.",
+            "models_load_error": "Error loading models: ",
+            "nvidia_test_result": "NVIDIA Test: OK {ok}, removed {removed}, tested {tested}/{total}",
+            "nvidia_timeout": "timeout: {n}",
+            "nvidia_remaining": "remaining: {n} (press again to continue)",
+            "nvidia_test_failed": "NVIDIA test failed",
+            "switched_to": "Switched to {provider} \u2192 {model}",
+            # Suggestions
+            "sug_lights": "Show all lights",
+            "sug_sensors": "Sensor status",
+            "sug_areas": "Rooms and areas",
+            "sug_temperature": "Temperature history",
+            "sug_scenes": "Available scenes",
+            "sug_automations": "List automations",
+        },
+        "it": {
+            "change_model": "Cambia modello",
+            "nvidia_test_title": "Test veloce NVIDIA (può richiedere qualche secondo)",
+            "nvidia_test_btn": "Test NVIDIA",
+            "new_chat_title": "Nuova conversazione",
+            "new_chat_btn": "Nuova chat",
+            "conversations": "Conversazioni",
+            "drag_resize": "Trascina per ridimensionare",
+            "remove_image": "Rimuovi immagine",
+            "upload_image": "Carica immagine",
+            "input_placeholder": "Scrivi un messaggio...",
+            "image_too_large": "L'immagine è troppo grande. Massimo 5MB.",
+            "restore_backup": "Ripristina backup",
+            "restore_backup_title": "Ripristina il backup (snapshot: {id})",
+            "confirm_restore": "Vuoi ripristinare il backup? Questa operazione annulla la modifica appena fatta.",
+            "restoring": "Ripristino...",
+            "restored": "Ripristinato",
+            "backup_restored": "Backup ripristinato. Se necessario, aggiorna la pagina Lovelace o verifica l'automazione/script.",
+            "restore_failed": "Ripristino fallito.",
+            "error_restore": "Errore ripristino: ",
+            "copy_btn": "Copia",
+            "copied": "Copiato!",
+            "request_failed": "Richiesta fallita ({status}): {body}",
+            "unexpected_response": "Risposta inattesa dal server.",
+            "error_prefix": "Errore: ",
+            "connection_lost": "Connessione interrotta. Riprova.",
+            "messages_count": "messaggi",
+            "delete_chat": "Elimina chat",
+            "no_conversations": "Nessuna conversazione",
+            "confirm_delete": "Eliminare questa conversazione?",
+            "select_agent": "Seleziona un agente dal menu in alto per iniziare. Potrai cambiarlo in qualsiasi momento.",
+            "nvidia_tested": "Testati",
+            "nvidia_to_test": "Da testare",
+            "no_models": "Nessun modello disponibile",
+            "no_models_msg": "Nessun modello disponibile. Verifica le API key dei provider.",
+            "models_load_error": "Errore nel caricamento dei modelli: ",
+            "nvidia_test_result": "Test NVIDIA: OK {ok}, rimossi {removed}, testati {tested}/{total}",
+            "nvidia_timeout": "timeout: {n}",
+            "nvidia_remaining": "restanti: {n} (ripremi per continuare)",
+            "nvidia_test_failed": "Test NVIDIA fallito",
+            "switched_to": "Passato a {provider} \u2192 {model}",
+            # Suggestions
+            "sug_lights": "Mostra tutte le luci",
+            "sug_sensors": "Stato sensori",
+            "sug_areas": "Stanze e aree",
+            "sug_temperature": "Storico temperatura",
+            "sug_scenes": "Scene disponibili",
+            "sug_automations": "Lista automazioni",
+        },
+        "es": {
+            "change_model": "Cambiar modelo",
+            "nvidia_test_title": "Test rápido NVIDIA (puede tardar unos segundos)",
+            "nvidia_test_btn": "Test NVIDIA",
+            "new_chat_title": "Nueva conversación",
+            "new_chat_btn": "Nuevo chat",
+            "conversations": "Conversaciones",
+            "drag_resize": "Arrastra para redimensionar",
+            "remove_image": "Eliminar imagen",
+            "upload_image": "Subir imagen",
+            "input_placeholder": "Escribe un mensaje...",
+            "image_too_large": "La imagen es demasiado grande. Máximo 5MB.",
+            "restore_backup": "Restaurar backup",
+            "restore_backup_title": "Restaurar backup (snapshot: {id})",
+            "confirm_restore": "¿Deseas restaurar el backup? Esta operación deshace el último cambio.",
+            "restoring": "Restaurando...",
+            "restored": "Restaurado",
+            "backup_restored": "Backup restaurado. Si es necesario, actualiza la página Lovelace o verifica la automatización/script.",
+            "restore_failed": "Restauración fallida.",
+            "error_restore": "Error de restauración: ",
+            "copy_btn": "Copiar",
+            "copied": "¡Copiado!",
+            "request_failed": "Solicitud fallida ({status}): {body}",
+            "unexpected_response": "Respuesta inesperada del servidor.",
+            "error_prefix": "Error: ",
+            "connection_lost": "Conexión interrumpida. Inténtalo de nuevo.",
+            "messages_count": "mensajes",
+            "delete_chat": "Eliminar chat",
+            "no_conversations": "Sin conversaciones",
+            "confirm_delete": "¿Eliminar esta conversación?",
+            "select_agent": "Selecciona un agente del menú superior para empezar. Puedes cambiarlo en cualquier momento.",
+            "nvidia_tested": "Probados",
+            "nvidia_to_test": "Por probar",
+            "no_models": "Sin modelos disponibles",
+            "no_models_msg": "Sin modelos disponibles. Verifica las API keys de los proveedores.",
+            "models_load_error": "Error al cargar los modelos: ",
+            "nvidia_test_result": "Test NVIDIA: OK {ok}, eliminados {removed}, probados {tested}/{total}",
+            "nvidia_timeout": "timeout: {n}",
+            "nvidia_remaining": "restantes: {n} (pulsa de nuevo para continuar)",
+            "nvidia_test_failed": "Test NVIDIA fallido",
+            "switched_to": "Cambiado a {provider} \u2192 {model}",
+            # Suggestions
+            "sug_lights": "Mostrar todas las luces",
+            "sug_sensors": "Estado de sensores",
+            "sug_areas": "Habitaciones y áreas",
+            "sug_temperature": "Historial de temperatura",
+            "sug_scenes": "Escenas disponibles",
+            "sug_automations": "Lista de automatizaciones",
+        },
+        "fr": {
+            "change_model": "Changer de modèle",
+            "nvidia_test_title": "Test rapide NVIDIA (peut prendre quelques secondes)",
+            "nvidia_test_btn": "Test NVIDIA",
+            "new_chat_title": "Nouvelle conversation",
+            "new_chat_btn": "Nouveau chat",
+            "conversations": "Conversations",
+            "drag_resize": "Glisser pour redimensionner",
+            "remove_image": "Supprimer l'image",
+            "upload_image": "Télécharger une image",
+            "input_placeholder": "Écris un message...",
+            "image_too_large": "L'image est trop volumineuse. Maximum 5 Mo.",
+            "restore_backup": "Restaurer la sauvegarde",
+            "restore_backup_title": "Restaurer la sauvegarde (snapshot : {id})",
+            "confirm_restore": "Veux-tu restaurer la sauvegarde ? Cette opération annule la dernière modification.",
+            "restoring": "Restauration...",
+            "restored": "Restauré",
+            "backup_restored": "Sauvegarde restaurée. Si nécessaire, actualise la page Lovelace ou vérifie l'automatisation/script.",
+            "restore_failed": "Restauration échouée.",
+            "error_restore": "Erreur de restauration : ",
+            "copy_btn": "Copier",
+            "copied": "Copié !",
+            "request_failed": "Requête échouée ({status}) : {body}",
+            "unexpected_response": "Réponse inattendue du serveur.",
+            "error_prefix": "Erreur : ",
+            "connection_lost": "Connexion interrompue. Réessaie.",
+            "messages_count": "messages",
+            "delete_chat": "Supprimer le chat",
+            "no_conversations": "Aucune conversation",
+            "confirm_delete": "Supprimer cette conversation ?",
+            "select_agent": "Sélectionne un agent dans le menu en haut pour commencer. Tu pourras le changer à tout moment.",
+            "nvidia_tested": "Testés",
+            "nvidia_to_test": "À tester",
+            "no_models": "Aucun modèle disponible",
+            "no_models_msg": "Aucun modèle disponible. Vérifie les clés API des fournisseurs.",
+            "models_load_error": "Erreur lors du chargement des modèles : ",
+            "nvidia_test_result": "Test NVIDIA : OK {ok}, supprimés {removed}, testés {tested}/{total}",
+            "nvidia_timeout": "timeout : {n}",
+            "nvidia_remaining": "restants : {n} (appuie à nouveau pour continuer)",
+            "nvidia_test_failed": "Test NVIDIA échoué",
+            "switched_to": "Passé à {provider} \u2192 {model}",
+            # Suggestions
+            "sug_lights": "Afficher toutes les lumières",
+            "sug_sensors": "État des capteurs",
+            "sug_areas": "Pièces et zones",
+            "sug_temperature": "Historique température",
+            "sug_scenes": "Scènes disponibles",
+            "sug_automations": "Liste des automatisations",
+        },
+    }
+    ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
+    ui_js_json = json.dumps(ui_js, ensure_ascii=False)
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -194,10 +396,10 @@ def get_chat_ui():
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
         <span class="badge">v{api.VERSION}</span>
-        <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="Cambia modello"></select>
-        <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="Test veloce NVIDIA (può richiedere qualche secondo)" style="display:none">🔍 Test NVIDIA</button>
+        <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="{ui_js['change_model']}"></select>
+        <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
-        <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
+        <button class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
         <div class="status">
             <div class="status-dot"></div>
             {status_text}
@@ -206,10 +408,10 @@ def get_chat_ui():
 
     <div class="main-container">
         <div class="sidebar">
-            <div class="sidebar-header">📝 Conversazioni</div>
+            <div class="sidebar-header">\U0001f4dd {ui_js['conversations']}</div>
             <div class="chat-list" id="chatList"></div>
         </div>
-        <div class="splitter" id="sidebarSplitter" title="Trascina per ridimensionare"></div>
+        <div class="splitter" id="sidebarSplitter" title="{ui_js['drag_resize']}"></div>
         <div class="main-content">
             <div class="chat-container" id="chat">
         <div class="message system">
@@ -221,25 +423,25 @@ def get_chat_ui():
     </div>
 
     <div class="suggestions" id="suggestions">
-        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f4a1 Mostra tutte le luci</div>
-        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f321 Stato sensori</div>
-        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3e0 Stanze e aree</div>
-        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f4c8 Storico temperatura</div>
-        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3ac Scene disponibili</div>
-        <div class="suggestion" onclick="sendSuggestion(this)">\u2699\ufe0f Lista automazioni</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f4a1 {ui_js['sug_lights']}</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f321 {ui_js['sug_sensors']}</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3e0 {ui_js['sug_areas']}</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f4c8 {ui_js['sug_temperature']}</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\U0001f3ac {ui_js['sug_scenes']}</div>
+        <div class="suggestion" onclick="sendSuggestion(this)">\u2699\ufe0f {ui_js['sug_automations']}</div>
     </div>
 
     <div class="input-area">
         <div id="imagePreviewContainer" class="image-preview-container">
             <img id="imagePreview" class="image-preview" />
-            <button class="remove-image-btn" onclick="removeImage()" title="Rimuovi immagine">×</button>
+            <button class="remove-image-btn" onclick="removeImage()" title="{ui_js['remove_image']}">×</button>
         </div>
         <div class="input-row">
             <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)" />
-            <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="Carica immagine">
+            <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="{ui_js['upload_image']}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </button>
-            <textarea id="input" rows="1" placeholder="Scrivi un messaggio..." onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
+            <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
             <button id="sendBtn" onclick="handleButtonClick()">
                 <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
@@ -250,6 +452,7 @@ def get_chat_ui():
     </div>
 
     <script>
+        const T = {ui_js_json};
         const chat = document.getElementById('chat');
         const input = document.getElementById('input');
         const sendBtn = document.getElementById('sendBtn');
@@ -328,7 +531,7 @@ def get_chat_ui():
 
             // Check file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {{
-                alert('L\\'immagine è troppo grande. Massimo 5MB.');
+                alert(T.image_too_large);
                 return;
             }}
 
@@ -435,19 +638,19 @@ def get_chat_ui():
 
             const btn = document.createElement('button');
             btn.className = 'undo-button';
-            btn.textContent = '↩︎ Ripristina backup';
-            btn.title = 'Ripristina il backup (snapshot: ' + snapshotId + ')';
+            btn.textContent = '\u21a9\ufe0e ' + T.restore_backup;
+            btn.title = T.restore_backup_title.replace('{{id}}', snapshotId);
             btn.onclick = () => restoreSnapshot(snapshotId, btn);
             div.appendChild(btn);
         }}
 
         async function restoreSnapshot(snapshotId, btn) {{
             if (!snapshotId) return;
-            if (!confirm('Vuoi ripristinare il backup? Questa operazione annulla la modifica appena fatta.')) return;
+            if (!confirm(T.confirm_restore)) return;
 
             const originalText = btn.textContent;
             btn.disabled = true;
-            btn.textContent = '⏳ Ripristino...';
+            btn.textContent = '\u23f3 ' + T.restoring;
             try {{
                 const resp = await fetch(apiUrl('api/snapshots/restore'), {{
                     method: 'POST',
@@ -456,18 +659,18 @@ def get_chat_ui():
                 }});
                 const data = await resp.json().catch(() => ({{}}));
                 if (resp.ok && data && data.status === 'success') {{
-                    btn.textContent = '✓ Ripristinato';
-                    addMessage('✅ Backup ripristinato. Se necessario, aggiorna la pagina Lovelace o verifica l’automazione/script.', 'system');
+                    btn.textContent = '\u2713 ' + T.restored;
+                    addMessage('\u2705 ' + T.backup_restored, 'system');
                 }} else {{
                     btn.disabled = false;
                     btn.textContent = originalText;
-                    const msg = (data && (data.error || data.message)) ? (data.error || data.message) : 'Ripristino fallito.';
+                    const msg = (data && (data.error || data.message)) ? (data.error || data.message) : T.restore_failed;
                     addMessage('❌ ' + msg, 'system');
                 }}
             }} catch (e) {{
                 btn.disabled = false;
                 btn.textContent = originalText;
-                addMessage('❌ Errore ripristino: ' + e.message, 'system');
+                addMessage('\u274c ' + T.error_restore + e.message, 'system');
             }}
         }}
 
@@ -507,7 +710,7 @@ def get_chat_ui():
             }}
 
             // 2. Code blocks
-            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\U0001F4CB Copia</button><pre><code>$2</code></pre></div>');
+            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\U0001F4CB ' + T.copy_btn + '</button><pre><code>$2</code></pre></div>');
             // 3. Inline code, bold, newlines
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
@@ -526,7 +729,7 @@ def get_chat_ui():
 
             const showSuccess = () => {{
                 const originalText = button.textContent;
-                button.textContent = '✓ Copiato!';
+                button.textContent = '\u2713 ' + T.copied;
                 button.classList.add('copied');
                 setTimeout(() => {{
                     button.textContent = originalText;
@@ -622,7 +825,7 @@ def get_chat_ui():
 
                 if (!resp.ok) {{
                     const bodyText = await resp.text().catch(() => '');
-                    throw new Error('Richiesta fallita (' + resp.status + '): ' + (bodyText ? bodyText.slice(0, 200) : '')); 
+                    throw new Error(T.request_failed.replace('{{status}}', resp.status).replace('{{body}}', bodyText ? bodyText.slice(0, 200) : '')); 
                 }}
 
                 const contentType = (resp.headers.get('content-type') || '').toLowerCase();
@@ -635,13 +838,13 @@ def get_chat_ui():
                     }} else if (data && data.error) {{
                         addMessage('\u274c ' + data.error, 'system');
                     }} else {{
-                        addMessage('\u274c Risposta inattesa dal server.', 'system');
+                        addMessage('\u274c ' + T.unexpected_response, 'system');
                     }}
                 }}
             }} catch (err) {{
                 removeThinking();
                 if (err && err.name !== 'AbortError') {{
-                    addMessage('\u274c Errore: ' + (err.message || String(err)), 'system');
+                    addMessage('\u274c ' + T.error_prefix + (err.message || String(err)), 'system');
                 }}
             }} finally {{
                 sending = false;
@@ -725,7 +928,7 @@ def get_chat_ui():
             }}
             removeThinking();
             if (!gotAnyEvent) {{
-                addMessage('\u274c Connessione interrotta. Riprova.', 'system');
+                addMessage('\u274c ' + T.connection_lost, 'system');
             }}
         }}
 
@@ -741,21 +944,21 @@ def get_chat_ui():
                         item.innerHTML = `
                             <div style="flex: 1;" onclick="loadConversation('${{conv.id}}')">
                                 <div class="chat-item-title">${{conv.title}}</div>
-                                <div class="chat-item-info">${{conv.message_count}} messaggi</div>
+                                <div class="chat-item-info">${{conv.message_count}} ${{T.messages_count}}</div>
                             </div>
-                            <span class="chat-item-delete" onclick="deleteConversation(event, '${{conv.id}}')" title="Elimina chat">\U0001f5d1</span>
+                            <span class="chat-item-delete" onclick="deleteConversation(event, '${{conv.id}}')" title="${{T.delete_chat}}">\U0001f5d1</span>
                         `;
                         chatList.appendChild(item);
                     }});
                 }} else {{
-                    chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">Nessuna conversazione</div>';
+                    chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + T.no_conversations + '</div>';
                 }}
             }} catch(e) {{ console.error('Error loading chat list:', e); }}
         }}
 
         async function deleteConversation(event, sessionId) {{
             event.stopPropagation();
-            if (!confirm('Eliminare questa conversazione?')) return;
+            if (!confirm(T.confirm_delete)) return;
             try {{
                 const resp = await fetch(apiUrl(`api/conversations/${{sessionId}}`), {{ method: 'DELETE' }});
                 if (resp.ok) {{
@@ -844,7 +1047,7 @@ def get_chat_ui():
 
                 // First-time onboarding: prompt user to pick an agent once
                 if (data.needs_first_selection && !window._firstSelectionPrompted) {{
-                    addMessage('👆 Seleziona un agente dal menu in alto per iniziare. Potrai cambiarlo in qualsiasi momento.', 'system');
+                    addMessage('\U0001f446 ' + T.select_agent, 'system');
                     window._firstSelectionPrompted = true;
                 }}
 
@@ -881,8 +1084,8 @@ def get_chat_ui():
                         const toTest = Array.isArray(data.nvidia_models_to_test) ? data.nvidia_models_to_test : [];
 
                         const groups = [
-                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' ✅ Testati', models: tested }},
-                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' Da testare', models: toTest }},
+                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' \u2705 ' + T.nvidia_tested, models: tested }},
+                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' ' + T.nvidia_to_test, models: toTest }},
                         ].filter(g => Array.isArray(g.models) && g.models.length > 0);
 
                         for (const g of groups) {{
@@ -922,12 +1125,12 @@ def get_chat_ui():
                 }}
                 if (!select.options.length) {{
                     const option = document.createElement('option');
-                    option.textContent = 'Nessun modello disponibile';
+                    option.textContent = T.no_models;
                     option.disabled = true;
                     option.selected = true;
                     select.appendChild(option);
                     if (!window._modelsEmptyNotified) {{
-                        addMessage('⚠️ Nessun modello disponibile. Verifica le API key dei provider.', 'system');
+                        addMessage('\u26a0\ufe0f ' + T.no_models_msg, 'system');
                         window._modelsEmptyNotified = true;
                     }}
                 }}
@@ -935,7 +1138,7 @@ def get_chat_ui():
             }} catch (error) {{
                 console.error('[loadModels] Error loading models:', error);
                 if (!window._modelsErrorNotified) {{
-                    addMessage('⚠️ Errore nel caricamento dei modelli: ' + (error.message || error), 'system');
+                    addMessage('\u26a0\ufe0f ' + T.models_load_error + (error.message || error), 'system');
                     window._modelsErrorNotified = true;
                 }}
             }}
@@ -967,19 +1170,19 @@ def get_chat_ui():
                         localStorage.setItem(cursorKey, '0');
                     }}
                     const parts = [];
-                    parts.push(`Test NVIDIA: OK ${{data.ok}}, rimossi ${{data.removed}}, testati ${{data.tested}}/${{data.total}}`);
+                    parts.push(T.nvidia_test_result.replace('{{ok}}', data.ok).replace('{{removed}}', data.removed).replace('{{tested}}', data.tested).replace('{{total}}', data.total));
                     if (data.stopped_reason) parts.push(`(${{data.stopped_reason}})`);
-                    if (typeof data.timeouts === 'number' && data.timeouts > 0) parts.push(`— timeout: ${{data.timeouts}}`);
-                    if (typeof data.remaining === 'number' && data.remaining > 0) parts.push(`— restanti: ${{data.remaining}} (ripremi per continuare)`);
-                    addMessage('🔍 ' + parts.join(' '), 'system');
+                    if (typeof data.timeouts === 'number' && data.timeouts > 0) parts.push('\u2014 ' + T.nvidia_timeout.replace('{{n}}', data.timeouts));
+                    if (typeof data.remaining === 'number' && data.remaining > 0) parts.push('\u2014 ' + T.nvidia_remaining.replace('{{n}}', data.remaining));
+                    addMessage('\U0001f50d ' + parts.join(' '), 'system');
                 }} else {{
-                    const msg = (data && (data.message || data.error)) || ('Test NVIDIA fallito (' + response.status + ')');
-                    addMessage('⚠️ ' + msg, 'system');
+                    const msg = (data && (data.message || data.error)) || (T.nvidia_test_failed + ' (' + response.status + ')');
+                    addMessage('\u26a0\ufe0f ' + msg, 'system');
                 }}
 
                 if (data && data.blocklisted) await loadModels();
             }} catch (e) {{
-                addMessage('⚠️ Test NVIDIA fallito: ' + (e && e.message ? e.message : String(e)), 'system');
+                addMessage('\u26a0\ufe0f ' + T.nvidia_test_failed + ': ' + (e && e.message ? e.message : String(e)), 'system');
             }} finally {{
                 btn.disabled = false;
                 btn.textContent = oldText;
@@ -1007,7 +1210,7 @@ def get_chat_ui():
                     }}
                     // Show notification
                     const providerName = PROVIDER_LABELS[parsed.provider] || parsed.provider;
-                    addMessage(`🔄 Passato a ${{providerName}} → ${{parsed.model}}`, 'system');
+                    addMessage('\U0001f504 ' + T.switched_to.replace('{{provider}}', providerName).replace('{{model}}', parsed.model), 'system');
                     const modelLower = String(parsed.model || '').toLowerCase();
                     if (parsed.provider === 'github' && modelLower.includes('o4-mini') && O4MINI_TOKENS_HINT) {{
                         addMessage(O4MINI_TOKENS_HINT, 'system');
