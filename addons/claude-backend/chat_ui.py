@@ -478,7 +478,7 @@ def get_chat_ui():
                 return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
             }});
             // 2. Code blocks
-            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\ud83d\udccb Copia</button><pre><code>$2</code></pre></div>');
+            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\U0001F4CB Copia</button><pre><code>$2</code></pre></div>');
             // 3. Inline code, bold, newlines
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
