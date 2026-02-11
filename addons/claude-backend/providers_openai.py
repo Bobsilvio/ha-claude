@@ -357,6 +357,21 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
         if intent_name not in ("create_automation", "create_script"):
             return False
         low = (text or "").lower()
+        # If the model claims it already searched / lists devices but no tool was called,
+        # force a retry that actually calls search_entities.
+        fake_search_markers = (
+            "ho cercato",
+            "ho cercato le entità",
+            "dalla lista",
+            "non trovo",
+            "non riesco a trovare",
+            "nel contesto fornito",
+            "i searched",
+            "i looked",
+            "from the list",
+            "can't find",
+            "cannot find",
+        )
         promise_markers = (
             "utilizzerò",
             "userò",
@@ -369,9 +384,17 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             "i will use",
         )
         has_promise = any(m in low for m in promise_markers)
-        block_markers = ("non posso", "non riesco", "vuoi", "quale", "confermi")
+        has_fake_search = any(m in low for m in fake_search_markers)
+        block_markers = (
+            "non posso",
+            "i can't",
+            "cannot",
+            "vuoi",
+            "quale",
+            "confermi",
+        )
         is_blocked = any(m in low for m in block_markers)
-        return has_promise and not is_blocked
+        return (has_fake_search or has_promise) and not is_blocked
 
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}]
@@ -468,8 +491,10 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                         "NVIDIA: No tool call for create intent; forcing a retry with strict tool-call reminder."
                     )
                     force_system_reminder = (
-                        "CRITICAL: You MUST call the appropriate creation tool NOW (create_automation/create_script). "
-                        "Do NOT output explanatory text. Return ONLY the tool call with complete, correct arguments."
+                        "CRITICAL: Do NOT claim you searched unless you called a tool. "
+                        "For create_automation/create_script you MUST call search_entities first (with a good query), "
+                        "then (if needed) get_entity_state, then call create_automation/create_script. "
+                        "Do NOT output explanatory text. Return ONLY tool calls with complete, correct arguments."
                     )
                     continue
 
@@ -638,6 +663,19 @@ def stream_chat_openai(messages, intent_info=None):
         if intent_name not in ("create_automation", "create_script"):
             return False
         low = (text or "").lower()
+        fake_search_markers = (
+            "ho cercato",
+            "ho cercato le entità",
+            "dalla lista",
+            "non trovo",
+            "non riesco a trovare",
+            "nel contesto fornito",
+            "i searched",
+            "i looked",
+            "from the list",
+            "can't find",
+            "cannot find",
+        )
         promise_markers = (
             "utilizzerò",
             "userò",
@@ -650,9 +688,17 @@ def stream_chat_openai(messages, intent_info=None):
             "i will use",
         )
         has_promise = any(m in low for m in promise_markers)
-        block_markers = ("non posso", "non riesco", "vuoi", "quale", "confermi")
+        has_fake_search = any(m in low for m in fake_search_markers)
+        block_markers = (
+            "non posso",
+            "i can't",
+            "cannot",
+            "vuoi",
+            "quale",
+            "confermi",
+        )
         is_blocked = any(m in low for m in block_markers)
-        return has_promise and not is_blocked
+        return (has_fake_search or has_promise) and not is_blocked
 
     force_system_reminder = None
     forced_create_retry = False
