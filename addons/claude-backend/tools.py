@@ -130,12 +130,16 @@ HA_TOOLS_DESCRIPTION = [
                     "type": "string",
                     "description": "Service name (e.g. 'turn_on', 'turn_off', 'toggle')."
                 },
+                "entity_id": {
+                    "type": "string",
+                    "description": "Optional shortcut for targeting a single entity (e.g. 'light.living_room'). If provided, it will be mapped into data.entity_id."
+                },
                 "data": {
                     "type": "object",
                     "description": "Service data including target entity_id and parameters."
                 }
             },
-            "required": ["domain", "service", "data"]
+            "required": ["domain", "service"]
         }
     },
     {
@@ -625,6 +629,26 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             if not isinstance(data, dict):
                 data = {}
 
+            # Compatibility: some models send entity_id at the top level.
+            # Normalize into the service payload so HA doesn't return 400.
+            top_entity_id = tool_input.get("entity_id")
+            if top_entity_id and "entity_id" not in data and "target" not in data:
+                data["entity_id"] = top_entity_id
+
+            # Also accept alternate shapes
+            # - service_data: {...}
+            # - target: {entity_id: ...}
+            service_data = tool_input.get("service_data")
+            if isinstance(service_data, dict):
+                # Only fill missing keys to avoid overriding explicit data
+                for k, v in service_data.items():
+                    if k not in data:
+                        data[k] = v
+
+            target = tool_input.get("target")
+            if isinstance(target, dict) and "target" not in data:
+                data["target"] = target
+
             if not domain or not service:
                 return json.dumps(
                     {
@@ -633,6 +657,22 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                         "example": {
                             "domain": "light",
                             "service": "turn_on",
+                            "data": {"entity_id": "light.living_room"},
+                        },
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                )
+
+            # If we still have no target, return a clearer error (prevents HA 400).
+            if not data or (not data.get("entity_id") and not data.get("target")):
+                return json.dumps(
+                    {
+                        "status": "error",
+                        "error": "Missing target for service call. Provide 'entity_id' or 'data' with entity_id/target.",
+                        "example": {
+                            "domain": domain,
+                            "service": service,
                             "data": {"entity_id": "light.living_room"},
                         },
                     },
@@ -2187,8 +2227,9 @@ HA_TOOLS_COMPACT = [
         "description": "Call HA service (e.g. light.turn_on, switch.toggle, climate.set_temperature, scene.turn_on, script.turn_on).",
         "parameters": {"type": "object", "properties": {
             "domain": {"type": "string"}, "service": {"type": "string"},
+            "entity_id": {"type": "string"},
             "data": {"type": "object"}
-        }, "required": ["domain", "service", "data"]}
+        }, "required": ["domain", "service"]}
     },
     {
         "name": "search_entities",

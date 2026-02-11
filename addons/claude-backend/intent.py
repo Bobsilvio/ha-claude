@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 INTENT_TOOL_SETS = {
     "chat": [],  # No tools needed for greetings/chitchat
     "find_automation": ["get_automations"],
-    "modify_automation": ["update_automation"],
+    "modify_automation": ["get_automations", "update_automation"],
     "modify_script": ["update_script"],
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
@@ -48,17 +48,21 @@ Then answer:
 Be concise and respond in the user's language.""",
 
     "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
-The automation config is provided in the DATI section of the user's message.
+The automation config MAY be provided in the DATI section of the user's message.
+
 CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
-1. FIRST, briefly confirm which automation you found: "Ho trovato l'automazione: [NAME] (id: [ID])"
-2. Describe WHAT EXACTLY will change in simple language
-3. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? Scrivi sì o no"
-4. WAIT FOR USER TO CONFIRM - DO NOT call update_automation until user says "sì" or "sa" (Italian yes)
-5. Only AFTER confirmation, call update_automation ONCE with the changes
-6. Show a before/after diff of what changed.
+1. If the automation is NOT clearly provided in DATI, FIRST call get_automations ONCE with a short query extracted from the user message.
+   - If you find multiple matches: list the best 1-5 (id + alias) and ask which one they mean.
+   - If you find none: say you couldn't find it and ask for the automation name/room/device.
+2. Once you know WHICH automation, briefly confirm it: "Ho trovato l'automazione: [NAME] (id: [ID])"
+3. Describe WHAT EXACTLY will change in simple language
+4. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? Scrivi sì o no"
+5. WAIT FOR USER TO CONFIRM - DO NOT call update_automation until user says "sì" (Italian yes)
+6. Only AFTER confirmation, call update_automation ONCE with the changes
+7. Show a before/after diff of what changed.
+
 - Respond in the user's language. Be concise.
-- NEVER call get_automations or read_config_file — the data is already provided.
-- If the automation in DATI doesn't match what the user asked for, tell them and ask for clarification. Do NOT modify the wrong automation.""",
+- Never modify the wrong automation.""",
 
     "modify_script": """You are a Home Assistant script editor. The user wants to modify a script.
 The script config is provided in the DATI section.
@@ -239,7 +243,15 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     # Also detect if smart context found a specific automation
     has_specific_auto = "## AUTOMAZIONE" in smart_context if smart_context else False
 
-    if has_modify and (has_auto or has_specific_auto):
+    # Heuristic: schedule/time change requests often mean automation edits even if the user
+    # doesn't say "automazione" explicitly (e.g. "modifica l'orario, accendi alle 22").
+    # This needs to run BEFORE device control so we can preload automation context.
+    looks_like_schedule_change = False
+    if has_modify:
+        if ("orario" in msg) or re.search(r"\balle\s*([01]?\d|2[0-3])([:.][0-5]\d)?\b", msg):
+            looks_like_schedule_change = True
+
+    if has_modify and (has_auto or has_specific_auto or looks_like_schedule_change):
         return {"intent": "modify_automation", "tools": INTENT_TOOL_SETS["modify_automation"],
                 "prompt": INTENT_PROMPTS["modify_automation"] + "\n\nIMPORTANT: Before calling update_automation, show the user which automation you will modify and ask for explicit confirmation. Provide modification details and ask: 'Confermi che devo modificare questa automazione? (sì/no)'", "specific_target": has_specific_auto}
 
@@ -399,7 +411,8 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
     try:
         # --- AUTOMATION CONTEXT ---
         auto_keywords = ["automazione", "automation", "automazion", "trigger", "condizione", "condition"]
-        if any(k in msg_lower for k in auto_keywords) and not skip_automation_matching:
+        force_automation_context = intent in ("modify_automation", "find_automation")
+        if (force_automation_context or any(k in msg_lower for k in auto_keywords)) and not skip_automation_matching:
             import yaml
             # Get automation list
             states = api.get_all_states()
