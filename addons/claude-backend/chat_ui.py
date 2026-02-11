@@ -142,9 +142,18 @@ def get_chat_ui():
         .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 0; font-size: 13px; }}
         .message.assistant code {{ background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }}
         .message.assistant pre code {{ background: none; padding: 0; }}
-        .diff-line-add {{ color: #22863a; background: #e6ffec; display: block; margin: 0 -10px; padding: 0 10px; }}
-        .diff-line-del {{ color: #cb2431; background: #ffeef0; display: block; margin: 0 -10px; padding: 0 10px; }}
-        .diff-line-hunk {{ color: #6f42c1; display: block; }}
+        .diff-side {{ overflow-x: auto; margin: 10px 0; border-radius: 8px; border: 1px solid #e1e4e8; }}
+        .diff-table {{ width: 100%; border-collapse: collapse; font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 11px; table-layout: fixed; }}
+        .diff-table th {{ padding: 6px 10px; background: #f6f8fa; border-bottom: 1px solid #e1e4e8; text-align: left; font-size: 11px; font-weight: 600; width: 50%; }}
+        .diff-th-old {{ color: #cb2431; }}
+        .diff-th-new {{ color: #22863a; border-left: 1px solid #e1e4e8; }}
+        .diff-table td {{ padding: 1px 8px; white-space: pre-wrap; word-break: break-all; vertical-align: top; font-size: 11px; line-height: 1.5; }}
+        .diff-eq {{ color: #586069; }}
+        .diff-del {{ background: #ffeef0; color: #cb2431; }}
+        .diff-add {{ background: #e6ffec; color: #22863a; }}
+        .diff-empty {{ background: #fafbfc; }}
+        .diff-table td + td {{ border-left: 1px solid #e1e4e8; }}
+        .diff-collapse {{ text-align: center; color: #6a737d; background: #f1f8ff; font-style: italic; font-size: 11px; padding: 2px 10px; }}
         .message.assistant strong {{ color: #333; }}
         .message.assistant ul, .message.assistant ol {{ margin: 6px 0 6px 20px; }}
         .message.assistant p {{ margin: 4px 0; }}
@@ -461,23 +470,23 @@ def get_chat_ui():
             }}
         }}
 
-        function colorizeDiff(code) {{
-            return code.split('\\n').map(function(line) {{
-                if (line.startsWith('+') && !line.startsWith('+++')) return '<span class="diff-line-add">' + line + '</span>';
-                if (line.startsWith('-') && !line.startsWith('---')) return '<span class="diff-line-del">' + line + '</span>';
-                if (line.startsWith('@@')) return '<span class="diff-line-hunk">' + line + '</span>';
-                return line;
-            }}).join('\\n');
-        }}
-
         function formatMarkdown(text) {{
-            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, function(match, lang, code) {{
-                var formatted = (lang === 'diff') ? colorizeDiff(code) : code;
-                return '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\ud83d\udccb Copia</button><pre><code>' + formatted + '</code></pre></div>';
+            // 1. Extract raw HTML diff blocks BEFORE any markdown processing
+            var diffBlocks = [];
+            text = text.replace(/<!--DIFF-->([\s\S]*?)<!--\/DIFF-->/g, function(m, html) {{
+                diffBlocks.push(html);
+                return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
             }});
+            // 2. Code blocks
+            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\ud83d\udccb Copia</button><pre><code>$2</code></pre></div>');
+            // 3. Inline code, bold, newlines
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
             text = text.replace(/\\n/g, '<br>');
+            // 4. Restore diff HTML blocks (untouched by markdown transforms)
+            for (var i = 0; i < diffBlocks.length; i++) {{
+                text = text.replace('%%DIFF_' + i + '%%', diffBlocks[i]);
+            }}
             return text;
         }}
 

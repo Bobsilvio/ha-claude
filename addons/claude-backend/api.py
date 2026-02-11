@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.37"
+VERSION = "3.1.38"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1556,19 +1556,88 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 
 
 
+def _build_side_by_side_diff_html(old_yaml: str, new_yaml: str) -> str:
+    """Build an HTML side-by-side diff table (GitHub-style split view).
+    Returns empty string if there are no actual changes."""
+    import difflib
+    import html as html_mod
+
+    old_lines = old_yaml.strip().splitlines()
+    new_lines = new_yaml.strip().splitlines()
+
+    sm = difflib.SequenceMatcher(None, old_lines, new_lines)
+
+    # Build row list: (type, left_text, right_text)
+    rows = []
+    context_lines = 3  # Lines of context around changes
+
+    for op, i1, i2, j1, j2 in sm.get_opcodes():
+        if op == "equal":
+            chunk = list(zip(old_lines[i1:i2], new_lines[j1:j2]))
+            if len(chunk) > context_lines * 2 + 1:
+                for left, right in chunk[:context_lines]:
+                    rows.append(("equal", left, right))
+                rows.append(("collapse", f"... {len(chunk) - context_lines * 2} righe uguali ...", ""))
+                for left, right in chunk[-context_lines:]:
+                    rows.append(("equal", left, right))
+            else:
+                for left, right in chunk:
+                    rows.append(("equal", left, right))
+        elif op == "replace":
+            old_chunk = old_lines[i1:i2]
+            new_chunk = new_lines[j1:j2]
+            max_len = max(len(old_chunk), len(new_chunk))
+            old_chunk += [""] * (max_len - len(old_chunk))
+            new_chunk += [""] * (max_len - len(new_chunk))
+            for o, n in zip(old_chunk, new_chunk):
+                rows.append(("replace", o, n))
+        elif op == "delete":
+            for i in range(i1, i2):
+                rows.append(("delete", old_lines[i], ""))
+        elif op == "insert":
+            for j in range(j1, j2):
+                rows.append(("insert", "", new_lines[j]))
+
+    # If no actual changes found, return empty
+    if not any(t in ("replace", "delete", "insert") for t, _, _ in rows):
+        return ""
+
+    # Build HTML
+    h = ['<div class="diff-side"><table class="diff-table">']
+    h.append('<thead><tr><th class="diff-th-old">\u274c PRIMA</th>')
+    h.append('<th class="diff-th-new">\u2705 DOPO</th></tr></thead><tbody>')
+
+    cls_map = {
+        "equal": ("diff-eq", "diff-eq"),
+        "replace": ("diff-del", "diff-add"),
+        "delete": ("diff-del", "diff-empty"),
+        "insert": ("diff-empty", "diff-add"),
+    }
+
+    for row_type, left, right in rows:
+        le = html_mod.escape(left)
+        re = html_mod.escape(right)
+        if row_type == "collapse":
+            h.append(f'<tr><td class="diff-collapse" colspan="2">{le}</td></tr>')
+        else:
+            lc, rc = cls_map.get(row_type, ("diff-eq", "diff-eq"))
+            h.append(f'<tr><td class="{lc}">{le}</td><td class="{rc}">{re}</td></tr>')
+
+    h.append("</tbody></table></div>")
+    return "".join(h)
+
+
 def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     """Format a human-readable response from a successful write tool result.
     This avoids needing another API round just to format the response.
-    For UPDATE operations, shows a unified diff (only changed lines)."""
-    import difflib
-
+    For UPDATE operations, shows a side-by-side diff (red/green)."""
     parts = []
 
     msg = result_data.get("message", "")
     if msg:
-        parts.append(f"✅ {msg}")
+        parts.append(f"\u2705 {msg}")
     else:
-        parts.append("✅ Operazione completata con successo!")
+        parts.append("\u2705 Operazione completata con successo!")
 
     # Show diff for update tools (only for updates, not creates)
     old_yaml = result_data.get("old_yaml", "")
@@ -1577,23 +1646,12 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     update_tools = ("update_automation", "update_script", "update_dashboard")
 
     if old_yaml and new_yaml and tool_name in update_tools:
-        # Use pre-computed diff_unified if available, else compute it
-        diff_text = result_data.get("diff_unified", "")
-        if not diff_text:
-            diff_lines = list(difflib.unified_diff(
-                old_yaml.strip().splitlines(),
-                new_yaml.strip().splitlines(),
-                fromfile="prima",
-                tofile="dopo",
-                lineterm="",
-            ))
-            diff_text = "\n".join(diff_lines)
-
-        if diff_text.strip():
-            parts.append("\n**Modifiche:**")
-            parts.append(f"```diff\n{diff_text}\n```")
+        diff_html = _build_side_by_side_diff_html(old_yaml, new_yaml)
+        if diff_html:
+            # Wrap in marker so chat_ui.formatMarkdown passes it through as raw HTML
+            parts.append(f"\n<!--DIFF-->{diff_html}<!--/DIFF-->")
         else:
-            parts.append("\nNessuna modifica rilevata (il contenuto è identico).")
+            parts.append("\nNessuna modifica rilevata (il contenuto \u00e8 identico).")
 
     elif new_yaml and tool_name not in update_tools:
         # For CREATE operations, show the new YAML
@@ -1602,7 +1660,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
 
     tip = result_data.get("tip", "")
     if tip:
-        parts.append(f"\nℹ️ {tip}")
+        parts.append(f"\n\u2139\ufe0f {tip}")
 
     snapshot = result_data.get("snapshot", "")
     snapshot_id = ""
@@ -1612,7 +1670,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
         snapshot_id = snapshot.strip()
 
     if snapshot_id and snapshot_id != "N/A (REST API)":
-        parts.append(f"\n💾 Snapshot creato: `{snapshot_id}`")
+        parts.append(f"\n\U0001f4be Snapshot creato: `{snapshot_id}`")
 
     return "\n".join(parts)
 
