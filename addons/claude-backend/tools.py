@@ -561,6 +561,40 @@ def get_gemini_tools():
     """Convert tools to Google Gemini format."""
     from intent import INTENT_TOOL_SETS
     from google.generativeai.types import FunctionDeclaration, Tool
+
+    def _sanitize_gemini_schema(obj):
+        """Remove JSON-schema fields not supported by google.generativeai Schema.
+
+        The Gemini SDK rejects some validation keywords (e.g. 'minimum').
+        We keep only structural fields needed for function calling.
+        """
+        blocked_keys = {
+            "minimum",
+            "maximum",
+            "exclusiveMinimum",
+            "exclusiveMaximum",
+            "multipleOf",
+            "minItems",
+            "maxItems",
+            "minLength",
+            "maxLength",
+            "pattern",
+            "format",
+            "examples",
+            "default",
+        }
+
+        if isinstance(obj, dict):
+            cleaned = {}
+            for k, v in obj.items():
+                if k in blocked_keys:
+                    continue
+                cleaned[k] = _sanitize_gemini_schema(v)
+            return cleaned
+        if isinstance(obj, list):
+            return [_sanitize_gemini_schema(v) for v in obj]
+        return obj
+
     tools = HA_TOOLS_DESCRIPTION
     if not api.ENABLE_FILE_ACCESS:
         config_edit_tools = set(INTENT_TOOL_SETS.get("config_edit", []))
@@ -570,7 +604,7 @@ def get_gemini_tools():
         declarations.append(FunctionDeclaration(
             name=t["name"],
             description=t["description"],
-            parameters=t["parameters"]
+            parameters=_sanitize_gemini_schema(t["parameters"])
         ))
     return Tool(function_declarations=declarations)
 
