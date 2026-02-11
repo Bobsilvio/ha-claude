@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.58"
+VERSION = "3.1.59"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -960,18 +960,8 @@ def initialize_ai_client():
         ai_client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
         logger.info(f"OpenAI client initialized (model: {get_active_model()})")
     elif AI_PROVIDER == "google" and api_key:
-        # google.generativeai is deprecated upstream and emits a FutureWarning at import time.
-        # We keep it for now (to avoid a breaking SDK migration) but silence the warning
-        # to reduce log noise in Home Assistant.
-        import warnings
-        warnings.filterwarnings(
-            "ignore",
-            category=FutureWarning,
-            message=r"All support for the `google\.generativeai` package has ended\..*",
-        )
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        ai_client = genai
+        from google import genai
+        ai_client = genai.Client(api_key=api_key)
         logger.info(f"Google Gemini client initialized (model: {get_active_model()})")
     elif AI_PROVIDER == "nvidia" and api_key:
         from openai import OpenAI
@@ -1569,56 +1559,89 @@ def chat_openai(messages: List[Dict]) -> tuple:
 
 def chat_google(messages: List[Dict]) -> tuple:
     """Chat with Google Gemini. Returns (response_text, updated_messages)."""
-    from google.generativeai.types import content_types
+    from google.genai import types
 
-    model = ai_client.GenerativeModel(
-        model_name=get_active_model(),
+    def _to_parts(content: object) -> list[dict]:
+        if isinstance(content, str):
+            return [{"text": content}]
+        if isinstance(content, list):
+            parts: list[dict] = []
+            for p in content:
+                if isinstance(p, str):
+                    parts.append({"text": p})
+                elif isinstance(p, dict):
+                    if "text" in p:
+                        parts.append({"text": p.get("text")})
+                    elif "inline_data" in p:
+                        parts.append({"inline_data": p.get("inline_data")})
+            return [pt for pt in parts if pt]
+        return []
+
+    contents: list[object] = []
+    for m in messages:
+        role = m.get("role")
+        if role == "assistant":
+            role = "model"
+        if role not in ("user", "model"):
+            continue
+        parts = _to_parts(m.get("content"))
+        if parts:
+            contents.append({"role": role, "parts": parts})
+
+    tool = tools.get_gemini_tools()
+    config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
-        tools=[tools.get_gemini_tools()]
+        tools=[tool],
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
 
-    # Convert messages to Gemini format
-    gemini_history = []
-    for m in messages[:-1]:  # All except last
-        role = "model" if m["role"] == "assistant" else "user"
-        if isinstance(m["content"], str):
-            gemini_history.append({"role": role, "parts": [m["content"]]})
+    while True:
+        response = ai_client.models.generate_content(
+            model=get_active_model(),
+            contents=contents,
+            config=config,
+        )
 
-    chat = model.start_chat(history=gemini_history)
-    last_message = messages[-1]["content"] if messages else ""
+        function_calls = getattr(response, "function_calls", None) or []
+        if not function_calls:
+            return (response.text or ""), messages
 
-    response = chat.send_message(last_message)
+        # Append the model's function-call content, then our tool responses.
+        try:
+            if response.candidates and response.candidates[0].content:
+                contents.append(response.candidates[0].content)
+        except Exception:
+            pass
 
-    # Handle function calls
-    while response.candidates[0].content.parts:
-        has_function_call = False
-        function_responses = []
+        response_parts: list[types.Part] = []
+        for fc in function_calls:
+            name = getattr(fc, "name", None)
+            args = getattr(fc, "args", None)
+            if not name and getattr(fc, "function_call", None):
+                name = getattr(fc.function_call, "name", None)
+                args = getattr(fc.function_call, "args", None)
 
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, "function_call") and part.function_call:
-                has_function_call = True
-                fn = part.function_call
-                logger.info(f"Tool: {fn.name}")
-                args = dict(fn.args) if fn.args else {}
-                result = tools.execute_tool(fn.name, args)
-                function_responses.append(
-                    ai_client.protos.Part(function_response=ai_client.protos.FunctionResponse(
-                        name=fn.name,
-                        response={"result": json.loads(result)}
-                    ))
+            name = (name or "").strip()
+            if not name:
+                continue
+
+            tool_args = dict(args) if isinstance(args, dict) else (dict(args) if args else {})
+            logger.info(f"Tool: {name}")
+            result = tools.execute_tool(name, tool_args)
+            try:
+                parsed = json.loads(result)
+            except Exception:
+                parsed = result
+            response_parts.append(
+                types.Part.from_function_response(
+                    name=name,
+                    response={"result": parsed},
                 )
+            )
 
-        if not has_function_call:
-            break
-
-        response = chat.send_message(function_responses)
-
-    final_text = ""
-    for part in response.candidates[0].content.parts:
-        if hasattr(part, "text") and part.text:
-            final_text += part.text
-
-    return final_text, messages
+        if response_parts:
+            contents.append(types.Content(role="tool", parts=response_parts))
+        time.sleep(1)
 
 
 # ---- Main chat function ----

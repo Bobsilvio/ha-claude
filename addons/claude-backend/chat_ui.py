@@ -473,7 +473,7 @@ def get_chat_ui():
         function formatMarkdown(text) {{
             // 1. Extract raw HTML diff blocks BEFORE any markdown processing
             var diffBlocks = [];
-            text = text.replace(/<!--DIFF-->([\s\S]*?)<!--\/DIFF-->/g, function(m, html) {{
+            text = text.replace(/<!--DIFF-->([\\s\\S]*?)<!--\\/DIFF-->/g, function(m, html) {{
                 diffBlocks.push(html);
                 return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
             }});
