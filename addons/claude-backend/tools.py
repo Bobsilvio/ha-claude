@@ -172,7 +172,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "update_automation",
-        "description": "Update or modify an existing automation by its ID. Pass the automation_id and the fields you want to change. The tool reads automations.yaml, finds the automation, applies the changes, creates a snapshot, and saves. Much simpler than rewriting the full file.",
+        "description": "Update or modify an existing automation by its ID. Prefer passing a 'changes' object with only the fields you want to change (alias, description, trigger(s), condition(s), action(s), mode). For compatibility, you may also pass those fields at the top-level and the tool will normalize them into 'changes'. The tool reads automations.yaml, finds the automation, applies the changes, creates a snapshot, and saves.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -859,6 +859,28 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             automation_id = tool_input.get("automation_id", "")
             changes = tool_input.get("changes", {})
             add_condition = tool_input.get("add_condition", None)
+
+            # Compatibility: some models incorrectly pass fields at top-level
+            # instead of nesting under {changes:{...}}.
+            # Normalize top-level fields into changes.
+            if not isinstance(changes, dict):
+                changes = {}
+
+            if not changes:
+                allowed_top_level = (
+                    "alias",
+                    "description",
+                    "trigger",
+                    "triggers",
+                    "condition",
+                    "conditions",
+                    "action",
+                    "actions",
+                    "mode",
+                )
+                for k in allowed_top_level:
+                    if k in tool_input:
+                        changes[k] = tool_input.get(k)
 
             if not automation_id:
                 return json.dumps({"error": "automation_id is required."})

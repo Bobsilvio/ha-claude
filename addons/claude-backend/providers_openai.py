@@ -411,7 +411,20 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             if not tool_calls_map:
                 # No tools - stream the final text
                 full_text = accumulated
-                logger.warning(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
+                low = (full_text or "").lower()
+                is_confirmation_step = any(
+                    p in low
+                    for p in ("confermi", "scrivi sì o no", "scrivi si o no", "confirm", "confirme", "confirmer")
+                )
+                log_fn = logger.info if is_confirmation_step else logger.warning
+                log_fn(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'"
+                )
+                is_confirmation_step = any(
+                    p in low
+                    for p in ("confermi", "scrivi sì o no", "scrivi si o no", "confirm", "confirme", "confirmer")
+                )
+                log_fn = logger.info if is_confirmation_step else logger.warning
+                log_fn(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
                 messages.append({"role": "assistant", "content": full_text})
                 yield {"type": "clear"}
                 for i in range(0, len(full_text), 4):
