@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.57"
+VERSION = "3.1.58"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -960,6 +960,15 @@ def initialize_ai_client():
         ai_client = OpenAI(api_key=api_key, base_url="https://api.openai.com/v1")
         logger.info(f"OpenAI client initialized (model: {get_active_model()})")
     elif AI_PROVIDER == "google" and api_key:
+        # google.generativeai is deprecated upstream and emits a FutureWarning at import time.
+        # We keep it for now (to avoid a breaking SDK migration) but silence the warning
+        # to reduce log noise in Home Assistant.
+        import warnings
+        warnings.filterwarnings(
+            "ignore",
+            category=FutureWarning,
+            message=r"All support for the `google\.generativeai` package has ended\..*",
+        )
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         ai_client = genai
