@@ -623,12 +623,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "create_automation":
             import yaml
+            # Accept both singular and plural keys from the model, send plural to HA (2024.x+ format)
             config = {
                 "alias": tool_input.get("alias", "New Automation"),
                 "description": tool_input.get("description", ""),
-                "trigger": tool_input.get("trigger", []),
-                "condition": tool_input.get("condition", []),
-                "action": tool_input.get("action", []),
+                "triggers": tool_input.get("triggers") or tool_input.get("trigger", []),
+                "conditions": tool_input.get("conditions") or tool_input.get("condition", []),
+                "actions": tool_input.get("actions") or tool_input.get("action", []),
                 "mode": tool_input.get("mode", "single"),
             }
             result = api.call_ha_api("POST", "config/automation/config/new", config)
