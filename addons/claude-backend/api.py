@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.48"
+VERSION = "3.1.49"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -71,14 +71,26 @@ class _ColorFormatter(logging.Formatter):
         "ERROR": "\x1b[31m",     # red
         "CRITICAL": "\x1b[35m",  # magenta
     }
+    ICONS = {
+        "DEBUG": "🔵",
+        "INFO": "🟢",
+        "WARNING": "🟡",
+        "ERROR": "🔴",
+        "CRITICAL": "🟣",
+    }
     RESET = "\x1b[0m"
 
     def format(self, record: logging.LogRecord) -> str:
         original = record.levelname
         try:
+            icon = self.ICONS.get(original)
             color = self.COLORS.get(original)
+            # HA add-on log viewer may strip ANSI; emoji badge still helps readability.
+            decorated = f"{icon} {original}" if icon else original
             if color:
-                record.levelname = f"{color}{original}{self.RESET}"
+                record.levelname = f"{color}{decorated}{self.RESET}"
+            else:
+                record.levelname = decorated
             return super().format(record)
         finally:
             record.levelname = original
