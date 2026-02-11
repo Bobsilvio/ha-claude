@@ -87,7 +87,7 @@ def stream_chat_anthropic(messages, intent_info=None):
         if round_num > 0:
             delay = min(3 + round_num, 6)  # 4s, 5s, 6s, 6s...
             logger.info(f"Rate-limit prevention: waiting {delay}s before round {round_num+1}")
-            yield {"type": "status", "message": f"Elaboro la risposta... (step {round_num+1})"}
+            yield {"type": "status", "message": api.tr("status_rate_limit_wait_seconds", provider="Anthropic", seconds=delay)}
             time.sleep(delay)
             if api.abort_streams.get("default"):
                 logger.info("Stream aborted by user during delay")
@@ -112,8 +112,22 @@ def stream_chat_anthropic(messages, intent_info=None):
             if focused_tools:
                 call_kwargs["tools"] = focused_tools
 
+            yield {"type": "status", "message": api.tr("status_request_sent", provider="Anthropic")}
+
+            sent_streaming_status = False
+            last_progress = time.monotonic()
+
             with api.ai_client.messages.stream(**call_kwargs) as stream:
+                yield {"type": "status", "message": api.tr("status_response_received", provider="Anthropic")}
                 for event in stream:
+                    if not sent_streaming_status:
+                        sent_streaming_status = True
+                        yield {"type": "status", "message": api.tr("status_generating", provider="Anthropic")}
+                    else:
+                        now = time.monotonic()
+                        if (now - last_progress) > 8:
+                            last_progress = now
+                            yield {"type": "status", "message": api.tr("status_still_working", provider="Anthropic")}
                     if event.type == "content_block_start":
                         if event.content_block.type == "tool_use":
                             current_tool_id = event.content_block.id
@@ -144,7 +158,7 @@ def stream_chat_anthropic(messages, intent_info=None):
             error_msg = str(api_err)
             if _is_rate_limit_error(error_msg):
                 logger.warning(f"Rate limit hit at round {round_num+1}: {error_msg}")
-                yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
+                yield {"type": "status", "message": api.tr("status_rate_limit_wait", provider="Anthropic")}
                 time.sleep(10)  # Wait and retry this round
                 continue
 
@@ -172,6 +186,7 @@ def stream_chat_anthropic(messages, intent_info=None):
 
         # Tools found - DON'T stream intermediate text, just show tool badges
         logger.info(f"Round {round_num+1}: {len(tool_uses)} tool(s), skipping intermediate text")
+        yield {"type": "status", "message": api.tr("status_actions_received")}
         # For Anthropic, use the full content list which includes tool_use blocks
         assistant_content = final_message.content
         messages.append({"role": "assistant", "content": assistant_content})
@@ -196,6 +211,7 @@ def stream_chat_anthropic(messages, intent_info=None):
                 continue
 
             logger.info(f"Anthropic: Executing tool '{tool['name']}' with input: {tool['input']}")
+            yield {"type": "status", "message": api.tr("status_executing_tool", provider="Anthropic", tool=tool["name"]) }
             yield {"type": "tool", "name": tool["name"], "description": tools.get_tool_description(tool["name"])}
             result = tools.execute_tool(tool["name"], tool["input"])
             logger.info(f"Anthropic: Tool '{tool['name']}' returned {len(result)} chars: {result[:300]}...")

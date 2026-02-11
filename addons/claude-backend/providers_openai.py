@@ -423,7 +423,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             payload["tools"] = tool_defs
 
         logger.info(f"NVIDIA: Calling API with model={payload['model']}, thinking={api.NVIDIA_THINKING_MODE}, stream=True")
-        yield {"type": "status", "message": "NVIDIA: invio richiesta al modello..."}
+        yield {"type": "status", "message": api.tr("status_request_sent", provider="NVIDIA")}
 
         try:
             # Increase timeout when thinking mode is enabled (reasoning takes longer)
@@ -431,7 +431,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             response = requests.post(url, headers=headers, json=payload, stream=True, timeout=timeout_seconds)
             response.raise_for_status()
             logger.info("NVIDIA: Response stream started")
-            yield {"type": "status", "message": "NVIDIA: risposta ricevuta, elaboro..."}
+            yield {"type": "status", "message": api.tr("status_response_received", provider="NVIDIA")}
 
             # Parse SSE stream manually
             content_parts = []
@@ -460,12 +460,12 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
                         if not sent_streaming_status:
                             sent_streaming_status = True
-                            yield {"type": "status", "message": "NVIDIA: sto generando la risposta..."}
+                            yield {"type": "status", "message": api.tr("status_generating", provider="NVIDIA")}
                         else:
                             now = time.monotonic()
                             if (now - last_progress) > 8:
                                 last_progress = now
-                                yield {"type": "status", "message": "NVIDIA: ancora in elaborazione..."}
+                                yield {"type": "status", "message": api.tr("status_still_working", provider="NVIDIA")}
 
                         if delta.get("content"):
                             content_parts.append(delta["content"])
@@ -540,7 +540,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 args_str = tc["function"]["arguments"]
                 tc_id = tc["id"]
 
-                yield {"type": "status", "message": f"NVIDIA: eseguo tool {fn_name}..."}
+                yield {"type": "status", "message": api.tr("status_executing_tool", provider="NVIDIA", tool=fn_name)}
                 yield {"type": "tool", "name": fn_name, "description": tools.get_tool_description(fn_name)}
 
                 try:
@@ -617,7 +617,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
             if status == 429 or _is_rate_limit_error(e, error_msg):
                 logger.warning(f"NVIDIA rate limit hit at round {round_num+1}: {error_msg}")
-                yield {"type": "status", "message": "Rate limit NVIDIA raggiunto, attendo..."}
+                yield {"type": "status", "message": api.tr("status_rate_limit_wait", provider="NVIDIA")}
                 time.sleep(10)
                 continue
 
@@ -753,7 +753,7 @@ def stream_chat_openai(messages, intent_info=None):
         if api.AI_PROVIDER == "github" and round_num > 0:
             delay = min(2 + round_num, 5)
             logger.info(f"Rate-limit prevention (GitHub): waiting {delay}s before round {round_num+1}")
-            yield {"type": "status", "message": f"Rate limit GitHub: attendo {delay}s..."}
+            yield {"type": "status", "message": api.tr("status_rate_limit_wait_seconds", provider="GitHub Models", seconds=delay)}
             time.sleep(delay)
 
         oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
@@ -778,7 +778,7 @@ def stream_chat_openai(messages, intent_info=None):
             kwargs["timeout"] = 120.0
 
         provider_label = "GitHub Models" if api.AI_PROVIDER == "github" else "OpenAI"
-        yield {"type": "status", "message": f"{provider_label}: invio richiesta al modello..."}
+        yield {"type": "status", "message": api.tr("status_request_sent", provider=provider_label)}
         logger.info(f"OpenAI: Calling API with model={kwargs['model']}, stream=True")
         try:
             response = api.ai_client.chat.completions.create(**kwargs)
@@ -865,7 +865,7 @@ def stream_chat_openai(messages, intent_info=None):
             else:
                 raise
         logger.info("OpenAI: Response stream started")
-        yield {"type": "status", "message": f"{provider_label}: risposta ricevuta, elaboro..."}
+        yield {"type": "status", "message": api.tr("status_response_received", provider=provider_label)}
 
         content_parts = []
         tool_calls_map = {}
@@ -880,12 +880,12 @@ def stream_chat_openai(messages, intent_info=None):
 
             if not sent_streaming_status:
                 sent_streaming_status = True
-                yield {"type": "status", "message": f"{provider_label}: sto generando la risposta..."}
+                yield {"type": "status", "message": api.tr("status_generating", provider=provider_label)}
             else:
                 now = time.monotonic()
                 if (now - last_progress) > 8:
                     last_progress = now
-                    yield {"type": "status", "message": f"{provider_label}: ancora in elaborazione..."}
+                    yield {"type": "status", "message": api.tr("status_still_working", provider=provider_label)}
 
             if delta.content:
                 content_parts.append(delta.content)
@@ -920,7 +920,7 @@ def stream_chat_openai(messages, intent_info=None):
 
         # Build assistant message with tool calls
         logger.info(f"Round {round_num+1}: {len(tool_calls_map)} tool(s), skipping intermediate text")
-        yield {"type": "status", "message": "Ho ricevuto una richiesta di azioni, eseguo..."}
+        yield {"type": "status", "message": api.tr("status_actions_received")}
         tc_list = []
         for idx in sorted(tool_calls_map.keys()):
             tc = tool_calls_map[idx]

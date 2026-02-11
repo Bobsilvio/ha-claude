@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.54"
+VERSION = "3.1.55"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -254,6 +254,17 @@ LANGUAGE_TEXT = {
         "err_http_403": "Access denied (403). The model may not be available for this account/token.",
         "err_http_413": "Request too large (413). Reduce message/context length or switch model.",
         "err_http_429": "Rate limit (429). Wait a few seconds and retry, or switch model/provider."
+        ,
+
+        "status_request_sent": "{provider}: sending request to the model...",
+        "status_response_received": "{provider}: response received, processing...",
+        "status_generating": "{provider}: generating the response...",
+        "status_still_working": "{provider}: still working...",
+        "status_actions_received": "Actions requested, executing...",
+        "status_executing_tool": "{provider}: running tool {tool}...",
+        "status_rate_limit_wait": "{provider}: rate limit reached, waiting..."
+        ,
+        "status_rate_limit_wait_seconds": "{provider}: rate limit, waiting {seconds}s..."
     },
     "it": {
         "before": "Prima",
@@ -270,6 +281,17 @@ LANGUAGE_TEXT = {
         "err_http_403": "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token.",
         "err_http_413": "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello.",
         "err_http_429": "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider."
+        ,
+
+        "status_request_sent": "{provider}: invio richiesta al modello...",
+        "status_response_received": "{provider}: risposta ricevuta, elaboro...",
+        "status_generating": "{provider}: sto generando la risposta...",
+        "status_still_working": "{provider}: ancora in elaborazione...",
+        "status_actions_received": "Ho ricevuto una richiesta di azioni, eseguo...",
+        "status_executing_tool": "{provider}: eseguo tool {tool}...",
+        "status_rate_limit_wait": "{provider}: rate limit raggiunto, attendo..."
+        ,
+        "status_rate_limit_wait_seconds": "{provider}: rate limit, attendo {seconds}s..."
     },
     "es": {
         "before": "Antes",
@@ -286,6 +308,17 @@ LANGUAGE_TEXT = {
         "err_http_403": "Acceso denegado (403). El modelo puede no estar disponible para esta cuenta/token.",
         "err_http_413": "Solicitud demasiado grande (413). Reduce el mensaje/contexto o cambia de modelo.",
         "err_http_429": "Límite de tasa (429). Espera unos segundos y reintenta, o cambia de modelo/proveedor."
+        ,
+
+        "status_request_sent": "{provider}: enviando solicitud al modelo...",
+        "status_response_received": "{provider}: respuesta recibida, procesando...",
+        "status_generating": "{provider}: generando la respuesta...",
+        "status_still_working": "{provider}: todavía procesando...",
+        "status_actions_received": "Acciones solicitadas, ejecutando...",
+        "status_executing_tool": "{provider}: ejecutando herramienta {tool}...",
+        "status_rate_limit_wait": "{provider}: límite de tasa alcanzado, esperando..."
+        ,
+        "status_rate_limit_wait_seconds": "{provider}: límite de tasa, esperando {seconds}s..."
     },
     "fr": {
         "before": "Avant",
@@ -302,12 +335,34 @@ LANGUAGE_TEXT = {
         "err_http_403": "Accès refusé (403). Le modèle peut ne pas être disponible pour ce compte/jeton.",
         "err_http_413": "Requête trop volumineuse (413). Réduis le message/le contexte ou change de modèle.",
         "err_http_429": "Limite de débit (429). Attends quelques secondes et réessaie, ou change de modèle/fournisseur."
+        ,
+
+        "status_request_sent": "{provider} : envoi de la requête au modèle...",
+        "status_response_received": "{provider} : réponse reçue, traitement...",
+        "status_generating": "{provider} : génération de la réponse...",
+        "status_still_working": "{provider} : toujours en cours...",
+        "status_actions_received": "Actions demandées, exécution...",
+        "status_executing_tool": "{provider} : exécution de l’outil {tool}...",
+        "status_rate_limit_wait": "{provider} : limite de débit atteinte, attente..."
+        ,
+        "status_rate_limit_wait_seconds": "{provider} : limite de débit, attente {seconds}s..."
     }
 }
 
 def get_lang_text(key: str) -> str:
     """Get language-specific text."""
     return LANGUAGE_TEXT.get(LANGUAGE, LANGUAGE_TEXT["en"]).get(key, "")
+
+
+def tr(key: str, default: str = "", **kwargs) -> str:
+    """Translate a key and apply simple str.format() interpolation."""
+    txt = get_lang_text(key) or default
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
 
 # ---- Image handling helpers (v3.0.0) ----
 
