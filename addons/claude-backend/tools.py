@@ -623,27 +623,69 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "create_automation":
             import yaml
-            # Accept both singular and plural keys from the model, send plural to HA (2024.x+ format)
+            import time as _time
+            # Accept both singular and plural keys from the model
+            alias = tool_input.get("alias", "New Automation")
             config = {
-                "alias": tool_input.get("alias", "New Automation"),
+                "id": str(int(_time.time() * 1000)),  # unique ID like HA UI generates
+                "alias": alias,
                 "description": tool_input.get("description", ""),
                 "triggers": tool_input.get("triggers") or tool_input.get("trigger", []),
                 "conditions": tool_input.get("conditions") or tool_input.get("condition", []),
                 "actions": tool_input.get("actions") or tool_input.get("action", []),
                 "mode": tool_input.get("mode", "single"),
             }
-            result = api.call_ha_api("POST", "config/automation/config/new", config)
-            if isinstance(result, dict) and "error" not in result:
-                # Return the YAML so AI can show it to the user
-                created_yaml = yaml.dump(config, default_flow_style=False, allow_unicode=True)
-                return json.dumps({
-                    "status": "success",
-                    "message": f"Automation '{config['alias']}' created!",
-                    "yaml": created_yaml,
-                    "result": result,
-                    "IMPORTANT": "Show the user the YAML code you created."
-                }, ensure_ascii=False, default=str)
-            return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
+
+            # Strategy: write directly to automations.yaml (same as update_automation)
+            yaml_path = api.get_config_file_path("automation", "automations.yaml")
+            created_via = None
+            snapshot = None
+
+            if yaml_path and os.path.isfile(yaml_path):
+                try:
+                    # Snapshot before modifying
+                    try:
+                        rel_path = os.path.relpath(yaml_path, api.HA_CONFIG_DIR) if yaml_path.startswith(api.HA_CONFIG_DIR + "/") else os.path.basename(yaml_path)
+                        snapshot = api.create_snapshot(rel_path)
+                    except Exception:
+                        snapshot = api.create_snapshot("automations.yaml")
+
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        automations = yaml.safe_load(f) or []
+                    if not isinstance(automations, list):
+                        automations = []
+
+                    automations.append(config)
+                    with open(yaml_path, "w", encoding="utf-8") as f:
+                        yaml.dump(automations, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+                    # Reload automations so HA picks up the change
+                    try:
+                        api.call_ha_api("POST", "services/automation/reload", {})
+                    except Exception:
+                        pass
+                    created_via = "yaml"
+                except Exception as e:
+                    logger.warning(f"YAML create_automation failed: {e}")
+
+            # Fallback: REST API
+            if created_via is None:
+                result = api.call_ha_api("POST", f"config/automation/config/{config['id']}", config)
+                if isinstance(result, dict) and "error" not in result:
+                    created_via = "rest_api"
+                else:
+                    return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
+
+            created_yaml = yaml.dump(config, default_flow_style=False, allow_unicode=True)
+            resp = {
+                "status": "success",
+                "message": f"Automation '{alias}' created!",
+                "yaml": created_yaml,
+                "IMPORTANT": "Show the user the YAML code you created."
+            }
+            if isinstance(snapshot, dict) and snapshot.get("snapshot_id"):
+                resp["snapshot"] = snapshot
+            return json.dumps(resp, ensure_ascii=False, default=str)
 
         elif tool_name == "get_automations":
             query = tool_input.get("query") if isinstance(tool_input, dict) else None
