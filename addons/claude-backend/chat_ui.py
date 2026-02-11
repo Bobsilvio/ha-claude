@@ -142,6 +142,9 @@ def get_chat_ui():
         .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 0; font-size: 13px; }}
         .message.assistant code {{ background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }}
         .message.assistant pre code {{ background: none; padding: 0; }}
+        .diff-line-add {{ color: #22863a; background: #e6ffec; display: block; margin: 0 -10px; padding: 0 10px; }}
+        .diff-line-del {{ color: #cb2431; background: #ffeef0; display: block; margin: 0 -10px; padding: 0 10px; }}
+        .diff-line-hunk {{ color: #6f42c1; display: block; }}
         .message.assistant strong {{ color: #333; }}
         .message.assistant ul, .message.assistant ol {{ margin: 6px 0 6px 20px; }}
         .message.assistant p {{ margin: 4px 0; }}
@@ -458,8 +461,20 @@ def get_chat_ui():
             }}
         }}
 
+        function colorizeDiff(code) {{
+            return code.split('\\n').map(function(line) {{
+                if (line.startsWith('+') && !line.startsWith('+++')) return '<span class="diff-line-add">' + line + '</span>';
+                if (line.startsWith('-') && !line.startsWith('---')) return '<span class="diff-line-del">' + line + '</span>';
+                if (line.startsWith('@@')) return '<span class="diff-line-hunk">' + line + '</span>';
+                return line;
+            }}).join('\\n');
+        }}
+
         function formatMarkdown(text) {{
-            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">📋 Copia</button><pre><code>$2</code></pre></div>');
+            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, function(match, lang, code) {{
+                var formatted = (lang === 'diff') ? colorizeDiff(code) : code;
+                return '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\ud83d\udccb Copia</button><pre><code>' + formatted + '</code></pre></div>';
+            }});
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
             text = text.replace(/\\n/g, '<br>');

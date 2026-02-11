@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.32"
+VERSION = "3.1.37"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1559,58 +1559,51 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     """Format a human-readable response from a successful write tool result.
     This avoids needing another API round just to format the response.
-    For UPDATE operations, shows before/after side-by-side with color highlighting."""
+    For UPDATE operations, shows a unified diff (only changed lines)."""
+    import difflib
+
     parts = []
-    
+
     msg = result_data.get("message", "")
     if msg:
         parts.append(f"✅ {msg}")
     else:
         parts.append("✅ Operazione completata con successo!")
-    
+
     # Show diff for update tools (only for updates, not creates)
     old_yaml = result_data.get("old_yaml", "")
     new_yaml = result_data.get("new_yaml", "")
-    
-    if old_yaml and new_yaml and tool_name in ("update_automation", "update_script", "update_dashboard"):
-        # Build side-by-side comparison
-        old_lines = old_yaml.strip().splitlines()
-        new_lines = new_yaml.strip().splitlines()
-        
-        # Pad to same length
-        max_len = max(len(old_lines), len(new_lines))
-        old_lines += [""] * (max_len - len(old_lines))
-        new_lines += [""] * (max_len - len(new_lines))
-        
-        # Build table header
-        table_rows = []
-        table_rows.append("| ❌ PRIMA (rimosso) | ✅ DOPO (aggiunto) |")
-        table_rows.append("|---|---|")
-        
-        # Add each line pair to table
-        for old, new in zip(old_lines, new_lines):
-            # Escape pipes in content
-            old_escaped = old.replace("|", "\\|") if old else ""
-            new_escaped = new.replace("|", "\\|") if new else ""
-            
-            # Create code formatted cells
-            old_cell = f"`{old_escaped}`" if old else ""
-            new_cell = f"`{new_escaped}`" if new else ""
-            
-            table_rows.append(f"| {old_cell} | {new_cell} |")
-        
-        parts.append("\n**Confronto Prima/Dopo:**")
-        parts.append("\n" + "\n".join(table_rows))
-    
-    elif old_yaml and new_yaml:
-        # For CREATE operations, just show "Creato:"
+
+    update_tools = ("update_automation", "update_script", "update_dashboard")
+
+    if old_yaml and new_yaml and tool_name in update_tools:
+        # Use pre-computed diff_unified if available, else compute it
+        diff_text = result_data.get("diff_unified", "")
+        if not diff_text:
+            diff_lines = list(difflib.unified_diff(
+                old_yaml.strip().splitlines(),
+                new_yaml.strip().splitlines(),
+                fromfile="prima",
+                tofile="dopo",
+                lineterm="",
+            ))
+            diff_text = "\n".join(diff_lines)
+
+        if diff_text.strip():
+            parts.append("\n**Modifiche:**")
+            parts.append(f"```diff\n{diff_text}\n```")
+        else:
+            parts.append("\nNessuna modifica rilevata (il contenuto è identico).")
+
+    elif new_yaml and tool_name not in update_tools:
+        # For CREATE operations, show the new YAML
         parts.append("\n**YAML creato:**")
         parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
-    
+
     tip = result_data.get("tip", "")
     if tip:
         parts.append(f"\nℹ️ {tip}")
-    
+
     snapshot = result_data.get("snapshot", "")
     snapshot_id = ""
     if isinstance(snapshot, dict):
@@ -1620,7 +1613,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
 
     if snapshot_id and snapshot_id != "N/A (REST API)":
         parts.append(f"\n💾 Snapshot creato: `{snapshot_id}`")
-    
+
     return "\n".join(parts)
 
 
