@@ -567,6 +567,36 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             for tc_id, (fn_name, result) in tool_call_results.items():
                 messages.append({"role": "tool", "tool_call_id": tc_id, "name": fn_name, "content": result})
 
+            # AUTO-STOP: If a write tool succeeded, format response locally (ensures YAML is shown)
+            WRITE_TOOLS = {
+                "update_automation",
+                "update_script",
+                "create_automation",
+                "create_script",
+                "create_dashboard",
+                "update_dashboard",
+                "write_config_file",
+            }
+            auto_stop = False
+            for _tc_id, (fn_name, result) in tool_call_results.items():
+                if fn_name in WRITE_TOOLS:
+                    try:
+                        rdata = json.loads(result)
+                        if isinstance(rdata, dict) and rdata.get("status") == "success":
+                            auto_stop = True
+                            full_text = api._format_write_tool_response(fn_name, rdata)
+                            break
+                    except Exception:
+                        pass
+
+            if auto_stop:
+                logger.info("NVIDIA auto-stop: write tool succeeded, skipping further API calls")
+                messages.append({"role": "assistant", "content": full_text})
+                yield {"type": "clear"}
+                for i in range(0, len(full_text), 4):
+                    yield {"type": "token", "content": full_text[i:i+4]}
+                break
+
         except requests.HTTPError as e:
             status = e.response.status_code if getattr(e, "response", None) is not None else None
             error_msg = str(e)

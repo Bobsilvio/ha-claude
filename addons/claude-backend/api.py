@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.50"
+VERSION = "3.1.52"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1694,6 +1694,10 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
             parts.append(f"\n<!--DIFF-->{diff_html}<!--/DIFF-->")
         else:
             parts.append("\nNessuna modifica rilevata (il contenuto \u00e8 identico).")
+
+        # Also show the updated YAML (required by show_yaml_rule)
+        parts.append("\n**YAML aggiornato:**")
+        parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
 
     elif new_yaml and tool_name not in update_tools:
         # For CREATE operations, show the new YAML
