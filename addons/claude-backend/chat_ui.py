@@ -348,11 +348,12 @@ def get_chat_ui():
         }}
 
         function apiUrl(path) {{
-            // Keep paths relative so HA Ingress routes to this add-on
-            if (path.startsWith('/')) {{
-                return path.slice(1);
-            }}
-            return path;
+            // Build URLs robustly for Home Assistant Ingress.
+            // If the current page URL doesn't end with '/', browsers treat the last segment as a file
+            // and relative fetches may drop it (breaking requests).
+            const cleanPath = (path || '').startsWith('/') ? (path || '').slice(1) : (path || '');
+            const base = window.location.href.endsWith('/') ? window.location.href : (window.location.href + '/');
+            return new URL(cleanPath, base).toString();
         }}
 
         function setStopMode(active) {{
@@ -581,22 +582,28 @@ def get_chat_ui():
         }}
 
         async function sendMessage() {{
-            const text = input.value.trim();
+            const text = (input && input.value ? input.value : '').trim();
             if (!text || sending) return;
+
             sending = true;
             setStopMode(true);
-            input.value = '';
-            input.style.height = 'auto';
-            suggestionsEl.style.display = 'none';
-
-            // Show user message with image if present
-            const imageToSend = currentImage;
-            addMessage(text, 'user', imageToSend);
-            // Clear the preview immediately (keep imageToSend for the request payload)
-            removeImage();
-            showThinking();
 
             try {{
+                if (input) {{
+                    input.value = '';
+                    input.style.height = 'auto';
+                }}
+                if (suggestionsEl && suggestionsEl.style) {{
+                    suggestionsEl.style.display = 'none';
+                }}
+
+                // Show user message with image if present
+                const imageToSend = currentImage;
+                addMessage(text, 'user', imageToSend);
+                // Clear the preview immediately (keep imageToSend for the request payload)
+                removeImage();
+                showThinking();
+
                 const payload = {{
                     message: text,
                     session_id: currentSessionId
@@ -612,25 +619,38 @@ def get_chat_ui():
                 }});
 
                 removeThinking();
-                if (resp.headers.get('content-type')?.includes('text/event-stream')) {{
+
+                if (!resp.ok) {{
+                    const bodyText = await resp.text().catch(() => '');
+                    throw new Error('Richiesta fallita (' + resp.status + '): ' + (bodyText ? bodyText.slice(0, 200) : '')); 
+                }}
+
+                const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+                if (contentType.includes('text/event-stream')) {{
                     await handleStream(resp);
                 }} else {{
-                    const data = await resp.json();
-                    if (data.response) {{ addMessage(data.response, 'assistant'); }}
-                    else if (data.error) {{ addMessage('\u274c ' + data.error, 'system'); }}
+                    const data = await resp.json().catch(() => ({{}}));
+                    if (data && data.response) {{
+                        addMessage(data.response, 'assistant');
+                    }} else if (data && data.error) {{
+                        addMessage('\u274c ' + data.error, 'system');
+                    }} else {{
+                        addMessage('\u274c Risposta inattesa dal server.', 'system');
+                    }}
                 }}
             }} catch (err) {{
                 removeThinking();
-                if (err.name !== 'AbortError') {{
-                    addMessage('\u274c Errore: ' + err.message, 'system');
+                if (err && err.name !== 'AbortError') {{
+                    addMessage('\u274c Errore: ' + (err.message || String(err)), 'system');
                 }}
+            }} finally {{
+                sending = false;
+                setStopMode(false);
+                if (sendBtn) sendBtn.disabled = false;
+                currentReader = null;
+                loadChatList();
+                if (input) input.focus();
             }}
-            sending = false;
-            setStopMode(false);
-            sendBtn.disabled = false;
-            currentReader = null;
-            loadChatList();
-            input.focus();
         }}
 
         async function handleStream(resp) {{
