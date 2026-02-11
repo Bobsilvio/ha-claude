@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.56"
+VERSION = "3.1.57"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1119,30 +1119,114 @@ def get_config_includes_text():
 # Conversation persistence - use /config for persistence across addon rebuilds
 CONVERSATIONS_FILE = "/config/.storage/claude_conversations.json"
 
+# Backward compatibility: older versions may have used different paths.
+LEGACY_CONVERSATIONS_FILES = [
+    "/config/claude_conversations.json",
+    "/config/.storage/conversations.json",
+    "/data/claude_conversations.json",
+    "/data/.storage/claude_conversations.json",
+]
+
+
+def _normalize_conversations_payload(payload: object) -> Dict[str, List[Dict]]:
+    """Normalize conversation payload to a dict[session_id] -> list[message]."""
+    normalized: Dict[str, List[Dict]] = {}
+
+    if isinstance(payload, dict):
+        for sid, msgs in payload.items():
+            if not isinstance(sid, str):
+                sid = str(sid)
+            if not isinstance(msgs, list):
+                continue
+            cleaned_msgs: List[Dict] = []
+            for msg in msgs:
+                if isinstance(msg, dict) and msg.get("role"):
+                    cleaned_msgs.append(msg)
+            if cleaned_msgs:
+                normalized[sid] = cleaned_msgs
+        return normalized
+
+    # Heuristic for legacy formats: a list of {id/session_id, messages}
+    if isinstance(payload, list):
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            sid = item.get("id") or item.get("session_id")
+            msgs = item.get("messages") or item.get("msgs")
+            if isinstance(sid, str) and isinstance(msgs, list):
+                cleaned_msgs: List[Dict] = []
+                for msg in msgs:
+                    if isinstance(msg, dict) and msg.get("role"):
+                        cleaned_msgs.append(msg)
+                if cleaned_msgs:
+                    normalized[sid] = cleaned_msgs
+        return normalized
+
+    return normalized
+
 
 def load_conversations():
-    """Load conversations from persistent storage."""
+    """Load conversations from persistent storage.
+
+    Tries the current path first, then legacy paths. If the current file is
+    corrupt, it is backed up and the loader falls back to legacy locations.
+    """
     global conversations
-    try:
-        if os.path.isfile(CONVERSATIONS_FILE):
-            with open(CONVERSATIONS_FILE, "r") as f:
-                conversations = json.load(f)
-            logger.info(f"Loaded {len(conversations)} conversation(s) from disk")
-    except Exception as e:
-        logger.warning(f"Could not load conversations: {e}")
+
+    def _try_load(path: str) -> Optional[Dict[str, List[Dict]]]:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+            normalized = _normalize_conversations_payload(payload)
+            return normalized if normalized else {}
+        except Exception as e:
+            logger.warning(f"Could not load conversations from {path}: {e}")
+            return None
+
+    candidates = [CONVERSATIONS_FILE] + [p for p in LEGACY_CONVERSATIONS_FILES if p != CONVERSATIONS_FILE]
+
+    for path in candidates:
+        if not os.path.isfile(path):
+            continue
+
+        loaded = _try_load(path)
+        if loaded is None:
+            # If the primary file is unreadable, back it up once.
+            if path == CONVERSATIONS_FILE:
+                try:
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    backup = f"{CONVERSATIONS_FILE}.corrupt.{ts}"
+                    os.replace(CONVERSATIONS_FILE, backup)
+                    logger.warning(f"Backed up corrupt conversations file to {backup}")
+                except Exception as be:
+                    logger.warning(f"Could not back up corrupt conversations file: {be}")
+            continue
+
+        conversations = loaded
+        logger.info(f"Loaded {len(conversations)} conversation(s) from {path}")
+        if path != CONVERSATIONS_FILE and conversations:
+            # Migrate to the new location.
+            save_conversations()
+            logger.info(f"Migrated conversations to {CONVERSATIONS_FILE}")
+        return
 
 
 def save_conversations():
     """Save conversations to persistent storage (without image data to save space)."""
+    tmp_path = f"{CONVERSATIONS_FILE}.tmp"
     try:
         os.makedirs(os.path.dirname(CONVERSATIONS_FILE), exist_ok=True)
         # Keep only last 10 sessions, 50 messages each
-        trimmed = {}
+        trimmed: Dict[str, List[Dict]] = {}
         for sid, msgs in list(conversations.items())[-10:]:
+            if not isinstance(msgs, list):
+                continue
             # Strip image data from messages to reduce file size
-            cleaned_msgs = []
+            cleaned_msgs: List[Dict] = []
             for msg in msgs[-50:]:
-                cleaned_msg = {"role": msg.get("role", "")}
+                if not isinstance(msg, dict):
+                    continue
+                cleaned_msg: Dict[str, Any] = {"role": msg.get("role", "")}
                 content = msg.get("content", "")
 
                 # If content is an array (with images), extract only text
@@ -1160,7 +1244,7 @@ def save_conversations():
                 # Preserve tool_calls and other metadata
                 if "tool_calls" in msg:
                     cleaned_msg["tool_calls"] = msg["tool_calls"]
-                
+
                 # Preserve model/provider info for assistant messages
                 if msg.get("role") == "assistant":
                     if "model" in msg:
@@ -1170,12 +1254,19 @@ def save_conversations():
 
                 cleaned_msgs.append(cleaned_msg)
 
-            trimmed[sid] = cleaned_msgs
+            if cleaned_msgs:
+                trimmed[str(sid)] = cleaned_msgs
 
-        with open(CONVERSATIONS_FILE, "w") as f:
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(trimmed, f, ensure_ascii=False, default=str)
+        os.replace(tmp_path, CONVERSATIONS_FILE)
     except Exception as e:
         logger.warning(f"Could not save conversations: {e}")
+        try:
+            if os.path.isfile(tmp_path):
+                os.remove(tmp_path)
+        except Exception:
+            pass
 
 
 # Load saved conversations on startup
