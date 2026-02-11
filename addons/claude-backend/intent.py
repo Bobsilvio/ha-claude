@@ -19,8 +19,8 @@ INTENT_TOOL_SETS = {
     "find_automation": ["get_automations"],
     "modify_automation": ["update_automation"],
     "modify_script": ["update_script"],
-    "create_automation": ["create_automation", "search_entities"],
-    "create_script": ["create_script", "search_entities"],
+    "create_automation": ["create_automation", "search_entities", "get_entity_state"],
+    "create_script": ["create_script", "search_entities", "get_entity_state"],
     "create_dashboard": ["create_dashboard", "search_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
     "control_device": ["call_service", "search_entities", "get_entity_state"],
@@ -72,6 +72,35 @@ CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
 - Respond in the user's language. Be concise.
 - NEVER call get_scripts or read_config_file — the data is already provided.
 - If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
+
+    "create_automation": """You are a Home Assistant automation builder. The user wants to create a NEW automation.
+CRITICAL WORKFLOW - follow these steps IN ORDER:
+1. FIRST call search_entities to find the correct entity_id for the device the user mentioned.
+   - A "luce" (light) could be a light.* OR a switch.* entity — you MUST search, never guess the domain.
+   - Use keywords from the user's message (room name, device type).
+2. If unsure about the entity type, call get_entity_state to verify the domain and attributes.
+3. Build the automation with COMPLETE and CORRECT trigger/condition/action:
+   - For time-based triggers use: {"platform": "time", "at": "HH:MM:SS"}
+   - For state triggers use: {"platform": "state", "entity_id": "...", "to": "on"}
+   - For actions use the CORRECT service for the entity domain:
+     * switch.* entities → service: switch.turn_on / switch.turn_off
+     * light.* entities → service: light.turn_on / light.turn_off
+     * cover.* entities → service: cover.open_cover / cover.close_cover
+     * climate.* entities → service: climate.set_temperature
+   - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
+4. Call create_automation ONCE with the complete config (alias, trigger, action, condition, mode).
+NEVER create an automation with empty trigger or action arrays.
+Respond in the user's language. Be concise.""",
+
+    "create_script": """You are a Home Assistant script builder. The user wants to create a NEW script.
+CRITICAL WORKFLOW:
+1. FIRST call search_entities to find the correct entity_id(s) for the device(s) mentioned.
+2. Build the script with a COMPLETE sequence of actions using correct services for each entity domain:
+   - switch.* → switch.turn_on/off, light.* → light.turn_on/off, etc.
+   - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
+3. Call create_script ONCE with script_id, alias, sequence, and mode.
+NEVER create a script with empty sequence.
+Respond in the user's language. Be concise.""",
 
     "control_device": """You are a Home Assistant device controller. Help the user control their devices.
 Use search_entities to find entities if needed, then call_service to control them.
@@ -240,12 +269,12 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
 
     if has_create and has_auto:
         return {"intent": "create_automation", "tools": INTENT_TOOL_SETS["create_automation"],
-                "prompt": None, "specific_target": False}
+                "prompt": INTENT_PROMPTS["create_automation"], "specific_target": False}
 
     # --- CREATE SCRIPT ---
     if has_create and has_script:
         return {"intent": "create_script", "tools": INTENT_TOOL_SETS["create_script"],
-                "prompt": None, "specific_target": False}
+                "prompt": INTENT_PROMPTS["create_script"], "specific_target": False}
 
     # --- DASHBOARD ---
     has_dash = any(k in msg for k in dash_kw)
