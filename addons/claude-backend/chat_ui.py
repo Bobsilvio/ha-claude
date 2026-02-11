@@ -487,21 +487,21 @@ def get_chat_ui():
                 if (text.startsWith('alias:') || text.startsWith('id:')) {{
                     start = 0;
                 }} else {{
-                    start = text.indexOf('\nalias:');
+                    start = text.indexOf('\\nalias:');
                     if (start >= 0) start += 1;
                     if (start < 0) {{
-                        start = text.indexOf('\nid:');
+                        start = text.indexOf('\\nid:');
                         if (start >= 0) start += 1;
                     }}
                 }}
 
                 if (start >= 0) {{
-                    let end = text.indexOf('\n\n', start);
+                    let end = text.indexOf('\\n\\n', start);
                     if (end < 0) end = text.length;
                     const block = text.slice(start, end).trimEnd();
-                    const looksLikeYaml = block.includes('\ntrigger:') && block.includes('\naction:');
+                    const looksLikeYaml = block.includes('\\ntrigger:') && block.includes('\\naction:');
                     if (looksLikeYaml) {{
-                        text = text.slice(0, start) + '```yaml\n' + block + '\n```' + text.slice(end);
+                        text = text.slice(0, start) + '```yaml\\n' + block + '\\n```' + text.slice(end);
                     }}
                 }}
             }}
