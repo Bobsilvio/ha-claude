@@ -656,7 +656,7 @@ def get_chat_ui():
                         try {{
                             const evt = JSON.parse(line.slice(6));
                             gotAnyEvent = true;
-                            if (evt.type === 'tool') {{
+                            if (evt.type === 'tool' || evt.type === 'tool_call') {{
                                 removeThinking();
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 hasTools = true;
