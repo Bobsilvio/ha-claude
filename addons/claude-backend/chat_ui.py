@@ -477,6 +477,34 @@ def get_chat_ui():
                 diffBlocks.push(html);
                 return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
             }});
+
+            // 1b. Auto-detect Home Assistant YAML blocks that arrive without ``` fences.
+            // Some models return YAML as plain text; wrap the first YAML-looking block
+            // so it renders as a code block with the existing copy button.
+            if (!text.includes('```')) {{
+                let start = -1;
+                if (text.startsWith('alias:') || text.startsWith('id:')) {{
+                    start = 0;
+                }} else {{
+                    start = text.indexOf('\nalias:');
+                    if (start >= 0) start += 1;
+                    if (start < 0) {{
+                        start = text.indexOf('\nid:');
+                        if (start >= 0) start += 1;
+                    }}
+                }}
+
+                if (start >= 0) {{
+                    let end = text.indexOf('\n\n', start);
+                    if (end < 0) end = text.length;
+                    const block = text.slice(start, end).trimEnd();
+                    const looksLikeYaml = block.includes('\ntrigger:') && block.includes('\naction:');
+                    if (looksLikeYaml) {{
+                        text = text.slice(0, start) + '```yaml\n' + block + '\n```' + text.slice(end);
+                    }}
+                }}
+            }}
+
             // 2. Code blocks
             text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\U0001F4CB Copia</button><pre><code>$2</code></pre></div>');
             // 3. Inline code, bold, newlines
