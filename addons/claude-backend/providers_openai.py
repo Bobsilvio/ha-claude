@@ -333,8 +333,26 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
         "search_entities", "get_entity_state", "get_entities",
     }
 
+    def _is_confirmation_text(text: str) -> bool:
+        low = (text or "").lower()
+        return any(
+            p in low
+            for p in (
+                "confermi",
+                "scrivi sì o no",
+                "scrivi si o no",
+                "confirm",
+                "confirme",
+                "confirmer",
+            )
+        )
+
     for round_num in range(max_rounds):
-        oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
+        oai_messages = [{"role": "system", "content": system_prompt}]
+        if force_system_reminder:
+            oai_messages.append({"role": "system", "content": force_system_reminder})
+            force_system_reminder = None
+        oai_messages += intent.trim_messages(messages)
 
         # Prepare NVIDIA API request
         url = "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -411,20 +429,27 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             if not tool_calls_map:
                 # No tools - stream the final text
                 full_text = accumulated
-                low = (full_text or "").lower()
-                is_confirmation_step = any(
-                    p in low
-                    for p in ("confermi", "scrivi sì o no", "scrivi si o no", "confirm", "confirme", "confirmer")
-                )
-                log_fn = logger.info if is_confirmation_step else logger.warning
+                intent_name = (intent_info or {}).get("intent") or ""
+
+                if (
+                    tool_defs
+                    and (not forced_create_retry)
+                    and round_num < (max_rounds - 1)
+                    and _should_force_create_tool(intent_name, full_text)
+                ):
+                    forced_create_retry = True
+                    logger.warning(
+                        "OpenAI: No tool call for create intent; forcing a retry with strict tool-call reminder."
+                    )
+                    force_system_reminder = (
+                        "CRITICAL: You MUST call the appropriate creation tool NOW (create_automation/create_script). "
+                        "Do NOT output explanatory text. Return ONLY the tool call with complete, correct arguments."
+                    )
+                    continue
+
+                log_fn = logger.info if _is_confirmation_text(full_text) else logger.warning
                 log_fn(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'"
                 )
-                is_confirmation_step = any(
-                    p in low
-                    for p in ("confermi", "scrivi sì o no", "scrivi si o no", "confirm", "confirme", "confirmer")
-                )
-                log_fn = logger.info if is_confirmation_step else logger.warning
-                log_fn(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
                 messages.append({"role": "assistant", "content": full_text})
                 yield {"type": "clear"}
                 for i in range(0, len(full_text), 4):
@@ -567,6 +592,43 @@ def stream_chat_openai(messages, intent_info=None):
         "list_config_files", "get_frontend_resources",
         "search_entities", "get_entity_state", "get_entities",
     }
+
+    def _is_confirmation_text(text: str) -> bool:
+        low = (text or "").lower()
+        return any(
+            p in low
+            for p in (
+                "confermi",
+                "scrivi sì o no",
+                "scrivi si o no",
+                "confirm",
+                "confirme",
+                "confirmer",
+            )
+        )
+
+    def _should_force_create_tool(intent_name: str, text: str) -> bool:
+        if intent_name not in ("create_automation", "create_script"):
+            return False
+        low = (text or "").lower()
+        promise_markers = (
+            "utilizzerò",
+            "userò",
+            "creerò",
+            "creiamo",
+            "creo l'automazione",
+            "sto per creare",
+            "i will create",
+            "i'll create",
+            "i will use",
+        )
+        has_promise = any(m in low for m in promise_markers)
+        block_markers = ("non posso", "non riesco", "vuoi", "quale", "confermi")
+        is_blocked = any(m in low for m in block_markers)
+        return has_promise and not is_blocked
+
+    force_system_reminder = None
+    forced_create_retry = False
 
     for round_num in range(max_rounds):
         did_size_retry = False
