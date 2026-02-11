@@ -194,7 +194,7 @@ def get_chat_ui():
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
         <span class="badge">v{api.VERSION}</span>
-        <select id="modelSelect" onchange="changeModel(this.value)" title="Cambia modello"></select>
+        <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="Cambia modello"></select>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="Test veloce NVIDIA (può richiedere qualche secondo)" style="display:none">🔍 Test NVIDIA</button>
         <!-- Populated by JavaScript -->
         <button class="new-chat" onclick="newChat()" title="Nuova conversazione">✨ Nuova chat</button>
@@ -934,6 +934,10 @@ def get_chat_ui():
                 console.log('[loadModels] Loaded models for', availableProviders.length, 'providers');
             }} catch (error) {{
                 console.error('[loadModels] Error loading models:', error);
+                if (!window._modelsErrorNotified) {{
+                    addMessage('⚠️ Errore nel caricamento dei modelli: ' + (error.message || error), 'system');
+                    window._modelsErrorNotified = true;
+                }}
             }}
         }}
 

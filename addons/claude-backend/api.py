@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.60"
+VERSION = "3.1.61"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -113,12 +113,26 @@ logger.info(f"LANGUAGE: {LANGUAGE}")
 def _extract_http_error_code(error_text: str) -> Optional[int]:
     if not error_text:
         return None
+    # "Error code: 429" (Anthropic/OpenAI style)
     m = re.search(r"Error code:\s*(\d{3})", error_text)
     if m:
         try:
             return int(m.group(1))
         except Exception:
-            return None
+            pass
+    # "429 RESOURCE_EXHAUSTED" (google-genai style) or "'code': 429"
+    m = re.search(r"^(\d{3})\s", error_text)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            pass
+    m = re.search(r"['\"]code['\"]\s*:\s*(\d{3})", error_text)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            pass
     return None
 
 
@@ -166,6 +180,8 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
         return get_lang_text("err_http_401") or "Authentication failed (401)."
     if code == 403:
         return get_lang_text("err_http_403") or "Access denied (403)."
+    if code == 429 and provider == "google" and "resource_exhausted" in low:
+        return get_lang_text("err_google_quota") or "Google Gemini: quota exhausted (429). Wait a minute and retry, or switch to another model/provider."
     if code == 429:
         return get_lang_text("err_http_429") or "Rate limit (429)."
 
@@ -253,8 +269,8 @@ LANGUAGE_TEXT = {
         "err_http_401": "Authentication failed (401). Check the provider API key/token.",
         "err_http_403": "Access denied (403). The model may not be available for this account/token.",
         "err_http_413": "Request too large (413). Reduce message/context length or switch model.",
-        "err_http_429": "Rate limit (429). Wait a few seconds and retry, or switch model/provider."
-        ,
+        "err_http_429": "Rate limit (429). Wait a few seconds and retry, or switch model/provider.",
+        "err_google_quota": "Google Gemini: quota exhausted (429). Wait a minute and retry, or switch to another model/provider.",
 
         "status_request_sent": "{provider}: sending request to the model...",
         "status_response_received": "{provider}: response received, processing...",
@@ -280,8 +296,8 @@ LANGUAGE_TEXT = {
         "err_http_401": "Autenticazione fallita (401). Verifica la chiave/token del provider selezionato.",
         "err_http_403": "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token.",
         "err_http_413": "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello.",
-        "err_http_429": "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider."
-        ,
+        "err_http_429": "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider.",
+        "err_google_quota": "Google Gemini: quota esaurita (429). Attendi un minuto e riprova, oppure cambia modello/provider.",
 
         "status_request_sent": "{provider}: invio richiesta al modello...",
         "status_response_received": "{provider}: risposta ricevuta, elaboro...",
@@ -307,8 +323,8 @@ LANGUAGE_TEXT = {
         "err_http_401": "Autenticación fallida (401). Verifica la clave/token del proveedor.",
         "err_http_403": "Acceso denegado (403). El modelo puede no estar disponible para esta cuenta/token.",
         "err_http_413": "Solicitud demasiado grande (413). Reduce el mensaje/contexto o cambia de modelo.",
-        "err_http_429": "Límite de tasa (429). Espera unos segundos y reintenta, o cambia de modelo/proveedor."
-        ,
+        "err_http_429": "Límite de tasa (429). Espera unos segundos y reintenta, o cambia de modelo/proveedor.",
+        "err_google_quota": "Google Gemini: cuota agotada (429). Espera un minuto y reintenta, o cambia de modelo/proveedor.",
 
         "status_request_sent": "{provider}: enviando solicitud al modelo...",
         "status_response_received": "{provider}: respuesta recibida, procesando...",
@@ -334,8 +350,8 @@ LANGUAGE_TEXT = {
         "err_http_401": "Échec d'authentification (401). Vérifie la clé/le jeton du fournisseur.",
         "err_http_403": "Accès refusé (403). Le modèle peut ne pas être disponible pour ce compte/jeton.",
         "err_http_413": "Requête trop volumineuse (413). Réduis le message/le contexte ou change de modèle.",
-        "err_http_429": "Limite de débit (429). Attends quelques secondes et réessaie, ou change de modèle/fournisseur."
-        ,
+        "err_http_429": "Limite de débit (429). Attends quelques secondes et réessaie, ou change de modèle/fournisseur.",
+        "err_google_quota": "Google Gemini : quota épuisé (429). Attends une minute et réessaie, ou change de modèle/fournisseur.",
 
         "status_request_sent": "{provider} : envoi de la requête au modèle...",
         "status_response_received": "{provider} : réponse reçue, traitement...",
@@ -2426,87 +2442,91 @@ def api_conversation_delete(session_id):
 @app.route('/api/get_models', methods=['GET'])
 def api_get_models():
     """Get available models (chat + HA settings) without duplicate routes."""
-    # --- Providers disponibili (per HA settings) ---
-    available_providers = []
-    if ANTHROPIC_API_KEY:
-        available_providers.append({"id": "anthropic", "name": "Anthropic Claude"})
-    if OPENAI_API_KEY:
-        available_providers.append({"id": "openai", "name": "OpenAI"})
-    if GOOGLE_API_KEY:
-        available_providers.append({"id": "google", "name": "Google Gemini"})
-    if NVIDIA_API_KEY:
-        available_providers.append({"id": "nvidia", "name": "NVIDIA NIM"})
-    if GITHUB_TOKEN:
-        available_providers.append({"id": "github", "name": "GitHub Models"})
+    try:
+        # --- Providers disponibili (per HA settings) ---
+        available_providers = []
+        if ANTHROPIC_API_KEY:
+            available_providers.append({"id": "anthropic", "name": "Anthropic Claude"})
+        if OPENAI_API_KEY:
+            available_providers.append({"id": "openai", "name": "OpenAI"})
+        if GOOGLE_API_KEY:
+            available_providers.append({"id": "google", "name": "Google Gemini"})
+        if NVIDIA_API_KEY:
+            available_providers.append({"id": "nvidia", "name": "NVIDIA NIM"})
+        if GITHUB_TOKEN:
+            available_providers.append({"id": "github", "name": "GitHub Models"})
 
-    # --- Tutti i modelli per provider (come li vuole la chat: display/prefissi) ---
-    models_display = {}
-    models_technical = {}
-    nvidia_models_tested_display: list[str] = []
-    nvidia_models_to_test_display: list[str] = []
-    for provider, models in PROVIDER_MODELS.items():
-        filtered_models = list(models)
+        # --- Tutti i modelli per provider (come li vuole la chat: display/prefissi) ---
+        models_display = {}
+        models_technical = {}
+        nvidia_models_tested_display: list[str] = []
+        nvidia_models_to_test_display: list[str] = []
+        for provider, models in PROVIDER_MODELS.items():
+            filtered_models = list(models)
 
-        # Live discovery for NVIDIA (per-key availability)
-        if provider == "nvidia":
-            live_models = get_nvidia_models_cached()
-            if live_models:
-                filtered_models = list(live_models)
-            if NVIDIA_MODEL_BLOCKLIST:
-                filtered_models = [m for m in filtered_models if m not in NVIDIA_MODEL_BLOCKLIST]
+            # Live discovery for NVIDIA (per-key availability)
+            if provider == "nvidia":
+                live_models = get_nvidia_models_cached()
+                if live_models:
+                    filtered_models = list(live_models)
+                if NVIDIA_MODEL_BLOCKLIST:
+                    filtered_models = [m for m in filtered_models if m not in NVIDIA_MODEL_BLOCKLIST]
 
-            # Partition into tested vs not-yet-tested (keep only currently available models)
-            tested_ok = [m for m in filtered_models if m in NVIDIA_MODEL_TESTED_OK]
-            to_test = [m for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
-            filtered_models = tested_ok + to_test
+                # Partition into tested vs not-yet-tested (keep only currently available models)
+                tested_ok = [m for m in filtered_models if m in NVIDIA_MODEL_TESTED_OK]
+                to_test = [m for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
+                filtered_models = tested_ok + to_test
 
-        if provider == "github" and GITHUB_MODEL_BLOCKLIST:
-            filtered_models = [m for m in filtered_models if m not in GITHUB_MODEL_BLOCKLIST]
-        models_technical[provider] = list(filtered_models)
-        # Use per-provider display mapping to avoid cross-provider conflicts
-        prov_map = PROVIDER_DISPLAY.get(provider, {})
-        models_display[provider] = [prov_map.get(m, m) for m in filtered_models]
+            if provider == "github" and GITHUB_MODEL_BLOCKLIST:
+                filtered_models = [m for m in filtered_models if m not in GITHUB_MODEL_BLOCKLIST]
+            models_technical[provider] = list(filtered_models)
+            # Use per-provider display mapping to avoid cross-provider conflicts
+            prov_map = PROVIDER_DISPLAY.get(provider, {})
+            models_display[provider] = [prov_map.get(m, m) for m in filtered_models]
 
-        if provider == "nvidia":
-            # Provide explicit groups for UI (display names)
-            nvidia_models_tested_display = [prov_map.get(m, m) for m in filtered_models if m in NVIDIA_MODEL_TESTED_OK]
-            nvidia_models_to_test_display = [prov_map.get(m, m) for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
+            if provider == "nvidia":
+                # Provide explicit groups for UI (display names)
+                nvidia_models_tested_display = [prov_map.get(m, m) for m in filtered_models if m in NVIDIA_MODEL_TESTED_OK]
+                nvidia_models_to_test_display = [prov_map.get(m, m) for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
 
-    # --- Current model (sia tech che display) ---
-    current_model_tech = get_active_model()
-    current_model_display = MODEL_DISPLAY_MAPPING.get(current_model_tech, current_model_tech)
+        # --- Current model (sia tech che display) ---
+        current_model_tech = get_active_model()
+        current_model_display = MODEL_DISPLAY_MAPPING.get(current_model_tech, current_model_tech)
 
-    # --- Modelli del provider corrente (per HA settings: lista con flag current) ---
-    provider_models = models_technical.get(AI_PROVIDER, PROVIDER_MODELS.get(AI_PROVIDER, []))
-    available_models = []
-    for tech_name in provider_models:
-        available_models.append({
-            "technical_name": tech_name,
-            "display_name": MODEL_DISPLAY_MAPPING.get(tech_name, tech_name),
-            "is_current": tech_name == current_model_tech
-        })
+        # --- Modelli del provider corrente (per HA settings: lista con flag current) ---
+        provider_models = models_technical.get(AI_PROVIDER, PROVIDER_MODELS.get(AI_PROVIDER, []))
+        available_models = []
+        for tech_name in provider_models:
+            available_models.append({
+                "technical_name": tech_name,
+                "display_name": MODEL_DISPLAY_MAPPING.get(tech_name, tech_name),
+                "is_current": tech_name == current_model_tech
+            })
 
-    return jsonify({
-        "success": True,
+        return jsonify({
+            "success": True,
 
-        # First-run onboarding: chat should prompt user to pick an agent once
-        "needs_first_selection": not os.path.isfile(RUNTIME_SELECTION_FILE),
+            # First-run onboarding: chat should prompt user to pick an agent once
+            "needs_first_selection": not os.path.isfile(RUNTIME_SELECTION_FILE),
 
-        # compat chat (quello che già usa il tuo JS)
-        "current_provider": AI_PROVIDER,
-        "current_model": current_model_display,
-        "models": models_display,
+            # compat chat (quello che già usa il tuo JS)
+            "current_provider": AI_PROVIDER,
+            "current_model": current_model_display,
+            "models": models_display,
 
-        # NVIDIA UI grouping: tested models first, then not-yet-tested
-        "nvidia_models_tested": nvidia_models_tested_display,
-        "nvidia_models_to_test": nvidia_models_to_test_display,
+            # NVIDIA UI grouping: tested models first, then not-yet-tested
+            "nvidia_models_tested": nvidia_models_tested_display,
+            "nvidia_models_to_test": nvidia_models_to_test_display,
 
-        # extra per HA (più completo)
-        "current_model_technical": current_model_tech,
-        "models_technical": models_technical,
-        "available_providers": available_providers,
-        "available_models": available_models
-    }), 200
+            # extra per HA (più completo)
+            "current_model_technical": current_model_tech,
+            "models_technical": models_technical,
+            "available_providers": available_providers,
+            "available_models": available_models
+        }), 200
+    except Exception as e:
+        logger.error(f"api_get_models error: {e}")
+        return jsonify({"success": False, "error": str(e), "models": {}, "available_providers": []}), 500
 
 
 @app.route('/api/snapshots/restore', methods=['POST'])
