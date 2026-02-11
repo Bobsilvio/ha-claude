@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.47"
+VERSION = "3.1.48"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -48,6 +48,7 @@ if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
 API_PORT = int(os.getenv("API_PORT", 5000))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
+COLORED_LOGS = os.getenv("COLORED_LOGS", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
@@ -59,7 +60,36 @@ RUNTIME_SELECTION_FILE = "/config/.storage/claude_runtime_selection.json"
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
 
-logging.basicConfig(level=logging.DEBUG if DEBUG_MODE else logging.INFO)
+_LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
+
+
+class _ColorFormatter(logging.Formatter):
+    COLORS = {
+        "DEBUG": "\x1b[36m",     # cyan
+        "INFO": "\x1b[32m",      # green
+        "WARNING": "\x1b[33m",   # yellow
+        "ERROR": "\x1b[31m",     # red
+        "CRITICAL": "\x1b[35m",  # magenta
+    }
+    RESET = "\x1b[0m"
+
+    def format(self, record: logging.LogRecord) -> str:
+        original = record.levelname
+        try:
+            color = self.COLORS.get(original)
+            if color:
+                record.levelname = f"{color}{original}{self.RESET}"
+            return super().format(record)
+        finally:
+            record.levelname = original
+
+
+if COLORED_LOGS:
+    handler = logging.StreamHandler()
+    handler.setFormatter(_ColorFormatter("%(levelname)s:%(name)s:%(message)s"))
+    logging.basicConfig(level=_LOG_LEVEL, handlers=[handler], force=True)
+else:
+    logging.basicConfig(level=_LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT SET')}")

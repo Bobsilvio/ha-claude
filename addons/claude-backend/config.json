@@ -1,6 +1,6 @@
 {
   "name": "AI Assistant for Home Assistant",
-  "version": "3.1.47",
+  "version": "3.1.48",
   "slug": "claude-backend",
   "description": "AI-powered smart home assistant with Claude, ChatGPT, Gemini, NVIDIA NIM and GitHub Models (40+ AI models)",
   "url": "https://github.com/Bobsilvio/ha-claude",
@@ -40,6 +40,7 @@
     "github_token": "",
     "api_port": "5000",
     "debug_mode": false,
+    "colored_logs": false,
     "enable_file_access": false,
     "language": "en",
     "timeout": "30",
@@ -54,6 +55,7 @@
     "github_token": "password?",
     "api_port": "str",
     "debug_mode": "bool?",
+    "colored_logs": "bool?",
     "enable_file_access": "bool?",
     "language": "list(en|it|es|fr)?",
     "timeout": "str?",

@@ -4,6 +4,7 @@ import json
 import time
 import logging
 import requests
+import re
 
 import api
 import tools
@@ -309,6 +310,10 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
     This allows using NVIDIA-specific parameters like chat_template_kwargs for thinking mode."""
     trimmed = intent.trim_messages(messages)
 
+    # Optional strict reminder injected for one retry round (used by create-intent guard).
+    force_system_reminder = None
+    forced_create_retry = False
+
     # Use focused tools/prompt if intent detected, else full
     if intent_info and intent_info.get("tools") is not None:
         system_prompt = intent.get_prompt_for_intent(intent_info)
@@ -318,9 +323,10 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
         system_prompt = tools.get_system_prompt()
         tool_defs = tools.get_openai_tools_for_provider()
 
-    # Log available tools
+    # Log available tools (keep INFO short; full list at DEBUG)
     tool_names = [t.get("function", {}).get("name", "unknown") for t in tool_defs]
-    logger.info(f"NVIDIA tools available ({len(tool_defs)}): {', '.join(tool_names)}")
+    logger.info(f"NVIDIA tools available ({len(tool_defs)})")
+    logger.debug(f"NVIDIA tools: {', '.join(tool_names)}")
 
     full_text = ""
     max_rounds = (intent_info or {}).get("max_rounds") or 5
@@ -346,6 +352,26 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 "confirmer",
             )
         )
+
+    def _should_force_create_tool(intent_name: str, text: str) -> bool:
+        if intent_name not in ("create_automation", "create_script"):
+            return False
+        low = (text or "").lower()
+        promise_markers = (
+            "utilizzerò",
+            "userò",
+            "creerò",
+            "creiamo",
+            "creo l'automazione",
+            "sto per creare",
+            "i will create",
+            "i'll create",
+            "i will use",
+        )
+        has_promise = any(m in low for m in promise_markers)
+        block_markers = ("non posso", "non riesco", "vuoi", "quale", "confermi")
+        is_blocked = any(m in low for m in block_markers)
+        return has_promise and not is_blocked
 
     for round_num in range(max_rounds):
         oai_messages = [{"role": "system", "content": system_prompt}]
@@ -439,7 +465,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 ):
                     forced_create_retry = True
                     logger.warning(
-                        "OpenAI: No tool call for create intent; forcing a retry with strict tool-call reminder."
+                        "NVIDIA: No tool call for create intent; forcing a retry with strict tool-call reminder."
                     )
                     force_system_reminder = (
                         "CRITICAL: You MUST call the appropriate creation tool NOW (create_automation/create_script). "
@@ -448,7 +474,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                     continue
 
                 log_fn = logger.info if _is_confirmation_text(full_text) else logger.warning
-                log_fn(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'"
+                log_fn(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'"
                 )
                 messages.append({"role": "assistant", "content": full_text})
                 yield {"type": "clear"}
@@ -574,9 +600,10 @@ def stream_chat_openai(messages, intent_info=None):
         system_prompt = tools.get_system_prompt()
         tool_defs = tools.get_openai_tools_for_provider()
 
-    # Log available tools for debugging
+    # Log available tools (keep INFO short; full list at DEBUG)
     tool_names = [t.get("function", {}).get("name", "unknown") for t in tool_defs]
-    logger.info(f"OpenAI tools available ({len(tool_defs)}): {', '.join(tool_names)}")
+    logger.info(f"OpenAI tools available ({len(tool_defs)})")
+    logger.debug(f"OpenAI tools: {', '.join(tool_names)}")
 
     max_tok = 4000 if api.AI_PROVIDER == "github" else 4096
     full_text = ""

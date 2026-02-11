@@ -18,6 +18,7 @@ NVIDIA_THINKING_MODE=$(bashio::config 'nvidia_thinking_mode')
 GITHUB_TOKEN=$(bashio::config 'github_token')
 API_PORT=$(bashio::config 'api_port')
 DEBUG_MODE=$(bashio::config 'debug_mode')
+COLORED_LOGS=$(bashio::config 'colored_logs')
 ENABLE_FILE_ACCESS=$(bashio::config 'enable_file_access')
 LANGUAGE=$(bashio::config 'language')
 
@@ -39,6 +40,7 @@ export NVIDIA_THINKING_MODE
 export GITHUB_TOKEN
 export API_PORT
 export DEBUG_MODE
+export COLORED_LOGS
 export ENABLE_FILE_ACCESS
 export LANGUAGE
 export SUPERVISOR_TOKEN
@@ -46,6 +48,7 @@ export SUPERVISOR_TOKEN
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
 bashio::log.info "ENABLE_FILE_ACCESS: ${ENABLE_FILE_ACCESS}"
 bashio::log.info "DEBUG_MODE: ${DEBUG_MODE}"
+bashio::log.info "COLORED_LOGS: ${COLORED_LOGS}"
 bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && echo 'yes' || echo 'NO - HA API will fail!')"
 bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
 

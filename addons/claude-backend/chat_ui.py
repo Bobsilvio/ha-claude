@@ -564,6 +564,8 @@ def get_chat_ui():
             // Show user message with image if present
             const imageToSend = currentImage;
             addMessage(text, 'user', imageToSend);
+            // Clear the preview immediately (keep imageToSend for the request payload)
+            removeImage();
             showThinking();
 
             try {{
@@ -580,9 +582,6 @@ def get_chat_ui():
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify(payload)
                 }});
-
-                // Clear image after sending
-                removeImage();
 
                 removeThinking();
                 if (resp.headers.get('content-type')?.includes('text/event-stream')) {{
