@@ -28,7 +28,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Version
-VERSION = "3.1.39"
+VERSION = "3.1.40"
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -1641,7 +1641,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
 
     # Show diff for update tools (only for updates, not creates)
     old_yaml = result_data.get("old_yaml", "")
-    new_yaml = result_data.get("new_yaml", "")
+    new_yaml = result_data.get("new_yaml", "") or result_data.get("yaml", "")
 
     update_tools = ("update_automation", "update_script", "update_dashboard")
 
