@@ -10,6 +10,30 @@ import api
 
 logger = logging.getLogger(__name__)
 
+AI_SIGNATURE = "AI Assistant"
+
+
+def _stamp_description(description: str, action: str = "create") -> str:
+    """Add AI Assistant watermark to a description field.
+
+    action: 'create' or 'modify' — selects the verb prefix by language.
+    If the signature is already present, returns description unchanged.
+    """
+    if AI_SIGNATURE in (description or ""):
+        return description
+
+    verbs = {
+        "create": {"en": "Created with", "it": "Creato con", "es": "Creado con", "fr": "Créé avec"},
+        "modify": {"en": "Modified with", "it": "Modificato con", "es": "Modificado con", "fr": "Modifié avec"},
+    }
+    lang = getattr(api, "LANGUAGE", "en") or "en"
+    verb = verbs.get(action, verbs["create"]).get(lang, verbs[action]["en"])
+    stamp = f"{verb} {AI_SIGNATURE}"
+
+    if description and description.strip():
+        return f"{description.strip()} | {stamp}"
+    return stamp
+
 
 # User-friendly tool descriptions (Italian)
 TOOL_DESCRIPTIONS = {
@@ -629,7 +653,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             config = {
                 "id": str(int(_time.time() * 1000)),  # unique ID like HA UI generates
                 "alias": alias,
-                "description": tool_input.get("description", ""),
+                "description": _stamp_description(tool_input.get("description", ""), "create"),
                 "triggers": tool_input.get("triggers") or tool_input.get("trigger", []),
                 "conditions": tool_input.get("conditions") or tool_input.get("condition", []),
                 "actions": tool_input.get("actions") or tool_input.get("action", []),
@@ -854,6 +878,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                                 if not isinstance(found[cond_key], list):
                                     found[cond_key] = [found[cond_key]]
                                 found[cond_key].append(add_condition)
+                            # Stamp description with AI signature
+                            found["description"] = _stamp_description(found.get("description", ""), "modify")
                             new_yaml = yaml.dump(found, default_flow_style=False, allow_unicode=True)
 
                             # Snapshot the actual file path (supports configuration.yaml include mapping)
@@ -915,6 +941,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                             else:
                                 current.pop("conditions", None)
 
+                        # Stamp description with AI signature
+                        current["description"] = _stamp_description(current.get("description", ""), "modify")
                         new_yaml = yaml.dump(current, default_flow_style=False, allow_unicode=True)
                         # Save via REST API (HA uses POST for both create and update)
                         save_result = api.call_ha_api("POST", f"config/automation/config/{automation_id}", current)
@@ -1118,6 +1146,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 for key, value in changes.items():
                     found[key] = value
 
+                # Stamp description with AI signature
+                found["description"] = _stamp_description(found.get("description", ""), "modify")
+
                 # Capture new state for diff
                 new_yaml = yaml.dump({script_id: found}, default_flow_style=False, allow_unicode=True)
 
@@ -1221,7 +1252,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             script_id = tool_input.get("script_id", "")
             config = {
                 "alias": tool_input.get("alias", "New Script"),
-                "description": tool_input.get("description", ""),
+                "description": _stamp_description(tool_input.get("description", ""), "create"),
                 "sequence": tool_input.get("sequence", []),
                 "mode": tool_input.get("mode", "single"),
             }
