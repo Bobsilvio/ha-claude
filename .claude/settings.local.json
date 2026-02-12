@@ -12,7 +12,23 @@
       "Bash(💰 PAID: Anthropic, OpenAI, Google\"\n- api.py: Updated MODEL_NAME_MAPPING to support both old names \\(retrocompat\\) and new names with emoji\n\nUser benefits:\n- Instantly see which models are free vs paid\n- Better decision-making when choosing models\n- No surprise costs\n\nModel indicators:\n🆓 FREE \\(with rate limits\\):\n  - NVIDIA: Kimi K2.5 🆓\n  - GitHub: All 40+ models 🆓\n\n💰 PAID \\(per-token\\):\n  - Claude: Sonnet 4, Opus 4, Haiku 4\n  - OpenAI: GPT-4o, o1, o3-mini\n  - Google: Gemini 2.0/2.5\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.api.nvidia.com)",
-      "WebFetch(domain:build.nvidia.com)"
+      "WebFetch(domain:build.nvidia.com)",
+      "Bash(node --check:*)",
+      "Bash(for lang in es fr)",
+      "Bash(do)",
+      "Bash(done)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude status -u)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude diff --stat)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude log --oneline -5)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude push origin main)",
+      "Bash(gh api:*)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude log --oneline -20)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude log --oneline --all)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude log --oneline -50)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude add addons/claude-backend/CHANGELOG.md)",
+      "Bash(git -C /Users/eleonor/italysat/ha-claude commit -m \"$\\(cat <<''EOF''\nAdd CHANGELOG.md for addon update notes\n\nShows version history in Home Assistant update UI.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git rm:*)"
     ]
   }
 }
