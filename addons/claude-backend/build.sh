@@ -2,7 +2,7 @@
 
 # Build script for Home Assistant Add-on
 
-VERSION=$(jq -r .version config.json)
+VERSION=$(grep '^version:' config.yaml | sed 's/version: *"\?\([^"]*\)"\?/\1/')
 IMAGE_NAME="claude-backend"
 REGISTRY="ghcr.io"
 NAMESPACE="Bobsilvio"

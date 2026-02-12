@@ -28,11 +28,12 @@ app = Flask(__name__)
 CORS(app)
 
 
-# Version: read from config.json
+# Version: read from config.yaml
 def get_version():
     try:
-        with open(os.path.join(os.path.dirname(__file__), "config.json"), encoding="utf-8") as f:
-            return json.load(f)["version"]
+        import yaml
+        with open(os.path.join(os.path.dirname(__file__), "config.yaml"), encoding="utf-8") as f:
+            return yaml.safe_load(f)["version"]
     except Exception:
         return "unknown"
 
@@ -1324,7 +1325,7 @@ load_model_blocklists()
 # ---- Snapshot system for safe config editing ----
 
 SNAPSHOTS_DIR = "/config/.storage/claude_snapshots"
-HA_CONFIG_DIR = "/config"  # Mapped via config.json "map": ["config:rw"]
+HA_CONFIG_DIR = "/config"  # Mapped via config.yaml "map: config:rw"
 
 def create_snapshot(filename: str) -> dict:
     """Create a snapshot of a file before modifying it. Returns snapshot info."""

@@ -4,5 +4,5 @@
     "aarch64": "ghcr.io/home-assistant/aarch64-base:latest",
     "armv7": "ghcr.io/home-assistant/armv7-base:latest"
   },
-  // "version" rimosso: ora la versione è solo in config.json
+  // "version" rimosso: ora la versione è solo in config.yaml
 }

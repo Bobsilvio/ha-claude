@@ -31,7 +31,7 @@ COPY providers_anthropic.py .
 COPY providers_google.py .
 COPY chat_ui.py .
 COPY keywords.json .
-COPY config.json .
+COPY config.yaml .
 
 # Copy rootfs (s6-overlay v3 service structure)
 COPY rootfs /

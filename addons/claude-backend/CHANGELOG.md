@@ -4,7 +4,8 @@
 
 - Fix double AI response in saved/loaded conversations (OpenAI/GitHub provider)
 - Improve read-only toggle UX: eye icon, always-visible label, ON/OFF state indicator
-- Fix version badge: copy config.json into Docker image, read dynamically
+- Fix version badge: read dynamically from config.yaml
+- Migrate addon configuration from config.json to config.yaml
 
 ## 3.2.0
 
