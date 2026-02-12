@@ -77,6 +77,7 @@ TOOL_DESCRIPTIONS = {
     "browse_media": "Sfoglio media",
     "list_snapshots": "Elenco snapshot",
     "restore_snapshot": "Ripristino snapshot",
+    "manage_helpers": "Gestisco helper",
 }
 
 
@@ -523,6 +524,54 @@ HA_TOOLS_DESCRIPTION = [
             },
             "required": ["snapshot_id"]
         }
+    },
+    {
+        "name": "manage_helpers",
+        "description": "Create, update, delete, or list Home Assistant helpers (input_boolean, input_number, input_select, input_text, input_datetime).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["list", "create", "update", "delete"],
+                    "description": "Action to perform."
+                },
+                "helper_type": {
+                    "type": "string",
+                    "enum": ["input_boolean", "input_number", "input_select", "input_text", "input_datetime"],
+                    "description": "Type of helper."
+                },
+                "helper_id": {
+                    "type": "string",
+                    "description": "Helper ID without domain prefix (e.g. 'guest_mode' for input_boolean.guest_mode). Required for create/update/delete."
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Friendly name for the helper."
+                },
+                "icon": {
+                    "type": "string",
+                    "description": "MDI icon (e.g. 'mdi:toggle-switch')."
+                },
+                "min": {"type": "number", "description": "Minimum value (input_number only)."},
+                "max": {"type": "number", "description": "Maximum value (input_number only)."},
+                "step": {"type": "number", "description": "Step value (input_number only)."},
+                "unit_of_measurement": {"type": "string", "description": "Unit (input_number only)."},
+                "mode": {"type": "string", "enum": ["box", "slider"], "description": "Display mode (input_number only)."},
+                "options": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of options (input_select only)."
+                },
+                "initial": {"type": "string", "description": "Initial/default value."},
+                "has_date": {"type": "boolean", "description": "Include date (input_datetime only)."},
+                "has_time": {"type": "boolean", "description": "Include time (input_datetime only)."},
+                "min_length": {"type": "integer", "description": "Min length (input_text only)."},
+                "max_length": {"type": "integer", "description": "Max length (input_text only)."},
+                "pattern": {"type": "string", "description": "Regex pattern (input_text only)."}
+            },
+            "required": ["action", "helper_type"]
+        }
     }
 ]
 
@@ -613,9 +662,47 @@ def get_gemini_tools():
 # ---- Tool execution ----
 
 
+# Tools that perform write operations (blocked in read-only mode)
+WRITE_TOOLS = {
+    "create_automation", "update_automation", "delete_automation",
+    "create_script", "update_script", "delete_script",
+    "create_dashboard", "update_dashboard", "delete_dashboard",
+    "call_service", "write_config_file", "send_notification",
+    "manage_entity", "create_backup", "manage_helpers",
+}
+# Tools that are write-only when action is NOT "list"
+WRITE_WHEN_NOT_LIST = {"manage_areas", "shopping_list"}
+
+
+def _read_only_response(tool_name: str, tool_input: dict) -> str:
+    """Return YAML preview instead of executing a write tool in read-only mode."""
+    import yaml
+    yaml_output = yaml.dump(tool_input, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    return json.dumps({
+        "status": "read_only",
+        "message": f"Read-only mode: '{tool_name}' was NOT executed.",
+        "yaml_preview": yaml_output,
+        "tool_name": tool_name,
+        "IMPORTANT": "MODALITA SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. "
+                     "Alla fine aggiungi la nota: **Modalit\u00e0 sola lettura - nessun file \u00e8 stato modificato.**"
+    }, ensure_ascii=False, default=str)
+
+
 def execute_tool(tool_name: str, tool_input: dict) -> str:
     """Execute a tool call and return the result as string."""
     try:
+        # Read-only mode: block write tools and return YAML preview
+        session_id = getattr(api, 'current_session_id', 'default')
+        if api.read_only_sessions.get(session_id, False):
+            if tool_name in WRITE_TOOLS:
+                logger.info(f"Read-only mode: blocked write tool '{tool_name}'")
+                return _read_only_response(tool_name, tool_input)
+            if tool_name in WRITE_WHEN_NOT_LIST:
+                action = tool_input.get("action", "list")
+                if action != "list":
+                    logger.info(f"Read-only mode: blocked write action '{action}' on '{tool_name}'")
+                    return _read_only_response(tool_name, tool_input)
+
         if tool_name == "get_entities":
             domain = tool_input.get("domain", "")
             states = api.get_all_states()
@@ -2012,6 +2099,107 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "restored_file": original_file,
                 "reload_result": reload_result,
             }, ensure_ascii=False, default=str)
+
+        elif tool_name == "manage_helpers":
+            import yaml
+            helper_type = tool_input.get("helper_type", "")
+            action = tool_input.get("action", "list")
+            helper_id = tool_input.get("helper_id", "")
+
+            valid_types = ("input_boolean", "input_number", "input_select", "input_text", "input_datetime")
+            if helper_type not in valid_types:
+                return json.dumps({
+                    "error": f"Invalid helper_type: {helper_type}. Must be one of: {', '.join(valid_types)}."
+                }, ensure_ascii=False)
+
+            if action == "list":
+                states = api.get_all_states()
+                helpers = [
+                    {
+                        "entity_id": s.get("entity_id"),
+                        "state": s.get("state"),
+                        "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                    }
+                    for s in states
+                    if s.get("entity_id", "").startswith(f"{helper_type}.")
+                ]
+                return json.dumps(
+                    {"helpers": helpers, "count": len(helpers), "type": helper_type},
+                    ensure_ascii=False, default=str,
+                )
+
+            if not helper_id:
+                return json.dumps({"error": "helper_id is required for create/update/delete."}, ensure_ascii=False)
+
+            # Clean the helper_id (remove domain prefix if provided)
+            if helper_id.startswith(f"{helper_type}."):
+                helper_id = helper_id[len(helper_type) + 1:]
+
+            if action in ("create", "update"):
+                config = {}
+                if tool_input.get("name"):
+                    config["name"] = tool_input["name"]
+                if tool_input.get("icon"):
+                    config["icon"] = tool_input["icon"]
+                if tool_input.get("initial") is not None:
+                    config["initial"] = tool_input["initial"]
+
+                # Type-specific fields
+                if helper_type == "input_number":
+                    if tool_input.get("min") is not None:
+                        config["min"] = tool_input["min"]
+                    if tool_input.get("max") is not None:
+                        config["max"] = tool_input["max"]
+                    if tool_input.get("step") is not None:
+                        config["step"] = tool_input["step"]
+                    if tool_input.get("unit_of_measurement"):
+                        config["unit_of_measurement"] = tool_input["unit_of_measurement"]
+                    if tool_input.get("mode"):
+                        config["mode"] = tool_input["mode"]
+                    # Defaults for required fields
+                    if "min" not in config:
+                        config["min"] = 0
+                    if "max" not in config:
+                        config["max"] = 100
+                elif helper_type == "input_select":
+                    if tool_input.get("options"):
+                        config["options"] = tool_input["options"]
+                elif helper_type == "input_datetime":
+                    if tool_input.get("has_date") is not None:
+                        config["has_date"] = tool_input["has_date"]
+                    if tool_input.get("has_time") is not None:
+                        config["has_time"] = tool_input["has_time"]
+                elif helper_type == "input_text":
+                    if tool_input.get("min_length") is not None:
+                        config["min"] = tool_input["min_length"]
+                    if tool_input.get("max_length") is not None:
+                        config["max"] = tool_input["max_length"]
+                    if tool_input.get("pattern"):
+                        config["pattern"] = tool_input["pattern"]
+
+                result = api.call_ha_api("POST", f"config/{helper_type}/config/{helper_id}", config)
+                if isinstance(result, dict) and "error" not in result:
+                    created_yaml = yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                    verb = "created" if action == "create" else "updated"
+                    return json.dumps({
+                        "status": "success",
+                        "message": f"Helper {helper_type}.{helper_id} {verb}.",
+                        "entity_id": f"{helper_type}.{helper_id}",
+                        "yaml": created_yaml,
+                        "IMPORTANT": f"Show the user the YAML code for the helper you {verb}."
+                    }, ensure_ascii=False, default=str)
+                return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
+
+            elif action == "delete":
+                result = api.call_ha_api("DELETE", f"config/{helper_type}/config/{helper_id}")
+                if result is None or (isinstance(result, dict) and "error" not in result):
+                    return json.dumps({
+                        "status": "success",
+                        "message": f"Helper {helper_type}.{helper_id} deleted."
+                    }, ensure_ascii=False, default=str)
+                return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
+
+            return json.dumps({"error": f"Unknown action: {action}"}, ensure_ascii=False)
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:

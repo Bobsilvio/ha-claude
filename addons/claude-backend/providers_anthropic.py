@@ -175,8 +175,6 @@ def stream_chat_anthropic(messages, intent_info=None):
             full_text = accumulated_text
             logger.warning(f"Anthropic: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
             logger.info(f"Anthropic: This means the AI decided not to use any of the {len(focused_tools)} available tools")
-            # Save assistant message to conversation
-            messages.append({"role": "assistant", "content": full_text})
             # Yield a clear signal to reset any previous tool badges
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
@@ -189,7 +187,7 @@ def stream_chat_anthropic(messages, intent_info=None):
         yield {"type": "status", "message": api.tr("status_actions_received")}
         # For Anthropic, use the full content list which includes tool_use blocks
         assistant_content = final_message.content
-        messages.append({"role": "assistant", "content": assistant_content})
+        # RIMOSSO: messages.append({"role": "assistant", "content": assistant_content})  # Doppione
 
         tool_results = []
         redundant_blocked = 0

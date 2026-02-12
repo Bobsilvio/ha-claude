@@ -2,7 +2,7 @@
 
 # Build script for Home Assistant Add-on
 
-VERSION="1.0.0"
+VERSION=$(jq -r .version config.json)
 IMAGE_NAME="claude-backend"
 REGISTRY="ghcr.io"
 NAMESPACE="Bobsilvio"

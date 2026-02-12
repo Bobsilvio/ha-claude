@@ -31,6 +31,7 @@ INTENT_TOOL_SETS = {
                      "list_snapshots", "restore_snapshot"],
     "areas": ["manage_areas", "manage_entity", "get_areas", "get_devices"],
     "notifications": ["send_notification", "search_entities"],
+    "helpers": ["manage_helpers", "search_entities"],
 }
 
 # Compact focused prompts by intent
@@ -56,10 +57,11 @@ CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
    - If you find none: say you couldn't find it and ask for the automation name/room/device.
 2. Once you know WHICH automation, briefly confirm it: "Ho trovato l'automazione: [NAME] (id: [ID])"
 3. Describe WHAT EXACTLY will change in simple language
-4. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? Scrivi sì o no"
-5. WAIT FOR USER TO CONFIRM - DO NOT call update_automation until user says "sì" (Italian yes)
-6. Only AFTER confirmation, call update_automation ONCE with the changes
-7. Show a before/after diff of what changed.
+4. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it
+5. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? (sì/no)"
+6. WAIT FOR USER TO CONFIRM - DO NOT call update_automation until user says "sì" (Italian yes)
+7. Only AFTER confirmation, call update_automation ONCE with the changes
+8. Show a before/after diff of what changed.
 
 - Respond in the user's language. Be concise.
 - Never modify the wrong automation.""",
@@ -69,10 +71,11 @@ The script config is provided in the DATI section.
 CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
 1. FIRST, briefly confirm which script you found: "Ho trovato lo script: [NAME] (id: [ID])"
 2. Describe WHAT EXACTLY will change in simple language
-3. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? Scrivi sì o no"
-4. WAIT FOR USER TO CONFIRM - DO NOT call update_script until user says "sì" or "si"
-5. Only AFTER confirmation, call update_script ONCE with the changes
-6. Show a before/after diff of what changed.
+3. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it
+4. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? (sì/no)"
+5. WAIT FOR USER TO CONFIRM - DO NOT call update_script until user says "sì" or "si"
+6. Only AFTER confirmation, call update_script ONCE with the changes
+7. Show a before/after diff of what changed.
 - Respond in the user's language. Be concise.
 - NEVER call get_scripts or read_config_file — the data is already provided.
 - If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
@@ -92,7 +95,10 @@ CRITICAL WORKFLOW - follow these steps IN ORDER:
      * cover.* entities → service: cover.open_cover / cover.close_cover
      * climate.* entities → service: climate.set_temperature
    - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
-4. Call create_automation ONCE with the complete config (alias, trigger, action, condition, mode).
+4. BEFORE creating, show the user the COMPLETE YAML of the automation in a ```yaml code block.
+   Verify the entity_ids are correct and ask: "Ho trovato questi sensori/dispositivi. Confermi la creazione? (sì/no)"
+5. WAIT FOR USER TO CONFIRM - DO NOT call create_automation until user confirms.
+6. Only AFTER confirmation, call create_automation ONCE with the complete config (alias, trigger, action, condition, mode).
 NEVER create an automation with empty trigger or action arrays.
 Respond in the user's language. Be concise.""",
 
@@ -102,7 +108,10 @@ CRITICAL WORKFLOW:
 2. Build the script with a COMPLETE sequence of actions using correct services for each entity domain:
    - switch.* → switch.turn_on/off, light.* → light.turn_on/off, etc.
    - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
-3. Call create_script ONCE with script_id, alias, sequence, and mode.
+3. BEFORE creating, show the user the COMPLETE YAML of the script in a ```yaml code block.
+   Verify the entity_ids are correct and ask: "Confermi la creazione di questo script? (sì/no)"
+4. WAIT FOR USER TO CONFIRM - DO NOT call create_script until user confirms.
+5. Only AFTER confirmation, call create_script ONCE with script_id, alias, sequence, and mode.
 NEVER create a script with empty sequence.
 Respond in the user's language. Be concise.""",
 
@@ -120,6 +129,20 @@ CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
 4. Only AFTER explicit confirmation, call the appropriate delete tool
 - Respond in the user's language. Be concise.
 - NEVER auto-confirm deletions. Deletions are IRREVERSIBLE.""",
+
+    "helpers": """You are a Home Assistant helper manager. The user wants to create, modify, delete, or list helpers.
+Helper types: input_boolean (on/off toggle), input_number (numeric value), input_select (dropdown), input_text (text field), input_datetime (date/time picker).
+WORKFLOW:
+1. If the user wants to list helpers, call manage_helpers with action="list" and the appropriate helper_type.
+2. If creating a new helper:
+   a. Use search_entities if needed to check if a similar helper already exists.
+   b. Build the helper config (name, icon, type-specific fields).
+   c. Show the user the complete YAML/config BEFORE creating.
+   d. ASK FOR CONFIRMATION: "Confermi la creazione di questo helper? (si/no)"
+   e. Only AFTER confirmation, call manage_helpers with action="create".
+3. If modifying: show what will change, ask confirmation, then call manage_helpers with action="update".
+4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
+- Respond in the user's language. Be concise.""",
 }
 
 
@@ -253,7 +276,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
 
     if has_modify and (has_auto or has_specific_auto or looks_like_schedule_change):
         return {"intent": "modify_automation", "tools": INTENT_TOOL_SETS["modify_automation"],
-                "prompt": INTENT_PROMPTS["modify_automation"] + "\n\nIMPORTANT: Before calling update_automation, show the user which automation you will modify and ask for explicit confirmation. Provide modification details and ask: 'Confermi che devo modificare questa automazione? (sì/no)'", "specific_target": has_specific_auto}
+                "prompt": INTENT_PROMPTS["modify_automation"] + "\n\nIMPORTANT: Before calling update_automation, show the user the COMPLETE YAML of the proposed changes in a ```yaml code block. Then ask for explicit confirmation: 'Confermi che devo fare questa modifica? (sì/no)'", "specific_target": has_specific_auto}
 
     # --- MODIFY SCRIPT ---
     has_script = any(k in msg for k in script_kw)
@@ -321,6 +344,12 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     if any(k in msg for k in config_kw):
         return {"intent": "config_edit", "tools": INTENT_TOOL_SETS["config_edit"],
                 "prompt": None, "specific_target": False}
+
+    # --- HELPERS ---
+    helper_kw = lang_keywords.get("helper", [])
+    if any(k in msg for k in helper_kw):
+        return {"intent": "helpers", "tools": INTENT_TOOL_SETS["helpers"],
+                "prompt": INTENT_PROMPTS["helpers"], "specific_target": False}
 
     # --- GENERIC (full mode) ---
     return {"intent": "generic", "tools": None, "prompt": None, "specific_target": False}

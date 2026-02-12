@@ -35,9 +35,10 @@ The selection is saved automatically and persists across restarts.
 | anthropic_api_key | - | Anthropic API key |
 | openai_api_key | - | OpenAI API key |
 | google_api_key | - | Google Gemini API key |
+| github_token | - | GitHub fine-grained token for GitHub Models |
 | nvidia_api_key | - | NVIDIA NIM API key |
 | nvidia_thinking_mode | false | Extra reasoning tokens (when supported) |
-| github_token | - | GitHub fine-grained token for GitHub Models |
+| colored_logs | true | Attiva i log colorati e leggibili nella console dell'add-on. Consigliato per debug e sviluppo. |
 | language | en | UI/assistant language (en/it/es/fr) |
 | enable_file_access | false | Allow read/write of files under `/config` |
 | debug_mode | false | Enable debug logging |

@@ -27,8 +27,16 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Version
-VERSION = "3.1.62"
+
+# Version: read from config.json
+def get_version():
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "config.json"), encoding="utf-8") as f:
+            return json.load(f)["version"]
+    except Exception:
+        return "unknown"
+
+VERSION = get_version()
 
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
@@ -63,6 +71,7 @@ CUSTOM_SYSTEM_PROMPT = None
 _LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
 
 
+
 class _ColorFormatter(logging.Formatter):
     COLORS = {
         "DEBUG": "\x1b[36m",     # cyan
@@ -81,17 +90,33 @@ class _ColorFormatter(logging.Formatter):
     RESET = "\x1b[0m"
 
     def format(self, record: logging.LogRecord) -> str:
+        # Timestamp
+        ts = self.formatTime(record, "%H:%M:%S")
+        # Context: SYSTEM, REQUEST, RESPONSE (default SYSTEM)
+        context = getattr(record, "context", None)
+        if not context:
+            # Heuristic: logger name or message prefix
+            lname = record.name.lower()
+            if "request" in lname or "http" in lname:
+                context = "REQUEST"
+            elif "response" in lname:
+                context = "RESPONSE"
+            elif "chat_ui" in lname:
+                context = "UI"
+            else:
+                context = "SYSTEM"
+        # Color and icon
         original = record.levelname
         try:
             icon = self.ICONS.get(original)
             color = self.COLORS.get(original)
-            # HA add-on log viewer may strip ANSI; emoji badge still helps readability.
             decorated = f"{icon} {original}" if icon else original
             if color:
-                record.levelname = f"{color}{decorated}{self.RESET}"
+                clevel = f"{color}{decorated}{self.RESET}"
             else:
-                record.levelname = decorated
-            return super().format(record)
+                clevel = decorated
+            # Format: [HH:MM:SS] [CONTEXT] 🟢 INFO:api: messaggio
+            return f"[{ts}] [{context}] {clevel}:{record.name}:{record.getMessage()}"
         finally:
             record.levelname = original
 
@@ -1017,6 +1042,12 @@ conversations: Dict[str, List[Dict]] = {}
 # Abort flag per session (for stop button)
 abort_streams: Dict[str, bool] = {}
 
+# Read-only mode per session
+read_only_sessions: Dict[str, bool] = {}
+
+# Current session ID for thread-safe access in execute_tool (Flask sync workers)
+current_session_id: str = "default"
+
 # --- Dynamic config structure scan ---
 CONFIG_STRUCTURE_TEXT = ""
 
@@ -1916,12 +1947,17 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
 
 
 
-def stream_chat_with_ai(user_message: str, session_id: str = "default", image_data: str = None):
+def stream_chat_with_ai(user_message: str, session_id: str = "default", image_data: str = None, read_only: bool = False):
     """Stream chat events for all providers with optional image support. Yields SSE event dicts.
     Uses LOCAL intent detection + smart context to minimize tokens sent to AI API."""
+    global current_session_id
     if not ai_client:
         yield {"type": "error", "message": "API key non configurata"}
         return
+
+    # Store read-only state for this session (accessible by execute_tool)
+    read_only_sessions[session_id] = read_only
+    current_session_id = session_id
 
     if session_id not in conversations:
         conversations[session_id] = []
@@ -1957,12 +1993,30 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         "config_edit": "Modifica configurazione",
         "areas": "Gestione stanze",
         "notifications": "Notifica",
+        "helpers": "Gestione helper",
         "chat": "Chat",
         "generic": "Analisi richiesta",
     }
     intent_label = INTENT_LABELS.get(intent_name, "Elaboro")
     yield {"type": "status", "message": f"{intent_label}... ({tool_count if tool_count else all_tools_count} tools)"}
-    
+
+    # Inject read-only instruction into intent prompt if read-only mode is active
+    if read_only and intent_info.get("prompt"):
+        read_only_instruction = (
+            "\n\nIMPORTANT - READ-ONLY MODE ACTIVE:\n"
+            "The user has enabled read-only mode. You MUST NOT execute any write operations.\n"
+            "Instead of calling write tools (create_automation, update_automation, delete_automation, "
+            "create_script, update_script, delete_script, create_dashboard, update_dashboard, "
+            "delete_dashboard, call_service, write_config_file, manage_areas, send_notification, "
+            "manage_entity, manage_helpers), show the user the COMPLETE YAML/code they would need "
+            "to manually insert or execute.\n"
+            "Format the output as a code block with language 'yaml' so they can copy it.\n"
+            "At the end, add this note: **Modalit\u00e0 sola lettura - nessun file \u00e8 stato modificato.**\n"
+            "You CAN still use read-only tools (get_entities, search_entities, get_entity_state, "
+            "get_automations, get_scripts, get_dashboards, etc.) to gather information."
+        )
+        intent_info["prompt"] = intent_info["prompt"] + read_only_instruction
+
     # Step 3: Save original message and build enriched version for API
     if image_data:
         # Parse image data
@@ -2321,16 +2375,19 @@ def api_chat_stream():
     message = data.get("message", "").strip()
     session_id = data.get("session_id", "default")
     image_data = data.get("image", None)  # Base64 image data
+    read_only = data.get("read_only", False)  # Read-only mode flag
     if not message:
         return jsonify({"error": "Empty message"}), 400
     if image_data:
         logger.info(f"Stream [{AI_PROVIDER}] with image: {message[:50]}...")
     else:
         logger.info(f"Stream [{AI_PROVIDER}]: {message}")
+    if read_only:
+        logger.info(f"Read-only mode active for session {session_id}")
     abort_streams[session_id] = False  # Reset abort flag
 
     def generate():
-        for event in stream_chat_with_ai(message, session_id, image_data):
+        for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
             yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
     return Response(

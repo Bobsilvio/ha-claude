@@ -109,6 +109,7 @@ def stream_chat_google(messages):
     final_text = (getattr(response, "text", None) or "") if response is not None else ""
 
     # Stream text word by word
+    # L'aggiunta a messages viene fatta solo qui, non altrove
     messages.append({"role": "assistant", "content": final_text})
     yield {"type": "clear"}
     words = final_text.split(' ')

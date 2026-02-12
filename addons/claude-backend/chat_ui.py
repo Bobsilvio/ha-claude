@@ -142,6 +142,16 @@ def get_chat_ui():
             "sug_temperature": "Temperature history",
             "sug_scenes": "Available scenes",
             "sug_automations": "List automations",
+            # Read-only mode
+            "readonly_title": "Read-only mode: show code without executing",
+            "readonly_on": "Read-only",
+            "readonly_off": "Active",
+            # Confirmation buttons
+            "confirm_yes": "Yes, confirm",
+            "confirm_no": "No, cancel",
+            "confirm_yes_value": "yes",
+            "confirm_no_value": "no",
+            "confirm_delete_yes": "Delete",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -191,6 +201,16 @@ def get_chat_ui():
             "sug_temperature": "Storico temperatura",
             "sug_scenes": "Scene disponibili",
             "sug_automations": "Lista automazioni",
+            # Read-only mode
+            "readonly_title": "Modalit\u00e0 sola lettura: mostra il codice senza eseguire",
+            "readonly_on": "Sola lettura",
+            "readonly_off": "Attivo",
+            # Confirmation buttons
+            "confirm_yes": "S\u00ec, conferma",
+            "confirm_no": "No, annulla",
+            "confirm_yes_value": "si",
+            "confirm_no_value": "no",
+            "confirm_delete_yes": "Elimina",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -240,6 +260,16 @@ def get_chat_ui():
             "sug_temperature": "Historial de temperatura",
             "sug_scenes": "Escenas disponibles",
             "sug_automations": "Lista de automatizaciones",
+            # Read-only mode
+            "readonly_title": "Modo solo lectura: mostrar c\u00f3digo sin ejecutar",
+            "readonly_on": "Solo lectura",
+            "readonly_off": "Activo",
+            # Confirmation buttons
+            "confirm_yes": "S\u00ed, confirma",
+            "confirm_no": "No, cancela",
+            "confirm_yes_value": "si",
+            "confirm_no_value": "no",
+            "confirm_delete_yes": "Eliminar",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -289,6 +319,16 @@ def get_chat_ui():
             "sug_temperature": "Historique température",
             "sug_scenes": "Scènes disponibles",
             "sug_automations": "Liste des automatisations",
+            # Read-only mode
+            "readonly_title": "Mode lecture seule : afficher le code sans ex\u00e9cuter",
+            "readonly_on": "Lecture seule",
+            "readonly_off": "Actif",
+            # Confirmation buttons
+            "confirm_yes": "Oui, confirme",
+            "confirm_no": "Non, annule",
+            "confirm_yes_value": "oui",
+            "confirm_no_value": "non",
+            "confirm_delete_yes": "Supprimer",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -389,6 +429,22 @@ def get_chat_ui():
         .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
         .undo-button:hover {{ opacity: 0.9; }}
         .undo-button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
+        .readonly-toggle {{ display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: 8px; user-select: none; }}
+        .readonly-toggle input {{ display: none; }}
+        .readonly-slider {{ width: 36px; height: 20px; background: rgba(255,255,255,0.3); border-radius: 10px; position: relative; transition: background 0.3s; flex-shrink: 0; }}
+        .readonly-slider::before {{ content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.3s; }}
+        .readonly-toggle input:checked + .readonly-slider {{ background: #fbbf24; }}
+        .readonly-toggle input:checked + .readonly-slider::before {{ transform: translateX(16px); }}
+        .readonly-label {{ font-size: 11px; color: rgba(255,255,255,0.9); white-space: nowrap; }}
+        .confirm-buttons {{ display: flex; gap: 10px; margin-top: 12px; }}
+        .confirm-btn {{ padding: 8px 24px; border-radius: 20px; border: 2px solid; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }}
+        .confirm-yes {{ background: #10b981; border-color: #10b981; color: white; }}
+        .confirm-yes:hover {{ background: #059669; border-color: #059669; }}
+        .confirm-no {{ background: white; border-color: #ef4444; color: #ef4444; }}
+        .confirm-no:hover {{ background: #fef2f2; }}
+        .confirm-btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+        .confirm-btn.selected {{ opacity: 1; transform: scale(1.05); }}
+        .confirm-buttons.answered .confirm-btn:not(.selected) {{ opacity: 0.3; }}
     </style>
 </head>
 <body>
@@ -400,6 +456,11 @@ def get_chat_ui():
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
         <button class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
+        <label class="readonly-toggle" title="{ui_js['readonly_title']}">
+            <input type="checkbox" id="readOnlyToggle" onchange="toggleReadOnly(this.checked)">
+            <span class="readonly-slider"></span>
+            <span class="readonly-label" id="readOnlyLabel">{ui_js['readonly_off']}</span>
+        </label>
         <div class="status">
             <div class="status-dot"></div>
             {status_text}
@@ -469,6 +530,7 @@ def get_chat_ui():
         let currentReader = null;
         let currentSessionId = localStorage.getItem('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
+        let readOnlyMode = localStorage.getItem('readOnlyMode') === 'true';
         let currentProviderId = '{api.AI_PROVIDER}';
 
         const ANALYZING_BY_PROVIDER = {{
@@ -548,6 +610,83 @@ def get_chat_ui():
             currentImage = null;
             imageInput.value = '';
             imagePreviewContainer.classList.remove('visible');
+        }}
+
+        function toggleReadOnly(checked) {{
+            readOnlyMode = checked;
+            localStorage.setItem('readOnlyMode', checked ? 'true' : 'false');
+            const label = document.getElementById('readOnlyLabel');
+            if (label) label.textContent = checked ? T.readonly_on : T.readonly_off;
+        }}
+
+        // Initialize read-only toggle on page load
+        (function() {{
+            const toggle = document.getElementById('readOnlyToggle');
+            if (toggle) {{
+                toggle.checked = readOnlyMode;
+                const label = document.getElementById('readOnlyLabel');
+                if (label) label.textContent = readOnlyMode ? T.readonly_on : T.readonly_off;
+            }}
+        }})();
+
+        function injectConfirmButtons(div, fullText) {{
+            if (!div || !fullText) return;
+            if (div.querySelector('.confirm-buttons')) return;
+
+            const CONFIRM_PATTERNS = [
+                /confermi.*?\\?/i,
+                /scrivi\\s+s[i\u00ec]\\s+o\\s+no/i,
+                /digita\\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?\\s+per\\s+confermare/i,
+                /vuoi\\s+(eliminare|procedere|continuare).*?\\?/i,
+                /s[i\u00ec]\\s*\\/\\s*no/i,
+                /confirm.*?\\?\\s*(yes.*no)?/i,
+                /type\\s+['"]?yes['"]?\\s+or\\s+['"]?no['"]?/i,
+                /do\\s+you\\s+want\\s+to\\s+(delete|proceed|continue).*?\\?/i,
+                /confirma.*?\\?/i,
+                /escribe\\s+s[i\u00ed]\\s+o\\s+no/i,
+                /confirme[sz]?.*?\\?/i,
+                /tape[sz]?\\s+['"]?oui['"]?\\s+ou\\s+['"]?non['"]?/i,
+            ];
+
+            const isConfirmation = CONFIRM_PATTERNS.some(function(p) {{ return p.test(fullText); }});
+            if (!isConfirmation) return;
+
+            const isDeleteConfirm = /digita\\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?/i.test(fullText) ||
+                                    /type\\s+['"]?delete['"]?/i.test(fullText);
+
+            const btnContainer = document.createElement('div');
+            btnContainer.className = 'confirm-buttons';
+
+            const yesBtn = document.createElement('button');
+            yesBtn.className = 'confirm-btn confirm-yes';
+            yesBtn.textContent = isDeleteConfirm ? ('\U0001f5d1 ' + T.confirm_delete_yes) : ('\u2705 ' + T.confirm_yes);
+
+            const noBtn = document.createElement('button');
+            noBtn.className = 'confirm-btn confirm-no';
+            noBtn.textContent = '\u274c ' + T.confirm_no;
+
+            yesBtn.onclick = function() {{
+                yesBtn.disabled = true;
+                noBtn.disabled = true;
+                btnContainer.classList.add('answered');
+                yesBtn.classList.add('selected');
+                const answer = isDeleteConfirm ? 'elimina' : T.confirm_yes_value;
+                input.value = answer;
+                sendMessage();
+            }};
+
+            noBtn.onclick = function() {{
+                yesBtn.disabled = true;
+                noBtn.disabled = true;
+                btnContainer.classList.add('answered');
+                noBtn.classList.add('selected');
+                input.value = T.confirm_no_value;
+                sendMessage();
+            }};
+
+            btnContainer.appendChild(yesBtn);
+            btnContainer.appendChild(noBtn);
+            div.appendChild(btnContainer);
         }}
 
         function apiUrl(path) {{
@@ -809,7 +948,8 @@ def get_chat_ui():
 
                 const payload = {{
                     message: text,
-                    session_id: currentSessionId
+                    session_id: currentSessionId,
+                    read_only: readOnlyMode
                 }};
                 if (imageToSend) {{
                     payload.image = imageToSend;
@@ -914,6 +1054,8 @@ def get_chat_ui():
                                     if (snap) {{
                                         appendUndoButton(div, snap);
                                     }}
+                                    // Inject YES/NO confirmation buttons if AI is asking for confirmation
+                                    injectConfirmButtons(div, fullText);
                                 }}
                             }}
                             chat.scrollTop = chat.scrollHeight;
