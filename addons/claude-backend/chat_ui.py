@@ -144,8 +144,9 @@ def get_chat_ui():
             "sug_automations": "List automations",
             # Read-only mode
             "readonly_title": "Read-only mode: show code without executing",
-            "readonly_on": "Read-only",
-            "readonly_off": "Active",
+            "readonly_on": "ON",
+            "readonly_off": "OFF",
+            "readonly_label": "Read-only",
             # Confirmation buttons
             "confirm_yes": "Yes, confirm",
             "confirm_no": "No, cancel",
@@ -203,8 +204,9 @@ def get_chat_ui():
             "sug_automations": "Lista automazioni",
             # Read-only mode
             "readonly_title": "Modalit\u00e0 sola lettura: mostra il codice senza eseguire",
-            "readonly_on": "Sola lettura",
-            "readonly_off": "Attivo",
+            "readonly_on": "ON",
+            "readonly_off": "OFF",
+            "readonly_label": "Sola lettura",
             # Confirmation buttons
             "confirm_yes": "S\u00ec, conferma",
             "confirm_no": "No, annulla",
@@ -262,8 +264,9 @@ def get_chat_ui():
             "sug_automations": "Lista de automatizaciones",
             # Read-only mode
             "readonly_title": "Modo solo lectura: mostrar c\u00f3digo sin ejecutar",
-            "readonly_on": "Solo lectura",
-            "readonly_off": "Activo",
+            "readonly_on": "ON",
+            "readonly_off": "OFF",
+            "readonly_label": "Solo lectura",
             # Confirmation buttons
             "confirm_yes": "S\u00ed, confirma",
             "confirm_no": "No, cancela",
@@ -321,8 +324,9 @@ def get_chat_ui():
             "sug_automations": "Liste des automatisations",
             # Read-only mode
             "readonly_title": "Mode lecture seule : afficher le code sans ex\u00e9cuter",
-            "readonly_on": "Lecture seule",
-            "readonly_off": "Actif",
+            "readonly_on": "ON",
+            "readonly_off": "OFF",
+            "readonly_label": "Lecture seule",
             # Confirmation buttons
             "confirm_yes": "Oui, confirme",
             "confirm_no": "Non, annule",
@@ -361,7 +365,7 @@ def get_chat_ui():
         .main-content {{ flex: 1; display: flex; flex-direction: column; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
-        .header .badge {{ font-size: 10px; opacity: 0.9; background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 10px; }}
+        .header .badge {{ font-size: 11px; opacity: 1; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 10px; font-weight: 500; letter-spacing: 0.3px; }}
         .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
         .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
         .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 240px; }}
@@ -429,13 +433,17 @@ def get_chat_ui():
         .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
         .undo-button:hover {{ opacity: 0.9; }}
         .undo-button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
-        .readonly-toggle {{ display: flex; align-items: center; gap: 6px; cursor: pointer; margin-left: 8px; user-select: none; }}
+        .readonly-toggle {{ display: flex; align-items: center; gap: 5px; cursor: pointer; margin-left: 8px; user-select: none; background: rgba(255,255,255,0.1); padding: 3px 10px; border-radius: 16px; transition: background 0.3s; }}
+        .readonly-toggle:hover {{ background: rgba(255,255,255,0.2); }}
+        .readonly-toggle.active {{ background: rgba(251,191,36,0.25); }}
         .readonly-toggle input {{ display: none; }}
-        .readonly-slider {{ width: 36px; height: 20px; background: rgba(255,255,255,0.3); border-radius: 10px; position: relative; transition: background 0.3s; flex-shrink: 0; }}
-        .readonly-slider::before {{ content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: transform 0.3s; }}
+        .readonly-icon {{ font-size: 14px; line-height: 1; }}
+        .readonly-name {{ font-size: 11px; color: rgba(255,255,255,0.9); white-space: nowrap; font-weight: 500; }}
+        .readonly-slider {{ width: 32px; height: 18px; background: rgba(255,255,255,0.3); border-radius: 9px; position: relative; transition: background 0.3s; flex-shrink: 0; }}
+        .readonly-slider::before {{ content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: white; border-radius: 50%; transition: transform 0.3s; }}
         .readonly-toggle input:checked + .readonly-slider {{ background: #fbbf24; }}
-        .readonly-toggle input:checked + .readonly-slider::before {{ transform: translateX(16px); }}
-        .readonly-label {{ font-size: 11px; color: rgba(255,255,255,0.9); white-space: nowrap; }}
+        .readonly-toggle input:checked + .readonly-slider::before {{ transform: translateX(14px); }}
+        .readonly-label {{ font-size: 10px; color: rgba(255,255,255,0.7); white-space: nowrap; min-width: 20px; }}
         .confirm-buttons {{ display: flex; gap: 10px; margin-top: 12px; }}
         .confirm-btn {{ padding: 8px 24px; border-radius: 20px; border: 2px solid; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }}
         .confirm-yes {{ background: #10b981; border-color: #10b981; color: white; }}
@@ -451,12 +459,14 @@ def get_chat_ui():
     <div class="header">
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
-        <span class="badge">v{api.VERSION}</span>
+        <span class="badge">v{api.get_version()}</span>
         <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="{ui_js['change_model']}"></select>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
         <button class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
         <label class="readonly-toggle" title="{ui_js['readonly_title']}">
+            <span class="readonly-icon">\U0001f441</span>
+            <span class="readonly-name">{ui_js['readonly_label']}</span>
             <input type="checkbox" id="readOnlyToggle" onchange="toggleReadOnly(this.checked)">
             <span class="readonly-slider"></span>
             <span class="readonly-label" id="readOnlyLabel">{ui_js['readonly_off']}</span>
@@ -617,6 +627,8 @@ def get_chat_ui():
             localStorage.setItem('readOnlyMode', checked ? 'true' : 'false');
             const label = document.getElementById('readOnlyLabel');
             if (label) label.textContent = checked ? T.readonly_on : T.readonly_off;
+            const wrapper = document.querySelector('.readonly-toggle');
+            if (wrapper) wrapper.classList.toggle('active', checked);
         }}
 
         // Initialize read-only toggle on page load
@@ -626,6 +638,8 @@ def get_chat_ui():
                 toggle.checked = readOnlyMode;
                 const label = document.getElementById('readOnlyLabel');
                 if (label) label.textContent = readOnlyMode ? T.readonly_on : T.readonly_off;
+                const wrapper = document.querySelector('.readonly-toggle');
+                if (wrapper) wrapper.classList.toggle('active', readOnlyMode);
             }}
         }})();
 

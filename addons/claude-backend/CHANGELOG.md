@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.2.1
+
+- Fix double AI response in saved/loaded conversations (OpenAI/GitHub provider)
+- Improve read-only toggle UX: eye icon, always-visible label, ON/OFF state indicator
+- Fix version badge to read dynamically from config.json
+
 ## 3.2.0
 
 - Add read-only mode toggle in chat header (shows YAML without executing)

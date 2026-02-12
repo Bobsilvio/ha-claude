@@ -910,8 +910,6 @@ def stream_chat_openai(messages, intent_info=None):
             full_text = accumulated
             logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
             logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tool_defs)} available tools")
-            # Save assistant message to conversation
-            messages.append({"role": "assistant", "content": full_text})
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
                 chunk = full_text[i:i+4]
@@ -1046,7 +1044,6 @@ def stream_chat_openai(messages, intent_info=None):
                         state_data = json.loads(state_json) if isinstance(state_json, str) else {}
                         full_text = intent._format_query_state_answer(best["entity_id"], state_data if isinstance(state_data, dict) else {})
                         logger.info("Auto-stop: query_state answered locally to avoid extra API call")
-                        messages.append({"role": "assistant", "content": full_text})
                         yield {"type": "clear"}
                         for i in range(0, len(full_text), 4):
                             yield {"type": "token", "content": full_text[i:i+4]}
