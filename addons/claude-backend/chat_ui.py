@@ -346,8 +346,9 @@ def get_chat_ui():
     <title>AI Assistant - Home Assistant</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; }}
-        .main-container {{ display: flex; flex: 1; overflow: hidden; }}
+        html, body {{ height: 100%; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; height: 100svh; display: flex; flex-direction: column; overflow-x: hidden; }}
+        .main-container {{ display: flex; flex: 1; overflow: hidden; min-width: 0; }}
         .sidebar {{ width: 250px; min-width: 150px; max-width: 500px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; resize: horizontal; overflow-x: hidden; position: relative; }}
         .splitter {{ width: 8px; flex: 0 0 8px; cursor: col-resize; background: transparent; }}
         .splitter:hover {{ background: rgba(0,0,0,0.06); }}
@@ -362,8 +363,8 @@ def get_chat_ui():
         .chat-item-delete {{ color: #ef4444; font-size: 16px; padding: 4px 8px; opacity: 0.6; transition: all 0.2s; cursor: pointer; flex-shrink: 0; background: none; border: none; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }}
         .chat-item:hover .chat-item-delete {{ opacity: 1; }}
         .chat-item-delete:hover {{ color: #dc2626; background: rgba(239,68,68,0.1); }}
-        .main-content {{ flex: 1; display: flex; flex-direction: column; }}
-        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }}
+        .main-content {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
+        .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 0; overflow-x: hidden; }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
         .header .badge {{ font-size: 11px; opacity: 1; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 10px; font-weight: 500; letter-spacing: 0.3px; }}
         .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
@@ -376,7 +377,7 @@ def get_chat_ui():
         .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {status_color}; animation: pulse 2s infinite; }}
         @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
         .chat-container {{ flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }}
-        .message {{ max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-wrap: break-word; animation: fadeIn 0.3s ease; }}
+        .message {{ max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-wrap: break-word; overflow-wrap: anywhere; animation: fadeIn 0.3s ease; }}
         @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
         .message.user {{ background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }}
         .message.user img {{ max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px; display: block; }}
@@ -415,6 +416,7 @@ def get_chat_ui():
         .image-preview {{ max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #667eea; }}
         .remove-image-btn {{ position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }}
         .input-row {{ display: flex; gap: 8px; align-items: flex-end; }}
+        .input-row > * {{ min-width: 0; }}
         .input-area textarea {{ flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 10px 16px; font-size: 14px; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.2s; }}
         .input-area textarea:focus {{ border-color: #667eea; }}
         .input-area button {{ background: #667eea; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }}
@@ -453,6 +455,40 @@ def get_chat_ui():
         .confirm-btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
         .confirm-btn.selected {{ opacity: 1; transform: scale(1.05); }}
         .confirm-buttons.answered .confirm-btn:not(.selected) {{ opacity: 0.3; }}
+
+        .mobile-only {{ display: none; }}
+
+        /* Mobile layout */
+        @media (max-width: 768px), (pointer: coarse) {{
+            .mobile-only {{ display: inline-flex; }}
+
+            .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
+            .header h1 {{ font-size: 16px; }}
+            .header .status {{ order: 99; width: 100%; margin-left: 0; justify-content: flex-end; }}
+            .model-selector {{ flex: 1 1 100%; max-width: none; }}
+            .readonly-toggle {{ margin-left: 0; }}
+
+            .main-container {{ flex-direction: column; }}
+            .sidebar {{ display: none; width: 100%; min-width: 0; max-width: none; resize: none; border-right: none; border-bottom: 1px solid #e0e0e0; }}
+            .sidebar.mobile-open {{ display: flex; }}
+            .splitter {{ display: none; }}
+            .chat-list {{ max-height: 28svh; }}
+
+            .chat-container {{ padding: 12px; }}
+            .message {{ max-width: 92%; padding: 10px 12px; }}
+
+            .suggestions {{ padding: 0 12px 8px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }}
+            .suggestion {{ flex: 0 0 auto; }}
+
+            .input-area {{ padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }}
+            .input-row {{ gap: 6px; }}
+            .input-area button {{ width: 38px; height: 38px; }}
+            .input-area textarea {{ padding: 10px 14px; }}
+        }}
+
+        @media (max-width: 360px) {{
+            .header .badge {{ display: none; }}
+        }}
     </style>
 </head>
 <body>
@@ -460,6 +496,7 @@ def get_chat_ui():
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
         <span class="badge">v{api.get_version()}</span>
+        <button class="new-chat mobile-only" onclick="toggleSidebar()" title="{ui_js['conversations']}">\u2630</button>
         <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="{ui_js['change_model']}"></select>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
@@ -478,7 +515,7 @@ def get_chat_ui():
     </div>
 
     <div class="main-container">
-        <div class="sidebar">
+        <div class="sidebar" id="sidebar">
             <div class="sidebar-header">\U0001f4dd {ui_js['conversations']}</div>
             <div class="chat-list" id="chatList"></div>
         </div>
@@ -558,6 +595,11 @@ def get_chat_ui():
         function initSidebarResize() {{
             if (!sidebarEl || !splitterEl) return;
 
+            // On mobile/touch, the sidebar becomes a stacked section and resize handle
+            // is hidden via CSS. Skip width persistence and mouse drag handlers.
+            const mobileLayout = window.matchMedia('(max-width: 768px)').matches || window.matchMedia('(pointer: coarse)').matches;
+            if (mobileLayout) return;
+
             const minWidth = 150;
             const maxWidth = 500;
             const storageKey = 'chatSidebarWidth';
@@ -595,6 +637,21 @@ def get_chat_ui():
                 const finalW = Math.round(sidebarEl.getBoundingClientRect().width);
                 localStorage.setItem(storageKey, String(finalW));
             }});
+        }}
+
+        function isMobileLayout() {{
+            return window.matchMedia('(max-width: 768px)').matches || window.matchMedia('(pointer: coarse)').matches;
+        }}
+
+        function toggleSidebar() {{
+            if (!sidebarEl) return;
+            sidebarEl.classList.toggle('mobile-open');
+        }}
+
+        function closeSidebarMobile() {{
+            if (!sidebarEl) return;
+            if (!isMobileLayout()) return;
+            sidebarEl.classList.remove('mobile-open');
         }}
 
         function handleImageSelect(event) {{
@@ -1157,6 +1214,7 @@ def get_chat_ui():
                     suggestionsEl.style.display = 'flex';
                 }}
                 loadChatList();
+                closeSidebarMobile();
             }} catch(e) {{ console.error('Error loading conversation:', e); }}
         }}
 
@@ -1176,6 +1234,7 @@ def get_chat_ui():
             suggestionsEl.style.display = 'flex';
             removeImage();
             loadChatList();
+            closeSidebarMobile();
         }}
 
         // Provider name mapping for optgroups

@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.2.3
+
+- Fix mobile chat UI overflow (no horizontal scroll)
+- Hide conversations sidebar on mobile and add a header toggle (☰)
+
 ## 3.2.1
 
 - Fix double AI response in saved/loaded conversations (OpenAI/GitHub provider)
