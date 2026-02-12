@@ -1,7 +1,7 @@
 {
   "keywords": {
     "it": {
-      "create": ["crea", "creare", "nuov", "create", "new", "aggiungi nuova", "una nuova automazione"],
+      "create": ["crea", "creare", "crei", "nuov", "create", "new", "aggiungi nuova", "una nuova automazione", "mi crei", "fammi"],
       "modify": ["modifica", "cambia", "aggiorna", "escludi", "aggiungi", "rimuovi", "togli", "modific", "cambiar", "aggiornar", "escluder", "aggiung", "rimuov", "exclude", "change", "modify", "update", "remove", "add", "fix"],
       "control": ["accendi", "spegni", "accend", "spegn", "turn on", "turn off", "imposta", "alza", "abbassa", "apri", "chiudi", "attiva", "disattiva"],
       "query": ["stato", "status", "come sta", "è acceso", "è spento", "quanto", "temperatura", "valore", "che ore", "quanti gradi", "produzione", "energia", "solare", "fotovoltaico", "panelli", "inverter", "consumi", "consumo", "potenza", "kw", "kwh"],

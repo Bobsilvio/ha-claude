@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.5
+
+- Fix intent detection for Italian "mi crei un'automazione" (routes to create_automation tools)
+
 ## 3.2.4
 
 - Improve mobile header layout for agent/model selection
