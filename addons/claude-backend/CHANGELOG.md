@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.4
+
+- Improve mobile header layout for agent/model selection
+
 ## 3.2.3
 
 - Fix mobile chat UI overflow (no horizontal scroll)

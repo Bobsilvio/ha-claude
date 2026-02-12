@@ -369,7 +369,7 @@ def get_chat_ui():
         .header .badge {{ font-size: 11px; opacity: 1; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 10px; font-weight: 500; letter-spacing: 0.3px; }}
         .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
         .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
-        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 240px; }}
+        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 240px; min-width: 0; }}
         .model-selector:hover {{ background: rgba(255,255,255,0.35); }}
         .model-selector option {{ background: #2c3e50; color: white; }}
         .model-selector optgroup {{ background: #1a252f; color: #aaa; font-style: normal; font-weight: 600; padding: 4px 0; }}
@@ -465,8 +465,13 @@ def get_chat_ui():
             .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
             .header h1 {{ font-size: 16px; }}
             .header .status {{ order: 99; width: 100%; margin-left: 0; justify-content: flex-end; }}
-            .model-selector {{ flex: 1 1 100%; max-width: none; }}
-            .readonly-toggle {{ margin-left: 0; }}
+            .model-selector {{ flex: 1 1 100%; max-width: none; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+
+            .header .new-chat {{ display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border-radius: 16px; }}
+            #testNvidiaBtn {{ flex: 1 1 160px; }}
+            .header .new-chat:not(.mobile-only) {{ flex: 1 1 160px; }}
+
+            .readonly-toggle {{ margin-left: 0; flex: 1 1 100%; justify-content: space-between; }}
 
             .main-container {{ flex-direction: column; }}
             .sidebar {{ display: none; width: 100%; min-width: 0; max-width: none; resize: none; border-right: none; border-bottom: 1px solid #e0e0e0; }}
