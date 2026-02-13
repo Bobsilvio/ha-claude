@@ -43,49 +43,49 @@ options:
   language: en
   timeout: "30"
   max_retries: "3"
+  enable_voice: false
+  enable_memory: false
+  enable_file_upload: false
+  enable_rag: false
 schema:
-  anthropic_api_key:
-    password?: true
-    description: API key for Anthropic Claude models
-  openai_api_key:
-    password?: true
-    description: API key for OpenAI ChatGPT models
-  google_api_key:
-    password?: true
-    description: API key for Google Gemini models
-  github_token:
-    password?: true
-    description: GitHub token for accessing Models API
-  nvidia_api_key:
-    password?: true
-    description: API key for NVIDIA NIM models
-  nvidia_thinking_mode:
-    bool?: true
-    description: Enable NVIDIA Thinking mode for deeper reasoning (experimental)
-  api_port:
-    str: null
-    description: Port for the API server (default: 5000)
-  debug_mode:
-    bool?: true
-    description: Show verbose debugging information including HTTP headers and detailed traces
-  colored_logs:
-    bool?: true
-    description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
-  log_level:
-    list(normal|verbose|debug)?: null
-    description: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
-  enable_file_access:
-    bool?: true
-    description: Allow AI assistant to read files from Home Assistant config directory
-  language:
-    list(en|it|es|fr)?: null
-    description: UI language for error messages and responses
-  timeout:
-    str?: null
-    description: Request timeout in seconds (default: 30)
-  max_retries:
-    str?: null
-    description: Maximum retry attempts for failed API requests (default: 3)
+  anthropic_api_key: password?
+  openai_api_key: password?
+  google_api_key: password?
+  github_token: password?
+  nvidia_api_key: password?
+  nvidia_thinking_mode: bool?
+  api_port: str
+  debug_mode: bool?
+  colored_logs: bool?
+  log_level: list(normal|verbose|debug)?
+  enable_file_access: bool?
+  language: list(en|it|es|fr)?
+  timeout: str?
+  max_retries: str?
+  enable_voice: bool?
+  enable_memory: bool?
+  enable_file_upload: bool?
+  enable_rag: bool?
+
+descriptions:
+  anthropic_api_key: "API key for Anthropic Claude models"
+  openai_api_key: "API key for OpenAI ChatGPT models"
+  google_api_key: "API key for Google Gemini models"
+  github_token: "GitHub token for accessing Models API"
+  nvidia_api_key: "API key for NVIDIA NIM models"
+  nvidia_thinking_mode: "Enable NVIDIA Thinking mode for deeper reasoning (experimental)"
+  api_port: "Port for the API server (default: 5000)"
+  debug_mode: "Show verbose debugging information including HTTP headers and detailed traces"
+  colored_logs: "Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)"
+  log_level: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
+  enable_file_access: "Allow AI assistant to read files from Home Assistant config directory"
+  language: "UI language for error messages and responses"
+  timeout: "Request timeout in seconds (default: 30)"
+  max_retries: "Maximum retry attempts for failed API requests (default: 3)"
+  enable_voice: "[EXPERIMENTAL] Enable voice input/output (speech-to-text, text-to-speech)"
+  enable_memory: "[EXPERIMENTAL] Enable persistent memory system to remember past conversations"
+  enable_file_upload: "[EXPERIMENTAL] Allow uploading documents (PDF, TXT) for AI to analyze"
+  enable_rag: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search"
 documentation: https://github.com/Bobsilvio/ha-claude
 support: https://github.com/Bobsilvio/ha-claude/issues
 maintainers:
