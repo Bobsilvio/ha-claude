@@ -14,7 +14,7 @@ pyttsx3>=2.90
 edge-tts>=6.1.0
 gtts>=2.3.0
 # File upload features (optional)
-PyPDF2>=4.0.0
+PyPDF2>=3.0.0
 python-docx>=1.0.0
 # RAG features (optional, auto-detected)
 sentence-transformers>=2.2.0
