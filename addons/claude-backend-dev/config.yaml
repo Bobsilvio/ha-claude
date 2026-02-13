@@ -5,7 +5,7 @@ slug: claude-backend-dev
 description: >-
   [DEVELOPMENT] AI-powered smart home assistant with experimental features:
   file upload, RAG, voice, memory. UNSTABLE - only for testing.
-url: https://github.com/Bobsilvio/ha-claude/tree/develop
+url: https://github.com/Bobsilvio/ha-claude
 init: false
 arch:
   - aarch64
