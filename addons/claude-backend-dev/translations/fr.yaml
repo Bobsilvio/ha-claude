@@ -1,0 +1,43 @@
+configuration:
+  ai_provider:
+    name: Fournisseur d'IA
+    description: "Sélectionnez votre fournisseur d'IA. 🆓 GRATUIT: NVIDIA, GitHub Models | 💳 PAYANT: Anthropic, OpenAI, Google"
+  ai_model:
+    name: Modèle d'IA
+    description: "Selon fournisseur: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=6 modèles🧪🆓 (Kimi/Llama/Mistral/Phi/Nemotron), GitHub=40+ modèles🆓"
+  anthropic_api_key:
+    name: Clé API Anthropic
+    description: Clé API de console.anthropic.com (sauvegardez même si non utilisée, pour changement rapide)
+  openai_api_key:
+    name: Clé API OpenAI
+    description: Clé API de platform.openai.com (sauvegardez même si non utilisée, pour changement rapide)
+  google_api_key:
+    name: Clé API Google
+    description: Clé API de aistudio.google.com (sauvegardez même si non utilisée, pour changement rapide)
+  nvidia_api_key:
+    name: Clé API NVIDIA
+    description: Clé API de build.nvidia.com (gratuite - sauvegardez même si non utilisée, pour changement rapide)
+  nvidia_thinking_mode:
+    name: Mode Thinking NVIDIA
+    description: "Active le mode thinking pour voir le processus de raisonnement de l'IA (plus lent mais plus transparent)"
+  github_token:
+    name: Token GitHub
+    description: Personal Access Token de github.com/settings/tokens (sauvegardez même si non utilisé, pour changement rapide)
+  api_port:
+    name: Port API
+    description: Port API interne (par défaut 5000, utilisateurs avancés uniquement)
+  debug_mode:
+    name: Mode Debug
+    description: Activer la journalisation détaillée pour le dépannage (crée des journaux plus volumineux)
+  enable_file_access:
+    name: Activer l'Accès aux Fichiers
+    description: Autoriser l'IA à lire/écrire les fichiers de configuration Home Assistant (automatisations, scripts, YAML)
+  language:
+    name: Langue
+    description: Langue des réponses de l'IA (Anglais, Italien, Espagnol ou Français)
+  timeout:
+    name: Délai d'Attente
+    description: Délai d'attente des requêtes API en secondes (par défaut 30, augmenter si les réponses sont lentes)
+  max_retries:
+    name: Tentatives Maximales
+    description: Nombre maximal de tentatives pour les appels API échoués (par défaut 3)

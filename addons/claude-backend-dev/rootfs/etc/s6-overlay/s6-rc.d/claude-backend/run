@@ -1,0 +1,56 @@
+#!/usr/bin/with-contenv bashio
+# vim: ft=bash
+# shellcheck shell=bash
+# ==============================================================================
+# Start AI Assistant Backend API
+# ==============================================================================
+bashio::log.info "Starting AI Assistant Backend API..."
+
+# AI Provider configuration
+AI_PROVIDER=$(bashio::config 'ai_provider')
+AI_MODEL=$(bashio::config "ai_model" 2>/dev/null || echo "")
+if [ "${AI_MODEL}" = "null" ]; then AI_MODEL=""; fi
+ANTHROPIC_API_KEY=$(bashio::config 'anthropic_api_key')
+OPENAI_API_KEY=$(bashio::config 'openai_api_key')
+GOOGLE_API_KEY=$(bashio::config 'google_api_key')
+NVIDIA_API_KEY=$(bashio::config 'nvidia_api_key')
+NVIDIA_THINKING_MODE=$(bashio::config 'nvidia_thinking_mode')
+GITHUB_TOKEN=$(bashio::config 'github_token')
+API_PORT=$(bashio::config 'api_port')
+DEBUG_MODE=$(bashio::config 'debug_mode')
+COLORED_LOGS=$(bashio::config 'colored_logs')
+ENABLE_FILE_ACCESS=$(bashio::config 'enable_file_access')
+LANGUAGE=$(bashio::config 'language')
+
+# SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
+if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
+    SUPERVISOR_TOKEN="${HASSIO_TOKEN:-}"
+fi
+if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
+    SUPERVISOR_TOKEN=$(bashio::api.supervisor_token 2>/dev/null || true)
+fi
+
+export AI_PROVIDER
+export AI_MODEL
+export ANTHROPIC_API_KEY
+export OPENAI_API_KEY
+export GOOGLE_API_KEY
+export NVIDIA_API_KEY
+export NVIDIA_THINKING_MODE
+export GITHUB_TOKEN
+export API_PORT
+export DEBUG_MODE
+export COLORED_LOGS
+export ENABLE_FILE_ACCESS
+export LANGUAGE
+export SUPERVISOR_TOKEN
+
+bashio::log.info "AI Provider: ${AI_PROVIDER}"
+bashio::log.info "ENABLE_FILE_ACCESS: ${ENABLE_FILE_ACCESS}"
+bashio::log.info "DEBUG_MODE: ${DEBUG_MODE}"
+bashio::log.info "COLORED_LOGS: ${COLORED_LOGS}"
+bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && echo 'yes' || echo 'NO - HA API will fail!')"
+bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
+
+cd /app
+exec python3 server.py
