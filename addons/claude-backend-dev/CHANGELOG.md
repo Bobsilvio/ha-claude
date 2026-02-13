@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.18-dev
+- **FIX**: Function scope error - handleDocumentSelect not defined
+- Moved window exports inside proper scope
+
 ## 3.3.17-dev
 - **FIX**: File upload to backend now working (was only sending text message)
 - YAML/YML file uploads now fully functional
