@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.14-dev
+- Add YAML/YML file format support to document upload
+- file_upload.py backend now processes .yaml and .yml files as plain text
+
 ## 3.3.11-dev
 - Fix NameError: add MEMORY_AVAILABLE check when accessing memory module
 - Add LOG_LEVEL mapping to run script (now respects log_level config)
