@@ -793,7 +793,7 @@ def get_chat_ui():
             if (div.querySelector('.entity-picker') || div.querySelector('.entity-manual')) return;
 
             const entityIds = extractEntityIds(fullText);
-            if (!entityIds || entityIds.length < 2) return;
+            if (!entityIds || entityIds.length < 1) return;
 
             const PICK_PATTERNS = [
                 /quale\s+(dispositivo|entit[aà]|entity)/i,
@@ -842,7 +842,7 @@ def get_chat_ui():
             const useBtn = document.createElement('button');
             useBtn.type = 'button';
             useBtn.className = 'suggestion';
-            useBtn.textContent = 'Usa';
+            useBtn.textContent = 'Seleziona';
 
             function submitManual() {{
                 const v = (field.value || '').trim();
