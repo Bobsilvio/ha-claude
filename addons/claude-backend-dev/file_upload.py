@@ -224,14 +224,15 @@ def get_upload_stats() -> Dict:
     }
 
 
-def get_document_context(limit: int = 3) -> str:
-    """Get recent documents as context for chat.
+def get_document_context(limit: int = 3, max_content_chars: int = 4000) -> str:
+    """Get recent documents as context for chat, including content.
     
     Args:
         limit: Max documents to include
+        max_content_chars: Max characters of content per document
     
     Returns:
-        Formatted context string, empty if no documents
+        Formatted context string with document content, empty if no documents
     """
     docs = list_documents(limit=limit)
     if not docs:
@@ -240,11 +241,20 @@ def get_document_context(limit: int = 3) -> str:
     context_lines = []
     for doc in docs:
         context_lines.append(
-            f"- {doc['filename']} ({doc['file_type'].upper()}, "
-            f"{doc['content_length']} chars, uploaded {doc['uploaded_at'][:10]})"
+            f"### {doc['filename']} ({doc['file_type'].upper()}, "
+            f"{doc['content_length']} chars)"
         )
         if doc.get("note"):
-            context_lines.append(f"  Note: {doc['note']}")
+            context_lines.append(f"Note: {doc['note']}")
+        
+        # Include actual document content
+        full_doc = get_document(doc['id'])
+        if full_doc and full_doc.get('content'):
+            content = full_doc['content']
+            if len(content) > max_content_chars:
+                content = content[:max_content_chars] + "\n... (truncated)"
+            context_lines.append(f"```\n{content}\n```")
+        context_lines.append("")
     
     return "\n".join(context_lines)
 

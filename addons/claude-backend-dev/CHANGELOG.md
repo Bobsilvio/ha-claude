@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.21-dev
+- **FIX**: Document context now includes actual file content (not just metadata)
+- AI can now read and analyze uploaded documents directly
+- Content truncated at 4000 chars per document to avoid token overflow
+
 ## 3.3.20-dev
 - **FIX**: Add missing files to Dockerfile (file_upload.py, rag.py, memory.py, voice.py)
 - **FIX**: Duplicate model change messages (removed inline onclick handlers)
