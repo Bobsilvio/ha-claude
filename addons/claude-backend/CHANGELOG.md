@@ -1,10 +1,10 @@
 # Changelog
 
-## 3.2.7
-
-
-## 3.2.10
-- When the assistant is unsure about which entity you mean, show a clickable/tappable list of found `entity_id`s in-chat plus a free input field to paste/type one manually.
+## 3.2.14
+- Progress UX: keep the last status/tool steps visible inside the assistant message while streaming (not only the "thinking" bubble).
+- Entity disambiguation: improve detection of selection prompts (e.g. "scrivi/inserisci il numero") and tweak numbered option buttons for easier tapping.
+- Conversation list: for chats older than Yesterday, show "N days ago" for recent chats (then fall back to the date).
+- UI caching: add no-cache headers for the Ingress HTML to reduce stale UI after updates.
 
 ## 3.2.13
 - Conversation list: group past chats by date with section headers like "Today" / "Yesterday".
@@ -12,37 +12,33 @@
 ## 3.2.12
 - Entity disambiguation UI: show the clickable entity selection even when there is only 1 candidate (still only when the assistant is asking you to pick).
 
-## 3.2.9
-- Reduce wrong device matches when searching entities: improve `search_entities` scoring using token coverage (e.g., "bagno piccolo"), and guide the assistant to ask for explicit selection when matches are low-confidence.
-- Improve chat UI progress feedback: keep thinking bubble visible, show status/tool steps and elapsed timer
-
-## 3.2.6
-
-## 3.2.8
-- Make it clearer what the assistant is doing while waiting: show a short in-chat list of progress steps (status + tools) in the thinking bubble.
-- Fix header provider status not updating after switching provider/model in chat UI
-## 3.2.5
-
-- Fix intent detection for Italian "mi crei un'automazione" (routes to create_automation tools)
-
-## 3.2.4
-
-- Improve mobile header layout for agent/model selection
-
-## 3.2.3
-
-- Fix mobile chat UI overflow (no horizontal scroll)
-- Hide conversations sidebar on mobile and add a header toggle (☰)
-
-## 3.2.1
-
-
 ## 3.2.11
 - Fix `search_entities` runtime error: "name 'List' is not defined".
 - Fix double AI response in saved/loaded conversations (OpenAI/GitHub provider)
 - Improve read-only toggle UX: eye icon, always-visible label, ON/OFF state indicator
 - Fix version badge: read dynamically from config.yaml
 - Migrate addon configuration from config.json to config.yaml
+
+## 3.2.10
+- When the assistant is unsure about which entity you mean, show a clickable/tappable list of found `entity_id`s in-chat plus a free input field to paste/type one manually.
+
+## 3.2.9
+- Reduce wrong device matches when searching entities: improve `search_entities` scoring using token coverage (e.g., "bagno piccolo"), and guide the assistant to ask for explicit selection when matches are low-confidence.
+- Improve chat UI progress feedback: keep thinking bubble visible, show status/tool steps and elapsed timer
+
+## 3.2.8
+- Make it clearer what the assistant is doing while waiting: show a short in-chat list of progress steps (status + tools) in the thinking bubble.
+- Fix header provider status not updating after switching provider/model in chat UI
+
+## 3.2.5
+- Fix intent detection for Italian "mi crei un'automazione" (routes to create_automation tools)
+
+## 3.2.4
+- Improve mobile header layout for agent/model selection
+
+## 3.2.3
+- Fix mobile chat UI overflow (no horizontal scroll)
+- Hide conversations sidebar on mobile and add a header toggle ()
 
 ## 3.2.0
 

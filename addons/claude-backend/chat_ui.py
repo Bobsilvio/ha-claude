@@ -155,6 +155,10 @@ def get_chat_ui():
             "confirm_delete_yes": "Delete",
             "today": "Today",
             "yesterday": "Yesterday",
+            "days_ago": "{n} days ago",
+            "sending_request": "Sending request",
+            "connected": "Connected",
+            "waiting_response": "Waiting for response",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -217,6 +221,10 @@ def get_chat_ui():
             "confirm_delete_yes": "Elimina",
             "today": "Oggi",
             "yesterday": "Ieri",
+            "days_ago": "{n} giorni fa",
+            "sending_request": "Invio richiesta",
+            "connected": "Connesso",
+            "waiting_response": "In attesa della risposta",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -279,6 +287,10 @@ def get_chat_ui():
             "confirm_delete_yes": "Eliminar",
             "today": "Hoy",
             "yesterday": "Ayer",
+            "days_ago": "hace {n} d\u00edas",
+            "sending_request": "Enviando solicitud",
+            "connected": "Conectado",
+            "waiting_response": "Esperando respuesta",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -341,6 +353,10 @@ def get_chat_ui():
             "confirm_delete_yes": "Supprimer",
             "today": "Aujourd'hui",
             "yesterday": "Hier",
+            "days_ago": "il y a {n} jours",
+            "sending_request": "Envoi de la requ\u00eate",
+            "connected": "Connect\u00e9",
+            "waiting_response": "En attente de r\u00e9ponse",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -420,6 +436,8 @@ def get_chat_ui():
         .message.thinking .dots span:nth-child(3) {{ animation-delay: 0.4s; }}
         .message.thinking .thinking-steps {{ margin-top: 6px; font-style: normal; font-size: 12px; color: #888; line-height: 1.35; }}
         .message.thinking .thinking-steps div {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .message.assistant .progress-steps {{ margin-bottom: 8px; font-size: 12px; color: #888; line-height: 1.35; }}
+        .message.assistant .progress-steps div {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
         @keyframes blink {{ 0%, 80%, 100% {{ opacity: 0; }} 40% {{ opacity: 1; }} }}
         .input-area {{ padding: 12px 16px; background: white; border-top: 1px solid #e0e0e0; display: flex; flex-direction: column; gap: 8px; }}
         .image-preview-container {{ display: none; padding: 8px; background: #f8f9fa; border-radius: 8px; position: relative; }}
@@ -442,7 +460,7 @@ def get_chat_ui():
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
         .suggestion:hover {{ background: #667eea; color: white; border-color: #667eea; }}
         .entity-picker {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }}
-        .entity-picker .suggestion {{ padding: 6px 10px; font-size: 12px; }}
+        .entity-picker .suggestion {{ padding: 8px 12px; font-size: 13px; }}
         .entity-manual {{ display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }}
         .entity-input {{ background: white; border: 1px solid #ddd; border-radius: 12px; padding: 8px 10px; font-size: 13px; min-width: 220px; max-width: 100%; outline: none; }}
         .entity-input:focus {{ border-color: #667eea; }}
@@ -725,6 +743,16 @@ def get_chat_ui():
             if (!div || !fullText) return;
             if (div.querySelector('.confirm-buttons')) return;
 
+            // If the message contains a numbered entity selection (e.g., "1) light.kitchen"),
+            // do NOT show confirm/cancel buttons.
+            try {{
+                const numbered = extractNumberedEntityOptions(fullText);
+                if (numbered && numbered.length) return;
+            }} catch (e) {{}}
+
+            // If the AI is asking the user to pick an entity/device first, do NOT show confirm/cancel buttons.
+            if (isEntityPickingPrompt(fullText)) return;
+
             const CONFIRM_PATTERNS = [
                 /confermi.*?\\?/i,
                 /scrivi\\s+s[i\u00ec]\\s+o\\s+no/i,
@@ -781,6 +809,38 @@ def get_chat_ui():
             div.appendChild(btnContainer);
         }}
 
+        function isEntityPickingPrompt(fullText) {{
+            if (!fullText || typeof fullText !== 'string') return false;
+
+            // If we can extract numbered entity options, this is almost certainly a selection prompt.
+            try {{
+                const numbered = extractNumberedEntityOptions(fullText);
+                if (numbered && numbered.length) return true;
+            }} catch (e) {{}}
+
+            const PICK_PATTERNS = [
+                /quale\s+(dispositivo|entit[aà]|entity)/i,
+                /scegli/i,
+                /seleziona/i,
+                /rispondi\s+con\s+il\s+numero/i,
+                /scrivi\s+il\s+numero/i,
+                /inserisci\s+il\s+numero/i,
+                /digita\s+il\s+numero/i,
+                /rispondi\s+con\s+(?:il\s+)?\d+/i,
+                /scrivi\s+(?:il\s+)?\d+/i,
+                /inserisci\s+(?:il\s+)?\d+/i,
+                /digita\s+(?:il\s+)?\d+/i,
+                /\b\d+\s*(?:o|oppure|or)\s*\d+\b/i,
+                /numero\s+o\s+con\s+l['’]?entity_id/i,
+                /which\s+(device|entity)/i,
+                /choose/i,
+                /select/i,
+                /pick/i,
+                /reply\s+with\s+the\s+(number|entity_id)/i,
+            ];
+            return PICK_PATTERNS.some(function(p) {{ return p.test(fullText); }});
+        }}
+
         function extractEntityIds(text) {{
             if (!text || typeof text !== 'string') return [];
             const re = /\b[a-z_]+\.[a-z0-9_]+\b/g;
@@ -797,46 +857,111 @@ def get_chat_ui():
             return uniq;
         }}
 
+        function extractNumberedEntityOptions(text) {{
+            if (!text || typeof text !== 'string') return [];
+            // Handles common formats:
+            // 1) light.kitchen — Kitchen
+            // 1. `light.kitchen`
+            // 1) Bagno piccolo\n   entity_id: light.bathroom
+            const lines = String(text).split(/\r?\n/);
+            const out = [];
+            const seenNum = new Set();
+
+            function findEntityIdInLine(line) {{
+                if (!line) return '';
+                const m = String(line).match(/`?\b([a-z_]+\.[a-z0-9_]+)\b`?/i);
+                return m ? String(m[1] || '').trim() : '';
+            }}
+
+            for (let i = 0; i < lines.length; i++) {{
+                const line = lines[i];
+                const m = String(line).match(/^\s*(?:[-*]\s*)?(\d+)\s*[\)\.:\-]\s*(.*)$/);
+                if (!m) continue;
+
+                const num = String(m[1] || '').trim();
+                if (!num || seenNum.has(num)) continue;
+
+                const rest = String(m[2] || '');
+                let entityId = findEntityIdInLine(rest);
+                let label = '';
+
+                if (entityId) {{
+                    // Remove the entity_id from the line to get a label, if present
+                    label = rest
+                        .replace(new RegExp('`?\\b' + entityId.replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\$&') + '\\b`?', 'i'), '')
+                        .replace(/^[\s:—–\-]+/, '')
+                        .trim();
+                }} else {{
+                    // Look ahead a few lines for an entity_id (common when formatted as YAML)
+                    for (let j = i + 1; j < Math.min(lines.length, i + 4); j++) {{
+                        const candidate = findEntityIdInLine(lines[j]);
+                        if (candidate) {{
+                            entityId = candidate;
+                            label = rest.trim();
+                            break;
+                        }}
+                    }}
+                }}
+
+                if (!entityId) continue;
+                seenNum.add(num);
+                out.push({{ num, entity_id: entityId, label }});
+            }}
+
+            return out;
+        }}
+
+        function _escapeHtml(s) {{
+            return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }}
+
+        function renderStepLines(steps) {{
+            if (!steps || !steps.length) return '';
+            return steps.map(s => '<div>• ' + _escapeHtml(s) + '</div>').join('');
+        }}
+
         function injectEntityPicker(div, fullText) {{
             if (!div || !fullText) return;
             if (div.querySelector('.entity-picker') || div.querySelector('.entity-manual')) return;
 
+            const numbered = extractNumberedEntityOptions(fullText);
             const entityIds = extractEntityIds(fullText);
-            if (!entityIds || entityIds.length < 1) return;
-
-            const PICK_PATTERNS = [
-                /quale\s+(dispositivo|entit[aà]|entity)/i,
-                /scegli/i,
-                /seleziona/i,
-                /rispondi\s+con\s+il\s+numero/i,
-                /numero\s+o\s+con\s+l['’]?entity_id/i,
-                /entity_id/i,
-                /which\s+(device|entity)/i,
-                /choose/i,
-                /select/i,
-                /pick/i,
-                /reply\s+with\s+the\s+(number|entity_id)/i,
-            ];
-
-            const isPicking = PICK_PATTERNS.some(function(p) {{ return p.test(fullText); }});
+            const isPicking = (numbered && numbered.length) || isEntityPickingPrompt(fullText);
             if (!isPicking) return;
+            if ((!numbered || numbered.length < 1) && (!entityIds || entityIds.length < 1)) return;
 
             // Click/tap list
             const picker = document.createElement('div');
             picker.className = 'entity-picker';
 
             const maxButtons = 10;
-            entityIds.slice(0, maxButtons).forEach(function(eid) {{
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'suggestion';
-                btn.textContent = eid;
-                btn.onclick = function() {{
-                    input.value = eid;
-                    sendMessage();
-                }};
-                picker.appendChild(btn);
-            }});
+            if (numbered && numbered.length) {{
+                numbered.slice(0, maxButtons).forEach(function(opt) {{
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'suggestion';
+                    btn.textContent = opt.num + ' • ' + (opt.entity_id || '');
+                    if (opt.label) btn.title = opt.label;
+                    btn.onclick = function() {{
+                        // The AI asked for the number.
+                        input.value = String(opt.num);
+                        sendMessage();
+                    }};
+                    picker.appendChild(btn);
+                }});
+            }} else {{
+                entityIds.slice(0, maxButtons).forEach(function(eid) {{
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'suggestion';
+                    btn.textContent = eid;
+                    btn.onclick = function() {{
+                        input.value = eid;
+                        sendMessage();
+                    }};
+                    picker.appendChild(btn);
+                }});
+            }}
 
             // Manual entry
             const manual = document.createElement('div');
@@ -1207,6 +1332,17 @@ def get_chat_ui():
                 removeImage();
                 showThinking();
                 startThinkingTicker(getAnalyzingMsg());
+                addThinkingStep(T.sending_request || 'Sending request');
+
+                // If the backend is retrying (e.g., 429) and no status/tool events are sent,
+                // add a small fallback step so the UI doesn't look "stuck".
+                setTimeout(() => {{
+                    try {{
+                        if (sending && document.getElementById('thinking')) {{
+                            addThinkingStep(T.waiting_response || 'Waiting for response');
+                        }}
+                    }} catch (e) {{}}
+                }}, 8000);
 
                 const payload = {{
                     message: text,
@@ -1266,6 +1402,9 @@ def get_chat_ui():
             let hasTools = false;
             let gotAnyEvent = false;
             let gotAnyToken = false;
+            let pendingSteps = null;
+            let shouldStop = false;
+            addThinkingStep(T.connected || 'Connected');
             try {{
             while (true) {{
                 const {{ done, value }} = await reader.read();
@@ -1292,17 +1431,24 @@ def get_chat_ui():
                                 hasTools = false;
                             }} else if (evt.type === 'status') {{
                                 // Update thinking bubble with current status and keep timer running
-                                updateThinkingBaseText('\u23f3 ' + evt.message);
-                                addThinkingStep(evt.message);
+                                const msg = evt.message || evt.content || evt.status || evt.text || '';
+                                updateThinkingBaseText('\u23f3 ' + msg);
+                                addThinkingStep(msg);
                             }} else if (evt.type === 'token') {{
                                 if (!gotAnyToken) {{
                                     gotAnyToken = true;
+                                    try {{
+                                        pendingSteps = (_thinkingSteps && _thinkingSteps.length) ? _thinkingSteps.slice(0) : null;
+                                    }} catch (e) {{ pendingSteps = null; }}
                                     removeThinking();
                                 }}
                                 if (hasTools && div) {{ div.innerHTML = ''; fullText = ''; hasTools = false; }}
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 fullText += evt.content;
-                                div.innerHTML = formatMarkdown(fullText);
+                                const prefix = (pendingSteps && pendingSteps.length)
+                                    ? ('<div class="progress-steps">' + renderStepLines(pendingSteps) + '</div>')
+                                    : '';
+                                div.innerHTML = prefix + formatMarkdown(fullText);
                             }} else if (evt.type === 'error') {{
                                 removeThinking();
                                 addMessage('\u274c ' + evt.message, 'system');
@@ -1320,11 +1466,15 @@ def get_chat_ui():
                                     // Inject entity picker UI if AI is asking the user to pick an entity
                                     injectEntityPicker(div, fullText);
                                 }}
+                                shouldStop = true;
+                                try {{ reader.cancel(); }} catch (e) {{}}
                             }}
                             chat.scrollTop = chat.scrollHeight;
                         }} catch(e) {{}}
                     }}
+                    if (shouldStop) break;
                 }}
+                if (shouldStop) break;
             }}
             }} catch(streamErr) {{
                 if (streamErr.name !== 'AbortError') {{
@@ -1366,8 +1516,16 @@ def get_chat_ui():
                         const startYesterday = new Date(startToday);
                         startYesterday.setDate(startYesterday.getDate() - 1);
 
-                        if (d >= startToday) return (T.today || 'Today');
-                        if (d >= startYesterday) return (T.yesterday || 'Yesterday');
+                        const startD = new Date(d);
+                        startD.setHours(0, 0, 0, 0);
+                        const diffDays = Math.floor((startToday.getTime() - startD.getTime()) / 86400000);
+
+                        if (diffDays === 0) return (T.today || 'Today');
+                        if (diffDays === 1) return (T.yesterday || 'Yesterday');
+                        if (diffDays >= 2 && diffDays <= 6) {{
+                            const tpl = (T.days_ago || '{n} days ago');
+                            return tpl.replace('{n}', String(diffDays));
+                        }}
 
                         const sameYear = d.getFullYear() === now.getFullYear();
                         const opts = sameYear
