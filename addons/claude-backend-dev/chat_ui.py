@@ -2112,6 +2112,12 @@ def get_chat_ui():
             }}
         }})();
         }}
+        
+        // Export global functions for onclick handlers
+        window.toggleVoiceRecording = toggleVoiceRecording;
+        window.handleDocumentSelect = handleDocumentSelect;
+        window.changeModel = changeModel;
+        window.handleButtonClick = handleButtonClick;
     </script>
 </body>
 </html>"""

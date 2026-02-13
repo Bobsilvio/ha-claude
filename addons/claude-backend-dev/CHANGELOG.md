@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.10-dev
+- Fix global scope for toggleVoiceRecording, handleDocumentSelect, changeModel functions
+- Export functions to window object so onclick handlers can access them
+- Voice recording button should now work
+- Stable: debug_mode shows debug info in responses, log_level=debug shows all internal logs
+
 ## 3.3.9-dev
 - Add error handling to stream endpoint to catch and log actual exceptions
 - Stream errors now show in logs instead of silently failing in waitress
