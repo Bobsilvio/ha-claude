@@ -15,7 +15,7 @@ startup: application
 apparmor: false
 boot: auto
 ingress: true
-ingress_port: 5000
+ingress_port: 5001
 ingress_entry: /
 panel_icon: mdi:robot
 panel_title: AI Assistant DEV
@@ -23,9 +23,9 @@ homeassistant_api: true
 map:
   - config:rw
 ports:
-  5000/tcp: null
+  5001/tcp: null
 ports_description:
-  5000/tcp: AI Assistant API
+  5001/tcp: AI Assistant API (DEV)
 environment:
   DEBUG_MODE: "False"
 options:
