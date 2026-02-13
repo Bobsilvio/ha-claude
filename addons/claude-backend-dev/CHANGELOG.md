@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.6-dev
+- Fix environment variable template syntax for feature flags
+- Use Jinja2 templates in config.yaml for proper boolean to string conversion
+- Buttons should now appear when you enable the features
+- IMPORTANT: Restart addon after enabling features for env vars to load
+
 ## 3.3.5-dev
 - Fix UI initialization error: remove missing ui_bootstrap.js and ui_main.js references
 - JavaScript functions now load directly from inline HTML
