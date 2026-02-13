@@ -1005,8 +1005,11 @@ def get_chat_ui():
             // If the current page URL doesn't end with '/', browsers treat the last segment as a file
             // and relative fetches may drop it (breaking requests).
             const cleanPath = (path || '').startsWith('/') ? (path || '').slice(1) : (path || '');
-            const base = window.location.href.endsWith('/') ? window.location.href : (window.location.href + '/');
-            return new URL(cleanPath, base).toString();
+            // Use origin+pathname (not href) to avoid hash/query edge cases.
+            const basePath = (window.location.pathname || '/').endsWith('/')
+                ? (window.location.pathname || '/')
+                : ((window.location.pathname || '/') + '/');
+            return window.location.origin.replace(/\\/$/, '') + basePath + cleanPath;
         }}
 
         function setStopMode(active) {{
@@ -1033,7 +1036,11 @@ def get_chat_ui():
                 setStopMode(false);
                 sendBtn.disabled = false;
             }} else {{
-                sendMessage();
+                try {{
+                    await sendMessage();
+                }} catch (e) {{
+                    addMessage('\u274c ' + (e && e.message ? e.message : String(e)), 'system');
+                }}
             }}
         }}
 
@@ -1043,7 +1050,10 @@ def get_chat_ui():
         }}
 
         function handleKeyDown(e) {{
-            if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); sendMessage(); }}
+            if (e.key === 'Enter' && !e.shiftKey) {{
+                e.preventDefault();
+                handleButtonClick();
+            }}
         }}
 
         function addMessage(text, role, imageData = null, metadata = null) {{
@@ -1490,6 +1500,7 @@ def get_chat_ui():
         async function loadChatList() {{
             try {{
                 const resp = await fetch(apiUrl('api/conversations'));
+                if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
                 chatList.innerHTML = '';
                 if (data.conversations && data.conversations.length > 0) {{
@@ -1565,7 +1576,13 @@ def get_chat_ui():
                 }} else {{
                     chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + T.no_conversations + '</div>';
                 }}
-            }} catch(e) {{ console.error('Error loading chat list:', e); }}
+            }} catch(e) {{
+                console.error('Error loading chat list:', e);
+                if (!window._chatListErrorNotified) {{
+                    addMessage('\u26a0\ufe0f ' + (e && e.message ? e.message : String(e)), 'system');
+                    window._chatListErrorNotified = true;
+                }}
+            }}
         }}
 
         async function deleteConversation(event, sessionId) {{

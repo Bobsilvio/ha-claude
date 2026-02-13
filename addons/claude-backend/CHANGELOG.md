@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.2.17
+- Fix UI init issues in Home Assistant Ingress: build API URLs from `origin + pathname` (avoids hash/query edge cases), show visible errors when loading models/conversations, and make send action awaitable.
+
 ## 3.2.16
 - Fix: prevent 500 on `/` caused by unescaped `{n}` placeholder inside the chat UI template (conversation grouping labels).
 
