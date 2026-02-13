@@ -535,11 +535,11 @@ def get_chat_ui():
         <span style="font-size: 24px;">\U0001f916</span>
         <h1>AI Assistant</h1>
         <span class="badge">v{api.get_version()}</span>
-        <button class="new-chat mobile-only" onclick="toggleSidebar()" title="{ui_js['conversations']}">\u2630</button>
+        <button id="sidebarToggleBtn" class="new-chat mobile-only" onclick="toggleSidebar()" title="{ui_js['conversations']}">\u2630</button>
         <select id="modelSelect" class="model-selector" onchange="changeModel(this.value)" title="{ui_js['change_model']}"></select>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
-        <button class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
+        <button id="newChatBtn" class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
         <label class="readonly-toggle" title="{ui_js['readonly_title']}">
             <span class="readonly-icon">\U0001f441</span>
             <span class="readonly-name">{ui_js['readonly_label']}</span>
@@ -599,7 +599,12 @@ def get_chat_ui():
     </div>
 
     <script src="ui_bootstrap.js"></script>
+    <script src="ui_main.js"></script>
     <script>
+        if (window.__UI_MAIN_INITIALIZED) {{
+            console.log('[ui] main already initialized');
+        }} else {{
+        window.__UI_MAIN_INITIALIZED = true;
         const T = {ui_js_json};
         const chat = document.getElementById('chat');
         const input = document.getElementById('input');
@@ -1217,7 +1222,7 @@ def get_chat_ui():
             }}
 
             // 2. Code blocks
-            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" onclick="copyCode(this)">\U0001F4CB ' + T.copy_btn + '</button><pre><code>$2</code></pre></div>');
+            text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, '<div class="code-block"><button class="copy-button" type="button">\U0001F4CB ' + T.copy_btn + '</button><pre><code>$2</code></pre></div>');
             // 3. Inline code, bold, newlines
             text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
             text = text.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
@@ -1608,13 +1613,29 @@ def get_chat_ui():
                         }}
                         const item = document.createElement('div');
                         item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
-                        item.innerHTML = `
-                            <div style="flex: 1;" onclick="loadConversation('${{conv.id}}')">
-                                <div class="chat-item-title">${{conv.title}}</div>
-                                <div class="chat-item-info">${{conv.message_count}} ${{T.messages_count}}</div>
-                            </div>
-                            <span class="chat-item-delete" onclick="deleteConversation(event, '${{conv.id}}')" title="${{T.delete_chat}}">\U0001f5d1</span>
-                        `;
+                        const left = document.createElement('div');
+                        left.style.flex = '1';
+                        left.addEventListener('click', () => loadConversation(conv.id));
+
+                        const title = document.createElement('div');
+                        title.className = 'chat-item-title';
+                        title.textContent = conv.title || '';
+
+                        const info = document.createElement('div');
+                        info.className = 'chat-item-info';
+                        info.textContent = String(conv.message_count || 0) + ' ' + (T.messages_count || 'messages');
+
+                        left.appendChild(title);
+                        left.appendChild(info);
+
+                        const del = document.createElement('span');
+                        del.className = 'chat-item-delete';
+                        del.title = T.delete_chat || 'Delete chat';
+                        del.textContent = '\U0001f5d1';
+                        del.addEventListener('click', (evt) => deleteConversation(evt, conv.id));
+
+                        item.appendChild(left);
+                        item.appendChild(del);
                         chatList.appendChild(item);
                     }});
                 }} else {{
@@ -1916,12 +1937,65 @@ def get_chat_ui():
         }}
 
         // Load history on page load
+        function bindCspSafeHandlers() {{
+            try {{
+                // Bind controls without relying on inline handlers (CSP blocks onclick/onchange in HA Ingress)
+                const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+                if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', toggleSidebar);
+
+                const modelSelect = document.getElementById('modelSelect');
+                if (modelSelect) modelSelect.addEventListener('change', (e) => changeModel(e.target.value));
+
+                const testBtn = document.getElementById('testNvidiaBtn');
+                if (testBtn) testBtn.addEventListener('click', testNvidiaModel);
+
+                const newChatBtn = document.getElementById('newChatBtn');
+                if (newChatBtn) newChatBtn.addEventListener('click', newChat);
+
+                const readOnlyToggle = document.getElementById('readOnlyToggle');
+                if (readOnlyToggle) readOnlyToggle.addEventListener('change', (e) => toggleReadOnly(!!e.target.checked));
+
+                if (imageInput) imageInput.addEventListener('change', handleImageSelect);
+                const imageBtn = document.querySelector('.image-btn');
+                if (imageBtn) imageBtn.addEventListener('click', () => imageInput && imageInput.click());
+
+                const removeBtn = document.querySelector('.remove-image-btn');
+                if (removeBtn) removeBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeImage(); }});
+
+                if (input) {{
+                    input.addEventListener('keydown', handleKeyDown);
+                    input.addEventListener('input', () => autoResize(input));
+                }}
+
+                // Suggestions: make clickable via JS (inline onclick may be blocked)
+                document.querySelectorAll('.suggestion').forEach((el) => {{
+                    el.addEventListener('click', () => sendSuggestion(el));
+                }});
+
+                // Copy buttons inside chat: use event delegation (inline onclick may be blocked)
+                if (chat && !chat._copyDelegateBound) {{
+                    chat._copyDelegateBound = true;
+                    chat.addEventListener('click', (evt) => {{
+                        const btn = evt && evt.target && evt.target.closest ? evt.target.closest('.copy-button') : null;
+                        if (btn) {{
+                            evt.preventDefault();
+                            copyCode(btn);
+                        }}
+                    }});
+                }}
+            }} catch (e) {{
+                console.warn('[ui] bindCspSafeHandlers failed', e);
+            }}
+        }}
+
         (function bootUI() {{
             try {{
                 // Reinforce click handler assignment (helps when inline onclick gets lost/cached)
                 if (sendBtn) {{
                     sendBtn.onclick = () => handleButtonClick();
                 }}
+
+                bindCspSafeHandlers();
 
                 initSidebarResize();
                 loadModels();
@@ -1933,6 +2007,7 @@ def get_chat_ui():
                 _appendSystemRaw('❌ UI boot error: ' + msg);
             }}
         }})();
+        }}
     </script>
 </body>
 </html>"""

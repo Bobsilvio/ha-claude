@@ -2245,12 +2245,12 @@ def index():
 
 @app.route('/ui_bootstrap.js')
 def ui_bootstrap_js():
-        """Small bootstrap script loaded before the main inline UI.
+    """Small bootstrap script loaded before the main inline UI.
 
-        Purpose: if the large inline script fails to parse/execute (Ingress/CSP/cache/etc.),
-        we still get a server log signal and a visible error when pressing Send.
-        """
-        js = r"""
+    Purpose: if the large inline script fails to parse/execute (Ingress/CSP/cache/etc.),
+    we still get a server log signal and a visible error when pressing Send.
+    """
+    js = r"""
 (function () {
     function appendSystem(text) {
         try {
@@ -2308,19 +2308,43 @@ def ui_bootstrap_js():
     }
 })();
 """
-        return js, 200, {
-                'Content-Type': 'application/javascript; charset=utf-8',
-                'Cache-Control': 'no-store, max-age=0',
-                'Pragma': 'no-cache',
-                'Expires': '0',
-        }
+    return js, 200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+    }
+
+
+@app.route('/ui_main.js')
+def ui_main_js():
+    """Serve the main UI script as an external JS file.
+
+    Home Assistant Ingress commonly enforces a strict CSP that blocks inline
+    scripts and inline event handlers. Serving the same code as an external
+    script allows the UI to boot.
+
+    Implementation detail: we extract the inline `<script>...</script>` from
+    the HTML so there's a single source of truth.
+    """
+    html = chat_ui.get_chat_ui()
+    m = re.search(r"<script>\s*(.*?)\s*</script>", html, flags=re.S | re.I)
+    js = (m.group(1) if m else "")
+    if not js:
+        logger.error("ui_main.js extraction failed: no inline <script> found")
+    return js, 200, {
+        'Content-Type': 'application/javascript; charset=utf-8',
+        'Cache-Control': 'no-store, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+    }
 
 
 @app.route('/api/ui_ping', methods=['GET'])
 def api_ui_ping():
-        """No-op endpoint used only to confirm that the browser executed JS."""
-        # Intentionally returns empty 204; request/response are logged by middleware.
-        return ("", 204)
+    """No-op endpoint used only to confirm that the browser executed JS."""
+    # Intentionally returns empty 204; request/response are logged by middleware.
+    return ("", 204)
 
 
 @app.route('/api/status')
