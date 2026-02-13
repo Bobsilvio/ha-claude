@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.7
+
+- Improve chat UI progress feedback: keep thinking bubble visible, show status/tool steps and elapsed timer
+
 ## 3.2.6
 
 - Fix header provider status not updating after switching provider/model in chat UI

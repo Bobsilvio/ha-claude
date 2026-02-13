@@ -984,14 +984,61 @@ def get_chat_ui():
             const div = document.createElement('div');
             div.className = 'message thinking';
             div.id = 'thinking';
-            div.innerHTML = getAnalyzingMsg() + '<span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            div.innerHTML = getAnalyzingMsg() + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>';
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
+        }}
+
+        let _thinkingStart = 0;
+        let _thinkingTimer = null;
+        let _thinkingBaseText = '';
+
+        function _formatElapsed(ms) {{
+            const s = Math.max(0, Math.floor(ms / 1000));
+            const m = Math.floor(s / 60);
+            const r = s % 60;
+            return m > 0 ? (m + ':' + String(r).padStart(2, '0')) : (r + 's');
+        }}
+
+        function startThinkingTicker(baseText) {{
+            _thinkingStart = Date.now();
+            _thinkingBaseText = baseText || getAnalyzingMsg();
+
+            const el = document.getElementById('thinking');
+            if (el) {{
+                // Ensure base text is visible in case showThinking wasn't called yet
+                if (!el.innerHTML || !el.innerHTML.trim()) {{
+                    el.innerHTML = _thinkingBaseText + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+                }}
+            }}
+
+            stopThinkingTicker();
+            _thinkingTimer = setInterval(() => {{
+                const elapsedEl = document.getElementById('thinkingElapsed');
+                if (!elapsedEl) return;
+                elapsedEl.textContent = '(' + _formatElapsed(Date.now() - _thinkingStart) + ')';
+            }}, 1000);
+        }}
+
+        function updateThinkingBaseText(text) {{
+            _thinkingBaseText = text || _thinkingBaseText || getAnalyzingMsg();
+            const el = document.getElementById('thinking');
+            if (!el) return;
+            const safe = String(_thinkingBaseText);
+            el.innerHTML = safe + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+        }}
+
+        function stopThinkingTicker() {{
+            if (_thinkingTimer) {{
+                clearInterval(_thinkingTimer);
+                _thinkingTimer = null;
+            }}
         }}
 
         function removeThinking() {{
             const el = document.getElementById('thinking');
             if (el) el.remove();
+            stopThinkingTicker();
         }}
 
         function sendSuggestion(el) {{
@@ -1021,6 +1068,7 @@ def get_chat_ui():
                 // Clear the preview immediately (keep imageToSend for the request payload)
                 removeImage();
                 showThinking();
+                startThinkingTicker(getAnalyzingMsg());
 
                 const payload = {{
                     message: text,
@@ -1036,8 +1084,6 @@ def get_chat_ui():
                     headers: {{ 'Content-Type': 'application/json' }},
                     body: JSON.stringify(payload)
                 }});
-
-                removeThinking();
 
                 if (!resp.ok) {{
                     const bodyText = await resp.text().catch(() => '');
@@ -1081,6 +1127,7 @@ def get_chat_ui():
             let buffer = '';
             let hasTools = false;
             let gotAnyEvent = false;
+            let gotAnyToken = false;
             try {{
             while (true) {{
                 const {{ done, value }} = await reader.read();
@@ -1096,24 +1143,22 @@ def get_chat_ui():
                             const evt = JSON.parse(line.slice(6));
                             gotAnyEvent = true;
                             if (evt.type === 'tool' || evt.type === 'tool_call') {{
-                                removeThinking();
-                                if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
-                                hasTools = true;
+                                // Show tool progress in the thinking bubble (no assistant message yet)
                                 const desc = evt.description || evt.name;
-                                div.innerHTML += '<div class="tool-badge">\U0001f527 ' + desc + '</div>';
+                                updateThinkingBaseText('\U0001f527 ' + desc);
                             }} else if (evt.type === 'clear') {{
-                                removeThinking();
+                                // Keep thinking visible; reset streamed text state
                                 if (div) {{ div.innerHTML = ''; }}
                                 fullText = '';
                                 hasTools = false;
                             }} else if (evt.type === 'status') {{
-                                removeThinking();
-                                if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
-                                const oldStatus = div.querySelector('.status-badge');
-                                if (oldStatus) oldStatus.remove();
-                                div.innerHTML += '<div class="status-badge">\u23f3 ' + evt.message + '</div>';
+                                // Update thinking bubble with current status and keep timer running
+                                updateThinkingBaseText('\u23f3 ' + evt.message);
                             }} else if (evt.type === 'token') {{
-                                removeThinking();
+                                if (!gotAnyToken) {{
+                                    gotAnyToken = true;
+                                    removeThinking();
+                                }}
                                 if (hasTools && div) {{ div.innerHTML = ''; fullText = ''; hasTools = false; }}
                                 if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
                                 fullText += evt.content;
