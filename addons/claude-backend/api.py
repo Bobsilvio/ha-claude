@@ -2328,7 +2328,8 @@ def ui_main_js():
     the HTML so there's a single source of truth.
     """
     html = chat_ui.get_chat_ui()
-    m = re.search(r"<script>\s*(.*?)\s*</script>", html, flags=re.S | re.I)
+    # Use negative lookahead to exclude <script src="..."> tags
+    m = re.search(r"<script(?!\s+src\s*=)[^>]*>\s*(.*?)\s*</script>", html, flags=re.S | re.I)
     js = (m.group(1) if m else "")
     if not js:
         logger.error("ui_main.js extraction failed: no inline <script> found")
