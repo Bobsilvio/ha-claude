@@ -747,7 +747,7 @@ def get_nvidia_models_cached() -> Optional[list[str]]:
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
-    "openai": ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
+    "openai": ["gpt-5", "gpt-5-chat", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
     "nvidia": [
         "moonshotai/kimi-k2.5",
@@ -795,6 +795,8 @@ MODEL_NAME_MAPPING = {
     "Claude: Sonnet 4": "claude-sonnet-4-20250514",
     "Claude: Opus 4": "claude-opus-4-20250514",
     "Claude: Haiku 4": "claude-haiku-4-20250514",
+    "OpenAI: GPT-5": "gpt-5",
+    "OpenAI: GPT-5-chat": "gpt-5-chat",
     "OpenAI: GPT-4o": "gpt-4o",
     "OpenAI: GPT-4o-mini": "gpt-4o-mini",
     "OpenAI: GPT-4-turbo": "gpt-4-turbo",
