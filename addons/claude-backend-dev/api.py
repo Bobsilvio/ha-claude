@@ -52,6 +52,7 @@ except ImportError:
 load_dotenv()
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload
 CORS(app)
 
 
@@ -2232,13 +2233,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     # Create a copy of messages for API with enriched last user message
     messages = conversations[session_id][:-1] + [{"role": "user", "content": api_content}]
 
-    # Inject file upload and RAG context if available and relevant
-    if FILE_UPLOAD_AVAILABLE or RAG_AVAILABLE:
+    # Inject file upload and RAG context if available AND enabled
+    if (FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD) or (RAG_AVAILABLE and ENABLE_RAG):
         last_user_content = api_content
         context_sections = []
         
-        # Inject document context if file upload is available
-        if FILE_UPLOAD_AVAILABLE:
+        # Inject document context if file upload is available AND enabled
+        if FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD:
             try:
                 doc_context = file_upload.get_document_context()
                 if doc_context:
@@ -2249,11 +2250,18 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         "the content is already available.\n\n"
                         f"{doc_context}"
                     )
+                    # Auto-cleanup: delete documents after injecting into message
+                    try:
+                        for doc in file_upload.list_documents():
+                            file_upload.delete_document(doc['id'])
+                        logger.info("Documents auto-cleaned after injection into chat")
+                    except Exception as cleanup_err:
+                        logger.debug(f"Document cleanup failed: {cleanup_err}")
             except Exception as e:
                 logger.debug(f"Could not get document context: {e}")
         
-        # Inject RAG semantic search results if available
-        if RAG_AVAILABLE:
+        # Inject RAG semantic search results if available AND enabled
+        if RAG_AVAILABLE and ENABLE_RAG:
             try:
                 rag_context = rag.get_rag_context(user_message)
                 if rag_context:
@@ -3478,8 +3486,8 @@ def upload_document():
             tags=tags
         )
         
-        # Auto-index in RAG if available
-        if RAG_AVAILABLE:
+        # Auto-index in RAG if available AND enabled
+        if RAG_AVAILABLE and ENABLE_RAG:
             doc_info = file_upload.get_document(doc_id)
             if doc_info:
                 rag.index_document(

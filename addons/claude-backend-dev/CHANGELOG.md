@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.3.24-dev
+- **FIX**: OOM crash (signal 9) when sending file with message
+- **FIX**: Context injection now respects ENABLE_FILE_UPLOAD and ENABLE_RAG flags
+- **FIX**: RAG auto-indexing on upload now checks ENABLE_RAG (was always running)
+- **FIX**: Flask MAX_CONTENT_LENGTH set to 10MB to prevent memory exhaustion
+- **FIX**: Documents auto-cleaned from storage after injection into chat message
+- **FIX**: Frontend upload limit reduced from 50MB to 10MB (matches backend)
+
 ## 3.3.23-dev
 - **FIX**: NameError in f-string comment - escaped curly braces in JavaScript comment
 

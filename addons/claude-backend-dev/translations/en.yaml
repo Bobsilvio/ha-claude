@@ -41,3 +41,21 @@ configuration:
   max_retries:
     name: Max Retries
     description: Maximum retry attempts for failed API calls (default 3)
+  colored_logs:
+    name: Colored Logs
+    description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
+  log_level:
+    name: Log Level
+    description: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
+  enable_voice:
+    name: Enable Voice
+    description: "[EXPERIMENTAL] Enable voice input/output - microphone and speaker buttons appear in chat"
+  enable_memory:
+    name: Enable Memory
+    description: "[EXPERIMENTAL] Enable persistent memory - AI remembers past conversations across sessions"
+  enable_file_upload:
+    name: Enable File Upload
+    description: "[EXPERIMENTAL] Allow uploading documents (PDF, DOCX, TXT, MD, YAML) for AI analysis"
+  enable_rag:
+    name: Enable RAG
+    description: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search and context injection"

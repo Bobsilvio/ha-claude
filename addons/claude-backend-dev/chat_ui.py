@@ -161,7 +161,7 @@ def get_chat_ui():
             "connected": "Connected",
             "waiting_response": "Waiting for response",
             "remove_document": "Remove document",
-            "file_too_large": "File too large (max 50MB)",
+            "file_too_large": "File too large (max 10MB)",
             "uploading_document": "Uploading document...",
             "upload_failed": "Upload failed",
             "upload_error": "Upload error",
@@ -241,7 +241,7 @@ def get_chat_ui():
             "connected": "Connesso",
             "waiting_response": "In attesa della risposta",
             "remove_document": "Rimuovi documento",
-            "file_too_large": "File troppo grande (max 50MB)",
+            "file_too_large": "File troppo grande (max 10MB)",
             "uploading_document": "Caricamento documento...",
             "upload_failed": "Upload fallito",
             "upload_error": "Errore upload",
@@ -321,7 +321,7 @@ def get_chat_ui():
             "connected": "Conectado",
             "waiting_response": "Esperando respuesta",
             "remove_document": "Eliminar documento",
-            "file_too_large": "Archivo demasiado grande (máx 50MB)",
+            "file_too_large": "Archivo demasiado grande (máx 10MB)",
             "uploading_document": "Subiendo documento...",
             "upload_failed": "Subida fallida",
             "upload_error": "Error de subida",
@@ -876,9 +876,9 @@ def get_chat_ui():
             const file = event.target.files[0];
             if (!file) return;
 
-            const maxSize = 50 * 1024 * 1024; // 50MB
+            const maxSize = 10 * 1024 * 1024; // 10MB
             if (file.size > maxSize) {{
-                alert(T.file_too_large || 'File too large (max 50MB)');
+                alert(T.file_too_large || 'File too large (max 10MB)');
                 document.getElementById('documentInput').value = '';
                 return;
             }}
