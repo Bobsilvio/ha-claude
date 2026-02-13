@@ -614,9 +614,25 @@ def get_chat_ui():
         const splitterEl = document.getElementById('sidebarSplitter');
         let sending = false;
         let currentReader = null;
-        let currentSessionId = localStorage.getItem('currentSessionId') || Date.now().toString();
+        function safeLocalStorageGet(key) {{
+            try {{
+                return localStorage.getItem(key);
+            }} catch (e) {{
+                return null;
+            }}
+        }}
+
+        function safeLocalStorageSet(key, value) {{
+            try {{
+                localStorage.setItem(key, value);
+            }} catch (e) {{
+                // ignore
+            }}
+        }}
+
+        let currentSessionId = safeLocalStorageGet('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
-        let readOnlyMode = localStorage.getItem('readOnlyMode') === 'true';
+        let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
         let currentProviderId = '{api.AI_PROVIDER}';
 
         const ANALYZING_BY_PROVIDER = {{
@@ -670,7 +686,7 @@ def get_chat_ui():
             const maxWidth = 500;
             const storageKey = 'chatSidebarWidth';
 
-            const saved = parseInt(localStorage.getItem(storageKey) || '', 10);
+            const saved = parseInt(safeLocalStorageGet(storageKey) || '', 10);
             if (!Number.isNaN(saved)) {{
                 const w = Math.max(minWidth, Math.min(maxWidth, saved));
                 sidebarEl.style.width = w + 'px';
@@ -701,7 +717,7 @@ def get_chat_ui():
                 dragging = false;
                 document.body.classList.remove('resizing');
                 const finalW = Math.round(sidebarEl.getBoundingClientRect().width);
-                localStorage.setItem(storageKey, String(finalW));
+                safeLocalStorageSet(storageKey, String(finalW));
             }});
         }}
 
@@ -747,7 +763,7 @@ def get_chat_ui():
 
         function toggleReadOnly(checked) {{
             readOnlyMode = checked;
-            localStorage.setItem('readOnlyMode', checked ? 'true' : 'false');
+            safeLocalStorageSet('readOnlyMode', checked ? 'true' : 'false');
             const label = document.getElementById('readOnlyLabel');
             if (label) label.textContent = checked ? T.readonly_on : T.readonly_off;
             const wrapper = document.querySelector('.readonly-toggle');
@@ -1629,7 +1645,7 @@ def get_chat_ui():
 
         async function loadConversation(sessionId) {{
             currentSessionId = sessionId;
-            localStorage.setItem('currentSessionId', sessionId);
+            safeLocalStorageSet('currentSessionId', sessionId);
             try {{
                 const resp = await fetch(apiUrl(`api/conversations/${{sessionId}}`));
                 if (resp.status === 404) {{
@@ -1667,7 +1683,7 @@ def get_chat_ui():
 
         async function newChat() {{
             currentSessionId = Date.now().toString();
-            localStorage.setItem('currentSessionId', currentSessionId);
+            safeLocalStorageSet('currentSessionId', currentSessionId);
             chat.innerHTML = `<div class="message system">
                 {msgs['welcome']}<br>
                 {msgs['provider_model']}<br>
@@ -1824,7 +1840,7 @@ def get_chat_ui():
             if (!btn) return;
 
             const cursorKey = 'nvidiaTestCursor';
-            const cursor = parseInt(localStorage.getItem(cursorKey) || '0', 10) || 0;
+            const cursor = parseInt(safeLocalStorageGet(cursorKey) || '0', 10) || 0;
 
             const oldText = btn.textContent;
             btn.disabled = true;
@@ -1839,10 +1855,10 @@ def get_chat_ui():
 
                 if (response.ok && data && data.success) {{
                     if (typeof data.next_cursor === 'number') {{
-                        localStorage.setItem(cursorKey, String(data.next_cursor));
+                        safeLocalStorageSet(cursorKey, String(data.next_cursor));
                     }}
                     if (typeof data.remaining === 'number' && data.remaining <= 0) {{
-                        localStorage.setItem(cursorKey, '0');
+                        safeLocalStorageSet(cursorKey, '0');
                     }}
                     const parts = [];
                     parts.push(T.nvidia_test_result.replace('{{ok}}', data.ok).replace('{{removed}}', data.removed).replace('{{tested}}', data.tested).replace('{{total}}', data.total));
