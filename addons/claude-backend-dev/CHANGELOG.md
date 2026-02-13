@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.4-dev
+- Fix feature flags not passed to addon environment
+- Map enable_file_upload, enable_voice, enable_memory, enable_rag to env vars
+- Buttons now properly appear when features are enabled
+- Important: Restart addon after enabling features for env vars to take effect
+
 ## 3.3.3-dev
 - Add UI controls for file upload and voice recording in chat interface
 - File upload button (📄) - import PDF, DOCX, TXT, MD documents to RAG
