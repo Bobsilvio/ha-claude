@@ -2333,6 +2333,30 @@ def ui_main_js():
     js = (m.group(1) if m else "")
     if not js:
         logger.error("ui_main.js extraction failed: no inline <script> found")
+        return js, 200, {'Content-Type': 'application/javascript; charset=utf-8'}
+    
+    # Fix newlines that break regex patterns (from Python/source line wrapping)
+    # Only collapse newlines within regex delimiters: /...NEWLINE.../
+    # Must NOT match across lines with // comments
+    lines = js.split('\n')
+    result = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        # Check if line ends with / and next line could complete it
+        if i < len(lines) - 1 and line.rstrip().endswith('/') and not line.rstrip().endswith('//'):
+            # This line might be an incomplete regex - the / without closing /
+            next_line = lines[i + 1]
+            # If the next line starts with potential regex continuation
+            if re.match(r'^\s*[^/]*?/[igm]*', next_line):
+                # Likely a regex split across lines - join them
+                result.append(line.rstrip() + ' ' + next_line.lstrip())
+                i += 2
+                continue
+        result.append(line)
+        i += 1
+    js = '\n'.join(result)
+    
     return js, 200, {
         'Content-Type': 'application/javascript; charset=utf-8',
         'Cache-Control': 'no-store, max-age=0',

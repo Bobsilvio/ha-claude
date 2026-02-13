@@ -908,11 +908,8 @@ def get_chat_ui():
 
         function extractNumberedEntityOptions(text) {{
             if (!text || typeof text !== 'string') return [];
-            // Handles common formats:
-            // 1) light.kitchen — Kitchen
-            // 1. `light.kitchen`
-            // 1) Bagno piccolo\n   entity_id: light.bathroom
-            const lines = String(text).split(/\r?\n/);
+            // Handles formats like: 1) light.kitchen — Kitchen, 1. `light.kitchen`, option 1) device name
+            const lines = String(text).split(/\\r?\\n/);
             const out = [];
             const seenNum = new Set();
 
