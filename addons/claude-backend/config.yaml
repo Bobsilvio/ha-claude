@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: AI Assistant for Home Assistant
-version: "3.2.26"
+version: "3.2.27"
 slug: claude-backend
 description: >-
   AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -38,24 +38,54 @@ options:
   api_port: "5000"
   debug_mode: false
   colored_logs: true
+  log_level: normal
   enable_file_access: false
   language: en
   timeout: "30"
   max_retries: "3"
 schema:
-  anthropic_api_key: password?
-  openai_api_key: password?
-  google_api_key: password?
-  github_token: password?
-  nvidia_api_key: password?
-  nvidia_thinking_mode: bool?
-  api_port: str
-  debug_mode: bool?
-  colored_logs: bool?
-  enable_file_access: bool?
-  language: list(en|it|es|fr)?
-  timeout: str?
-  max_retries: str?
+  anthropic_api_key:
+    password?: true
+    description: API key for Anthropic Claude models
+  openai_api_key:
+    password?: true
+    description: API key for OpenAI ChatGPT models
+  google_api_key:
+    password?: true
+    description: API key for Google Gemini models
+  github_token:
+    password?: true
+    description: GitHub token for accessing Models API
+  nvidia_api_key:
+    password?: true
+    description: API key for NVIDIA NIM models
+  nvidia_thinking_mode:
+    bool?: true
+    description: Enable NVIDIA Thinking mode for deeper reasoning (experimental)
+  api_port:
+    str: null
+    description: Port for the API server (default: 5000)
+  debug_mode:
+    bool?: true
+    description: Show verbose debugging information including HTTP headers and detailed traces
+  colored_logs:
+    bool?: true
+    description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
+  log_level:
+    list(normal|verbose|debug)?: null
+    description: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
+  enable_file_access:
+    bool?: true
+    description: Allow AI assistant to read files from Home Assistant config directory
+  language:
+    list(en|it|es|fr)?: null
+    description: UI language for error messages and responses
+  timeout:
+    str?: null
+    description: Request timeout in seconds (default: 30)
+  max_retries:
+    str?: null
+    description: Maximum retry attempts for failed API requests (default: 3)
 documentation: https://github.com/Bobsilvio/ha-claude
 support: https://github.com/Bobsilvio/ha-claude/issues
 maintainers:

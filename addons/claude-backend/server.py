@@ -14,6 +14,7 @@ def main() -> None:
     api.logger.info(f"Provider: {api.AI_PROVIDER} | Model: {api.get_active_model()}")
     api.logger.info(f"API Key: {'configured' if api.get_api_key() else 'NOT configured'}")
     api.logger.info(f"HA Token: {'available' if api.get_ha_token() else 'NOT available'}")
+    api.logger.info(f"Log Level: {api.LOG_LEVEL.upper()} | Colored Logs: {api.COLORED_LOGS} | Debug Mode: {api.DEBUG_MODE}")
 
     # Validate provider/model compatibility
     is_valid, error_msg = api.validate_model_provider_compatibility()

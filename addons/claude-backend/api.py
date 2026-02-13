@@ -62,6 +62,7 @@ DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 COLORED_LOGS = os.getenv("COLORED_LOGS", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
+LOG_LEVEL = os.getenv("LOG_LEVEL", "normal").lower()  # Supported: normal, verbose, debug
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
@@ -176,6 +177,15 @@ def _log_request_start() -> None:
     if request.method == "OPTIONS" and not DEBUG_MODE:
         return
 
+    # Filter noisy endpoints in normal log level
+    if LOG_LEVEL == "normal":
+        # Skip logging for health checks and streaming endpoints
+        if request.path == "/api/ui_ping" or (request.path == "/api/chat/stream" and request.method == "POST"):
+            g._skip_log = True
+            return
+
+    g._skip_log = False
+
     meta = _safe_request_meta()
     logger.info(
         f"[{g._req_id}] → {request.method} {request.path}"
@@ -189,6 +199,10 @@ def _log_request_start() -> None:
 def _log_request_end(response: Response) -> Response:
     try:
         if request.method == "OPTIONS" and not DEBUG_MODE:
+            return response
+
+        # Skip logging for noisy endpoints in normal log level
+        if getattr(g, "_skip_log", False):
             return response
 
         rid = getattr(g, "_req_id", "")
