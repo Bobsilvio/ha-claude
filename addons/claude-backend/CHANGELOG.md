@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.2.16
+- Fix: prevent 500 on `/` caused by unescaped `{n}` placeholder inside the chat UI template (conversation grouping labels).
+
 ## 3.2.15
 - Fix: remove Python SyntaxWarning "invalid escape sequence" in `chat_ui.py` (escape backslashes in embedded JS regex literals).
 

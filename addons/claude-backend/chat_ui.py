@@ -1523,8 +1523,8 @@ def get_chat_ui():
                         if (diffDays === 0) return (T.today || 'Today');
                         if (diffDays === 1) return (T.yesterday || 'Yesterday');
                         if (diffDays >= 2 && diffDays <= 6) {{
-                            const tpl = (T.days_ago || '{n} days ago');
-                            return tpl.replace('{n}', String(diffDays));
+                            const tpl = (T.days_ago || '{{n}} days ago');
+                            return tpl.replace('{{n}}', String(diffDays));
                         }}
 
                         const sameYear = d.getFullYear() === now.getFullYear();
