@@ -2739,8 +2739,14 @@ def api_chat_stream():
     abort_streams[session_id] = False  # Reset abort flag
 
     def generate():
-        for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        try:
+            for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.error(f"❌ Stream error in stream_chat_with_ai: {type(e).__name__}: {str(e)}", extra={"context": "REQUEST"})
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}", extra={"context": "REQUEST"})
+            yield f"data: {json.dumps({'error': f'Stream error: {str(e)}'}, ensure_ascii=False)}\n\n"
 
     return Response(
         stream_with_context(generate()),

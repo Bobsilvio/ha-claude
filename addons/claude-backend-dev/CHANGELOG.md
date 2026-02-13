@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.9-dev
+- Add error handling to stream endpoint to catch and log actual exceptions
+- Stream errors now show in logs instead of silently failing in waitress
+- Debug mode improvements for troubleshooting chat issues
+
 ## 3.3.8-dev
 - Fix feature flags mapping: use run script to read from addon config (like other options)
 - Add ENABLE_VOICE, ENABLE_MEMORY, ENABLE_FILE_UPLOAD, ENABLE_RAG to run script
