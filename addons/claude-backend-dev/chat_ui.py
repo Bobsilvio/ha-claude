@@ -160,6 +160,19 @@ def get_chat_ui():
             "sending_request": "Sending request",
             "connected": "Connected",
             "waiting_response": "Waiting for response",
+            "remove_document": "Remove document",
+            "file_too_large": "File too large (max 50MB)",
+            "uploading_document": "Uploading document...",
+            "upload_failed": "Upload failed",
+            "upload_error": "Upload error",
+            "unknown_error": "Unknown error",
+            "document_uploaded": "Document uploaded",
+            "mic_not_supported": "Browser does not support audio recording. Use HTTPS or a compatible browser.",
+            "mic_denied_settings": "Microphone access denied. Go to browser settings to enable it.",
+            "mic_denied_icon": "Microphone denied. Click the 🔒 icon in the browser bar to enable it.",
+            "mic_not_found": "No microphone found. Connect a microphone and try again.",
+            "mic_in_use": "Microphone in use by another app. Close other apps and try again.",
+            "mic_error": "Microphone error",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -227,6 +240,19 @@ def get_chat_ui():
             "sending_request": "Invio richiesta",
             "connected": "Connesso",
             "waiting_response": "In attesa della risposta",
+            "remove_document": "Rimuovi documento",
+            "file_too_large": "File troppo grande (max 50MB)",
+            "uploading_document": "Caricamento documento...",
+            "upload_failed": "Upload fallito",
+            "upload_error": "Errore upload",
+            "unknown_error": "Errore sconosciuto",
+            "document_uploaded": "Documento caricato",
+            "mic_not_supported": "Il browser non supporta la registrazione audio. Usa HTTPS o un browser compatibile.",
+            "mic_denied_settings": "Accesso al microfono negato. Vai nelle impostazioni del browser per abilitarlo.",
+            "mic_denied_icon": "Permesso microfono negato. Clicca l'icona 🔒 nella barra del browser per abilitarlo.",
+            "mic_not_found": "Nessun microfono trovato. Collega un microfono e riprova.",
+            "mic_in_use": "Microfono in uso da un'altra app. Chiudi le altre app e riprova.",
+            "mic_error": "Errore microfono",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -294,6 +320,19 @@ def get_chat_ui():
             "sending_request": "Enviando solicitud",
             "connected": "Conectado",
             "waiting_response": "Esperando respuesta",
+            "remove_document": "Eliminar documento",
+            "file_too_large": "Archivo demasiado grande (máx 50MB)",
+            "uploading_document": "Subiendo documento...",
+            "upload_failed": "Subida fallida",
+            "upload_error": "Error de subida",
+            "unknown_error": "Error desconocido",
+            "document_uploaded": "Documento subido",
+            "mic_not_supported": "El navegador no soporta grabación de audio. Usa HTTPS o un navegador compatible.",
+            "mic_denied_settings": "Acceso al micrófono denegado. Ve a los ajustes del navegador para habilitarlo.",
+            "mic_denied_icon": "Permiso de micrófono denegado. Haz clic en el icono 🔒 en la barra del navegador.",
+            "mic_not_found": "No se encontró micrófono. Conecta un micrófono e inténtalo de nuevo.",
+            "mic_in_use": "Micrófono en uso por otra app. Cierra las otras apps e inténtalo de nuevo.",
+            "mic_error": "Error de micrófono",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -612,7 +651,7 @@ def get_chat_ui():
                 <div class="doc-preview-name" id="docPreviewName"></div>
                 <div class="doc-preview-size" id="docPreviewSize"></div>
             </div>
-            <button class="remove-doc-btn" id="removeDocBtn" title="Rimuovi documento">×</button>
+            <button class="remove-doc-btn" id="removeDocBtn" title="">×</button>
         </div>
         <div class="input-row">
             <input type="file" id="imageInput" accept="image/*" style="display: none;" />
@@ -839,7 +878,7 @@ def get_chat_ui():
 
             const maxSize = 50 * 1024 * 1024; // 50MB
             if (file.size > maxSize) {{
-                alert('File troppo grande (max 50MB)');
+                alert(T.file_too_large || 'File too large (max 50MB)');
                 document.getElementById('documentInput').value = '';
                 return;
             }}
@@ -859,7 +898,7 @@ def get_chat_ui():
             if (!isRecording) {{
                 // Check if browser supports getUserMedia
                 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {{
-                    addMessage('❌ Il browser non supporta la registrazione audio. Usa HTTPS o un browser compatibile.', 'system');
+                    addMessage('❌ ' + (T.mic_not_supported || 'Browser does not support audio recording. Use HTTPS or a compatible browser.'), 'system');
                     return;
                 }}
 
@@ -868,7 +907,7 @@ def get_chat_ui():
                     try {{
                         const permStatus = await navigator.permissions.query({{ name: 'microphone' }});
                         if (permStatus.state === 'denied') {{
-                            addMessage('🎤 Accesso al microfono negato. Vai nelle impostazioni del browser per abilitarlo.', 'system');
+                            addMessage('🎤 ' + (T.mic_denied_settings || 'Microphone access denied. Go to browser settings to enable it.'), 'system');
                             return;
                         }}
                     }} catch (e) {{
@@ -898,13 +937,13 @@ def get_chat_ui():
                     btn.title = 'Stop Recording';
                 }} catch (error) {{
                     if (error.name === 'NotAllowedError') {{
-                        addMessage('🎤 Permesso microfono negato. Clicca sull\'icona 🔒 nella barra del browser per abilitarlo.', 'system');
+                        addMessage('🎤 ' + (T.mic_denied_icon || 'Microphone denied. Click the 🔒 icon in the browser bar to enable it.'), 'system');
                     }} else if (error.name === 'NotFoundError') {{
-                        addMessage('🎤 Nessun microfono trovato. Collega un microfono e riprova.', 'system');
+                        addMessage('🎤 ' + (T.mic_not_found || 'No microphone found. Connect a microphone and try again.'), 'system');
                     }} else if (error.name === 'NotReadableError') {{
-                        addMessage('🎤 Microfono in uso da un\'altra app. Chiudi le altre app e riprova.', 'system');
+                        addMessage('🎤 ' + (T.mic_in_use || 'Microphone in use by another app. Close other apps and try again.'), 'system');
                     }} else {{
-                        addMessage(`🎤 Errore microfono: ${{error.message || error.name}}`, 'system');
+                        addMessage(`🎤 ${{T.mic_error || 'Microphone error'}}: ${{error.message || error.name}}`, 'system');
                     }}
                 }}
             }} else {{
@@ -1544,7 +1583,7 @@ def get_chat_ui():
                     addMessage(displayText, 'user', imageToSendDoc);
                     showThinking();
                     startThinkingTicker(getAnalyzingMsg());
-                    addThinkingStep('📤 Caricamento documento...');
+                    addThinkingStep(`📤 ${{T.uploading_document || 'Uploading document...'}}`);
                     try {{
                         const formData = new FormData();
                         formData.append('file', docToSend);
@@ -1557,14 +1596,14 @@ def get_chat_ui():
                             docUploaded = true;
                         }} else {{
                             const err = await upResp.json().catch(() => ({{}}));
-                            addMessage(`❌ Upload fallito: ${{err.error || 'Errore sconosciuto'}}`, 'system');
+                            addMessage(`❌ ${{T.upload_failed || 'Upload failed'}}: ${{err.error || T.unknown_error || 'Unknown error'}}`, 'system');
                             sending = false;
                             setStopMode(false);
                             removeThinking();
                             return;
                         }}
                     }} catch (upErr) {{
-                        addMessage(`❌ Errore upload: ${{upErr.message}}`, 'system');
+                        addMessage(`❌ ${{T.upload_error || 'Upload error'}}: ${{upErr.message}}`, 'system');
                         sending = false;
                         setStopMode(false);
                         removeThinking();
@@ -1594,7 +1633,7 @@ def get_chat_ui():
                 }}, 8000);
 
                 const payload = {{
-                    message: text || `[Documento caricato: ${{docToSend ? docToSend.name : ''}}]`,
+                    message: text || `[${{T.document_uploaded || 'Document uploaded'}}: ${{docToSend ? docToSend.name : ''}}]`,
                     session_id: currentSessionId,
                     read_only: readOnlyMode
                 }};
@@ -2187,7 +2226,10 @@ def get_chat_ui():
                 if (fileBtn) fileBtn.addEventListener('click', () => documentInput && documentInput.click());
 
                 const removeDocBtn = document.getElementById('removeDocBtn');
-                if (removeDocBtn) removeDocBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeDocument(); }});
+                if (removeDocBtn) {{
+                    removeDocBtn.title = T.remove_document || 'Remove document';
+                    removeDocBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeDocument(); }});
+                }}
 
                 const voiceBtn = document.getElementById('voiceRecordBtn');
                 if (voiceBtn) voiceBtn.addEventListener('click', toggleVoiceRecording);

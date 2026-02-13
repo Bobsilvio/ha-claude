@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.3.22-dev
+- **FEAT**: Document upload with preview bar (like images) - select file, write message, send together
+- **FEAT**: AI instructed not to use tools to read uploaded files (content already injected)
+- **FIX**: Microphone permission handling with Permissions API and specific error messages
+- **FIX**: All hardcoded Italian strings replaced with multilingual translations (en/it/es/fr)
+- Added 12 new translation keys: document upload, microphone messages
+- Upload errors now abort gracefully instead of sending empty message to AI
+
 ## 3.3.21-dev
 - **FIX**: Document context now includes actual file content (not just metadata)
 - AI can now read and analyze uploaded documents directly
