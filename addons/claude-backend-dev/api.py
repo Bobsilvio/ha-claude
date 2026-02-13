@@ -3450,7 +3450,7 @@ def clear_conversation():
 @app.route("/api/documents/upload", methods=["POST"])
 def upload_document():
     """Upload a document (PDF, DOCX, TXT, MD, etc.)."""
-    if not FILE_UPLOAD_AVAILABLE:
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
         return jsonify({"error": "File upload feature not available"}), 503
     
     if "file" not in request.files:
@@ -3502,7 +3502,7 @@ def upload_document():
 @app.route("/api/documents", methods=["GET"])
 def list_documents():
     """List uploaded documents."""
-    if not FILE_UPLOAD_AVAILABLE:
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
         return jsonify({"error": "File upload feature not available"}), 503
     
     try:
@@ -3517,7 +3517,7 @@ def list_documents():
 @app.route("/api/documents/<doc_id>", methods=["GET"])
 def get_document(doc_id):
     """Get a specific document."""
-    if not FILE_UPLOAD_AVAILABLE:
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
         return jsonify({"error": "File upload feature not available"}), 503
     
     try:
@@ -3533,7 +3533,7 @@ def get_document(doc_id):
 @app.route("/api/documents/search", methods=["GET"])
 def search_documents():
     """Search documents by query."""
-    if not FILE_UPLOAD_AVAILABLE:
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
         return jsonify({"error": "File upload feature not available"}), 503
     
     query = request.args.get("q", "")
@@ -3551,7 +3551,7 @@ def search_documents():
 @app.route("/api/documents/<doc_id>", methods=["DELETE"])
 def delete_document(doc_id):
     """Delete a document."""
-    if not FILE_UPLOAD_AVAILABLE:
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
         return jsonify({"error": "File upload feature not available"}), 503
     
     try:
@@ -3571,7 +3571,7 @@ def delete_document(doc_id):
 @app.route("/api/documents/stats", methods=["GET"])
 def document_stats():
     """Get document upload statistics."""
-    if not FILE_UPLOAD_AVAILABLE:
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
         return jsonify({"error": "File upload feature not available"}), 503
     
     try:

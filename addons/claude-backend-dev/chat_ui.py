@@ -597,23 +597,23 @@ def get_chat_ui():
     <div class="input-area">
         <div id="imagePreviewContainer" class="image-preview-container">
             <img id="imagePreview" class="image-preview" />
-            <button class="remove-image-btn" onclick="removeImage()" title="{ui_js['remove_image']}">×</button>
+            <button class="remove-image-btn" title="{ui_js['remove_image']}">×</button>
         </div>
         <div class="input-row">
-            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)" />
-            <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="{ui_js['upload_image']}">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" />
+            <button class="image-btn" title="{ui_js['upload_image']}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </button>
-            <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.yaml,.yml,.odt" style="display: none;" onchange="handleDocumentSelect(event)" />
-            <button class="file-btn" onclick="document.getElementById('documentInput').click()" title="Upload Document (PDF, DOCX, TXT, MD, YAML)" style="display: {file_upload_display};" id="fileUploadBtn">
+            <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.yaml,.yml,.odt" style="display: none;" />
+            <button class="file-btn" title="Upload Document (PDF, DOCX, TXT, MD, YAML)" style="display: {file_upload_display};" id="fileUploadBtn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
             </button>
             <input type="hidden" id="voiceInput" />
-            <button class="voice-btn" onclick="toggleVoiceRecording()" title="Record Voice" style="display: {voice_display};" id="voiceRecordBtn">
+            <button class="voice-btn" title="Record Voice" style="display: {voice_display};" id="voiceRecordBtn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v12a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2m14 0a7 7 0 0 0-14 0v2"/></svg>
             </button>
-            <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
-            <button id="sendBtn" onclick="handleButtonClick()">
+            <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}"></textarea>
+            <button id="sendBtn">
                 <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
             </button>
@@ -2092,6 +2092,14 @@ def get_chat_ui():
 
                 const removeBtn = document.querySelector('.remove-image-btn');
                 if (removeBtn) removeBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeImage(); }});
+
+                const documentInput = document.getElementById('documentInput');
+                if (documentInput) documentInput.addEventListener('change', handleDocumentSelect);
+                const fileBtn = document.getElementById('fileUploadBtn');
+                if (fileBtn) fileBtn.addEventListener('click', () => documentInput && documentInput.click());
+
+                const voiceBtn = document.getElementById('voiceRecordBtn');
+                if (voiceBtn) voiceBtn.addEventListener('click', toggleVoiceRecording);
 
                 if (input) {{
                     input.addEventListener('keydown', handleKeyDown);

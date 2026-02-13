@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.20-dev
+- **FIX**: Add missing files to Dockerfile (file_upload.py, rag.py, memory.py, voice.py)
+- **FIX**: Duplicate model change messages (removed inline onclick handlers)
+- **FIX**: File upload checks both ENABLE_FILE_UPLOAD config and module availability
+- All event handlers now bound via JavaScript only (CSP-safe)
+
 ## 3.3.19-dev
 - **FIX**: File upload uses apiUrl() for correct HA Ingress routing
 - Removed undefined ingressPath variable
