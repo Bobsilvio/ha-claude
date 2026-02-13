@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.7-dev
+- Fix feature flags reading from Home Assistant addon config
+- Read enable_voice, enable_memory, enable_file_upload, enable_rag from /root/options.json
+- These settings now take effect immediately (no env var templating needed)
+- Buttons and features should now work when enabled in addon config
+
 ## 3.3.6-dev
 - Fix environment variable template syntax for feature flags
 - Use Jinja2 templates in config.yaml for proper boolean to string conversion

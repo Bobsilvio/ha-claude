@@ -88,11 +88,26 @@ COLORED_LOGS = os.getenv("COLORED_LOGS", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
 LOG_LEVEL = os.getenv("LOG_LEVEL", "normal").lower()  # Supported: normal, verbose, debug
-# Feature flags for experimental features
-ENABLE_VOICE = os.getenv("ENABLE_VOICE", "False").lower() == "true"
-ENABLE_MEMORY = os.getenv("ENABLE_MEMORY", "False").lower() == "true"
-ENABLE_FILE_UPLOAD = os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true"
-ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
+
+# Feature flags: read from Home Assistant options.json (takes priority) or env vars
+def _load_feature_flags():
+    """Load feature flags from options.json (Home Assistant config) or env vars"""
+    options = {}
+    try:
+        with open("/root/options.json", "r") as f:
+            options = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    
+    # Priority: options.json > env vars > False
+    enable_voice = options.get("enable_voice", os.getenv("ENABLE_VOICE", "False").lower() == "true")
+    enable_memory = options.get("enable_memory", os.getenv("ENABLE_MEMORY", "False").lower() == "true")
+    enable_file_upload = options.get("enable_file_upload", os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true")
+    enable_rag = options.get("enable_rag", os.getenv("ENABLE_RAG", "False").lower() == "true")
+    
+    return enable_voice, enable_memory, enable_file_upload, enable_rag
+
+ENABLE_VOICE, ENABLE_MEMORY, ENABLE_FILE_UPLOAD, ENABLE_RAG = _load_feature_flags()
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
