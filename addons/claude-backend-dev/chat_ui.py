@@ -714,7 +714,7 @@ def get_chat_ui():
 
         let currentSessionId = safeLocalStorageGet('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
-        let pendingDocument = null;  // Stores {file, name, size} for upload on send
+        let pendingDocument = null;  // Stores {{file, name, size}} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
         let currentProviderId = '{api.AI_PROVIDER}';
 

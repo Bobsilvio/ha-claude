@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.3.23-dev
+- **FIX**: NameError in f-string comment - escaped curly braces in JavaScript comment
+
 ## 3.3.22-dev
 - **FEAT**: Document upload with preview bar (like images) - select file, write message, send together
 - **FEAT**: AI instructed not to use tools to read uploaded files (content already injected)
