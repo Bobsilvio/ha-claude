@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.19-dev
+- **FIX**: File upload uses apiUrl() for correct HA Ingress routing
+- Removed undefined ingressPath variable
+
 ## 3.3.18-dev
 - **FIX**: Function scope error - handleDocumentSelect not defined
 - Moved window exports inside proper scope

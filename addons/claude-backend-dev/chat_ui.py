@@ -809,12 +809,9 @@ def get_chat_ui():
                 formData.append('file', file);
                 formData.append('note', `Uploaded: ${{new Date().toLocaleString()}}`);
                 
-                const response = await fetch('/api/documents/upload', {{
+                const response = await fetch(apiUrl('/api/documents/upload'), {{
                     method: 'POST',
-                    body: formData,
-                    headers: {{
-                        'X-Ingress-Path': ingressPath || ''
-                    }}
+                    body: formData
                 }});
                 
                 if (response.ok) {{
