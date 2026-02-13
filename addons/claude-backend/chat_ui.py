@@ -117,6 +117,7 @@ def get_chat_ui():
             "copy_btn": "Copy",
             "copied": "Copied!",
             "request_failed": "Request failed ({status}): {body}",
+            "rate_limit_error": "Rate limit exceeded. Please wait a moment before trying again.",
             "unexpected_response": "Unexpected response from server.",
             "error_prefix": "Error: ",
             "connection_lost": "Connection lost. Try again.",
@@ -183,6 +184,7 @@ def get_chat_ui():
             "copy_btn": "Copia",
             "copied": "Copiato!",
             "request_failed": "Richiesta fallita ({status}): {body}",
+            "rate_limit_error": "Limite di velocit\u00e0 superato. Attendi un momento prima di riprovare.",
             "unexpected_response": "Risposta inattesa dal server.",
             "error_prefix": "Errore: ",
             "connection_lost": "Connessione interrotta. Riprova.",
@@ -249,6 +251,7 @@ def get_chat_ui():
             "copy_btn": "Copiar",
             "copied": "¡Copiado!",
             "request_failed": "Solicitud fallida ({status}): {body}",
+            "rate_limit_error": "Límite de velocidad superado. Espera un momento antes de reintentar.",
             "unexpected_response": "Respuesta inesperada del servidor.",
             "error_prefix": "Error: ",
             "connection_lost": "Conexión interrumpida. Inténtalo de nuevo.",
@@ -315,6 +318,7 @@ def get_chat_ui():
             "copy_btn": "Copier",
             "copied": "Copié !",
             "request_failed": "Requête échouée ({status}) : {body}",
+            "rate_limit_error": "Limite de débit dépassée. Veuillez attendre un moment avant de réessayer.",
             "unexpected_response": "Réponse inattendue du serveur.",
             "error_prefix": "Erreur : ",
             "connection_lost": "Connexion interrompue. Réessaie.",
@@ -1417,7 +1421,13 @@ def get_chat_ui():
 
                 if (!resp.ok) {{
                     const bodyText = await resp.text().catch(() => '');
-                    throw new Error(T.request_failed.replace('{{status}}', resp.status).replace('{{body}}', bodyText ? bodyText.slice(0, 200) : '')); 
+                    let errMsg = '';
+                    if (resp.status === 429) {{
+                        errMsg = T.rate_limit_error || 'Rate limit exceeded. Please wait a moment before trying again.';
+                    }} else {{
+                        errMsg = T.request_failed.replace('{{status}}', resp.status).replace('{{body}}', bodyText ? bodyText.slice(0, 100) : '');
+                    }}
+                    throw new Error(errMsg);
                 }}
 
                 const contentType = (resp.headers.get('content-type') || '').toLowerCase();
