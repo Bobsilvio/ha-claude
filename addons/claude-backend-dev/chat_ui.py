@@ -841,6 +841,25 @@ def get_chat_ui():
         async function toggleVoiceRecording() {{
             const btn = document.getElementById('voiceRecordBtn');
             if (!isRecording) {{
+                // Check if browser supports getUserMedia
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {{
+                    addMessage('❌ Il browser non supporta la registrazione audio. Usa HTTPS o un browser compatibile.', 'system');
+                    return;
+                }}
+
+                // Check permission status first (if Permissions API available)
+                if (navigator.permissions && navigator.permissions.query) {{
+                    try {{
+                        const permStatus = await navigator.permissions.query({{ name: 'microphone' }});
+                        if (permStatus.state === 'denied') {{
+                            addMessage('🎤 Accesso al microfono negato. Vai nelle impostazioni del browser per abilitarlo.', 'system');
+                            return;
+                        }}
+                    }} catch (e) {{
+                        // Permissions API may not support 'microphone' query in some browsers
+                    }}
+                }}
+
                 try {{
                     const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
                     mediaRecorder = new MediaRecorder(stream);
@@ -862,7 +881,15 @@ def get_chat_ui():
                     btn.style.backgroundColor = '#f44336';
                     btn.title = 'Stop Recording';
                 }} catch (error) {{
-                    alert('Microphone access denied. Enable in browser settings.');
+                    if (error.name === 'NotAllowedError') {{
+                        addMessage('🎤 Permesso microfono negato. Clicca sull\'icona 🔒 nella barra del browser per abilitarlo.', 'system');
+                    }} else if (error.name === 'NotFoundError') {{
+                        addMessage('🎤 Nessun microfono trovato. Collega un microfono e riprova.', 'system');
+                    }} else if (error.name === 'NotReadableError') {{
+                        addMessage('🎤 Microfono in uso da un\'altra app. Chiudi le altre app e riprova.', 'system');
+                    }} else {{
+                        addMessage(`🎤 Errore microfono: ${{error.message || error.name}}`, 'system');
+                    }}
                 }}
             }} else {{
                 if (mediaRecorder && isRecording) {{
