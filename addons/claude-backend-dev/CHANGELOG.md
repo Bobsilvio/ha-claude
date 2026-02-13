@@ -1,6 +1,6 @@
 # Changelog
 
-## 3.3.12-dev
+## 3.3.13-dev
 - Add YAML/YML file format support to document upload
 - Fix broken toggleVoiceRecording export: remove extra }} that was in wrong scope
 - Add MEMORY_AVAILABLE check to ALL memory endpoints (not just save)
