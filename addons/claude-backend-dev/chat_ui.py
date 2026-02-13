@@ -604,8 +604,8 @@ def get_chat_ui():
             <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="{ui_js['upload_image']}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </button>
-            <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.yaml,.yml,.odt" style="display: none;" onchange="handleDocumentSelect(event)" />
-            <button class="file-btn" onclick="document.getElementById('documentInput').click()" title="Upload Document (PDF, DOCX, TXT, MD, YAML)" style="display: {file_upload_display};" id="fileUploadBtn">
+            <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.odt" style="display: none;" onchange="handleDocumentSelect(event)" />
+            <button class="file-btn" onclick="document.getElementById('documentInput').click()" title="Upload Document (PDF, DOCX, TXT, MD)" style="display: {file_upload_display};" id="fileUploadBtn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
             </button>
             <input type="hidden" id="voiceInput" />
@@ -2111,6 +2111,7 @@ def get_chat_ui():
                 _appendSystemRaw('❌ UI boot error: ' + msg);
             }}
         }})();
+        }}
         
         // Export global functions for onclick handlers
         window.toggleVoiceRecording = toggleVoiceRecording;

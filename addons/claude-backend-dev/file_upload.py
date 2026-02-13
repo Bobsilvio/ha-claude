@@ -254,10 +254,12 @@ def get_document_context(limit: int = 3) -> str:
 def _extract_text_from_file(file_content: bytes, file_type: str) -> Tuple[bool, str]:
     """Extract text from file based on type.
     
+    Supports: txt, md, markdown, yaml, yml, pdf, docx, doc
+    
     Returns:
         (success, text)
     """
-    if file_type in ('txt', 'md', 'markdown'):
+    if file_type in ('txt', 'md', 'markdown', 'yaml', 'yml'):
         return _extract_text_plain(file_content)
     elif file_type == 'pdf':
         return _extract_text_pdf(file_content)

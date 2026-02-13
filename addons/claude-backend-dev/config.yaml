@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration (DEV)
 name: "AI Assistant DEV 🚧"
-version: "3.3.14-dev"
+version: "3.3.15-dev"
 slug: claude-backend-dev
 description: >-
   [DEVELOPMENT] AI-powered smart home assistant with experimental features:
