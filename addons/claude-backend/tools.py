@@ -1202,7 +1202,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "le", "la", "les", "un", "une", "de", "du", "des", "et", "ou",
             }
 
-            def _tokenize(text: str) -> List[str]:
+            def _tokenize(text):
                 if not text:
                     return []
                 parts = re.split(r"[\s_\-\.]+", text.lower())

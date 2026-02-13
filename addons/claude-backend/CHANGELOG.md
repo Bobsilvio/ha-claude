@@ -30,6 +30,9 @@
 
 ## 3.2.1
 
+
+## 3.2.11
+- Fix `search_entities` runtime error: "name 'List' is not defined".
 - Fix double AI response in saved/loaded conversations (OpenAI/GitHub provider)
 - Improve read-only toggle UX: eye icon, always-visible label, ON/OFF state indicator
 - Fix version badge: read dynamically from config.yaml
