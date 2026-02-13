@@ -7,13 +7,15 @@ import queue
 import re
 import time
 import threading
+import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, request, jsonify, Response, stream_with_context
+from flask import Flask, request, jsonify, Response, stream_with_context, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
+from werkzeug.exceptions import HTTPException
 
 import tools
 import intent
@@ -134,6 +136,103 @@ logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT 
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
 logger.info(f"LANGUAGE: {LANGUAGE}")
+
+
+def _truncate(s: str, max_len: int = 160) -> str:
+    if not s:
+        return ""
+    s = str(s)
+    return s if len(s) <= max_len else (s[: max_len - 1] + "…")
+
+
+def _get_client_ip() -> str:
+    xff = request.headers.get("X-Forwarded-For", "")
+    if xff:
+        return xff.split(",", 1)[0].strip()
+    return request.remote_addr or ""
+
+
+def _safe_request_meta() -> Dict[str, str]:
+    # Keep this intentionally small and never log secrets.
+    return {
+        "ip": _get_client_ip(),
+        "ua": _truncate(request.headers.get("User-Agent", ""), 140),
+        "origin": _truncate(request.headers.get("Origin", ""), 140),
+        "referer": _truncate(request.headers.get("Referer", ""), 140),
+        "xf_proto": request.headers.get("X-Forwarded-Proto", ""),
+        "xf_host": _truncate(request.headers.get("X-Forwarded-Host", ""), 120),
+        "xf_prefix": _truncate(request.headers.get("X-Forwarded-Prefix", ""), 140),
+        "ingress_path": _truncate(request.headers.get("X-Ingress-Path", ""), 140),
+    }
+
+
+@app.before_request
+def _log_request_start() -> None:
+    # Correlation id for log lines belonging to the same request.
+    g._req_id = uuid.uuid4().hex[:8]
+    g._t0 = time.monotonic()
+
+    # Avoid noisy preflight logs unless debug is enabled.
+    if request.method == "OPTIONS" and not DEBUG_MODE:
+        return
+
+    meta = _safe_request_meta()
+    logger.info(
+        f"[{g._req_id}] → {request.method} {request.path}"
+        f" | ip={meta['ip']} ua={meta['ua']}"
+        f" | ingress={meta['ingress_path']} xf_prefix={meta['xf_prefix']}",
+        extra={"context": "REQUEST"},
+    )
+
+
+@app.after_request
+def _log_request_end(response: Response) -> Response:
+    try:
+        if request.method == "OPTIONS" and not DEBUG_MODE:
+            return response
+
+        rid = getattr(g, "_req_id", "")
+        t0 = getattr(g, "_t0", None)
+        dur_ms = int((time.monotonic() - t0) * 1000) if t0 else -1
+        logger.info(
+            f"[{rid}] ← {request.method} {request.path}"
+            f" | {response.status_code} | {dur_ms}ms",
+            extra={"context": "RESPONSE"},
+        )
+    except Exception:
+        # Never fail a request due to logging.
+        pass
+    return response
+
+
+@app.errorhandler(HTTPException)
+def _log_http_exception(e: HTTPException):
+    # Log HTTP errors but preserve their status codes and bodies.
+    rid = getattr(g, "_req_id", "")
+    meta = _safe_request_meta()
+    logger.warning(
+        f"[{rid}] HTTP {e.code} during {request.method} {request.path}"
+        f" | ip={meta['ip']} ua={meta['ua']} ingress={meta['ingress_path']}: {e}",
+        extra={"context": "SYSTEM"},
+    )
+    return e
+
+
+@app.errorhandler(Exception)
+def _log_unhandled_exception(e: Exception):
+    # Log full traceback in add-on logs for cases where the UI can't display anything.
+    rid = getattr(g, "_req_id", "")
+    meta = _safe_request_meta()
+    logger.exception(
+        f"[{rid}] Unhandled exception during {request.method} {request.path}"
+        f" | ip={meta['ip']} ua={meta['ua']} ingress={meta['ingress_path']}: {type(e).__name__}: {e}",
+        extra={"context": "SYSTEM"},
+    )
+
+    # Preserve current behavior as much as possible: API routes return JSON, UI returns a minimal text.
+    if request.path.startswith("/api/"):
+        return jsonify({"success": False, "error": "Internal server error"}), 500
+    return "Internal server error", 500
 
 
 def _extract_http_error_code(error_text: str) -> Optional[int]:
@@ -2364,7 +2463,13 @@ def api_set_system_prompt():
 @app.route('/api/chat', methods=['POST'])
 def api_chat():
     """Chat endpoint."""
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if data is None or not isinstance(data, dict):
+        logger.warning(
+            f"Invalid JSON body for /api/chat (content_type={request.content_type}, len={request.content_length})",
+            extra={"context": "REQUEST"},
+        )
+        return jsonify({"error": "Invalid JSON"}), 400
     message = data.get("message", "").strip()
     session_id = data.get("session_id", "default")
     if not message:
@@ -2377,7 +2482,13 @@ def api_chat():
 @app.route('/api/chat/stream', methods=['POST'])
 def api_chat_stream():
     """Streaming chat endpoint using Server-Sent Events with image support."""
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if data is None or not isinstance(data, dict):
+        logger.warning(
+            f"Invalid JSON body for /api/chat/stream (content_type={request.content_type}, len={request.content_length})",
+            extra={"context": "REQUEST"},
+        )
+        return jsonify({"error": "Invalid JSON"}), 400
     message = data.get("message", "").strip()
     session_id = data.get("session_id", "default")
     image_data = data.get("image", None)  # Base64 image data
