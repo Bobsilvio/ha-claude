@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.3-dev
+- Add UI controls for file upload and voice recording in chat interface
+- File upload button (📄) - import PDF, DOCX, TXT, MD documents to RAG
+- Voice recording button (🎤) - record audio input for voice features
+- Both buttons conditionally display based on feature enable flags
+
 ## 3.2.29-dev (develop branch)
 - [EXPERIMENTAL] Add feature flags for upcoming features: enable_voice, enable_memory, enable_file_upload, enable_rag (all default OFF)
 - [EXPERIMENTAL] **MEMORY SYSTEM**: Add persistent conversation memory that stores past conversations and injects relevant context into future chats. Includes:

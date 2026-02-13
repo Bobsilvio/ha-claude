@@ -365,12 +365,6 @@ def get_chat_ui():
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
     ui_js_json = json.dumps(ui_js, ensure_ascii=False)
-    
-    # Feature flags for UI elements
-    file_upload_enabled = api.ENABLE_FILE_UPLOAD
-    voice_enabled = api.ENABLE_VOICE
-    file_upload_display = "block" if file_upload_enabled else "none"
-    voice_display = "block" if voice_enabled else "none"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -465,12 +459,6 @@ def get_chat_ui():
         .input-area button.stop-btn:hover {{ background: #dc2626; }}
         .input-area button.image-btn {{ background: #10b981; }}
         .input-area button.image-btn:hover {{ background: #059669; }}
-        .input-area button.file-btn {{ background: #f59e0b; }}
-        .input-area button.file-btn:hover {{ background: #d97706; }}
-        .input-area button.voice-btn {{ background: #8b5cf6; }}
-        .input-area button.voice-btn:hover {{ background: #7c3aed; }}
-        .input-area button.voice-btn.recording {{ background: #ef4444; animation: pulse-record 1s infinite; }}
-        @keyframes pulse-record {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         @keyframes pulse-stop {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
@@ -603,14 +591,6 @@ def get_chat_ui():
             <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)" />
             <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="{ui_js['upload_image']}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-            </button>
-            <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.odt" style="display: none;" onchange="handleDocumentSelect(event)" />
-            <button class="file-btn" onclick="document.getElementById('documentInput').click()" title="Upload Document (PDF, DOCX, TXT, MD)" style="display: {file_upload_display};" id="fileUploadBtn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-            </button>
-            <input type="hidden" id="voiceInput" />
-            <button class="voice-btn" onclick="toggleVoiceRecording()" title="Record Voice" style="display: {voice_display};" id="voiceRecordBtn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v12a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2m14 0a7 7 0 0 0-14 0v2"/></svg>
             </button>
             <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
             <button id="sendBtn" onclick="handleButtonClick()">
@@ -789,62 +769,6 @@ def get_chat_ui():
             currentImage = null;
             imageInput.value = '';
             imagePreviewContainer.classList.remove('visible');
-        }}
-
-        function handleDocumentSelect(event) {{
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const maxSize = 50 * 1024 * 1024; // 50MB
-            if (file.size > maxSize) {{
-                alert('File too large (max 50MB)');
-                return;
-            }}
-            
-            // Send document with special marker
-            const timestamp = new Date().toISOString();
-            const message = `[DOCUMENT_UPLOAD] Uploading: ${{file.name}} (${{(file.size/1024/1024).toFixed(2)}}MB)`;
-            sendMessage(message);
-            
-            document.getElementById('documentInput').value = '';
-        }}
-
-        let mediaRecorder = null;
-        let audioChunks = [];
-        let isRecording = false;
-
-        async function toggleVoiceRecording() {{
-            const btn = document.getElementById('voiceRecordBtn');
-            if (!isRecording) {{
-                try {{
-                    const stream = await navigator.mediaDevices.getUserMedia({{ audio: true }});
-                    mediaRecorder = new MediaRecorder(stream);
-                    audioChunks = [];
-                    
-                    mediaRecorder.ondataavailable = (e) => {{
-                        audioChunks.push(e.data);
-                    }};
-                    
-                    mediaRecorder.onstop = () => {{
-                        const audioBlob = new Blob(audioChunks, {{ type: 'audio/wav' }});
-                        addMessage(`🎤 Voice recorded (${{(audioBlob.size/1024).toFixed(1)}}KB)`, 'user');
-                        btn.style.backgroundColor = '#333';
-                        isRecording = false;
-                    }};
-                    
-                    mediaRecorder.start();
-                    isRecording = true;
-                    btn.style.backgroundColor = '#f44336';
-                    btn.title = 'Stop Recording';
-                }} catch (error) {{
-                    alert('Microphone access denied. Enable in browser settings.');
-                }}
-            }} else {{
-                if (mediaRecorder && isRecording) {{
-                    mediaRecorder.stop();
-                    mediaRecorder.stream.getTracks().forEach(track => track.stop());
-                }}
-            }}
         }}
 
         function toggleReadOnly(checked) {{
