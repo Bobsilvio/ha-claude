@@ -1187,6 +1187,38 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             states = api.get_all_states()
             matches = []
 
+            import re
+
+            STOPWORDS = {
+                # IT
+                "il", "lo", "la", "i", "gli", "le", "un", "uno", "una",
+                "di", "del", "dello", "della", "dei", "degli", "delle",
+                "a", "ad", "al", "allo", "alla", "ai", "agli", "alle",
+                "da", "dal", "dallo", "dalla", "dai", "dagli", "dalle",
+                "in", "su", "per", "con", "senza", "e", "o",
+                # EN/ES/FR common
+                "the", "a", "an", "of", "to", "in", "on", "for", "and", "or",
+                "el", "la", "los", "las", "un", "una", "de", "del", "al", "y", "o",
+                "le", "la", "les", "un", "une", "de", "du", "des", "et", "ou",
+            }
+
+            def _tokenize(text: str) -> List[str]:
+                if not text:
+                    return []
+                parts = re.split(r"[\s_\-\.]+", text.lower())
+                tokens = [p.strip() for p in parts if p and p.strip()]
+                # keep short tokens only if they are meaningful (avoid noise)
+                out = []
+                for t in tokens:
+                    if t in STOPWORDS:
+                        continue
+                    if len(t) <= 1:
+                        continue
+                    out.append(t)
+                return out
+
+            query_tokens = _tokenize(query)
+
             # Build search index with scoring
             search_results = []
 
@@ -1196,47 +1228,81 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
                 score = 0
 
-                # Check 1: Exact substring in entity_id (highest priority)
-                if query in eid:
-                    score += 100
+                # Strong signals: exact substring match
+                if query and query in eid:
+                    score += 120
+                if query and query in fname:
+                    score += 110
 
-                # Check 2: Exact substring in friendly_name
-                if query in fname:
-                    score += 95
+                eid_tokens = _tokenize(eid.replace(".", " "))
+                fname_tokens = _tokenize(fname)
+                all_tokens = set(eid_tokens) | set(fname_tokens)
 
-                # Check 3: Tokenization (split by underscore/hyphen/space and match individual tokens)
-                # This allows "produzione" to match "yesterday_production" or "production_daily"
-                eid_tokens = [t.strip() for t in eid.replace(".", " ").replace("_", " ").replace("-", " ").split()]
-                fname_tokens = [t.strip() for t in fname.replace("_", " ").replace("-", " ").split()]
-                query_tokens = [t.strip() for t in query.replace("_", " ").replace("-", " ").split()]
-
-                # Check if any query token matches any entity token (for better cross-language matching)
+                matched = set()
+                # Token coverage: multi-word queries must match multiple tokens
                 for qt in query_tokens:
-                    for et in eid_tokens:
-                        if len(qt) > 2 and len(et) > 2:
-                            # Fuzzy match: if first 3 chars match or Levenshtein distance < 2
-                            if qt[:3] == et[:3]:  # Quick prefix match
-                                score += 30
-                            elif abs(len(qt) - len(et)) <= 2 and (qt in et or et in qt):
-                                score += 25
-                    for et in fname_tokens:
-                        if len(qt) > 2 and len(et) > 2:
-                            if qt[:3] == et[:3]:
-                                score += 35  # Friendly name match is slightly higher
-                            elif abs(len(qt) - len(et)) <= 2 and (qt in et or et in qt):
-                                score += 30
+                    if qt in all_tokens:
+                        matched.add(qt)
+                        score += 55 if qt in fname_tokens else 50
+                        continue
 
-                # Check 4: Partial match (substring anywhere)
-                if score == 0:
-                    if query in eid or query in fname:
-                        score += 10
+                    # Fuzzy token matching only for reasonably long tokens
+                    if len(qt) >= 4:
+                        for tt in all_tokens:
+                            if tt.startswith(qt):
+                                matched.add(qt)
+                                score += 28 if tt in fname_tokens else 24
+                                break
+                        if qt not in matched:
+                            for tt in all_tokens:
+                                if qt in tt or tt in qt:
+                                    matched.add(qt)
+                                    score += 18 if tt in fname_tokens else 14
+                                    break
+
+                total_q = len(query_tokens)
+                missing = [t for t in query_tokens if t not in matched]
+                coverage = (len(matched) / total_q) if total_q else 0.0
+
+                # Extra boost: full token coverage for multiword queries
+                if total_q >= 2 and coverage >= 1.0:
+                    score += 80
+
+                # Penalize missing tokens heavily for multiword queries
+                if total_q >= 2 and missing:
+                    score -= 45 * len(missing)
+
+                # If we only matched 1 token out of >=2, keep it but demote heavily.
+                if total_q >= 2 and coverage < 0.5:
+                    score -= 80
+
+                # Phrase bonus: query tokens appear in order in friendly_name
+                if total_q >= 2:
+                    phrase = " ".join(query_tokens)
+                    if phrase and phrase in fname:
+                        score += 90
+
+                # Fallback: if query is empty or tokenization is empty, do nothing
+                if not query or not (query_tokens or query.strip()):
+                    continue
 
                 if score > 0:
+                    if coverage >= 1.0 and score >= 140:
+                        quality = "high"
+                    elif coverage >= 0.75 and score >= 90:
+                        quality = "medium"
+                    else:
+                        quality = "low"
+
                     search_results.append({
                         "entity_id": s.get("entity_id"),
                         "state": s.get("state"),
                         "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
-                        "score": score
+                        "match_quality": quality,
+                        "token_coverage": round(coverage, 3),
+                        "matched_tokens": sorted(list(matched))[:20],
+                        "missing_tokens": missing[:20],
+                        "score": score,
                     })
 
             # Sort by score (descending) and take top results

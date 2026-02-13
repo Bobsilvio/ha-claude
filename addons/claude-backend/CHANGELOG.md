@@ -2,6 +2,9 @@
 
 ## 3.2.7
 
+
+## 3.2.9
+- Reduce wrong device matches when searching entities: improve `search_entities` scoring using token coverage (e.g., "bagno piccolo"), and guide the assistant to ask for explicit selection when matches are low-confidence.
 - Improve chat UI progress feedback: keep thinking bubble visible, show status/tool steps and elapsed timer
 
 ## 3.2.6

@@ -85,6 +85,8 @@ CRITICAL WORKFLOW - follow these steps IN ORDER:
 1. FIRST call search_entities to find the correct entity_id for the device the user mentioned.
    - A "luce" (light) could be a light.* OR a switch.* entity — you MUST search, never guess the domain.
    - Use keywords from the user's message (room name, device type).
+    - If results include match_quality/token_coverage: ONLY treat as a sure match when token_coverage is 1.0 (no missing_tokens) or match_quality is "high".
+    - If all results are low confidence (missing key query words like "piccolo"), DO NOT guess: ask the user to choose the correct entity_id from a short numbered list.
 2. If unsure about the entity type, call get_entity_state to verify the domain and attributes.
 3. Build the automation with COMPLETE and CORRECT trigger/condition/action:
    - For time-based triggers use: {"platform": "time", "at": "HH:MM:SS"}
@@ -96,7 +98,9 @@ CRITICAL WORKFLOW - follow these steps IN ORDER:
      * climate.* entities → service: climate.set_temperature
    - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
 4. BEFORE creating, show the user the COMPLETE YAML of the automation in a ```yaml code block.
-   Verify the entity_ids are correct and ask: "Ho trovato questi sensori/dispositivi. Confermi la creazione? (sì/no)"
+    Verify the entity_ids are correct.
+    - If you are NOT 100% sure which entity is the right one, ask the user to pick: "Quale dispositivo intendi? Rispondi con il numero o con l'entity_id".
+    - Only when the entity_id is clearly confirmed, ask: "Ho trovato questi sensori/dispositivi. Confermi la creazione? (sì/no)"
 5. WAIT FOR USER TO CONFIRM - DO NOT call create_automation until user confirms.
 6. Only AFTER confirmation, call create_automation ONCE with the complete config (alias, trigger, action, condition, mode).
 NEVER create an automation with empty trigger or action arrays.
@@ -109,7 +113,9 @@ CRITICAL WORKFLOW:
    - switch.* → switch.turn_on/off, light.* → light.turn_on/off, etc.
    - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
 3. BEFORE creating, show the user the COMPLETE YAML of the script in a ```yaml code block.
-   Verify the entity_ids are correct and ask: "Confermi la creazione di questo script? (sì/no)"
+    Verify the entity_ids are correct.
+    - If you are NOT 100% sure which entity is correct (low-confidence search results), ask the user to pick the entity_id first.
+    - Only when confirmed, ask: "Confermi la creazione di questo script? (sì/no)"
 4. WAIT FOR USER TO CONFIRM - DO NOT call create_script until user confirms.
 5. Only AFTER confirmation, call create_script ONCE with script_id, alias, sequence, and mode.
 NEVER create a script with empty sequence.
