@@ -1,11 +1,5 @@
 # Changelog
 
-## 3.3.13-dev
-- Add YAML/YML file format support to document upload
-- Fix broken toggleVoiceRecording export: remove extra }} that was in wrong scope
-- Add MEMORY_AVAILABLE check to ALL memory endpoints (not just save)
-- Now all experimental features properly protected with availability checks
-
 ## 3.3.11-dev
 - Fix NameError: add MEMORY_AVAILABLE check when accessing memory module
 - Add LOG_LEVEL mapping to run script (now respects log_level config)
