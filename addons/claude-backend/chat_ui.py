@@ -1551,92 +1551,115 @@ def get_chat_ui():
                 const resp = await fetch(apiUrl('api/conversations'));
                 if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
+                console.log('[loadChatList] received ', data.conversations ? data.conversations.length : 0, ' conversations');
                 chatList.innerHTML = '';
                 if (data.conversations && data.conversations.length > 0) {{
                     function parseConvTs(conv) {{
-                        const raw = (conv && (conv.last_updated || conv.id)) ? (conv.last_updated || conv.id) : '';
-                        if (typeof raw === 'number') return raw;
-                        const s = String(raw || '').trim();
-                        if (!s) return 0;
-                        // Typical session ids are Date.now() strings
-                        const n = parseInt(s, 10);
-                        if (!Number.isNaN(n) && n > 0) return n;
-                        const p = Date.parse(s);
-                        return Number.isNaN(p) ? 0 : p;
+                        try {{
+                            const raw = (conv && (conv.last_updated || conv.id)) ? (conv.last_updated || conv.id) : '';
+                            if (typeof raw === 'number') return raw;
+                            const s = String(raw || '').trim();
+                            if (!s) return 0;
+                            // Typical session ids are Date.now() strings
+                            const n = parseInt(s, 10);
+                            if (!Number.isNaN(n) && n > 0) return n;
+                            const p = Date.parse(s);
+                            return Number.isNaN(p) ? 0 : p;
+                        }} catch (e) {{
+                            console.warn('[parseConvTs] parse error for', conv, e);
+                            return 0;
+                        }}
                     }}
 
                     function formatGroupLabel(ts) {{
-                        if (!ts) return '';
-                        const d = new Date(ts);
-                        if (Number.isNaN(d.getTime())) return '';
-
-                        const now = new Date();
-                        const startToday = new Date(now);
-                        startToday.setHours(0, 0, 0, 0);
-                        const startYesterday = new Date(startToday);
-                        startYesterday.setDate(startYesterday.getDate() - 1);
-
-                        const startD = new Date(d);
-                        startD.setHours(0, 0, 0, 0);
-                        const diffDays = Math.floor((startToday.getTime() - startD.getTime()) / 86400000);
-
-                        if (diffDays === 0) return (T.today || 'Today');
-                        if (diffDays === 1) return (T.yesterday || 'Yesterday');
-                        if (diffDays >= 2 && diffDays <= 6) {{
-                            const tpl = (T.days_ago || '{{n}} days ago');
-                            return tpl.replace('{{n}}', String(diffDays));
-                        }}
-
-                        const sameYear = d.getFullYear() === now.getFullYear();
-                        const opts = sameYear
-                            ? {{ day: '2-digit', month: 'short' }}
-                            : {{ day: '2-digit', month: 'short', year: 'numeric' }};
                         try {{
-                            return d.toLocaleDateString(undefined, opts);
+                            if (!ts || ts === 0) return '';
+                            const d = new Date(ts);
+                            if (Number.isNaN(d.getTime())) return '';
+
+                            const now = new Date();
+                            const startToday = new Date(now);
+                            startToday.setHours(0, 0, 0, 0);
+                            const startYesterday = new Date(startToday);
+                            startYesterday.setDate(startYesterday.getDate() - 1);
+
+                            const startD = new Date(d);
+                            startD.setHours(0, 0, 0, 0);
+                            const diffDays = Math.floor((startToday.getTime() - startD.getTime()) / 86400000);
+
+                            if (diffDays === 0) return (T.today || 'Today');
+                            if (diffDays === 1) return (T.yesterday || 'Yesterday');
+                            if (diffDays >= 2 && diffDays <= 6) {{
+                                const tpl = (T.days_ago || '{{n}} days ago');
+                                return tpl.replace('{{n}}', String(diffDays));
+                            }}
+
+                            const sameYear = d.getFullYear() === now.getFullYear();
+                            const opts = sameYear
+                                ? {{ day: '2-digit', month: 'short' }}
+                                : {{ day: '2-digit', month: 'short', year: 'numeric' }};
+                            try {{
+                                return d.toLocaleDateString(undefined, opts);
+                            }} catch (e) {{
+                                return d.toDateString();
+                            }}
                         }} catch (e) {{
-                            return d.toDateString();
+                            console.warn('[formatGroupLabel] format error for ts=', ts, e);
+                            return '';
                         }}
                     }}
 
                     const convs = data.conversations.slice();
-                    convs.sort((a, b) => parseConvTs(b) - parseConvTs(a));
+                    convs.sort((a, b) => {{
+                        try {{
+                            return parseConvTs(b) - parseConvTs(a);
+                        }} catch (e) {{
+                            console.warn('[loadChatList sort] sort error', e);
+                            return 0;
+                        }}
+                    }});
 
                     let lastLabel = null;
-                    convs.forEach(conv => {{
-                        const label = formatGroupLabel(parseConvTs(conv));
-                        if (label && label !== lastLabel) {{
-                            const header = document.createElement('div');
-                            header.className = 'chat-group-title';
-                            header.textContent = label;
-                            chatList.appendChild(header);
-                            lastLabel = label;
+                    convs.forEach((conv, idx) => {{
+                        try {{
+                            const ts = parseConvTs(conv);
+                            const label = formatGroupLabel(ts);
+                            if (label && label !== lastLabel) {{
+                                const header = document.createElement('div');
+                                header.className = 'chat-group-title';
+                                header.textContent = label;
+                                chatList.appendChild(header);
+                                lastLabel = label;
+                            }}
+                            const item = document.createElement('div');
+                            item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
+                            const left = document.createElement('div');
+                            left.style.flex = '1';
+                            left.addEventListener('click', () => loadConversation(conv.id));
+
+                            const title = document.createElement('div');
+                            title.className = 'chat-item-title';
+                            title.textContent = conv.title || '';
+
+                            const info = document.createElement('div');
+                            info.className = 'chat-item-info';
+                            info.textContent = String(conv.message_count || 0) + ' ' + (T.messages_count || 'messages');
+
+                            left.appendChild(title);
+                            left.appendChild(info);
+
+                            const del = document.createElement('span');
+                            del.className = 'chat-item-delete';
+                            del.title = T.delete_chat || 'Delete chat';
+                            del.textContent = '\U0001f5d1';
+                            del.addEventListener('click', (evt) => deleteConversation(evt, conv.id));
+
+                            item.appendChild(left);
+                            item.appendChild(del);
+                            chatList.appendChild(item);
+                        }} catch (e) {{
+                            console.error('[loadChatList forEach] error at index', idx, ':', e);
                         }}
-                        const item = document.createElement('div');
-                        item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
-                        const left = document.createElement('div');
-                        left.style.flex = '1';
-                        left.addEventListener('click', () => loadConversation(conv.id));
-
-                        const title = document.createElement('div');
-                        title.className = 'chat-item-title';
-                        title.textContent = conv.title || '';
-
-                        const info = document.createElement('div');
-                        info.className = 'chat-item-info';
-                        info.textContent = String(conv.message_count || 0) + ' ' + (T.messages_count || 'messages');
-
-                        left.appendChild(title);
-                        left.appendChild(info);
-
-                        const del = document.createElement('span');
-                        del.className = 'chat-item-delete';
-                        del.title = T.delete_chat || 'Delete chat';
-                        del.textContent = '\U0001f5d1';
-                        del.addEventListener('click', (evt) => deleteConversation(evt, conv.id));
-
-                        item.appendChild(left);
-                        item.appendChild(del);
-                        chatList.appendChild(item);
                     }});
                 }} else {{
                     chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + T.no_conversations + '</div>';
@@ -1644,7 +1667,7 @@ def get_chat_ui():
             }} catch(e) {{
                 console.error('Error loading chat list:', e);
                 if (!window._chatListErrorNotified) {{
-                    addMessage('\u26a0\ufe0f ' + (e && e.message ? e.message : String(e)), 'system');
+                    addMessage('\u26a0\ufe0f Error loading conversations: ' + (e && e.message ? e.message : String(e)), 'system');
                     window._chatListErrorNotified = true;
                 }}
             }}
