@@ -3360,33 +3360,8 @@ def api_transcribe_audio():
 
 @app.route('/api/voice/speak', methods=['POST'])
 def api_synthesize_speech():
-    """Convert text to audio (text-to-speech)."""
-    if not ENABLE_VOICE:
-        return jsonify({"error": "Voice feature not enabled"}), 400
-    
-    try:
-        body = request.get_json(silent=True) or {}
-        text = body.get('text', '')
-        language = body.get('language', 'en-US')
-        
-        if not text:
-            return jsonify({"error": "No text provided"}), 400
-        
-        # Synthesize
-        success, audio_data = voice.synthesize_speech(text, language=language)
-        
-        if success and audio_data:
-            logger.info(f"Text synthesized to speech: {text[:50]}...")
-            return audio_data, 200, {'Content-Type': 'audio/wav'}
-        else:
-            return jsonify({
-                "success": False,
-                "error": "TTS synthesis failed"
-            }), 400
-    
-    except Exception as e:
-        logger.error(f"TTS endpoint error: {e}")
-        return jsonify({"error": str(e)}), 500
+    """Text-to-speech (TTS) - not yet implemented."""
+    return jsonify({"error": "TTS not yet available. Use voice for speech-to-text only."}), 501
 
 @app.route("/health", methods=["GET"])
 def health():

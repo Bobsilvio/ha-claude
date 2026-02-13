@@ -8,11 +8,7 @@ openai>=1.40.0
 google-genai>=1.0.0
 websocket-client>=1.6.0
 pyyaml>=6.0
-# Voice features (optional, auto-detected)
-SpeechRecognition>=3.10.0
-pyttsx3>=2.90
-edge-tts>=6.1.0
-gtts>=2.3.0
+# Voice: uses OpenAI Whisper API / Google Gemini / HA STT (no extra deps needed)
 # File upload features (optional)
 PyPDF2
 python-docx

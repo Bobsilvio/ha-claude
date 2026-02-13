@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.26-dev
+- **FIX**: Voice STT rewritten - uses OpenAI Whisper API / Google Gemini / HA STT
+- Removed SpeechRecognition, pyttsx3, edge-tts, gtts dependencies (broken in Alpine Linux)
+- Priority: OpenAI Whisper > Google Gemini > Home Assistant built-in STT
+- No extra packages needed - uses existing provider API keys
+- Moved debug_mode, colored_logs, log_level to optional config section in HA UI
+
 ## 3.3.25-dev
 - **FIX**: Voice now transcribes audio to text (speech-to-text) instead of just showing file size
 - Voice recording sends audio to `/api/voice/transcribe`, puts text in input, and auto-sends
