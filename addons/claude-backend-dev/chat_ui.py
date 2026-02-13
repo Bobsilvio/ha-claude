@@ -789,20 +789,50 @@ def get_chat_ui():
             imagePreviewContainer.classList.remove('visible');
         }}
 
-        function handleDocumentSelect(event) {{
+        async function handleDocumentSelect(event) {{
             const file = event.target.files[0];
             if (!file) return;
             
             const maxSize = 50 * 1024 * 1024; // 50MB
             if (file.size > maxSize) {{
                 alert('File too large (max 50MB)');
+                document.getElementById('documentInput').value = '';
                 return;
             }}
             
-            // Send document with special marker
-            const timestamp = new Date().toISOString();
-            const message = `[DOCUMENT_UPLOAD] Uploading: ${{file.name}} (${{(file.size/1024/1024).toFixed(2)}}MB)`;
-            sendMessage(message);
+            // Upload document to backend
+            try {{
+                const message = `📤 Uploading document: ${{file.name}} (${{(file.size/1024/1024).toFixed(2)}}MB)...`;
+                addMessage(message, 'system');
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('note', `Uploaded: ${{new Date().toLocaleString()}}`);
+                
+                const response = await fetch('/api/documents/upload', {{
+                    method: 'POST',
+                    body: formData,
+                    headers: {{
+                        'X-Ingress-Path': ingressPath || ''
+                    }}
+                }});
+                
+                if (response.ok) {{
+                    const data = await response.json();
+                    const successMsg = `✅ Document uploaded: ${{file.name}} (ID: ${{data.doc_id.substring(0, 8)}}...)`;
+                    addMessage(successMsg, 'system');
+                    
+                    // Add to message context for next chat
+                    const contextMsg = `[Document available: ${{file.name}}]`;
+                    sendMessage(contextMsg);
+                }} else {{
+                    const error = await response.json();
+                    const errorMsg = `❌ Upload failed: ${{error.error || 'Unknown error'}}`;
+                    addMessage(errorMsg, 'system');
+                }}
+            }} catch (error) {{
+                addMessage(`❌ Upload error: ${{error.message}}`, 'system');
+            }}
             
             document.getElementById('documentInput').value = '';
         }}
