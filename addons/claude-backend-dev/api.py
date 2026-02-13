@@ -2120,7 +2120,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     
     # Step 2.5: Inject memory context if enabled
     memory_context = ""
-    if ENABLE_MEMORY:
+    if ENABLE_MEMORY and MEMORY_AVAILABLE:
         memory_context = memory.get_memory_context(query=user_message, limit=3)
         if memory_context:
             logger.info(f"Memory context injected for session {session_id}")

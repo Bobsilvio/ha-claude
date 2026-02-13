@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.11-dev
+- Fix NameError: add MEMORY_AVAILABLE check when accessing memory module
+- Add LOG_LEVEL mapping to run script (now respects log_level config)
+- Add TIMEOUT and MAX_RETRIES mapping to run script
+- Stream should now work with memory enabled
+
 ## 3.3.10-dev
 - Fix global scope for toggleVoiceRecording, handleDocumentSelect, changeModel functions
 - Export functions to window object so onclick handlers can access them
