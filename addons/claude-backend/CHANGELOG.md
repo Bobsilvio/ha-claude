@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.2.6
+
+- Fix header provider status not updating after switching provider/model in chat UI
+
 ## 3.2.5
 
 - Fix intent detection for Italian "mi crei un'automazione" (routes to create_automation tools)

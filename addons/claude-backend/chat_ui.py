@@ -514,8 +514,8 @@ def get_chat_ui():
             <span class="readonly-label" id="readOnlyLabel">{ui_js['readonly_off']}</span>
         </label>
         <div class="status">
-            <div class="status-dot"></div>
-            {status_text}
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">{status_text}</span>
         </div>
     </div>
 
@@ -1251,6 +1251,21 @@ def get_chat_ui():
             'github': '🚀 GitHub Models'
         }};
 
+        function updateHeaderProviderStatus(providerId, availableProviders) {{
+            const statusTextEl = document.getElementById('statusText');
+            const statusDotEl = document.getElementById('statusDot');
+            if (!statusTextEl || !statusDotEl) return;
+
+            const providerName = PROVIDER_LABELS[providerId] || providerId || '';
+            const ids = Array.isArray(availableProviders)
+                ? availableProviders.map(p => (p && p.id) ? String(p.id) : '').filter(Boolean)
+                : [];
+            const configured = providerId ? ids.includes(String(providerId)) : false;
+
+            statusTextEl.textContent = configured ? providerName : (providerName ? (providerName + ' (no key)') : '');
+            statusDotEl.style.background = configured ? '#4caf50' : '#ff9800';
+        }}
+
         // Load models and populate dropdown with ALL providers
         async function loadModels() {{
             try {{
@@ -1274,6 +1289,8 @@ def get_chat_ui():
                 if (currentProvider) {{
                     currentProviderId = currentProvider;
                 }}
+
+                updateHeaderProviderStatus(currentProviderId, data.available_providers);
 
                 const testBtn = document.getElementById('testNvidiaBtn');
                 if (testBtn) {{
