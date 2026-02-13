@@ -173,6 +173,13 @@ def get_chat_ui():
             "mic_not_found": "No microphone found. Connect a microphone and try again.",
             "mic_in_use": "Microphone in use by another app. Close other apps and try again.",
             "mic_error": "Microphone error",
+            "voice_record": "Record Voice",
+            "voice_stop": "Stop Recording",
+            "voice_too_short": "Recording too short, try again.",
+            "voice_transcribing": "Transcribing...",
+            "voice_transcribed": "Transcribed",
+            "voice_transcribe_fail": "Could not transcribe audio",
+            "voice_transcribe_error": "Transcription error",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -253,6 +260,13 @@ def get_chat_ui():
             "mic_not_found": "Nessun microfono trovato. Collega un microfono e riprova.",
             "mic_in_use": "Microfono in uso da un'altra app. Chiudi le altre app e riprova.",
             "mic_error": "Errore microfono",
+            "voice_record": "Registra voce",
+            "voice_stop": "Ferma registrazione",
+            "voice_too_short": "Registrazione troppo breve, riprova.",
+            "voice_transcribing": "Trascrizione in corso...",
+            "voice_transcribed": "Trascritto",
+            "voice_transcribe_fail": "Impossibile trascrivere l'audio",
+            "voice_transcribe_error": "Errore di trascrizione",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -333,6 +347,13 @@ def get_chat_ui():
             "mic_not_found": "No se encontró micrófono. Conecta un micrófono e inténtalo de nuevo.",
             "mic_in_use": "Micrófono en uso por otra app. Cierra las otras apps e inténtalo de nuevo.",
             "mic_error": "Error de micrófono",
+            "voice_record": "Grabar voz",
+            "voice_stop": "Detener grabación",
+            "voice_too_short": "Grabación muy corta, inténtalo de nuevo.",
+            "voice_transcribing": "Transcribiendo...",
+            "voice_transcribed": "Transcrito",
+            "voice_transcribe_fail": "No se pudo transcribir el audio",
+            "voice_transcribe_error": "Error de transcripción",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -400,6 +421,26 @@ def get_chat_ui():
             "sending_request": "Envoi de la requ\u00eate",
             "connected": "Connect\u00e9",
             "waiting_response": "En attente de r\u00e9ponse",
+            "remove_document": "Supprimer le document",
+            "file_too_large": "Fichier trop volumineux (max 10 Mo)",
+            "uploading_document": "T\u00e9l\u00e9chargement du document...",
+            "upload_failed": "T\u00e9l\u00e9chargement \u00e9chou\u00e9",
+            "upload_error": "Erreur de t\u00e9l\u00e9chargement",
+            "unknown_error": "Erreur inconnue",
+            "document_uploaded": "Document t\u00e9l\u00e9charg\u00e9",
+            "mic_not_supported": "Le navigateur ne prend pas en charge l'enregistrement audio. Utilisez HTTPS ou un navigateur compatible.",
+            "mic_denied_settings": "Acc\u00e8s au microphone refus\u00e9. Allez dans les param\u00e8tres du navigateur pour l'activer.",
+            "mic_denied_icon": "Microphone refus\u00e9. Cliquez sur l'ic\u00f4ne \ud83d\udd12 dans la barre du navigateur.",
+            "mic_not_found": "Aucun microphone trouv\u00e9. Connectez un microphone et r\u00e9essayez.",
+            "mic_in_use": "Microphone utilis\u00e9 par une autre app. Fermez les autres apps et r\u00e9essayez.",
+            "mic_error": "Erreur de microphone",
+            "voice_record": "Enregistrer la voix",
+            "voice_stop": "Arr\u00eater l'enregistrement",
+            "voice_too_short": "Enregistrement trop court, r\u00e9essayez.",
+            "voice_transcribing": "Transcription en cours...",
+            "voice_transcribed": "Transcrit",
+            "voice_transcribe_fail": "Impossible de transcrire l'audio",
+            "voice_transcribe_error": "Erreur de transcription",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -924,17 +965,56 @@ def get_chat_ui():
                         audioChunks.push(e.data);
                     }};
                     
-                    mediaRecorder.onstop = () => {{
-                        const audioBlob = new Blob(audioChunks, {{ type: 'audio/wav' }});
-                        addMessage(`🎤 Voice recorded (${{(audioBlob.size/1024).toFixed(1)}}KB)`, 'user');
-                        btn.style.backgroundColor = '#333';
+                    mediaRecorder.onstop = async () => {{
+                        btn.classList.remove('recording');
+                        btn.style.backgroundColor = '';
                         isRecording = false;
+                        btn.title = T.voice_record || 'Record Voice';
+
+                        const audioBlob = new Blob(audioChunks, {{ type: 'audio/webm' }});
+                        if (audioBlob.size < 100) {{
+                            addMessage('🎤 ' + (T.voice_too_short || 'Recording too short, try again.'), 'system');
+                            return;
+                        }}
+
+                        // Map language to STT locale
+                        const langMap = {{ 'en': 'en-US', 'it': 'it-IT', 'es': 'es-ES', 'fr': 'fr-FR' }};
+                        const sttLang = langMap['{api.LANGUAGE}'] || 'en-US';
+
+                        addMessage('🎤 ' + (T.voice_transcribing || 'Transcribing...'), 'system');
+
+                        try {{
+                            const formData = new FormData();
+                            formData.append('audio', audioBlob, 'recording.webm');
+                            formData.append('language', sttLang);
+
+                            const resp = await fetch(apiUrl('/api/voice/transcribe'), {{
+                                method: 'POST',
+                                body: formData
+                            }});
+                            const data = await resp.json();
+
+                            if (data.success && data.text) {{
+                                // Put transcribed text into input and send
+                                if (input) {{
+                                    input.value = data.text;
+                                    input.dispatchEvent(new Event('input'));
+                                }}
+                                addMessage('🎤 ' + (T.voice_transcribed || 'Transcribed') + ': ' + data.text, 'system');
+                                sendMessage();
+                            }} else {{
+                                addMessage('🎤 ' + (T.voice_transcribe_fail || 'Could not transcribe audio') + (data.error ? ': ' + data.error : ''), 'system');
+                            }}
+                        }} catch (err) {{
+                            addMessage('🎤 ' + (T.voice_transcribe_error || 'Transcription error') + ': ' + err.message, 'system');
+                        }}
                     }};
                     
                     mediaRecorder.start();
                     isRecording = true;
+                    btn.classList.add('recording');
                     btn.style.backgroundColor = '#f44336';
-                    btn.title = 'Stop Recording';
+                    btn.title = T.voice_stop || 'Stop Recording';
                 }} catch (error) {{
                     if (error.name === 'NotAllowedError') {{
                         addMessage('🎤 ' + (T.mic_denied_icon || 'Microphone denied. Click the 🔒 icon in the browser bar to enable it.'), 'system');

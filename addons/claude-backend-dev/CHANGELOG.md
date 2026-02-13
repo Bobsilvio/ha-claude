@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.25-dev
+- **FIX**: Voice now transcribes audio to text (speech-to-text) instead of just showing file size
+- Voice recording sends audio to `/api/voice/transcribe`, puts text in input, and auto-sends
+- Added voice translation keys in all 4 languages (en/it/es/fr)
+- Completed missing French translation keys (document upload, microphone messages)
+
 ## 3.3.24-dev
 - **FIX**: OOM crash (signal 9) when sending file with message
 - **FIX**: Context injection now respects ENABLE_FILE_UPLOAD and ENABLE_RAG flags
