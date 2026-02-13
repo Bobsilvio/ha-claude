@@ -2242,7 +2242,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             try:
                 doc_context = file_upload.get_document_context()
                 if doc_context:
-                    context_sections.append(f"## DOCUMENTI CARICATI:\n{doc_context}")
+                    context_sections.append(
+                        "## DOCUMENTI CARICATI DALL'UTENTE\n"
+                        "IMPORTANTE: Il contenuto completo dei file è riportato qui sotto. "
+                        "NON usare strumenti come read_config_file per leggere questi file, "
+                        "il contenuto è già disponibile.\n\n"
+                        f"{doc_context}"
+                    )
             except Exception as e:
                 logger.debug(f"Could not get document context: {e}")
         
