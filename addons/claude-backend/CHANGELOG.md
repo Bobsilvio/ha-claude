@@ -3,6 +3,9 @@
 ## 3.2.7
 
 
+## 3.2.10
+- When the assistant is unsure about which entity you mean, show a clickable/tappable list of found `entity_id`s in-chat plus a free input field to paste/type one manually.
+
 ## 3.2.9
 - Reduce wrong device matches when searching entities: improve `search_entities` scoring using token coverage (e.g., "bagno piccolo"), and guide the assistant to ask for explicit selection when matches are low-confidence.
 - Improve chat UI progress feedback: keep thinking bubble visible, show status/tool steps and elapsed timer

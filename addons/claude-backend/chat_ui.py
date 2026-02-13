@@ -432,6 +432,11 @@ def get_chat_ui():
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
         .suggestion:hover {{ background: #667eea; color: white; border-color: #667eea; }}
+        .entity-picker {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }}
+        .entity-picker .suggestion {{ padding: 6px 10px; font-size: 12px; }}
+        .entity-manual {{ display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }}
+        .entity-input {{ background: white; border: 1px solid #ddd; border-radius: 12px; padding: 8px 10px; font-size: 13px; min-width: 220px; max-width: 100%; outline: none; }}
+        .entity-input:focus {{ border-color: #667eea; }}
         .tool-badge {{ display: inline-block; background: #e8f0fe; color: #1967d2; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
         .status-badge {{ display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
         .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
@@ -767,6 +772,100 @@ def get_chat_ui():
             div.appendChild(btnContainer);
         }}
 
+        function extractEntityIds(text) {{
+            if (!text || typeof text !== 'string') return [];
+            const re = /\b[a-z_]+\.[a-z0-9_]+\b/g;
+            const found = text.match(re) || [];
+            const uniq = [];
+            const seen = new Set();
+            for (const eid of found) {{
+                const v = String(eid).trim();
+                if (!v) continue;
+                if (seen.has(v)) continue;
+                seen.add(v);
+                uniq.push(v);
+            }}
+            return uniq;
+        }}
+
+        function injectEntityPicker(div, fullText) {{
+            if (!div || !fullText) return;
+            if (div.querySelector('.entity-picker') || div.querySelector('.entity-manual')) return;
+
+            const entityIds = extractEntityIds(fullText);
+            if (!entityIds || entityIds.length < 2) return;
+
+            const PICK_PATTERNS = [
+                /quale\s+(dispositivo|entit[aà]|entity)/i,
+                /scegli/i,
+                /seleziona/i,
+                /rispondi\s+con\s+il\s+numero/i,
+                /numero\s+o\s+con\s+l['’]?entity_id/i,
+                /entity_id/i,
+                /which\s+(device|entity)/i,
+                /choose/i,
+                /select/i,
+                /pick/i,
+                /reply\s+with\s+the\s+(number|entity_id)/i,
+            ];
+
+            const isPicking = PICK_PATTERNS.some(function(p) {{ return p.test(fullText); }});
+            if (!isPicking) return;
+
+            // Click/tap list
+            const picker = document.createElement('div');
+            picker.className = 'entity-picker';
+
+            const maxButtons = 10;
+            entityIds.slice(0, maxButtons).forEach(function(eid) {{
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'suggestion';
+                btn.textContent = eid;
+                btn.onclick = function() {{
+                    input.value = eid;
+                    sendMessage();
+                }};
+                picker.appendChild(btn);
+            }});
+
+            // Manual entry
+            const manual = document.createElement('div');
+            manual.className = 'entity-manual';
+
+            const field = document.createElement('input');
+            field.className = 'entity-input';
+            field.placeholder = 'entity_id…';
+            field.autocomplete = 'off';
+            field.spellcheck = false;
+
+            const useBtn = document.createElement('button');
+            useBtn.type = 'button';
+            useBtn.className = 'suggestion';
+            useBtn.textContent = 'Usa';
+
+            function submitManual() {{
+                const v = (field.value || '').trim();
+                if (!v) return;
+                input.value = v;
+                sendMessage();
+            }}
+
+            useBtn.onclick = submitManual;
+            field.addEventListener('keydown', function(e) {{
+                if (e.key === 'Enter') {{
+                    e.preventDefault();
+                    submitManual();
+                }}
+            }});
+
+            manual.appendChild(field);
+            manual.appendChild(useBtn);
+
+            div.appendChild(picker);
+            div.appendChild(manual);
+        }}
+
         function apiUrl(path) {{
             // Build URLs robustly for Home Assistant Ingress.
             // If the current page URL doesn't end with '/', browsers treat the last segment as a file
@@ -830,6 +929,9 @@ def get_chat_ui():
                 if (snap) {{
                     appendUndoButton(div, snap);
                 }}
+
+                // If the assistant is asking to choose an entity_id, provide tap-to-select UI
+                injectEntityPicker(div, text);
             }} else {{
                 div.textContent = text;
                 if (imageData) {{
@@ -1206,6 +1308,8 @@ def get_chat_ui():
                                     }}
                                     // Inject YES/NO confirmation buttons if AI is asking for confirmation
                                     injectConfirmButtons(div, fullText);
+                                    // Inject entity picker UI if AI is asking the user to pick an entity
+                                    injectEntityPicker(div, fullText);
                                 }}
                             }}
                             chat.scrollTop = chat.scrollHeight;
