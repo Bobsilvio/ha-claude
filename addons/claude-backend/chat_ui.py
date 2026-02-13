@@ -819,31 +819,31 @@ def get_chat_ui():
             }} catch (e) {{}}
 
             const PICK_PATTERNS = [
-                /quale\s+(dispositivo|entit[aà]|entity)/i,
+                /quale\\s+(dispositivo|entit[aà]|entity)/i,
                 /scegli/i,
                 /seleziona/i,
-                /rispondi\s+con\s+il\s+numero/i,
-                /scrivi\s+il\s+numero/i,
-                /inserisci\s+il\s+numero/i,
-                /digita\s+il\s+numero/i,
-                /rispondi\s+con\s+(?:il\s+)?\d+/i,
-                /scrivi\s+(?:il\s+)?\d+/i,
-                /inserisci\s+(?:il\s+)?\d+/i,
-                /digita\s+(?:il\s+)?\d+/i,
-                /\b\d+\s*(?:o|oppure|or)\s*\d+\b/i,
-                /numero\s+o\s+con\s+l['’]?entity_id/i,
-                /which\s+(device|entity)/i,
+                /rispondi\\s+con\\s+il\\s+numero/i,
+                /scrivi\\s+il\\s+numero/i,
+                /inserisci\\s+il\\s+numero/i,
+                /digita\\s+il\\s+numero/i,
+                /rispondi\\s+con\\s+(?:il\\s+)?\\d+/i,
+                /scrivi\\s+(?:il\\s+)?\\d+/i,
+                /inserisci\\s+(?:il\\s+)?\\d+/i,
+                /digita\\s+(?:il\\s+)?\\d+/i,
+                /\\b\\d+\\s*(?:o|oppure|or)\\s*\\d+\\b/i,
+                /numero\\s+o\\s+con\\s+l['’]?entity_id/i,
+                /which\\s+(device|entity)/i,
                 /choose/i,
                 /select/i,
                 /pick/i,
-                /reply\s+with\s+the\s+(number|entity_id)/i,
+                /reply\\s+with\\s+the\\s+(number|entity_id)/i,
             ];
             return PICK_PATTERNS.some(function(p) {{ return p.test(fullText); }});
         }}
 
         function extractEntityIds(text) {{
             if (!text || typeof text !== 'string') return [];
-            const re = /\b[a-z_]+\.[a-z0-9_]+\b/g;
+            const re = /\\b[a-z_]+\\.[a-z0-9_]+\\b/g;
             const found = text.match(re) || [];
             const uniq = [];
             const seen = new Set();
@@ -869,13 +869,13 @@ def get_chat_ui():
 
             function findEntityIdInLine(line) {{
                 if (!line) return '';
-                const m = String(line).match(/`?\b([a-z_]+\.[a-z0-9_]+)\b`?/i);
+                const m = String(line).match(/`?\\b([a-z_]+\\.[a-z0-9_]+)\\b`?/i);
                 return m ? String(m[1] || '').trim() : '';
             }}
 
             for (let i = 0; i < lines.length; i++) {{
                 const line = lines[i];
-                const m = String(line).match(/^\s*(?:[-*]\s*)?(\d+)\s*[\)\.:\-]\s*(.*)$/);
+                const m = String(line).match(/^\\s*(?:[-*]\\s*)?(\\d+)\\s*[\\)\\.:\\-]\\s*(.*)$/);
                 if (!m) continue;
 
                 const num = String(m[1] || '').trim();
@@ -889,7 +889,7 @@ def get_chat_ui():
                     // Remove the entity_id from the line to get a label, if present
                     label = rest
                         .replace(new RegExp('`?\\b' + entityId.replace(/[.*+?^$()|[\\]\\\\]/g, '\\\\$&') + '\\b`?', 'i'), '')
-                        .replace(/^[\s:—–\-]+/, '')
+                        .replace(/^[\\s:—–\\-]+/, '')
                         .trim();
                 }} else {{
                     // Look ahead a few lines for an entity_id (common when formatted as YAML)

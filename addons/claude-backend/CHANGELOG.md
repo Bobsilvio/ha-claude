@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.2.15
+- Fix: remove Python SyntaxWarning "invalid escape sequence" in `chat_ui.py` (escape backslashes in embedded JS regex literals).
+
 ## 3.2.14
 - Progress UX: keep the last status/tool steps visible inside the assistant message while streaming (not only the "thinking" bubble).
 - Entity disambiguation: improve detection of selection prompts (e.g. "scrivi/inserisci il numero") and tweak numbered option buttons for easier tapping.
