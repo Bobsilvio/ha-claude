@@ -1,5 +1,11 @@
 # Changelog
 
+## 3.3.8-dev
+- Fix feature flags mapping: use run script to read from addon config (like other options)
+- Add ENABLE_VOICE, ENABLE_MEMORY, ENABLE_FILE_UPLOAD, ENABLE_RAG to run script
+- Add detailed descriptions for feature flag options in config.yaml
+- Now works exactly like enable_file_access and other standard addon options
+
 ## 3.3.7-dev
 - Fix feature flags reading from Home Assistant addon config
 - Read enable_voice, enable_memory, enable_file_upload, enable_rag from /root/options.json

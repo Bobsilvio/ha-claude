@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration (DEV)
 name: "AI Assistant DEV 🚧"
-version: "3.3.7-dev"
+version: "3.3.8-dev"
 slug: claude-backend-dev
 description: >-
   [DEVELOPMENT] AI-powered smart home assistant with experimental features:
@@ -83,10 +83,10 @@ descriptions:
   language: "UI language for error messages and responses"
   timeout: "Request timeout in seconds (default: 30)"
   max_retries: "Maximum retry attempts for failed API requests (default: 3)"
-  enable_voice: "[EXPERIMENTAL] Enable voice input/output (speech-to-text, text-to-speech)"
+  enable_voice: "[EXPERIMENTAL] Enable voice input/output - buttons appear in chat when enabled"
   enable_memory: "[EXPERIMENTAL] Enable persistent memory system to remember past conversations"
-  enable_file_upload: "[EXPERIMENTAL] Allow uploading documents (PDF, TXT) for AI to analyze"
-  enable_rag: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search"
+  enable_file_upload: "[EXPERIMENTAL] Allow uploading documents (PDF, TXT) for AI to analyze - button appears when enabled"
+  enable_rag: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search and context injection"
 documentation: https://github.com/Bobsilvio/ha-claude
 support: https://github.com/Bobsilvio/ha-claude/issues
 maintainers:

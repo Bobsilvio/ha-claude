@@ -21,6 +21,10 @@ DEBUG_MODE=$(bashio::config 'debug_mode')
 COLORED_LOGS=$(bashio::config 'colored_logs')
 ENABLE_FILE_ACCESS=$(bashio::config 'enable_file_access')
 LANGUAGE=$(bashio::config 'language')
+ENABLE_VOICE=$(bashio::config 'enable_voice')
+ENABLE_MEMORY=$(bashio::config 'enable_memory')
+ENABLE_FILE_UPLOAD=$(bashio::config 'enable_file_upload')
+ENABLE_RAG=$(bashio::config 'enable_rag')
 
 # SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
 if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
@@ -43,6 +47,10 @@ export DEBUG_MODE
 export COLORED_LOGS
 export ENABLE_FILE_ACCESS
 export LANGUAGE
+export ENABLE_VOICE
+export ENABLE_MEMORY
+export ENABLE_FILE_UPLOAD
+export ENABLE_RAG
 export SUPERVISOR_TOKEN
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
