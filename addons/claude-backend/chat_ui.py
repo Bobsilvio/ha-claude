@@ -627,6 +627,33 @@ def get_chat_ui():
             'nvidia': {json.dumps(provider_analyzing['nvidia'].get(api.LANGUAGE, provider_analyzing['nvidia']['en']))}
         }};
 
+        function _appendSystemRaw(text) {{
+            try {{
+                const container = document.getElementById('chat');
+                if (!container) return;
+                const div = document.createElement('div');
+                div.className = 'message system';
+                div.textContent = String(text || '');
+                container.appendChild(div);
+                container.scrollTop = container.scrollHeight;
+            }} catch (e) {{}}
+        }}
+
+        // Show JS runtime errors directly in chat (useful on mobile where console isn't visible)
+        window.addEventListener('error', function (evt) {{
+            try {{
+                const msg = (evt && evt.message) ? evt.message : 'Unknown error';
+                _appendSystemRaw('❌ UI error: ' + msg);
+            }} catch (e) {{}}
+        }});
+        window.addEventListener('unhandledrejection', function (evt) {{
+            try {{
+                const r = evt && evt.reason;
+                const msg = r && r.message ? r.message : String(r || 'Unknown rejection');
+                _appendSystemRaw('❌ UI error: ' + msg);
+            }} catch (e) {{}}
+        }});
+
         function getAnalyzingMsg() {{
             return ANALYZING_BY_PROVIDER[currentProviderId] || ANALYZING_BY_PROVIDER['openai'];
         }}
@@ -1872,11 +1899,23 @@ def get_chat_ui():
         }}
 
         // Load history on page load
-        initSidebarResize();
-        loadModels();
-        loadChatList();
-        loadHistory();
-        input.focus();
+        (function bootUI() {{
+            try {{
+                // Reinforce click handler assignment (helps when inline onclick gets lost/cached)
+                if (sendBtn) {{
+                    sendBtn.onclick = () => handleButtonClick();
+                }}
+
+                initSidebarResize();
+                loadModels();
+                loadChatList();
+                loadHistory();
+                if (input) input.focus();
+            }} catch (e) {{
+                const msg = (e && e.message) ? e.message : String(e);
+                _appendSystemRaw('❌ UI boot error: ' + msg);
+            }}
+        }})();
     </script>
 </body>
 </html>"""

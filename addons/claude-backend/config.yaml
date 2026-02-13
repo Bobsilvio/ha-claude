@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: AI Assistant for Home Assistant
-version: "3.2.17"
+version: "3.2.18"
 slug: claude-backend
 description: >-
   AI-powered smart home assistant with Claude, ChatGPT, Gemini,
