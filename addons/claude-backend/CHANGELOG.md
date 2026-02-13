@@ -6,6 +6,9 @@
 ## 3.2.10
 - When the assistant is unsure about which entity you mean, show a clickable/tappable list of found `entity_id`s in-chat plus a free input field to paste/type one manually.
 
+## 3.2.13
+- Conversation list: group past chats by date with section headers like "Today" / "Yesterday".
+
 ## 3.2.12
 - Entity disambiguation UI: show the clickable entity selection even when there is only 1 candidate (still only when the assistant is asking you to pick).
 

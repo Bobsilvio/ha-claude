@@ -153,6 +153,8 @@ def get_chat_ui():
             "confirm_yes_value": "yes",
             "confirm_no_value": "no",
             "confirm_delete_yes": "Delete",
+            "today": "Today",
+            "yesterday": "Yesterday",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -213,6 +215,8 @@ def get_chat_ui():
             "confirm_yes_value": "si",
             "confirm_no_value": "no",
             "confirm_delete_yes": "Elimina",
+            "today": "Oggi",
+            "yesterday": "Ieri",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -273,6 +277,8 @@ def get_chat_ui():
             "confirm_yes_value": "si",
             "confirm_no_value": "no",
             "confirm_delete_yes": "Eliminar",
+            "today": "Hoy",
+            "yesterday": "Ayer",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -333,6 +339,8 @@ def get_chat_ui():
             "confirm_yes_value": "oui",
             "confirm_no_value": "non",
             "confirm_delete_yes": "Supprimer",
+            "today": "Aujourd'hui",
+            "yesterday": "Hier",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -363,6 +371,7 @@ def get_chat_ui():
         .chat-item-delete {{ color: #ef4444; font-size: 16px; padding: 4px 8px; opacity: 0.6; transition: all 0.2s; cursor: pointer; flex-shrink: 0; background: none; border: none; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; }}
         .chat-item:hover .chat-item-delete {{ opacity: 1; }}
         .chat-item-delete:hover {{ color: #dc2626; background: rgba(239,68,68,0.1); }}
+        .chat-group-title {{ padding: 10px 12px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.04em; border-top: 1px solid #f0f0f0; }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 0; overflow-x: hidden; }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
@@ -1334,7 +1343,56 @@ def get_chat_ui():
                 const data = await resp.json();
                 chatList.innerHTML = '';
                 if (data.conversations && data.conversations.length > 0) {{
-                    data.conversations.forEach(conv => {{
+                    function parseConvTs(conv) {{
+                        const raw = (conv && (conv.last_updated || conv.id)) ? (conv.last_updated || conv.id) : '';
+                        if (typeof raw === 'number') return raw;
+                        const s = String(raw || '').trim();
+                        if (!s) return 0;
+                        // Typical session ids are Date.now() strings
+                        const n = parseInt(s, 10);
+                        if (!Number.isNaN(n) && n > 0) return n;
+                        const p = Date.parse(s);
+                        return Number.isNaN(p) ? 0 : p;
+                    }}
+
+                    function formatGroupLabel(ts) {{
+                        if (!ts) return '';
+                        const d = new Date(ts);
+                        if (Number.isNaN(d.getTime())) return '';
+
+                        const now = new Date();
+                        const startToday = new Date(now);
+                        startToday.setHours(0, 0, 0, 0);
+                        const startYesterday = new Date(startToday);
+                        startYesterday.setDate(startYesterday.getDate() - 1);
+
+                        if (d >= startToday) return (T.today || 'Today');
+                        if (d >= startYesterday) return (T.yesterday || 'Yesterday');
+
+                        const sameYear = d.getFullYear() === now.getFullYear();
+                        const opts = sameYear
+                            ? {{ day: '2-digit', month: 'short' }}
+                            : {{ day: '2-digit', month: 'short', year: 'numeric' }};
+                        try {{
+                            return d.toLocaleDateString(undefined, opts);
+                        }} catch (e) {{
+                            return d.toDateString();
+                        }}
+                    }}
+
+                    const convs = data.conversations.slice();
+                    convs.sort((a, b) => parseConvTs(b) - parseConvTs(a));
+
+                    let lastLabel = null;
+                    convs.forEach(conv => {{
+                        const label = formatGroupLabel(parseConvTs(conv));
+                        if (label && label !== lastLabel) {{
+                            const header = document.createElement('div');
+                            header.className = 'chat-group-title';
+                            header.textContent = label;
+                            chatList.appendChild(header);
+                            lastLabel = label;
+                        }}
                         const item = document.createElement('div');
                         item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
                         item.innerHTML = `
