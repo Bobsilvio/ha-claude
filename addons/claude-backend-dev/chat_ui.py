@@ -622,8 +622,6 @@ def get_chat_ui():
         </div>
     </div>
 
-    <script src="ui_bootstrap.js"></script>
-    <script src="ui_main.js"></script>
     <script>
         if (window.__UI_MAIN_INITIALIZED) {{
             console.log('[ui] main already initialized');
