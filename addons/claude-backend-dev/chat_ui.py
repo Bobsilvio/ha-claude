@@ -454,6 +454,13 @@ def get_chat_ui():
         .image-preview-container.visible {{ display: block; }}
         .image-preview {{ max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #667eea; }}
         .remove-image-btn {{ position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }}
+        .doc-preview-container {{ display: none; padding: 8px 12px; background: #f0f4ff; border-radius: 8px; position: relative; align-items: center; gap: 8px; }}
+        .doc-preview-container.visible {{ display: flex; }}
+        .doc-preview-icon {{ font-size: 24px; flex-shrink: 0; }}
+        .doc-preview-info {{ flex: 1; min-width: 0; }}
+        .doc-preview-name {{ font-weight: 600; font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .doc-preview-size {{ font-size: 11px; color: #888; }}
+        .remove-doc-btn {{ background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
         .input-row {{ display: flex; gap: 8px; align-items: flex-end; }}
         .input-row > * {{ min-width: 0; }}
         .input-area textarea {{ flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 10px 16px; font-size: 14px; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.2s; }}
@@ -599,6 +606,14 @@ def get_chat_ui():
             <img id="imagePreview" class="image-preview" />
             <button class="remove-image-btn" title="{ui_js['remove_image']}">×</button>
         </div>
+        <div id="docPreviewContainer" class="doc-preview-container">
+            <span class="doc-preview-icon" id="docPreviewIcon">📄</span>
+            <div class="doc-preview-info">
+                <div class="doc-preview-name" id="docPreviewName"></div>
+                <div class="doc-preview-size" id="docPreviewSize"></div>
+            </div>
+            <button class="remove-doc-btn" id="removeDocBtn" title="Rimuovi documento">×</button>
+        </div>
         <div class="input-row">
             <input type="file" id="imageInput" accept="image/*" style="display: none;" />
             <button class="image-btn" title="{ui_js['upload_image']}">
@@ -660,6 +675,7 @@ def get_chat_ui():
 
         let currentSessionId = safeLocalStorageGet('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
+        let pendingDocument = null;  // Stores {file, name, size} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
         let currentProviderId = '{api.AI_PROVIDER}';
 
@@ -789,49 +805,49 @@ def get_chat_ui():
             imagePreviewContainer.classList.remove('visible');
         }}
 
-        async function handleDocumentSelect(event) {{
+        const docPreviewContainer = document.getElementById('docPreviewContainer');
+        const docPreviewName = document.getElementById('docPreviewName');
+        const docPreviewSize = document.getElementById('docPreviewSize');
+        const docPreviewIcon = document.getElementById('docPreviewIcon');
+
+        const DOC_ICONS = {{
+            'pdf': '📕', 'docx': '📘', 'doc': '📘',
+            'txt': '📝', 'md': '📝', 'markdown': '📝',
+            'yaml': '📋', 'yml': '📋', 'odt': '📗'
+        }};
+
+        function showDocPreview(file) {{
+            const ext = file.name.split('.').pop().toLowerCase();
+            docPreviewIcon.textContent = DOC_ICONS[ext] || '📄';
+            docPreviewName.textContent = file.name;
+            const sizeKB = file.size / 1024;
+            docPreviewSize.textContent = sizeKB > 1024
+                ? `${{(sizeKB / 1024).toFixed(2)}} MB`
+                : `${{sizeKB.toFixed(1)}} KB`;
+            docPreviewContainer.classList.add('visible');
+        }}
+
+        function removeDocument() {{
+            pendingDocument = null;
+            document.getElementById('documentInput').value = '';
+            docPreviewContainer.classList.remove('visible');
+        }}
+
+        function handleDocumentSelect(event) {{
             const file = event.target.files[0];
             if (!file) return;
-            
+
             const maxSize = 50 * 1024 * 1024; // 50MB
             if (file.size > maxSize) {{
-                alert('File too large (max 50MB)');
+                alert('File troppo grande (max 50MB)');
                 document.getElementById('documentInput').value = '';
                 return;
             }}
-            
-            // Upload document to backend
-            try {{
-                const message = `📤 Uploading document: ${{file.name}} (${{(file.size/1024/1024).toFixed(2)}}MB)...`;
-                addMessage(message, 'system');
-                
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('note', `Uploaded: ${{new Date().toLocaleString()}}`);
-                
-                const response = await fetch(apiUrl('/api/documents/upload'), {{
-                    method: 'POST',
-                    body: formData
-                }});
-                
-                if (response.ok) {{
-                    const data = await response.json();
-                    const successMsg = `✅ Document uploaded: ${{file.name}} (ID: ${{data.doc_id.substring(0, 8)}}...)`;
-                    addMessage(successMsg, 'system');
-                    
-                    // Add to message context for next chat
-                    const contextMsg = `[Document available: ${{file.name}}]`;
-                    sendMessage(contextMsg);
-                }} else {{
-                    const error = await response.json();
-                    const errorMsg = `❌ Upload failed: ${{error.error || 'Unknown error'}}`;
-                    addMessage(errorMsg, 'system');
-                }}
-            }} catch (error) {{
-                addMessage(`❌ Upload error: ${{error.message}}`, 'system');
-            }}
-            
-            document.getElementById('documentInput').value = '';
+
+            pendingDocument = file;
+            showDocPreview(file);
+            // Focus the input so the user can type a message
+            if (input) input.focus();
         }}
 
         let mediaRecorder = null;
@@ -1499,10 +1515,15 @@ def get_chat_ui():
 
         async function sendMessage() {{
             const text = (input && input.value ? input.value : '').trim();
-            if (!text || sending) return;
+            const hasDoc = !!pendingDocument;
+            if ((!text && !hasDoc) || sending) return;
 
             sending = true;
             setStopMode(true);
+
+            // Capture pending document before clearing
+            const docToSend = pendingDocument;
+            pendingDocument = null;
 
             try {{
                 if (input) {{
@@ -1513,13 +1534,53 @@ def get_chat_ui():
                     suggestionsEl.style.display = 'none';
                 }}
 
-                // Show user message with image if present
+                // Upload document if attached
+                let docUploaded = false;
+                if (docToSend) {{
+                    removeDocument();
+                    const docLabel = `📎 ${{docToSend.name}}`;
+                    const displayText = text ? `${{text}}\n\n${{docLabel}}` : docLabel;
+                    const imageToSendDoc = currentImage;
+                    addMessage(displayText, 'user', imageToSendDoc);
+                    showThinking();
+                    startThinkingTicker(getAnalyzingMsg());
+                    addThinkingStep('📤 Caricamento documento...');
+                    try {{
+                        const formData = new FormData();
+                        formData.append('file', docToSend);
+                        formData.append('note', `Uploaded: ${{new Date().toLocaleString()}}`);
+                        const upResp = await fetch(apiUrl('/api/documents/upload'), {{
+                            method: 'POST',
+                            body: formData
+                        }});
+                        if (upResp.ok) {{
+                            docUploaded = true;
+                        }} else {{
+                            const err = await upResp.json().catch(() => ({{}}));
+                            addMessage(`❌ Upload fallito: ${{err.error || 'Errore sconosciuto'}}`, 'system');
+                            sending = false;
+                            setStopMode(false);
+                            removeThinking();
+                            return;
+                        }}
+                    }} catch (upErr) {{
+                        addMessage(`❌ Errore upload: ${{upErr.message}}`, 'system');
+                        sending = false;
+                        setStopMode(false);
+                        removeThinking();
+                        return;
+                    }}
+                }}
+
+                // Show user message with image if present (only if no doc already shown)
                 const imageToSend = currentImage;
-                addMessage(text, 'user', imageToSend);
+                if (!docToSend) {{
+                    addMessage(text, 'user', imageToSend);
+                    showThinking();
+                    startThinkingTicker(getAnalyzingMsg());
+                }}
                 // Clear the preview immediately (keep imageToSend for the request payload)
                 removeImage();
-                showThinking();
-                startThinkingTicker(getAnalyzingMsg());
                 addThinkingStep(T.sending_request || 'Sending request');
 
                 // If the backend is retrying (e.g., 429) and no status/tool events are sent,
@@ -1533,7 +1594,7 @@ def get_chat_ui():
                 }}, 8000);
 
                 const payload = {{
-                    message: text,
+                    message: text || `[Documento caricato: ${{docToSend ? docToSend.name : ''}}]`,
                     session_id: currentSessionId,
                     read_only: readOnlyMode
                 }};
@@ -2125,6 +2186,9 @@ def get_chat_ui():
                 const fileBtn = document.getElementById('fileUploadBtn');
                 if (fileBtn) fileBtn.addEventListener('click', () => documentInput && documentInput.click());
 
+                const removeDocBtn = document.getElementById('removeDocBtn');
+                if (removeDocBtn) removeDocBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeDocument(); }});
+
                 const voiceBtn = document.getElementById('voiceRecordBtn');
                 if (voiceBtn) voiceBtn.addEventListener('click', toggleVoiceRecording);
 
@@ -2177,6 +2241,7 @@ def get_chat_ui():
         // Export global functions for onclick handlers
         window.toggleVoiceRecording = toggleVoiceRecording;
         window.handleDocumentSelect = handleDocumentSelect;
+        window.removeDocument = removeDocument;
         window.changeModel = changeModel;
         window.handleButtonClick = handleButtonClick;
         }}
