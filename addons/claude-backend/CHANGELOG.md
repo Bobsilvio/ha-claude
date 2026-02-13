@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.2.29
+- Maintenance release: internal code improvements and stability fixes.
+
 ## 3.2.28
 - Add native GPT-5 support for OpenAI (gpt-5 and gpt-5-chat) with direct API key authentication - no longer need GitHub token to access GPT-5.
 
