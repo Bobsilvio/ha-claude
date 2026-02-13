@@ -2243,6 +2243,86 @@ def index():
     }
 
 
+@app.route('/ui_bootstrap.js')
+def ui_bootstrap_js():
+        """Small bootstrap script loaded before the main inline UI.
+
+        Purpose: if the large inline script fails to parse/execute (Ingress/CSP/cache/etc.),
+        we still get a server log signal and a visible error when pressing Send.
+        """
+        js = r"""
+(function () {
+    function appendSystem(text) {
+        try {
+            var container = document.getElementById('chat');
+            if (!container) return;
+            var div = document.createElement('div');
+            div.className = 'message system';
+            div.textContent = String(text || '');
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        } catch (e) {}
+    }
+
+    // Lightweight ping so the add-on logs show the browser executed JS.
+    try {
+        fetch('./api/ui_ping', { cache: 'no-store' }).catch(function () {});
+    } catch (e) {}
+
+    function onSendAttempt(evt) {
+        try {
+            // If the main UI didn't load, explain it directly.
+            if (typeof window.handleButtonClick !== 'function') {
+                appendSystem('❌ UI error: main script not loaded (handleButtonClick missing).');
+                try { fetch('./api/ui_ping?send=1', { cache: 'no-store' }).catch(function () {}); } catch (e) {}
+                if (evt && evt.preventDefault) evt.preventDefault();
+                return false;
+            }
+        } catch (e) {}
+        return true;
+    }
+
+    function bind() {
+        try {
+            var btn = document.getElementById('sendBtn');
+            if (btn && !btn._bootstrapBound) {
+                btn._bootstrapBound = true;
+                btn.addEventListener('click', onSendAttempt, true);
+            }
+            var input = document.getElementById('input');
+            if (input && !input._bootstrapKeyBound) {
+                input._bootstrapKeyBound = true;
+                input.addEventListener('keydown', function (e) {
+                    if (e && e.key === 'Enter' && !e.shiftKey) {
+                        onSendAttempt(e);
+                    }
+                }, true);
+            }
+        } catch (e) {}
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bind);
+    } else {
+        bind();
+    }
+})();
+"""
+        return js, 200, {
+                'Content-Type': 'application/javascript; charset=utf-8',
+                'Cache-Control': 'no-store, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+        }
+
+
+@app.route('/api/ui_ping', methods=['GET'])
+def api_ui_ping():
+        """No-op endpoint used only to confirm that the browser executed JS."""
+        # Intentionally returns empty 204; request/response are logged by middleware.
+        return ("", 204)
+
+
 @app.route('/api/status')
 def api_status():
     """Debug endpoint to check HA connection status."""

@@ -598,6 +598,7 @@ def get_chat_ui():
         </div>
     </div>
 
+    <script src="ui_bootstrap.js"></script>
     <script>
         const T = {ui_js_json};
         const chat = document.getElementById('chat');
