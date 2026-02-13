@@ -14,8 +14,8 @@ pyttsx3>=2.90
 edge-tts>=6.1.0
 gtts>=2.3.0
 # File upload features (optional)
-PyPDF2>=3.0.0
-python-docx>=1.0.0
+PyPDF2
+python-docx
 # RAG features (optional, auto-detected)
 # Note: torch and sentence-transformers not available in Alpine Linux
 # Install manually if needed: docker exec -it ha-claude pip install torch sentence-transformers
