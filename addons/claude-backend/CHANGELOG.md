@@ -6,8 +6,9 @@
 
 ## 3.2.6
 
+## 3.2.8
+- Make it clearer what the assistant is doing while waiting: show a short in-chat list of progress steps (status + tools) in the thinking bubble.
 - Fix header provider status not updating after switching provider/model in chat UI
-
 ## 3.2.5
 
 - Fix intent detection for Italian "mi crei un'automazione" (routes to create_automation tools)

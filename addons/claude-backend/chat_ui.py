@@ -409,6 +409,8 @@ def get_chat_ui():
         .message.thinking .dots span {{ animation: blink 1.4s infinite both; }}
         .message.thinking .dots span:nth-child(2) {{ animation-delay: 0.2s; }}
         .message.thinking .dots span:nth-child(3) {{ animation-delay: 0.4s; }}
+        .message.thinking .thinking-steps {{ margin-top: 6px; font-style: normal; font-size: 12px; color: #888; line-height: 1.35; }}
+        .message.thinking .thinking-steps div {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
         @keyframes blink {{ 0%, 80%, 100% {{ opacity: 0; }} 40% {{ opacity: 1; }} }}
         .input-area {{ padding: 12px 16px; background: white; border-top: 1px solid #e0e0e0; display: flex; flex-direction: column; gap: 8px; }}
         .image-preview-container {{ display: none; padding: 8px; background: #f8f9fa; border-radius: 8px; position: relative; }}
@@ -984,7 +986,8 @@ def get_chat_ui():
             const div = document.createElement('div');
             div.className = 'message thinking';
             div.id = 'thinking';
-            div.innerHTML = getAnalyzingMsg() + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            div.innerHTML = getAnalyzingMsg() + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>'
+                + '<div class="thinking-steps" id="thinkingSteps"></div>';
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
         }}
@@ -992,6 +995,21 @@ def get_chat_ui():
         let _thinkingStart = 0;
         let _thinkingTimer = null;
         let _thinkingBaseText = '';
+        let _thinkingSteps = [];
+
+        function addThinkingStep(stepText) {{
+            const t = String(stepText || '').trim();
+            if (!t) return;
+            // Deduplicate consecutive identical steps
+            const last = _thinkingSteps.length ? _thinkingSteps[_thinkingSteps.length - 1] : '';
+            if (t === last) return;
+            _thinkingSteps.push(t);
+            // Keep last 4 steps to avoid clutter
+            if (_thinkingSteps.length > 4) _thinkingSteps = _thinkingSteps.slice(-4);
+            const stepsEl = document.getElementById('thinkingSteps');
+            if (!stepsEl) return;
+            stepsEl.innerHTML = _thinkingSteps.map(s => '<div>• ' + s.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>').join('');
+        }}
 
         function _formatElapsed(ms) {{
             const s = Math.max(0, Math.floor(ms / 1000));
@@ -1003,12 +1021,14 @@ def get_chat_ui():
         function startThinkingTicker(baseText) {{
             _thinkingStart = Date.now();
             _thinkingBaseText = baseText || getAnalyzingMsg();
+            _thinkingSteps = [];
 
             const el = document.getElementById('thinking');
             if (el) {{
                 // Ensure base text is visible in case showThinking wasn't called yet
                 if (!el.innerHTML || !el.innerHTML.trim()) {{
-                    el.innerHTML = _thinkingBaseText + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+                    el.innerHTML = _thinkingBaseText + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>'
+                        + '<div class="thinking-steps" id="thinkingSteps"></div>';
                 }}
             }}
 
@@ -1025,7 +1045,13 @@ def get_chat_ui():
             const el = document.getElementById('thinking');
             if (!el) return;
             const safe = String(_thinkingBaseText);
-            el.innerHTML = safe + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>';
+            el.innerHTML = safe + ' <span class="thinking-elapsed" id="thinkingElapsed"></span><span class="dots"><span>.</span><span>.</span><span>.</span></span>'
+                + '<div class="thinking-steps" id="thinkingSteps"></div>';
+            // Re-render steps after rewriting innerHTML
+            if (_thinkingSteps && _thinkingSteps.length) {{
+                const stepsEl = document.getElementById('thinkingSteps');
+                if (stepsEl) stepsEl.innerHTML = _thinkingSteps.map(s => '<div>• ' + s.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>').join('');
+            }}
         }}
 
         function stopThinkingTicker() {{
@@ -1039,6 +1065,7 @@ def get_chat_ui():
             const el = document.getElementById('thinking');
             if (el) el.remove();
             stopThinkingTicker();
+            _thinkingSteps = [];
         }}
 
         function sendSuggestion(el) {{
@@ -1146,6 +1173,7 @@ def get_chat_ui():
                                 // Show tool progress in the thinking bubble (no assistant message yet)
                                 const desc = evt.description || evt.name;
                                 updateThinkingBaseText('\U0001f527 ' + desc);
+                                addThinkingStep(desc);
                             }} else if (evt.type === 'clear') {{
                                 // Keep thinking visible; reset streamed text state
                                 if (div) {{ div.innerHTML = ''; }}
@@ -1154,6 +1182,7 @@ def get_chat_ui():
                             }} else if (evt.type === 'status') {{
                                 // Update thinking bubble with current status and keep timer running
                                 updateThinkingBaseText('\u23f3 ' + evt.message);
+                                addThinkingStep(evt.message);
                             }} else if (evt.type === 'token') {{
                                 if (!gotAnyToken) {{
                                     gotAnyToken = true;
