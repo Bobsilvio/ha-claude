@@ -1,6 +1,12 @@
 # Changelog
 
-## 3.3.14-dev
+## 3.3.17-dev
+- **FIX**: File upload to backend now working (was only sending text message)
+- YAML/YML file uploads now fully functional
+- All document formats (PDF, DOCX, TXT, MD, YAML, YML, ODT) properly uploaded
+- Improved feedback messages in chat for upload status
+
+## 3.3.15-dev
 - Add YAML/YML file format support to document upload
 - file_upload.py backend now processes .yaml and .yml files as plain text
 
