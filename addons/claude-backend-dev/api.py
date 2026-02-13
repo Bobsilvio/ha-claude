@@ -3176,8 +3176,8 @@ def api_nvidia_test_models():
 @app.route('/api/memory', methods=['GET'])
 def api_get_memory():
     """Get recent saved conversations from memory."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
+    if not ENABLE_MEMORY or not MEMORY_AVAILABLE:
+        return jsonify({"error": "Memory feature not available"}), 400
     
     try:
         limit = request.args.get('limit', default=10, type=int)
@@ -3199,8 +3199,8 @@ def api_get_memory():
 @app.route('/api/memory/search', methods=['GET'])
 def api_search_memory():
     """Search past conversations by query."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
+    if not ENABLE_MEMORY or not MEMORY_AVAILABLE:
+        return jsonify({"error": "Memory feature not available"}), 400
     
     query = request.args.get('q', default='', type=str)
     if not query:
@@ -3227,8 +3227,8 @@ def api_search_memory():
 @app.route('/api/memory/stats', methods=['GET'])
 def api_memory_stats():
     """Get statistics about stored memories."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
+    if not ENABLE_MEMORY or not MEMORY_AVAILABLE:
+        return jsonify({"error": "Memory feature not available"}), 400
     
     try:
         stats = memory.get_memory_stats()
@@ -3244,8 +3244,8 @@ def api_memory_stats():
 @app.route('/api/memory/<conversation_id>', methods=['DELETE'])
 def api_delete_memory(conversation_id):
     """Delete a conversation from memory."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
+    if not ENABLE_MEMORY or not MEMORY_AVAILABLE:
+        return jsonify({"error": "Memory feature not available"}), 400
     
     try:
         deleted = memory.delete_conversation(conversation_id)
@@ -3267,8 +3267,8 @@ def api_delete_memory(conversation_id):
 @app.route('/api/memory/cleanup', methods=['POST'])
 def api_cleanup_memory():
     """Clean up old conversations from memory."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
+    if not ENABLE_MEMORY or not MEMORY_AVAILABLE:
+        return jsonify({"error": "Memory feature not available"}), 400
     
     try:
         body = request.get_json(silent=True) or {}
