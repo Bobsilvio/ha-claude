@@ -3290,69 +3290,6 @@ def api_cleanup_memory():
         return jsonify({"error": str(e)}), 500
 
 
-# ---- Voice API Endpoints ----
-
-@app.route('/api/voice/config', methods=['GET'])
-def api_voice_config():
-    """Get voice system configuration and available backends."""
-    if not ENABLE_VOICE:
-        return jsonify({"error": "Voice feature not enabled"}), 400
-    
-    try:
-        config = voice.get_voice_config()
-        return jsonify({
-            "success": True,
-            "config": config
-        }), 200
-    except Exception as e:
-        logger.error(f"Voice config error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/voice/transcribe', methods=['POST'])
-def api_transcribe_audio():
-    """Convert audio (WAV) to text (speech-to-text)."""
-    if not ENABLE_VOICE:
-        return jsonify({"error": "Voice feature not enabled"}), 400
-    
-    try:
-        # Get audio data from request
-        if 'audio' not in request.files:
-            return jsonify({"error": "No audio file provided"}), 400
-        
-        audio_file = request.files['audio']
-        audio_data = audio_file.read()
-        
-        if not audio_data:
-            return jsonify({"error": "Empty audio file"}), 400
-        
-        # Get parameters
-        language = request.form.get('language', 'en-US')
-        
-        # Transcribe
-        success, result = voice.transcribe_audio(audio_data, language=language)
-        
-        if success:
-            logger.info(f"Audio transcribed: {result[:50]}...")
-            return jsonify({
-                "success": True,
-                "text": result
-            }), 200
-        else:
-            return jsonify({
-                "success": False,
-                "error": result
-            }), 400
-    
-    except Exception as e:
-        logger.error(f"Transcription endpoint error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/voice/speak', methods=['POST'])
-def api_synthesize_speech():
-    """Text-to-speech (TTS) - not yet implemented."""
-    return jsonify({"error": "TTS not yet available. Use voice for speech-to-text only."}), 501
 
 @app.route("/health", methods=["GET"])
 def health():

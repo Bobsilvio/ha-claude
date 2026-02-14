@@ -24,7 +24,6 @@ ENABLE_FILE_ACCESS=$(bashio::config 'enable_file_access')
 LANGUAGE=$(bashio::config 'language')
 TIMEOUT=$(bashio::config 'timeout')
 MAX_RETRIES=$(bashio::config 'max_retries')
-ENABLE_VOICE=$(bashio::config 'enable_voice')
 ENABLE_MEMORY=$(bashio::config 'enable_memory')
 ENABLE_FILE_UPLOAD=$(bashio::config 'enable_file_upload')
 ENABLE_RAG=$(bashio::config 'enable_rag')
@@ -53,7 +52,6 @@ export ENABLE_FILE_ACCESS
 export LANGUAGE
 export TIMEOUT
 export MAX_RETRIES
-export ENABLE_VOICE
 export ENABLE_MEMORY
 export ENABLE_FILE_UPLOAD
 export ENABLE_RAG

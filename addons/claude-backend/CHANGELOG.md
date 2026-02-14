@@ -1,7 +1,8 @@
 # Changelog
 
 ## 3.3.1
-- Little fix
+- **FIX**: Removed voice feature references accidentally included from dev addon (caused AttributeError crash on UI load)
+- Removed voice button, voice CSS, voice JS, voice API endpoints, voice env vars from public addon
 
 ## 3.3.0
 - **NEW**: File Upload - upload documents (PDF, DOCX, TXT, MD, YAML) for AI analysis
