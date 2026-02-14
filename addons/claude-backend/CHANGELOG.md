@@ -1,5 +1,20 @@
 # Changelog
 
+## 3.3.0
+- **NEW**: File Upload - upload documents (PDF, DOCX, TXT, MD, YAML) for AI analysis
+- **NEW**: Persistent Memory - AI remembers past conversations across sessions
+- **NEW**: RAG (Retrieval-Augmented Generation) - semantic document search and context injection
+- All 3 features are EXPERIMENTAL and disabled by default (enable in addon config)
+- File upload button (orange) appears in chat when enabled
+- Documents auto-injected into AI context and cleaned up after use
+- Memory searches past conversations by keywords and message content
+- Added translation keys for all new features in EN/IT/ES/FR
+- Added PyPDF2 and python-docx dependencies for document parsing
+- Upload limit set to 10MB per file
+
+## 3.2.30
+- Maintenance release: internal code improvements and stability fixes.
+
 ## 3.2.29
 - Maintenance release: internal code improvements and stability fixes.
 

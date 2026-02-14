@@ -24,10 +24,30 @@ import providers_anthropic
 import providers_google
 import chat_ui
 
+# Optional feature modules
+try:
+    import memory
+    MEMORY_AVAILABLE = True
+except ImportError:
+    MEMORY_AVAILABLE = False
+
+try:
+    import file_upload
+    FILE_UPLOAD_AVAILABLE = True
+except ImportError:
+    FILE_UPLOAD_AVAILABLE = False
+
+try:
+    import rag
+    RAG_AVAILABLE = True
+except ImportError:
+    RAG_AVAILABLE = False
+
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload
 
 
 # Version: read from config.yaml
@@ -63,6 +83,9 @@ COLORED_LOGS = os.getenv("COLORED_LOGS", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"
 LANGUAGE = os.getenv("LANGUAGE", "en").lower()  # Supported: en, it, es, fr
 LOG_LEVEL = os.getenv("LOG_LEVEL", "normal").lower()  # Supported: normal, verbose, debug
+ENABLE_MEMORY = os.getenv("ENABLE_MEMORY", "False").lower() == "true"
+ENABLE_FILE_UPLOAD = os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true"
+ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
@@ -2087,6 +2110,14 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     # If user is creating new automation/script, skip fuzzy matching to avoid false automation injection
     smart_context = intent.build_smart_context(user_message, intent=intent_name)
     
+    # Step 2.5: Inject memory context if enabled
+    memory_context = ""
+    if ENABLE_MEMORY and MEMORY_AVAILABLE:
+        memory_context = memory.get_memory_context(query=user_message, limit=3)
+        if memory_context:
+            logger.info(f"Memory context injected for session {session_id}")
+            smart_context = memory_context + "\n\n" + smart_context
+    
     # Step 3: Re-detect intent WITH full smart context for accuracy
     intent_info = intent.detect_intent(user_message, smart_context)
     intent_name = intent_info["intent"]
@@ -2193,6 +2224,47 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     # Create a copy of messages for API with enriched last user message
     messages = conversations[session_id][:-1] + [{"role": "user", "content": api_content}]
 
+    # Inject file upload and RAG context if available AND enabled
+    if (FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD) or (RAG_AVAILABLE and ENABLE_RAG):
+        last_user_content = api_content
+        context_sections = []
+
+        # Inject document context if file upload is available AND enabled
+        if FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD:
+            try:
+                doc_context = file_upload.get_document_context()
+                if doc_context:
+                    context_sections.append(
+                        "## UPLOADED USER DOCUMENTS\n"
+                        "IMPORTANT: The full content of these files is included below. "
+                        "DO NOT use tools like read_config_file to read these files, "
+                        "the content is already available.\n\n"
+                        f"{doc_context}"
+                    )
+                    # Auto-cleanup: delete documents after injecting into message
+                    try:
+                        for doc in file_upload.list_documents():
+                            file_upload.delete_document(doc['id'])
+                        logger.info("Documents auto-cleaned after injection into chat")
+                    except Exception as cleanup_err:
+                        logger.debug(f"Document cleanup failed: {cleanup_err}")
+            except Exception as e:
+                logger.debug(f"Could not get document context: {e}")
+
+        # Inject RAG semantic search results if available AND enabled
+        if RAG_AVAILABLE and ENABLE_RAG:
+            try:
+                rag_context = rag.get_rag_context(user_message)
+                if rag_context:
+                    context_sections.append(f"## RISULTATI RICERCA SEMANTICA:\n{rag_context}")
+            except Exception as e:
+                logger.debug(f"Could not get RAG context: {e}")
+
+        if context_sections:
+            enriched_content = last_user_content + "\n\n" + "\n\n".join(context_sections)
+            messages[-1]["content"] = enriched_content
+            logger.info(f"Injected document/RAG context ({len(''.join(context_sections))} chars)")
+
     try:
         # Remember current conversation length to avoid duplicates
         conv_length_before = len(conversations[session_id])
@@ -2239,6 +2311,27 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         if len(conversations[session_id]) > 50:
             conversations[session_id] = conversations[session_id][-40:]
         save_conversations()
+        
+        # Save to persistent memory if enabled
+        if ENABLE_MEMORY and MEMORY_AVAILABLE and conversations[session_id]:
+            try:
+                first_user_msg = next(
+                    (m.get("content", "")[:60].strip() for m in conversations[session_id] if m.get("role") == "user"),
+                    f"Chat #{session_id}"
+                )
+                title = first_user_msg if first_user_msg else f"Chat on {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+                
+                memory.save_conversation(
+                    session_id=session_id,
+                    title=title,
+                    messages=conversations[session_id],
+                    provider=AI_PROVIDER,
+                    model=get_active_model(),
+                    metadata={"intent": intent_name, "read_only": read_only}
+                )
+                logger.info(f"Conversation {session_id} saved to persistent memory")
+            except Exception as e:
+                logger.warning(f"Failed to save conversation to memory: {e}")
     except Exception as e:
         logger.error(f"Stream error ({AI_PROVIDER}): {e}")
         yield {"type": "error", "message": humanize_provider_error(e, AI_PROVIDER)}
@@ -3145,6 +3238,322 @@ def clear_conversation():
     sid = (request.get_json() or {}).get("session_id", "default")
     conversations.pop(sid, None)
     return jsonify({"status": "cleared"}), 200
+
+
+# ---- Memory API Endpoints ----
+
+@app.route('/api/memory', methods=['GET'])
+def api_get_memory():
+    """Get recent saved conversations from memory."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        limit = request.args.get('limit', default=10, type=int)
+        days_back = request.args.get('days_back', default=30, type=int)
+        provider = request.args.get('provider', default=None, type=str)
+        
+        convs = memory.get_past_conversations(limit=limit, days_back=days_back, provider=provider)
+        
+        return jsonify({
+            "success": True,
+            "count": len(convs),
+            "conversations": convs
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory retrieval error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/search', methods=['GET'])
+def api_search_memory():
+    """Search past conversations by query."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    query = request.args.get('q', default='', type=str)
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+    
+    try:
+        limit = request.args.get('limit', default=5, type=int)
+        days_back = request.args.get('days_back', default=30, type=int)
+        
+        results = memory.search_memory(query, limit=limit, days_back=days_back)
+        convs = [{"conversation": conv, "score": score} for conv, score in results]
+        
+        return jsonify({
+            "success": True,
+            "query": query,
+            "count": len(convs),
+            "results": convs
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory search error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/stats', methods=['GET'])
+def api_memory_stats():
+    """Get statistics about stored memories."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        stats = memory.get_memory_stats()
+        return jsonify({
+            "success": True,
+            "stats": stats
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory stats error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/<conversation_id>', methods=['DELETE'])
+def api_delete_memory(conversation_id):
+    """Delete a conversation from memory."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        deleted = memory.delete_conversation(conversation_id)
+        if deleted:
+            return jsonify({
+                "success": True,
+                "message": f"Conversation {conversation_id} deleted"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Conversation not found"
+            }), 404
+    except Exception as e:
+        logger.error(f"Memory delete error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/cleanup', methods=['POST'])
+def api_cleanup_memory():
+    """Clean up old conversations from memory."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        body = request.get_json(silent=True) or {}
+        days = int(body.get('days', 90))
+        
+        deleted_count = memory.clear_old_memories(days=days)
+        return jsonify({
+            "success": True,
+            "deleted": deleted_count,
+            "message": f"Deleted {deleted_count} conversations older than {days} days"
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory cleanup error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== FILE UPLOAD ENDPOINTS =====
+
+@app.route("/api/documents/upload", methods=["POST"])
+def upload_document():
+    """Upload a document (PDF, DOCX, TXT, MD, etc.)."""
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
+        return jsonify({"error": "File upload feature not available"}), 503
+    
+    if "file" not in request.files:
+        return jsonify({"error": "No file provided"}), 400
+    
+    file = request.files["file"]
+    if not file.filename:
+        return jsonify({"error": "Empty filename"}), 400
+    
+    try:
+        file_content = file.read()
+        note = request.form.get("note", "")
+        tags = request.form.getlist("tags")
+        
+        doc_id = file_upload.process_uploaded_file(
+            file_content, 
+            file.filename,
+            note=note,
+            tags=tags
+        )
+        
+        # Auto-index in RAG if available AND enabled
+        if RAG_AVAILABLE and ENABLE_RAG:
+            doc_info = file_upload.get_document(doc_id)
+            if doc_info:
+                rag.index_document(
+                    doc_id,
+                    doc_info.get("content", ""),
+                    {
+                        "filename": doc_info.get("filename"),
+                        "uploaded_at": doc_info.get("uploaded_at"),
+                        "tags": doc_info.get("tags", []),
+                        "note": doc_info.get("note")
+                    }
+                )
+        
+        return jsonify({
+            "status": "uploaded",
+            "doc_id": doc_id,
+            "filename": file.filename,
+            "indexed_in_rag": RAG_AVAILABLE
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"File upload error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents", methods=["GET"])
+def list_documents():
+    """List uploaded documents."""
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
+        return jsonify({"error": "File upload feature not available"}), 503
+    
+    try:
+        tags_filter = request.args.getlist("tags")
+        docs = file_upload.list_documents(tags=tags_filter)
+        return jsonify({"documents": docs}), 200
+    except Exception as e:
+        logger.error(f"List documents error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents/<doc_id>", methods=["GET"])
+def get_document(doc_id):
+    """Get a specific document."""
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
+        return jsonify({"error": "File upload feature not available"}), 503
+    
+    try:
+        doc = file_upload.get_document(doc_id)
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+        return jsonify(doc), 200
+    except Exception as e:
+        logger.error(f"Get document error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents/search", methods=["GET"])
+def search_documents():
+    """Search documents by query."""
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
+        return jsonify({"error": "File upload feature not available"}), 503
+    
+    query = request.args.get("q", "")
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+    
+    try:
+        results = file_upload.search_documents(query)
+        return jsonify({"query": query, "results": results}), 200
+    except Exception as e:
+        logger.error(f"Search documents error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents/<doc_id>", methods=["DELETE"])
+def delete_document(doc_id):
+    """Delete a document."""
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
+        return jsonify({"error": "File upload feature not available"}), 503
+    
+    try:
+        # Remove from RAG index if available
+        if RAG_AVAILABLE:
+            rag.delete_indexed_document(doc_id)
+        
+        success = file_upload.delete_document(doc_id)
+        if not success:
+            return jsonify({"error": "Document not found"}), 404
+        return jsonify({"status": "deleted", "doc_id": doc_id}), 200
+    except Exception as e:
+        logger.error(f"Delete document error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/documents/stats", methods=["GET"])
+def document_stats():
+    """Get document upload statistics."""
+    if not ENABLE_FILE_UPLOAD or not FILE_UPLOAD_AVAILABLE:
+        return jsonify({"error": "File upload feature not available"}), 503
+    
+    try:
+        stats = file_upload.get_upload_stats()
+        return jsonify(stats), 200
+    except Exception as e:
+        logger.error(f"Get stats error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ===== RAG / SEMANTIC SEARCH ENDPOINTS =====
+
+@app.route("/api/rag/index", methods=["POST"])
+def rag_index():
+    """Index a document for semantic search."""
+    if not RAG_AVAILABLE:
+        return jsonify({"error": "RAG feature not available"}), 503
+    
+    data = request.get_json()
+    doc_id = data.get("doc_id")
+    content = data.get("content", "")
+    metadata = data.get("metadata", {})
+    
+    if not doc_id or not content:
+        return jsonify({"error": "doc_id and content required"}), 400
+    
+    try:
+        rag.index_document(doc_id, content, metadata)
+        return jsonify({
+            "status": "indexed",
+            "doc_id": doc_id,
+        }), 201
+    except Exception as e:
+        logger.error(f"RAG index error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/rag/search", methods=["GET"])
+def rag_search():
+    """Semantic search in indexed documents."""
+    if not RAG_AVAILABLE:
+        return jsonify({"error": "RAG feature not available"}), 503
+    
+    query = request.args.get("q", "")
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+    
+    try:
+        limit = int(request.args.get("limit", "5"))
+        threshold = float(request.args.get("threshold", "0.0"))
+        
+        results = rag.semantic_search(query, limit=limit, threshold=threshold)
+        return jsonify({
+            "query": query,
+            "results": results
+        }), 200
+    except Exception as e:
+        logger.error(f"RAG search error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/rag/stats", methods=["GET"])
+def rag_stats():
+    """Get RAG indexing statistics."""
+    if not RAG_AVAILABLE:
+        return jsonify({"error": "RAG feature not available"}), 503
+    
+    try:
+        stats = rag.get_rag_stats()
+        return jsonify(stats), 200
+    except Exception as e:
+        logger.error(f"RAG stats error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @app.errorhandler(404)

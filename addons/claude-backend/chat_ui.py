@@ -160,6 +160,13 @@ def get_chat_ui():
             "sending_request": "Sending request",
             "connected": "Connected",
             "waiting_response": "Waiting for response",
+            "remove_document": "Remove document",
+            "file_too_large": "File too large (max 10MB)",
+            "uploading_document": "Uploading document...",
+            "upload_failed": "Upload failed",
+            "upload_error": "Upload error",
+            "unknown_error": "Unknown error",
+            "document_uploaded": "Document uploaded",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -227,6 +234,13 @@ def get_chat_ui():
             "sending_request": "Invio richiesta",
             "connected": "Connesso",
             "waiting_response": "In attesa della risposta",
+            "remove_document": "Rimuovi documento",
+            "file_too_large": "File troppo grande (max 10MB)",
+            "uploading_document": "Caricamento documento...",
+            "upload_failed": "Upload fallito",
+            "upload_error": "Errore upload",
+            "unknown_error": "Errore sconosciuto",
+            "document_uploaded": "Documento caricato",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -294,6 +308,13 @@ def get_chat_ui():
             "sending_request": "Enviando solicitud",
             "connected": "Conectado",
             "waiting_response": "Esperando respuesta",
+            "remove_document": "Eliminar documento",
+            "file_too_large": "Archivo demasiado grande (máx 10MB)",
+            "uploading_document": "Subiendo documento...",
+            "upload_failed": "Subida fallida",
+            "upload_error": "Error de subida",
+            "unknown_error": "Error desconocido",
+            "document_uploaded": "Documento subido",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -361,10 +382,20 @@ def get_chat_ui():
             "sending_request": "Envoi de la requ\u00eate",
             "connected": "Connect\u00e9",
             "waiting_response": "En attente de r\u00e9ponse",
+            "remove_document": "Supprimer le document",
+            "file_too_large": "Fichier trop volumineux (max 10 Mo)",
+            "uploading_document": "Téléchargement du document...",
+            "upload_failed": "Téléchargement échoué",
+            "upload_error": "Erreur de téléchargement",
+            "unknown_error": "Erreur inconnue",
+            "document_uploaded": "Document téléchargé",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
     ui_js_json = json.dumps(ui_js, ensure_ascii=False)
+
+    file_upload_enabled = api.ENABLE_FILE_UPLOAD
+    file_upload_display = "block" if file_upload_enabled else "none"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -448,6 +479,13 @@ def get_chat_ui():
         .image-preview-container.visible {{ display: block; }}
         .image-preview {{ max-width: 150px; max-height: 150px; border-radius: 8px; border: 2px solid #667eea; }}
         .remove-image-btn {{ position: absolute; top: 4px; right: 4px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }}
+        .doc-preview-container {{ display: none; padding: 8px 12px; background: #f0f4ff; border-radius: 8px; position: relative; align-items: center; gap: 8px; }}
+        .doc-preview-container.visible {{ display: flex; }}
+        .doc-preview-icon {{ font-size: 24px; flex-shrink: 0; }}
+        .doc-preview-info {{ flex: 1; min-width: 0; }}
+        .doc-preview-name {{ font-weight: 600; font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .doc-preview-size {{ font-size: 11px; color: #888; }}
+        .remove-doc-btn {{ background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
         .input-row {{ display: flex; gap: 8px; align-items: flex-end; }}
         .input-row > * {{ min-width: 0; }}
         .input-area textarea {{ flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 10px 16px; font-size: 14px; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.2s; }}
@@ -459,6 +497,8 @@ def get_chat_ui():
         .input-area button.stop-btn:hover {{ background: #dc2626; }}
         .input-area button.image-btn {{ background: #10b981; }}
         .input-area button.image-btn:hover {{ background: #059669; }}
+        .input-area button.file-btn {{ background: #f59e0b; }}
+        .input-area button.file-btn:hover {{ background: #d97706; }}
         @keyframes pulse-stop {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
@@ -587,10 +627,22 @@ def get_chat_ui():
             <img id="imagePreview" class="image-preview" />
             <button class="remove-image-btn" onclick="removeImage()" title="{ui_js['remove_image']}">×</button>
         </div>
+        <div id="docPreviewContainer" class="doc-preview-container">
+            <span class="doc-preview-icon" id="docPreviewIcon">📄</span>
+            <div class="doc-preview-info">
+                <div class="doc-preview-name" id="docPreviewName"></div>
+                <div class="doc-preview-size" id="docPreviewSize"></div>
+            </div>
+            <button class="remove-doc-btn" id="removeDocBtn" title="">×</button>
+        </div>
         <div class="input-row">
             <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)" />
             <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="{ui_js['upload_image']}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            </button>
+            <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.yaml,.yml,.odt" style="display: none;" />
+            <button class="file-btn" title="Upload Document (PDF, DOCX, TXT, MD, YAML)" style="display: {file_upload_display};" id="fileUploadBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
             </button>
             <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
             <button id="sendBtn" onclick="handleButtonClick()">
@@ -642,6 +694,7 @@ def get_chat_ui():
 
         let currentSessionId = safeLocalStorageGet('currentSessionId') || Date.now().toString();
         let currentImage = null;  // Stores base64 image data
+        let pendingDocument = null;  // Stores {{file, name, size}} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
         let currentProviderId = '{api.AI_PROVIDER}';
 
@@ -769,6 +822,50 @@ def get_chat_ui():
             currentImage = null;
             imageInput.value = '';
             imagePreviewContainer.classList.remove('visible');
+        }}
+
+        const docPreviewContainer = document.getElementById('docPreviewContainer');
+        const docPreviewName = document.getElementById('docPreviewName');
+        const docPreviewSize = document.getElementById('docPreviewSize');
+        const docPreviewIcon = document.getElementById('docPreviewIcon');
+
+        const DOC_ICONS = {{
+            'pdf': '📕', 'docx': '📘', 'doc': '📘',
+            'txt': '📝', 'md': '📝', 'markdown': '📝',
+            'yaml': '📋', 'yml': '📋', 'odt': '📗'
+        }};
+
+        function showDocPreview(file) {{
+            const ext = file.name.split('.').pop().toLowerCase();
+            docPreviewIcon.textContent = DOC_ICONS[ext] || '📄';
+            docPreviewName.textContent = file.name;
+            const sizeKB = file.size / 1024;
+            docPreviewSize.textContent = sizeKB > 1024
+                ? `${{(sizeKB / 1024).toFixed(2)}} MB`
+                : `${{sizeKB.toFixed(1)}} KB`;
+            docPreviewContainer.classList.add('visible');
+        }}
+
+        function removeDocument() {{
+            pendingDocument = null;
+            document.getElementById('documentInput').value = '';
+            docPreviewContainer.classList.remove('visible');
+        }}
+
+        function handleDocumentSelect(event) {{
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.size > maxSize) {{
+                alert(T.file_too_large || 'File too large (max 10MB)');
+                document.getElementById('documentInput').value = '';
+                return;
+            }}
+
+            pendingDocument = file;
+            showDocPreview(file);
+            if (input) input.focus();
         }}
 
         function toggleReadOnly(checked) {{
@@ -1371,10 +1468,15 @@ def get_chat_ui():
 
         async function sendMessage() {{
             const text = (input && input.value ? input.value : '').trim();
-            if (!text || sending) return;
+            const hasDoc = !!pendingDocument;
+            if ((!text && !hasDoc) || sending) return;
 
             sending = true;
             setStopMode(true);
+
+            // Capture and clear pending document before async operations
+            const docToSend = pendingDocument;
+            pendingDocument = null;
 
             try {{
                 if (input) {{
@@ -1385,13 +1487,53 @@ def get_chat_ui():
                     suggestionsEl.style.display = 'none';
                 }}
 
-                // Show user message with image if present
+                // Upload document if attached
+                let docUploaded = false;
+                if (docToSend) {{
+                    removeDocument();
+                    const docLabel = `📎 ${{docToSend.name}}`;
+                    const displayText = text ? `${{text}}\n\n${{docLabel}}` : docLabel;
+                    const imageToSendDoc = currentImage;
+                    addMessage(displayText, 'user', imageToSendDoc);
+                    showThinking();
+                    startThinkingTicker(getAnalyzingMsg());
+                    addThinkingStep(`📤 ${{T.uploading_document || 'Uploading document...'}}`);
+                    try {{
+                        const formData = new FormData();
+                        formData.append('file', docToSend);
+                        formData.append('note', `Uploaded: ${{new Date().toLocaleString()}}`);
+                        const upResp = await fetch(apiUrl('api/documents/upload'), {{
+                            method: 'POST',
+                            body: formData
+                        }});
+                        if (upResp.ok) {{
+                            docUploaded = true;
+                        }} else {{
+                            const err = await upResp.json().catch(() => ({{}}));
+                            addMessage(`❌ ${{T.upload_failed || 'Upload failed'}}: ${{err.error || T.unknown_error || 'Unknown error'}}`, 'system');
+                            sending = false;
+                            setStopMode(false);
+                            removeThinking();
+                            return;
+                        }}
+                    }} catch (upErr) {{
+                        addMessage(`❌ ${{T.upload_error || 'Upload error'}}: ${{upErr.message}}`, 'system');
+                        sending = false;
+                        setStopMode(false);
+                        removeThinking();
+                        return;
+                    }}
+                }}
+
+                // Show user message with image if present (only if no doc was uploaded — doc already showed it)
                 const imageToSend = currentImage;
-                addMessage(text, 'user', imageToSend);
+                if (!docToSend) {{
+                    addMessage(text, 'user', imageToSend);
+                    showThinking();
+                    startThinkingTicker(getAnalyzingMsg());
+                }}
                 // Clear the preview immediately (keep imageToSend for the request payload)
                 removeImage();
-                showThinking();
-                startThinkingTicker(getAnalyzingMsg());
                 addThinkingStep(T.sending_request || 'Sending request');
 
                 // If the backend is retrying (e.g., 429) and no status/tool events are sent,
@@ -1405,7 +1547,7 @@ def get_chat_ui():
                 }}, 8000);
 
                 const payload = {{
-                    message: text,
+                    message: text || `[${{T.document_uploaded || 'Document uploaded'}}: ${{docToSend ? docToSend.name : ''}}]`,
                     session_id: currentSessionId,
                     read_only: readOnlyMode
                 }};
@@ -1991,6 +2133,17 @@ def get_chat_ui():
 
                 const removeBtn = document.querySelector('.remove-image-btn');
                 if (removeBtn) removeBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeImage(); }});
+
+                const documentInput = document.getElementById('documentInput');
+                if (documentInput) documentInput.addEventListener('change', handleDocumentSelect);
+                const fileBtn = document.getElementById('fileUploadBtn');
+                if (fileBtn) fileBtn.addEventListener('click', () => documentInput && documentInput.click());
+
+                const removeDocBtn = document.getElementById('removeDocBtn');
+                if (removeDocBtn) {{
+                    removeDocBtn.title = T.remove_document || 'Remove document';
+                    removeDocBtn.addEventListener('click', (e) => {{ e.preventDefault(); removeDocument(); }});
+                }}
 
                 if (input) {{
                     input.addEventListener('keydown', handleKeyDown);
