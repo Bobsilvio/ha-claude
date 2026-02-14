@@ -1,5 +1,14 @@
 # Changelog
 
+## 3.3.27-dev
+- **FIX**: Persistent memory not working across conversations
+- Fixed keyword extraction: was too restrictive (only words > 5 chars repeated 2+ times), now captures words > 2 chars including single mentions
+- Fixed search_memory: was matching full query as substring, now matches individual words in title/summary/message content
+- Fixed _generate_summary: was only saving first user + last assistant message (200 chars), now saves up to 5 user + 3 assistant messages (500 chars)
+- Fixed get_memory_context: now injects actual message content instead of just summary, with Italian instructions
+- Fixed save check: added missing MEMORY_AVAILABLE guard
+- Added stop words for IT/ES/FR languages in keyword extraction
+
 ## 3.3.26-dev
 - **FIX**: Voice STT rewritten - uses OpenAI Whisper API / Google Gemini / HA STT
 - Removed SpeechRecognition, pyttsx3, edge-tts, gtts dependencies (broken in Alpine Linux)

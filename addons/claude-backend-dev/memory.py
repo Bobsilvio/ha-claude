@@ -133,11 +133,13 @@ def search_memory(
     Returns:
         List of (conversation, score) tuples sorted by relevance
     """
+    import re
     ensure_memory_dir()
     conversations = _load_conversations()
     
     query_lower = query.lower()
-    query_words = set(query_lower.split())
+    # Extract meaningful words from query (length > 2)
+    query_words = set(w for w in re.findall(r'[a-zA-ZàèìòùáéíóúñÑ0-9]+', query_lower) if len(w) > 2)
     
     cutoff = datetime.now() - timedelta(days=days_back)
     results = []
@@ -147,18 +149,33 @@ def search_memory(
         if created < cutoff:
             continue
         
-        # Score based on keyword matches
         score = 0.0
+        
+        # Score based on keyword matches (individual word matching)
         conv_keywords = set(conv.get("keywords", []))
-        score += len(query_words & conv_keywords) * 1.0
+        keyword_matches = query_words & conv_keywords
+        score += len(keyword_matches) * 1.5
         
-        # Score based on title match
-        if query_lower in conv.get("title", "").lower():
-            score += 2.0
+        # Score based on individual word matches in title
+        title_lower = conv.get("title", "").lower()
+        for word in query_words:
+            if word in title_lower:
+                score += 1.0
         
-        # Score based on summary match
-        if query_lower in conv.get("summary", "").lower():
-            score += 0.5
+        # Score based on individual word matches in summary
+        summary_lower = conv.get("summary", "").lower()
+        for word in query_words:
+            if word in summary_lower:
+                score += 0.5
+        
+        # Score based on actual message content search
+        messages = conv.get("messages", [])
+        msg_text = " ".join(
+            m.get("content", "").lower() for m in messages 
+            if isinstance(m.get("content"), str)
+        )
+        content_matches = sum(1 for word in query_words if word in msg_text)
+        score += content_matches * 0.8
         
         if score > 0:
             results.append((conv, score))
@@ -196,26 +213,39 @@ def get_memory_context(
     if not conversations:
         return ""
     
-    context_lines = ["🧠 **MEMORY CONTEXT** - Relevant past conversations:\n"]
+    context_lines = ["## MEMORIA PERSISTENTE - Conversazioni passate rilevanti:\n"]
     token_count = 0
     
     for i, conv in enumerate(conversations, 1):
-        # Format conversation summary
-        summary = conv.get("summary", "No summary available")
         title = conv.get("title", "Untitled")
-        created = conv.get("created", "Unknown date")[:10]  # Just date part
+        created = conv.get("created", "Unknown date")[:10]
         
-        block = f"{i}. **{title}** ({created})\n   {summary}\n"
-        block_tokens = len(block) // 4  # Rough estimate
+        # Include actual messages for better context, not just summary
+        messages = conv.get("messages", [])
+        msg_lines = []
+        for m in messages:
+            content = m.get("content", "")
+            if not isinstance(content, str):
+                continue
+            role = m.get("role", "unknown")
+            if role in ("user", "assistant"):
+                msg_lines.append(f"  {role}: {content[:200]}")
         
+        block = f"{i}. [{created}] {title}\n"
+        if msg_lines:
+            block += "\n".join(msg_lines[:8]) + "\n"  # Max 8 messages per conversation
+        else:
+            block += f"  {conv.get('summary', 'No summary')}\n"
+        
+        block_tokens = len(block) // 4
         if token_count + block_tokens > max_tokens:
-            context_lines.append(f"   ... ({len(conversations) - i} more conversations available)")
+            context_lines.append(f"   ... ({len(conversations) - i} more conversations disponibili)")
             break
         
         context_lines.append(block)
         token_count += block_tokens
     
-    context_lines.append("\nUse this context to provide more personalized and consistent responses.\n")
+    context_lines.append("\nUSA queste informazioni dalle conversazioni passate per dare risposte personalizzate e coerenti. Se l'utente ha condiviso informazioni personali (nome, età, preferenze), ricordale.\n")
     
     return "\n".join(context_lines)
 
@@ -295,38 +325,61 @@ def _load_conversations() -> Dict:
         return {}
 
 
-def _generate_summary(messages: List[Dict], max_length: int = 200) -> str:
-    """Generate a brief summary of the conversation."""
+def _generate_summary(messages: List[Dict], max_length: int = 500) -> str:
+    """Generate a summary of the conversation including key facts."""
     if not messages:
         return "Empty conversation"
     
-    # Take first user message and last assistant message
-    first_user = next((m.get("content", "")[:100] for m in messages if m.get("role") == "user"), "")
-    last_assistant = next((m.get("content", "")[:100] for m in reversed(messages) if m.get("role") == "assistant"), "")
+    # Collect ALL user messages (up to a limit) for better context
+    user_msgs = []
+    assistant_msgs = []
+    for m in messages:
+        content = m.get("content", "")
+        if not isinstance(content, str):
+            continue
+        if m.get("role") == "user":
+            user_msgs.append(content[:150])
+        elif m.get("role") == "assistant":
+            assistant_msgs.append(content[:150])
     
-    if first_user and last_assistant:
-        return f"Q: {first_user}... A: {last_assistant}..."
-    elif first_user:
-        return f"User asked: {first_user}..."
-    else:
-        return "Conversation with various messages"
+    parts = []
+    # Include first few user messages for context
+    for i, msg in enumerate(user_msgs[:5]):
+        parts.append(f"User: {msg}")
+    # Include key assistant responses
+    for i, msg in enumerate(assistant_msgs[:3]):
+        parts.append(f"Assistant: {msg}")
+    
+    summary = " | ".join(parts)
+    if len(summary) > max_length:
+        summary = summary[:max_length] + "..."
+    
+    return summary if summary else "Conversation with various messages"
 
 
-def _extract_keywords(messages: List[Dict], max_keywords: int = 10) -> List[str]:
+def _extract_keywords(messages: List[Dict], max_keywords: int = 20) -> List[str]:
     """Extract keywords from conversation for better searching."""
-    # Simple keyword extraction: words > 5 chars that appear multiple times
     from collections import Counter
+    import re
     
     all_text = " ".join(m.get("content", "") for m in messages if isinstance(m.get("content"), str))
-    words = all_text.lower().split()
+    # Extract words, including numbers
+    words = re.findall(r'[a-zA-ZàèìòùÀÈÌÒÙáéíóúÁÉÍÓÚñÑ0-9]+', all_text.lower())
     
-    # Filter: length > 5, not common words
-    common_words = {"what", "which", "where", "when", "there", "these", "those", "about", "with", "from"}
-    filtered = [w for w in words if len(w) > 5 and w not in common_words]
+    # Filter: length > 2, not common stop words
+    stop_words = {
+        "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her",
+        "was", "one", "our", "out", "has", "have", "been", "some", "them", "than",
+        "its", "over", "such", "that", "this", "with", "will", "each", "make",
+        "che", "non", "per", "una", "sono", "come", "del", "della", "con",
+        "les", "des", "une", "que", "qui", "est", "dans", "pour", "sur",
+        "los", "las", "por", "como"
+    }
+    filtered = [w for w in words if len(w) > 2 and w not in stop_words]
     
-    # Get most common
+    # Get most common - include even single mentions for short conversations
     counter = Counter(filtered)
-    keywords = [word for word, count in counter.most_common(max_keywords) if count > 1]
+    keywords = [word for word, count in counter.most_common(max_keywords)]
     
     return keywords
 

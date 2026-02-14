@@ -2323,7 +2323,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         save_conversations()
         
         # Save to persistent memory if enabled
-        if ENABLE_MEMORY and conversations[session_id]:
+        if ENABLE_MEMORY and MEMORY_AVAILABLE and conversations[session_id]:
             try:
                 # Generate title from first user message
                 first_user_msg = next(
