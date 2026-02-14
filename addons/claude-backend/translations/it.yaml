@@ -43,19 +43,16 @@ configuration:
     description: Numero massimo di tentativi per chiamate API fallite (predefinito 3)
   colored_logs:
     name: Log Colorati
-    description: Abilita indicatori emoji colorati nei log dell'addon
+    description: Abilita indicatori emoji colorati nei log dell'addon (🟢 successo, 🔴 errore, ecc.)
   log_level:
     name: Livello Log
     description: "Verbosità log: normal (filtra rumore), verbose (tutti i log), debug (include dati payload)"
-  enable_voice:
-    name: Abilita Voce
-    description: "[SPERIMENTALE] Abilita input vocale - pulsante microfono appare nella chat"
   enable_memory:
     name: Abilita Memoria
-    description: "[SPERIMENTALE] Abilita memoria persistente - l'AI ricorda conversazioni passate tra sessioni"
+    description: "[SPERIMENTALE] Abilita memoria persistente - l'AI ricorda le conversazioni passate tra le sessioni"
   enable_file_upload:
     name: Abilita Upload File
-    description: "[SPERIMENTALE] Permetti upload documenti (PDF, DOCX, TXT, MD, YAML) per analisi AI"
+    description: "[SPERIMENTALE] Permetti di caricare documenti (PDF, DOCX, TXT, MD, YAML) per l'analisi AI"
   enable_rag:
     name: Abilita RAG
     description: "[SPERIMENTALE] Abilita RAG (Retrieval-Augmented Generation) per ricerca documenti e iniezione contesto"

@@ -43,13 +43,10 @@ configuration:
     description: Maximum retry attempts for failed API calls (default 3)
   colored_logs:
     name: Colored Logs
-    description: Enable colored emoji indicators in addon logs
+    description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
   log_level:
     name: Log Level
     description: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
-  enable_voice:
-    name: Enable Voice
-    description: "[EXPERIMENTAL] Enable voice input - microphone button appears in chat"
   enable_memory:
     name: Enable Memory
     description: "[EXPERIMENTAL] Enable persistent memory - AI remembers past conversations across sessions"

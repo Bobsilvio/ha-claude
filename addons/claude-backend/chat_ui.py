@@ -167,6 +167,19 @@ def get_chat_ui():
             "upload_error": "Upload error",
             "unknown_error": "Unknown error",
             "document_uploaded": "Document uploaded",
+            "mic_not_supported": "Browser does not support audio recording. Use HTTPS or a compatible browser.",
+            "mic_denied_settings": "Microphone access denied. Go to browser settings to enable it.",
+            "mic_denied_icon": "Microphone denied. Click the 🔒 icon in the browser bar to enable it.",
+            "mic_not_found": "No microphone found. Connect a microphone and try again.",
+            "mic_in_use": "Microphone in use by another app. Close other apps and try again.",
+            "mic_error": "Microphone error",
+            "voice_record": "Record Voice",
+            "voice_stop": "Stop Recording",
+            "voice_too_short": "Recording too short, try again.",
+            "voice_transcribing": "Transcribing...",
+            "voice_transcribed": "Transcribed",
+            "voice_transcribe_fail": "Could not transcribe audio",
+            "voice_transcribe_error": "Transcription error",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -241,6 +254,19 @@ def get_chat_ui():
             "upload_error": "Errore upload",
             "unknown_error": "Errore sconosciuto",
             "document_uploaded": "Documento caricato",
+            "mic_not_supported": "Il browser non supporta la registrazione audio. Usa HTTPS o un browser compatibile.",
+            "mic_denied_settings": "Accesso al microfono negato. Vai nelle impostazioni del browser per abilitarlo.",
+            "mic_denied_icon": "Permesso microfono negato. Clicca l'icona 🔒 nella barra del browser per abilitarlo.",
+            "mic_not_found": "Nessun microfono trovato. Collega un microfono e riprova.",
+            "mic_in_use": "Microfono in uso da un'altra app. Chiudi le altre app e riprova.",
+            "mic_error": "Errore microfono",
+            "voice_record": "Registra voce",
+            "voice_stop": "Ferma registrazione",
+            "voice_too_short": "Registrazione troppo breve, riprova.",
+            "voice_transcribing": "Trascrizione in corso...",
+            "voice_transcribed": "Trascritto",
+            "voice_transcribe_fail": "Impossibile trascrivere l'audio",
+            "voice_transcribe_error": "Errore di trascrizione",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -315,6 +341,19 @@ def get_chat_ui():
             "upload_error": "Error de subida",
             "unknown_error": "Error desconocido",
             "document_uploaded": "Documento subido",
+            "mic_not_supported": "El navegador no soporta grabación de audio. Usa HTTPS o un navegador compatible.",
+            "mic_denied_settings": "Acceso al micrófono denegado. Ve a los ajustes del navegador para habilitarlo.",
+            "mic_denied_icon": "Permiso de micrófono denegado. Haz clic en el icono 🔒 en la barra del navegador.",
+            "mic_not_found": "No se encontró micrófono. Conecta un micrófono e inténtalo de nuevo.",
+            "mic_in_use": "Micrófono en uso por otra app. Cierra las otras apps e inténtalo de nuevo.",
+            "mic_error": "Error de micrófono",
+            "voice_record": "Grabar voz",
+            "voice_stop": "Detener grabación",
+            "voice_too_short": "Grabación muy corta, inténtalo de nuevo.",
+            "voice_transcribing": "Transcribiendo...",
+            "voice_transcribed": "Transcrito",
+            "voice_transcribe_fail": "No se pudo transcribir el audio",
+            "voice_transcribe_error": "Error de transcripción",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -384,18 +423,34 @@ def get_chat_ui():
             "waiting_response": "En attente de r\u00e9ponse",
             "remove_document": "Supprimer le document",
             "file_too_large": "Fichier trop volumineux (max 10 Mo)",
-            "uploading_document": "Téléchargement du document...",
-            "upload_failed": "Téléchargement échoué",
-            "upload_error": "Erreur de téléchargement",
+            "uploading_document": "T\u00e9l\u00e9chargement du document...",
+            "upload_failed": "T\u00e9l\u00e9chargement \u00e9chou\u00e9",
+            "upload_error": "Erreur de t\u00e9l\u00e9chargement",
             "unknown_error": "Erreur inconnue",
-            "document_uploaded": "Document téléchargé",
+            "document_uploaded": "Document t\u00e9l\u00e9charg\u00e9",
+            "mic_not_supported": "Le navigateur ne prend pas en charge l'enregistrement audio. Utilisez HTTPS ou un navigateur compatible.",
+            "mic_denied_settings": "Acc\u00e8s au microphone refus\u00e9. Allez dans les param\u00e8tres du navigateur pour l'activer.",
+            "mic_denied_icon": "Microphone refus\u00e9. Cliquez sur l'ic\u00f4ne \ud83d\udd12 dans la barre du navigateur.",
+            "mic_not_found": "Aucun microphone trouv\u00e9. Connectez un microphone et r\u00e9essayez.",
+            "mic_in_use": "Microphone utilis\u00e9 par une autre app. Fermez les autres apps et r\u00e9essayez.",
+            "mic_error": "Erreur de microphone",
+            "voice_record": "Enregistrer la voix",
+            "voice_stop": "Arr\u00eater l'enregistrement",
+            "voice_too_short": "Enregistrement trop court, r\u00e9essayez.",
+            "voice_transcribing": "Transcription en cours...",
+            "voice_transcribed": "Transcrit",
+            "voice_transcribe_fail": "Impossible de transcrire l'audio",
+            "voice_transcribe_error": "Erreur de transcription",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
     ui_js_json = json.dumps(ui_js, ensure_ascii=False)
-
+    
+    # Feature flags for UI elements
     file_upload_enabled = api.ENABLE_FILE_UPLOAD
+    voice_enabled = api.ENABLE_VOICE
     file_upload_display = "block" if file_upload_enabled else "none"
+    voice_display = "block" if voice_enabled else "none"
 
     return f"""<!DOCTYPE html>
 <html>
@@ -499,6 +554,10 @@ def get_chat_ui():
         .input-area button.image-btn:hover {{ background: #059669; }}
         .input-area button.file-btn {{ background: #f59e0b; }}
         .input-area button.file-btn:hover {{ background: #d97706; }}
+        .input-area button.voice-btn {{ background: #8b5cf6; }}
+        .input-area button.voice-btn:hover {{ background: #7c3aed; }}
+        .input-area button.voice-btn.recording {{ background: #ef4444; animation: pulse-record 1s infinite; }}
+        @keyframes pulse-record {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         @keyframes pulse-stop {{ 0%, 100% {{ box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }} 50% {{ box-shadow: 0 0 0 6px rgba(239,68,68,0); }} }}
         .suggestions {{ display: flex; gap: 8px; padding: 0 16px 8px; flex-wrap: wrap; }}
         .suggestion {{ background: white; border: 1px solid #ddd; border-radius: 16px; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }}
@@ -625,7 +684,7 @@ def get_chat_ui():
     <div class="input-area">
         <div id="imagePreviewContainer" class="image-preview-container">
             <img id="imagePreview" class="image-preview" />
-            <button class="remove-image-btn" onclick="removeImage()" title="{ui_js['remove_image']}">×</button>
+            <button class="remove-image-btn" title="{ui_js['remove_image']}">×</button>
         </div>
         <div id="docPreviewContainer" class="doc-preview-container">
             <span class="doc-preview-icon" id="docPreviewIcon">📄</span>
@@ -636,16 +695,20 @@ def get_chat_ui():
             <button class="remove-doc-btn" id="removeDocBtn" title="">×</button>
         </div>
         <div class="input-row">
-            <input type="file" id="imageInput" accept="image/*" style="display: none;" onchange="handleImageSelect(event)" />
-            <button class="image-btn" onclick="document.getElementById('imageInput').click()" title="{ui_js['upload_image']}">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;" />
+            <button class="image-btn" title="{ui_js['upload_image']}">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             </button>
             <input type="file" id="documentInput" accept=".pdf,.docx,.doc,.txt,.md,.yaml,.yml,.odt" style="display: none;" />
             <button class="file-btn" title="Upload Document (PDF, DOCX, TXT, MD, YAML)" style="display: {file_upload_display};" id="fileUploadBtn">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
             </button>
-            <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}" onkeydown="handleKeyDown(event)" oninput="autoResize(this)"></textarea>
-            <button id="sendBtn" onclick="handleButtonClick()">
+            <input type="hidden" id="voiceInput" />
+            <button class="voice-btn" title="Record Voice" style="display: {voice_display};" id="voiceRecordBtn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v12a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2m14 0a7 7 0 0 0-14 0v2"/></svg>
+            </button>
+            <textarea id="input" rows="1" placeholder="{ui_js['input_placeholder']}"></textarea>
+            <button id="sendBtn">
                 <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
             </button>
@@ -654,8 +717,6 @@ def get_chat_ui():
         </div>
     </div>
 
-    <script src="ui_bootstrap.js"></script>
-    <script src="ui_main.js"></script>
     <script>
         if (window.__UI_MAIN_INITIALIZED) {{
             console.log('[ui] main already initialized');
@@ -865,6 +926,7 @@ def get_chat_ui():
 
             pendingDocument = file;
             showDocPreview(file);
+            // Focus the input so the user can type a message
             if (input) input.focus();
         }}
 
@@ -1474,7 +1536,7 @@ def get_chat_ui():
             sending = true;
             setStopMode(true);
 
-            // Capture and clear pending document before async operations
+            // Capture pending document before clearing
             const docToSend = pendingDocument;
             pendingDocument = null;
 
@@ -1502,7 +1564,7 @@ def get_chat_ui():
                         const formData = new FormData();
                         formData.append('file', docToSend);
                         formData.append('note', `Uploaded: ${{new Date().toLocaleString()}}`);
-                        const upResp = await fetch(apiUrl('api/documents/upload'), {{
+                        const upResp = await fetch(apiUrl('/api/documents/upload'), {{
                             method: 'POST',
                             body: formData
                         }});
@@ -1525,7 +1587,7 @@ def get_chat_ui():
                     }}
                 }}
 
-                // Show user message with image if present (only if no doc was uploaded — doc already showed it)
+                // Show user message with image if present (only if no doc already shown)
                 const imageToSend = currentImage;
                 if (!docToSend) {{
                     addMessage(text, 'user', imageToSend);
@@ -2190,7 +2252,15 @@ def get_chat_ui():
                 _appendSystemRaw('❌ UI boot error: ' + msg);
             }}
         }})();
+        
+        // Export global functions for onclick handlers
+        window.toggleVoiceRecording = toggleVoiceRecording;
+        window.handleDocumentSelect = handleDocumentSelect;
+        window.removeDocument = removeDocument;
+        window.changeModel = changeModel;
+        window.handleButtonClick = handleButtonClick;
         }}
+        
     </script>
 </body>
 </html>"""

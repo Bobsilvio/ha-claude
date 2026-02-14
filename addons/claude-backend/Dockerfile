@@ -32,6 +32,9 @@ COPY providers_google.py .
 COPY chat_ui.py .
 COPY keywords.json .
 COPY config.yaml .
+COPY file_upload.py .
+COPY rag.py .
+COPY memory.py .
 
 # Copy rootfs (s6-overlay v3 service structure)
 COPY rootfs /

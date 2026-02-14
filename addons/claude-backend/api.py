@@ -36,7 +36,7 @@ try:
     FILE_UPLOAD_AVAILABLE = True
 except ImportError:
     FILE_UPLOAD_AVAILABLE = False
-
+    
 try:
     import rag
     RAG_AVAILABLE = True
@@ -46,8 +46,8 @@ except ImportError:
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload
+CORS(app)
 
 
 # Version: read from config.yaml
@@ -2228,7 +2228,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     if (FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD) or (RAG_AVAILABLE and ENABLE_RAG):
         last_user_content = api_content
         context_sections = []
-
+        
         # Inject document context if file upload is available AND enabled
         if FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD:
             try:
@@ -2250,7 +2250,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         logger.debug(f"Document cleanup failed: {cleanup_err}")
             except Exception as e:
                 logger.debug(f"Could not get document context: {e}")
-
+        
         # Inject RAG semantic search results if available AND enabled
         if RAG_AVAILABLE and ENABLE_RAG:
             try:
@@ -2259,7 +2259,8 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     context_sections.append(f"## RISULTATI RICERCA SEMANTICA:\n{rag_context}")
             except Exception as e:
                 logger.debug(f"Could not get RAG context: {e}")
-
+        
+        # Add context sections to the last user message if any context was found
         if context_sections:
             enriched_content = last_user_content + "\n\n" + "\n\n".join(context_sections)
             messages[-1]["content"] = enriched_content
@@ -2315,6 +2316,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Save to persistent memory if enabled
         if ENABLE_MEMORY and MEMORY_AVAILABLE and conversations[session_id]:
             try:
+                # Generate title from first user message
                 first_user_msg = next(
                     (m.get("content", "")[:60].strip() for m in conversations[session_id] if m.get("role") == "user"),
                     f"Chat #{session_id}"
@@ -2742,8 +2744,14 @@ def api_chat_stream():
     abort_streams[session_id] = False  # Reset abort flag
 
     def generate():
-        for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
-            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        try:
+            for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            logger.error(f"❌ Stream error in stream_chat_with_ai: {type(e).__name__}: {str(e)}", extra={"context": "REQUEST"})
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}", extra={"context": "REQUEST"})
+            yield f"data: {json.dumps({'error': f'Stream error: {str(e)}'}, ensure_ascii=False)}\n\n"
 
     return Response(
         stream_with_context(generate()),
@@ -3168,6 +3176,184 @@ def api_nvidia_test_models():
         "timeouts": timeouts,
     }), 200
 
+# ---- Memory API Endpoints ----
+
+@app.route('/api/memory', methods=['GET'])
+def api_get_memory():
+    """Get recent saved conversations from memory."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        limit = request.args.get('limit', default=10, type=int)
+        days_back = request.args.get('days_back', default=30, type=int)
+        provider = request.args.get('provider', default=None, type=str)
+        
+        conversations = memory.get_past_conversations(limit=limit, days_back=days_back, provider=provider)
+        
+        return jsonify({
+            "success": True,
+            "count": len(conversations),
+            "conversations": conversations
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory retrieval error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/search', methods=['GET'])
+def api_search_memory():
+    """Search past conversations by query."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    query = request.args.get('q', default='', type=str)
+    if not query:
+        return jsonify({"error": "Query parameter 'q' required"}), 400
+    
+    try:
+        limit = request.args.get('limit', default=5, type=int)
+        days_back = request.args.get('days_back', default=30, type=int)
+        
+        results = memory.search_memory(query, limit=limit, days_back=days_back)
+        conversations = [{"conversation": conv, "score": score} for conv, score in results]
+        
+        return jsonify({
+            "success": True,
+            "query": query,
+            "count": len(conversations),
+            "results": conversations
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory search error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/stats', methods=['GET'])
+def api_memory_stats():
+    """Get statistics about stored memories."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        stats = memory.get_memory_stats()
+        return jsonify({
+            "success": True,
+            "stats": stats
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory stats error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/<conversation_id>', methods=['DELETE'])
+def api_delete_memory(conversation_id):
+    """Delete a conversation from memory."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        deleted = memory.delete_conversation(conversation_id)
+        if deleted:
+            return jsonify({
+                "success": True,
+                "message": f"Conversation {conversation_id} deleted"
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Conversation not found"
+            }), 404
+    except Exception as e:
+        logger.error(f"Memory delete error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/memory/cleanup', methods=['POST'])
+def api_cleanup_memory():
+    """Clean up old conversations from memory."""
+    if not ENABLE_MEMORY:
+        return jsonify({"error": "Memory feature not enabled"}), 400
+    
+    try:
+        body = request.get_json(silent=True) or {}
+        days = int(body.get('days', 90))
+        
+        deleted_count = memory.clear_old_memories(days=days)
+        return jsonify({
+            "success": True,
+            "deleted": deleted_count,
+            "message": f"Deleted {deleted_count} conversations older than {days} days"
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory cleanup error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---- Voice API Endpoints ----
+
+@app.route('/api/voice/config', methods=['GET'])
+def api_voice_config():
+    """Get voice system configuration and available backends."""
+    if not ENABLE_VOICE:
+        return jsonify({"error": "Voice feature not enabled"}), 400
+    
+    try:
+        config = voice.get_voice_config()
+        return jsonify({
+            "success": True,
+            "config": config
+        }), 200
+    except Exception as e:
+        logger.error(f"Voice config error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/voice/transcribe', methods=['POST'])
+def api_transcribe_audio():
+    """Convert audio (WAV) to text (speech-to-text)."""
+    if not ENABLE_VOICE:
+        return jsonify({"error": "Voice feature not enabled"}), 400
+    
+    try:
+        # Get audio data from request
+        if 'audio' not in request.files:
+            return jsonify({"error": "No audio file provided"}), 400
+        
+        audio_file = request.files['audio']
+        audio_data = audio_file.read()
+        
+        if not audio_data:
+            return jsonify({"error": "Empty audio file"}), 400
+        
+        # Get parameters
+        language = request.form.get('language', 'en-US')
+        
+        # Transcribe
+        success, result = voice.transcribe_audio(audio_data, language=language)
+        
+        if success:
+            logger.info(f"Audio transcribed: {result[:50]}...")
+            return jsonify({
+                "success": True,
+                "text": result
+            }), 200
+        else:
+            return jsonify({
+                "success": False,
+                "error": result
+            }), 400
+    
+    except Exception as e:
+        logger.error(f"Transcription endpoint error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/voice/speak', methods=['POST'])
+def api_synthesize_speech():
+    """Text-to-speech (TTS) - not yet implemented."""
+    return jsonify({"error": "TTS not yet available. Use voice for speech-to-text only."}), 501
+
 @app.route("/health", methods=["GET"])
 def health():
     """Health check."""
@@ -3240,122 +3426,7 @@ def clear_conversation():
     return jsonify({"status": "cleared"}), 200
 
 
-# ---- Memory API Endpoints ----
-
-@app.route('/api/memory', methods=['GET'])
-def api_get_memory():
-    """Get recent saved conversations from memory."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
-    
-    try:
-        limit = request.args.get('limit', default=10, type=int)
-        days_back = request.args.get('days_back', default=30, type=int)
-        provider = request.args.get('provider', default=None, type=str)
-        
-        convs = memory.get_past_conversations(limit=limit, days_back=days_back, provider=provider)
-        
-        return jsonify({
-            "success": True,
-            "count": len(convs),
-            "conversations": convs
-        }), 200
-    except Exception as e:
-        logger.error(f"Memory retrieval error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/memory/search', methods=['GET'])
-def api_search_memory():
-    """Search past conversations by query."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
-    
-    query = request.args.get('q', default='', type=str)
-    if not query:
-        return jsonify({"error": "Query parameter 'q' required"}), 400
-    
-    try:
-        limit = request.args.get('limit', default=5, type=int)
-        days_back = request.args.get('days_back', default=30, type=int)
-        
-        results = memory.search_memory(query, limit=limit, days_back=days_back)
-        convs = [{"conversation": conv, "score": score} for conv, score in results]
-        
-        return jsonify({
-            "success": True,
-            "query": query,
-            "count": len(convs),
-            "results": convs
-        }), 200
-    except Exception as e:
-        logger.error(f"Memory search error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/memory/stats', methods=['GET'])
-def api_memory_stats():
-    """Get statistics about stored memories."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
-    
-    try:
-        stats = memory.get_memory_stats()
-        return jsonify({
-            "success": True,
-            "stats": stats
-        }), 200
-    except Exception as e:
-        logger.error(f"Memory stats error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/memory/<conversation_id>', methods=['DELETE'])
-def api_delete_memory(conversation_id):
-    """Delete a conversation from memory."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
-    
-    try:
-        deleted = memory.delete_conversation(conversation_id)
-        if deleted:
-            return jsonify({
-                "success": True,
-                "message": f"Conversation {conversation_id} deleted"
-            }), 200
-        else:
-            return jsonify({
-                "success": False,
-                "error": "Conversation not found"
-            }), 404
-    except Exception as e:
-        logger.error(f"Memory delete error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/memory/cleanup', methods=['POST'])
-def api_cleanup_memory():
-    """Clean up old conversations from memory."""
-    if not ENABLE_MEMORY:
-        return jsonify({"error": "Memory feature not enabled"}), 400
-    
-    try:
-        body = request.get_json(silent=True) or {}
-        days = int(body.get('days', 90))
-        
-        deleted_count = memory.clear_old_memories(days=days)
-        return jsonify({
-            "success": True,
-            "deleted": deleted_count,
-            "message": f"Deleted {deleted_count} conversations older than {days} days"
-        }), 200
-    except Exception as e:
-        logger.error(f"Memory cleanup error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
 # ===== FILE UPLOAD ENDPOINTS =====
-
 @app.route("/api/documents/upload", methods=["POST"])
 def upload_document():
     """Upload a document (PDF, DOCX, TXT, MD, etc.)."""
@@ -3492,7 +3563,6 @@ def document_stats():
 
 
 # ===== RAG / SEMANTIC SEARCH ENDPOINTS =====
-
 @app.route("/api/rag/index", methods=["POST"])
 def rag_index():
     """Index a document for semantic search."""

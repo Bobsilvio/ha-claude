@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: AI Assistant for Home Assistant
-version: "3.3.0"
+version: "3.3.1"
 slug: claude-backend
 description: >-
   AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -37,14 +37,10 @@ options:
   nvidia_api_key: ""
   nvidia_thinking_mode: false
   api_port: "5000"
-  debug_mode: false
-  colored_logs: true
-  log_level: normal
   enable_file_access: false
   language: en
   timeout: "30"
   max_retries: "3"
-  enable_voice: false
   enable_memory: false
   enable_file_upload: false
   enable_rag: false
@@ -56,14 +52,13 @@ schema:
   nvidia_api_key: password?
   nvidia_thinking_mode: bool?
   api_port: str
-  debug_mode: bool?
   colored_logs: bool?
+  debug_mode: bool?
   log_level: list(normal|verbose|debug)?
   enable_file_access: bool?
   language: list(en|it|es|fr)?
   timeout: str?
   max_retries: str?
-  enable_voice: bool?
   enable_memory: bool?
   enable_file_upload: bool?
   enable_rag: bool?
@@ -83,7 +78,6 @@ descriptions:
   language: "UI language for error messages and responses"
   timeout: "Request timeout in seconds (default: 30)"
   max_retries: "Maximum retry attempts for failed API requests (default: 3)"
-  enable_voice: "[EXPERIMENTAL] Enable voice input/output (speech-to-text, text-to-speech)"
   enable_memory: "[EXPERIMENTAL] Enable persistent memory system to remember past conversations"
   enable_file_upload: "[EXPERIMENTAL] Allow uploading documents (PDF, TXT) for AI to analyze"
   enable_rag: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search"

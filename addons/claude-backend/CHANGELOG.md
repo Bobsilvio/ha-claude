@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.3.1
+- Little fix
+
 ## 3.3.0
 - **NEW**: File Upload - upload documents (PDF, DOCX, TXT, MD, YAML) for AI analysis
 - **NEW**: Persistent Memory - AI remembers past conversations across sessions

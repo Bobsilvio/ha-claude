@@ -42,20 +42,17 @@ configuration:
     name: Tentatives Maximales
     description: Nombre maximal de tentatives pour les appels API échoués (par défaut 3)
   colored_logs:
-    name: Logs Colorés
-    description: Activer les indicateurs emoji colorés dans les logs de l'addon
+    name: Journaux Colorés
+    description: Activer les indicateurs emoji colorés dans les journaux de l'addon (🟢 succès, 🔴 erreur, etc.)
   log_level:
-    name: Niveau de Log
-    description: "Verbosité du log: normal (filtrer le bruit), verbose (tous les logs), debug (inclut les données de payload)"
-  enable_voice:
-    name: Activer la Voix
-    description: "[EXPÉRIMENTAL] Activer l'entrée vocale - bouton micro apparaît dans le chat"
+    name: Niveau de Journal
+    description: "Verbosité des journaux : normal (filtrer le bruit), verbose (tous les journaux), debug (inclut les données payload)"
   enable_memory:
     name: Activer la Mémoire
-    description: "[EXPÉRIMENTAL] Activer la mémoire persistante - l'IA se souvient des conversations passées entre sessions"
+    description: "[EXPÉRIMENTAL] Activer la mémoire persistante - l'IA se souvient des conversations passées entre les sessions"
   enable_file_upload:
     name: Activer l'Upload de Fichiers
-    description: "[EXPÉRIMENTAL] Permettre le téléchargement de documents (PDF, DOCX, TXT, MD, YAML) pour analyse IA"
+    description: "[EXPÉRIMENTAL] Autoriser le téléchargement de documents (PDF, DOCX, TXT, MD, YAML) pour l'analyse IA"
   enable_rag:
     name: Activer RAG
-    description: "[EXPÉRIMENTAL] Activer RAG (Génération Augmentée par Récupération) pour recherche de documents et injection de contexte"
+    description: "[EXPÉRIMENTAL] Activer RAG (Génération Augmentée par Récupération) pour la recherche de documents et l'injection de contexte"
