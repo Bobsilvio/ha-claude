@@ -54,14 +54,14 @@ schema:
   github_token: password?
   nvidia_api_key: password?
   nvidia_thinking_mode: bool?
-  api_port: str
-  colored_logs: bool(true)
-  debug_mode: bool
-  log_level: list(normal|verbose|debug)
+  api_port: str?
+  colored_logs: bool?
+  debug_mode: bool?
+  log_level: list(normal|verbose|debug)?
   enable_file_access: bool?
   language: list(en|it|es|fr)?
-  timeout: str
-  max_retries: str
+  timeout: str?
+  max_retries: str?
   enable_memory: bool?
   enable_file_upload: bool?
   enable_rag: bool?
