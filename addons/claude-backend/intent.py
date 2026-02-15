@@ -22,6 +22,7 @@ INTENT_TOOL_SETS = {
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
     "create_dashboard": ["create_dashboard", "search_entities", "get_frontend_resources"],
+    "create_html_dashboard": ["create_html_dashboard", "search_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
     "control_device": ["call_service", "search_entities", "get_entity_state"],
     "query_state": ["get_entities", "get_entity_state", "search_entities"],
@@ -319,7 +320,19 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
 
     # --- DASHBOARD ---
     has_dash = any(k in msg for k in dash_kw)
+    
+    # Check for HTML/Vue/Web dashboard keywords
+    html_keywords = ["html", "vue", "web", "javascript", "js", "react", "svelte", 
+                     "interattiv", "realtime", "live", "responsive", "app", "custom css",
+                     "custom design", "framework", "personal", "creativ"]
+    has_html_dash = any(k in msg for k in html_keywords)
+    
     if has_dash and has_create:
+        # Route to HTML dashboard if user mentions HTML/Vue/Web features
+        if has_html_dash:
+            return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
+                    "prompt": None, "specific_target": False}
+        # Otherwise use standard Lovelace dashboard
         return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
                 "prompt": None, "specific_target": False}
     if has_dash and has_modify:

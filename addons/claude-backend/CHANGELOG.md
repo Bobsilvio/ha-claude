@@ -1,5 +1,19 @@
 # Changelog
+## 3.5.2
+- **FIX**: Intent detection now recognizes HTML/Vue/Web keywords and routes to create_html_dashboard
+- **FIX**: Keywords like "HTML", "Vue", "web app", "realtime", "interactive", "responsive", "custom CSS" trigger HTML dashboard tool
+- **IMPROVEMENT**: Smarter intent routing - user can ask for "HTML dashboard" and model uses correct tool automatically
+- Dashboard creation now correctly differentiates between YAML (Lovelace) and HTML (Vue.js) dashboards
+
 ## 3.5.1
+- **IMPROVEMENT**: HTML dashboards now automatically create Lovelace wrapper with iframe
+- **IMPROVEMENT**: Custom dashboards now appear directly in Home Assistant sidebar (no manual setup needed)
+- **FEATURE**: Dashboard is fully accessible from sidebar - click to view, appears in the dashboard list
+- Dashboard has automatic icon (mdi:web) and appears alongside native Lovelace dashboards
+- Full title and description displayed in sidebar
+- Frame height auto-scales to full viewport
+
+## 3.5.0
 - **IMPROVEMENT**: HTML dashboards now automatically create Lovelace wrapper with iframe
 - **IMPROVEMENT**: Custom dashboards now appear directly in Home Assistant sidebar (no manual setup needed)
 - **FEATURE**: Dashboard is fully accessible from sidebar - click to view, appears in the dashboard list
