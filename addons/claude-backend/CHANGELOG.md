@@ -1,5 +1,12 @@
 # Changelog
 
+## 3.3.8
+- **NEW**: Add GPT-5.2 and GPT-5.2-mini as default OpenAI models
+- **NEW**: Add o3 and o3-mini reasoning models to OpenAI options
+- OpenAI default model updated from GPT-4o to GPT-5.2 (flagship model)
+- GitHub Models also support GPT-5.2 variants
+- All available models now reflect current OpenAI lineup (Feb 2026)
+
 ## 3.3.7
 - **FEAT**: Dynamic API port synchronization - users can now change `api_port` in addon config
 - New `sync_ports.py` script auto-updates ingress_port and port mappings on runtime
