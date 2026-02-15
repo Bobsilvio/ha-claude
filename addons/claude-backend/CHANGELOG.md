@@ -1,4 +1,10 @@
 # Changelog
+## 3.4.7
+- **FIX**: Improved regex filtering for unnecessary comments (now handles code block markers and language specifiers)
+- Comment-only code blocks like ```yaml\n# (nessun YAML...)\n``` are now properly removed
+- Stronger pattern matching for all supported languages (IT, EN, ES, FR)
+- Filter applied both in main response pipeline and provider logging
+
 ## 3.4.6
 - **FIX**: Applied response cleaning filter to provider logging output
 - Unnecessary comment-only code blocks no longer appear in server logs

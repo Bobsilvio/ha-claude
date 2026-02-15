@@ -20,16 +20,23 @@ def _clean_response_for_logging(text: str) -> str:
     - # (nessun YAML necessario...)
     - # (no YAML needed...)
     """
-    patterns = [
-        r'#\s*\([^)]*nessun YAML[^)]*\)',  # Italian
-        r'#\s*\([^)]*no YAML[^)]*\)',       # English
-        r'#\s*\([^)]*ningún YAML[^)]*\)',   # Spanish
-        r'#\s*\([^)]*aucun YAML[^)]*\)',    # French
+    # Strategy: Remove entire code blocks that contain ONLY these filler comments
+    filler_patterns = [
+        r'nessun YAML',    # Italian
+        r'no YAML',         # English
+        r'ningún YAML',     # Spanish
+        r'aucun YAML',      # French
     ]
     
-    for pattern in patterns:
-        text = re.sub(pattern + r'\s*\n?', '', text)
-        text = re.sub(f'```\n{pattern}\s*\n```\n?', '', text)
+    for filler in filler_patterns:
+        # Match: ```[optional lang]\n# (...filler text...)\n```
+        block_pattern = rf'```[a-z]*\n\s*#\s*\([^)]*{re.escape(filler)}[^)]*\)\s*\n```\n?'
+        text = re.sub(block_pattern, '', text, flags=re.IGNORECASE | re.MULTILINE)
+    
+    # Also remove standalone lines with just these comments
+    for filler in filler_patterns:
+        line_pattern = rf'^\s*#\s*\([^)]*{re.escape(filler)}[^)]*\)\s*$'
+        text = re.sub(line_pattern, '', text, flags=re.IGNORECASE | re.MULTILINE)
     
     return text
 
