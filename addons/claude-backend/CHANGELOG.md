@@ -1,4 +1,17 @@
 # Changelog
+## 3.5.0
+- **NEW FEATURE**: Added `create_html_dashboard` tool for generating custom Vue 3 dashboards with real-time WebSocket
+- **NEW**: Html dashboards support Vue 3, CSS, responsive design, and live entity monitoring
+- **NEW**: Dashboards are self-contained, serve through Flask routes at `/custom_dashboards/<name>`
+- **NEW**: List all dashboards via `/custom_dashboards` endpoint
+- **IMPROVEMENT**: WebSocket real-time entity state updates in HTML dashboards
+- **IMPROVEMENT**: Support for multiple themes (light, dark, auto-detect)
+- **IMPROVEMENT**: Rich component library (info cards, gauges, charts, state displays)
+- **REMOVED**: Deleted development addon (claude-backend-dev) - single plugin maintenance only
+- Dashboards can monitor multiple entities with live updates
+- Built-in error handling and connection status indicators
+- Full responsive design (mobile, tablet, desktop)
+
 ## 3.4.9
 - **FIX**: Fixed critical bug in get_dashboard_config tool that crashed with `slice(None, 10, None)` error
 - **FIX**: Added robust try-catch error handling at card/view level in get_dashboard_config

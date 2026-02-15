@@ -13,6 +13,421 @@ logger = logging.getLogger(__name__)
 AI_SIGNATURE = "AI Assistant"
 
 
+def _generate_html_dashboard(title: str, name: str, description: str, entities: list, 
+                            layout: str = "grid", components: list = None, 
+                            theme: str = "auto", html_content: str = None) -> str:
+    """Generate a complete HTML dashboard with Vue 3, real-time WebSocket and API integration."""
+    
+    if components is None:
+        components = ["info", "chart"]
+    
+    # Sanitize filename
+    safe_name = name.lower().replace(" ", "-").replace("_", "-")
+    
+    # Build entity watch list
+    entity_list_str = ", ".join([f'"{e}"' for e in entities]) if entities else '""'
+    
+    # Theme colors
+    theme_config = {
+        "light": {
+            "bg": "#ffffff",
+            "text": "#1f2937",
+            "card": "#f3f4f6",
+            "border": "#e5e7eb"
+        },
+        "dark": {
+            "bg": "#1f2937",
+            "text": "#f3f4f6",
+            "card": "#111827",
+            "border": "#374151"
+        }
+    }
+    
+    colors = theme_config.get(theme if theme != "auto" else "light", theme_config["light"])
+    
+    # Generate Vue template based on components
+    component_html = ""
+    if "info" in components:
+        component_html += """
+        <div class="info-card">
+          <h3>{{title}}</h3>
+          <p>{{description}}</p>
+          <div class="entity-count">Monitored: {{entities.length}} entities</div>
+        </div>"""
+    
+    if "chart" in components:
+        component_html += """
+        <div class="chart-container">
+          <canvas id="entityChart"></canvas>
+        </div>"""
+    
+    if "gauge" in components:
+        component_html += """
+        <div class="gauge-container">
+          <svg viewBox="0 0 200 120">
+            <path d="M 20 100 A 80 80 0 0 1 180 100" class="gauge-background"/>
+            <path :d="`M 20 100 A 80 80 0 0 1 ${gaugeValue} 100`" class="gauge-fill"/>
+          </svg>
+          <div class="gauge-value">{{gaugePercent}}%</div>
+        </div>"""
+    
+    # Build HTML template
+    html_template = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
+    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+    <style>
+        :root {{
+            --bg-primary: '{colors["bg"]}';
+            --text-primary: '{colors["text"]}';
+            --card-bg: '{colors["card"]}';
+            --border-color: '{colors["border"]}';
+        }}
+        
+        * {{
+            color-scheme: {'dark' if theme == 'dark' else 'light'};
+        }}
+        
+        body {{
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+        }}
+        
+        #app {{
+            min-height: 100vh;
+            padding: 2rem;
+        }}
+        
+        .dashboard-header {{
+            margin-bottom: 2rem;
+        }}
+        
+        .dashboard-header h1 {{
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }}
+        
+        .dashboard-header p {{
+            opacity: 0.7;
+            font-size: 0.95rem;
+        }}
+        
+        .connection-status {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            padding: 0.5rem 1rem;
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }}
+        
+        .status-indicator {{
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }}
+        
+        .status-indicator.connected {{
+            background-color: #10b981;
+        }}
+        
+        .status-indicator.disconnected {{
+            background-color: #ef4444;
+            animation: none;
+        }}
+        
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 1; }}
+            50% {{ opacity: 0.5; }}
+        }}
+        
+        .dashboard-grid {{
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }}
+        
+        .card {{
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }}
+        
+        .card:hover {{
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }}
+        
+        .card h3 {{
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }}
+        
+        .entity-item {{
+            padding: 0.75rem;
+            background-color: var(--bg-primary);
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        
+        .entity-value {{
+            font-weight: 600;
+            font-size: 1.1rem;
+        }}
+        
+        .info-card {{
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            margin-bottom: 2rem;
+        }}
+        
+        .info-card h3 {{
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }}
+        
+        .entity-count {{
+            margin-top: 1rem;
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }}
+        
+        .chart-container {{
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            height: 300px;
+        }}
+        
+        .gauge-container {{
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            text-align: center;
+        }}
+        
+        .gauge-background {{
+            stroke: var(--border-color);
+            stroke-width: 8;
+            fill: none;
+        }}
+        
+        .gauge-fill {{
+            stroke: #10b981;
+            stroke-width: 8;
+            fill: none;
+            transition: d 0.3s ease;
+        }}
+        
+        .gauge-value {{
+            margin-top: 1rem;
+            font-size: 2rem;
+            font-weight: bold;
+        }}
+        
+        .error {{
+            background-color: #fee2e2;
+            color: #991b1b;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-top: 1rem;
+        }}
+        
+        .loading {{
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }}
+        
+        .loading span {{
+            width: 0.5rem;
+            height: 0.5rem;
+            border-radius: 50%;
+            background-color: var(--text-primary);
+            animation: bounce 1.4s infinite;
+        }}
+        
+        .loading span:nth-child(2) {{ animation-delay: 0.2s; }}
+        .loading span:nth-child(3) {{ animation-delay: 0.4s; }}
+        
+        @keyframes bounce {{
+            0%, 100% {{ transform: translateY(0); }}
+            50% {{ transform: translateY(-10px); }}
+        }}
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="dashboard-header">
+            <h1>{title}</h1>
+            <p>{description}</p>
+            <div class="connection-status">
+                <div :class="['status-indicator', connected ? 'connected' : 'disconnected']"></div>
+                <span>{{connected ? 'Connected' : 'Connecting...'}}</span>
+            </div>
+        </div>
+        
+        <div class="dashboard-grid" v-if="entities.length > 0">
+            {component_html if html_content is None else html_content}
+            
+            <div class="card">
+                <h3>Entity States</h3>
+                <div v-for="(state, entity) in entityStates" :key="entity" class="entity-item">
+                    <span>{{ entity }}</span>
+                    <span class="entity-value">{{ state }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div v-else class="error">
+            No entities to display
+        </div>
+        
+        <div v-if="error" class="error">
+            {{ error }}
+        </div>
+    </div>
+    
+    <script>
+        const {{ createApp, ref, reactive, onMounted, computed }} = Vue;
+        
+        createApp({{
+            template: '#app',
+            setup() {{
+                const connected = ref(false);
+                const error = ref('');
+                const entityStates = reactive({{}});
+                const entities = ref({entities});
+                let ws = null;
+                
+                const gaugeValue = computed(() => {{
+                    // Calculate gauge value based on first entity
+                    if (entities.value.length === 0) return 0;
+                    const state = entityStates[entities.value[0]];
+                    const num = parseFloat(state) || 0;
+                    return Math.min(100, Math.max(0, num));
+                }});
+                
+                const gaugePercent = computed(() => Math.round(gaugeValue.value));
+                
+                const connectWebSocket = () => {{
+                    try {{
+                        // Get websocket endpoint from current location
+                        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                        const wsUrl = `${{protocol}}//${{window.location.host}}/api/websocket`;
+                        
+                        ws = new WebSocket(wsUrl);
+                        
+                        ws.onopen = () => {{
+                            connected.value = true;
+                            error.value = '';
+                            console.log('✅ WebSocket connected');
+                            
+                            // Subscribe to state changes for our entities
+                            entities.value.forEach(entity => {{
+                                ws.send(JSON.stringify({{
+                                    id: 1,
+                                    type: 'subscribe_entities',
+                                    entity_ids: [entity]
+                                }}));
+                            }});
+                        }};
+                        
+                        ws.onmessage = (event) => {{
+                            const msg = JSON.parse(event.data);
+                            
+                            if (msg.type === 'result' && msg.success) {{
+                                // Initial state loaded
+                                if (msg.result) {{
+                                    Object.entries(msg.result).forEach(([entity, state]) => {{
+                                        entityStates[entity] = state.state;
+                                    }});
+                                }}
+                            }} else if (msg.type === 'event' && msg.event) {{
+                                // Live update
+                                const entity = msg.event.entity_id;
+                                const state = msg.event.new_state?.state || 'unknown';
+                                entityStates[entity] = state;
+                            }}
+                        }};
+                        
+                        ws.onerror = (error) => {{
+                            connected.value = false;
+                            console.error('❌ WebSocket error:', error);
+                        }};
+                        
+                        ws.onclose = () => {{
+                            connected.value = false;
+                            console.log('⚠️ WebSocket disconnected, retrying...');
+                            setTimeout(connectWebSocket, 3000);
+                        }};
+                    }} catch (err) {{
+                        error.value = `Connection error: ${{err.message}}`;
+                        console.error('❌ WebSocket setup failed:', err);
+                    }}
+                }};
+                
+                const fetchEntityStates = () => {{
+                    // Fallback: fetch via REST API if WebSocket not available
+                    fetch('/api/states')
+                        .then(r => r.json())
+                        .then(states => {{
+                            states.forEach(state => {{
+                                if (entities.value.includes(state.entity_id)) {{
+                                    entityStates[state.entity_id] = state.state;
+                                }}
+                            }});
+                        }})
+                        .catch(err => {{
+                            error.value = `REST API error: ${{err.message}}`;
+                        }});
+                }};
+                
+                onMounted(() => {{
+                    connectWebSocket();
+                    fetchEntityStates();
+                }});
+                
+                return {{
+                    connected,
+                    error,
+                    entityStates,
+                    entities,
+                    gaugeValue,
+                    gaugePercent
+                }};
+            }}
+        }}).mount('#app');
+    </script>
+</body>
+</html>"""
+    
+    return html_template
+
+
 def _stamp_description(description: str, action: str = "create") -> str:
     """Add AI Assistant watermark to a description field.
 
@@ -55,6 +470,7 @@ TOOL_DESCRIPTIONS = {
     "get_dashboard_config": "Leggo config dashboard",
     "update_dashboard": "Modifico dashboard",
     "create_dashboard": "Creo dashboard",
+    "create_html_dashboard": "Creo dashboard HTML/Vue",
     "delete_dashboard": "Elimino dashboard",
     "get_frontend_resources": "Verifico card installate",
     "get_scenes": "Carico scene",
@@ -571,6 +987,43 @@ HA_TOOLS_DESCRIPTION = [
                 "pattern": {"type": "string", "description": "Regex pattern (input_text only)."}
             },
             "required": ["action", "helper_type"]
+        }
+    },
+    {
+        "name": "create_html_dashboard",
+        "description": "Create a custom HTML dashboard with Vue 3, CSS, JavaScript and real-time WebSocket connection to Home Assistant. Generates a complete standalone HTML app with responsive design, charts, controls, and live entity updates.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Dashboard title (e.g. 'Smart Energy Dashboard')."},
+                "name": {"type": "string", "description": "URL-safe filename (lowercase, no spaces, e.g. 'energie-smart'). Will create file as HTML file."},
+                "description": {"type": "string", "description": "Description of the dashboard purpose."},
+                "entities": {
+                    "type": "array",
+                    "description": "List of entity_ids to monitor/display (e.g. ['sensor.epcube_soc', 'switch.carica_batteria']).",
+                    "items": {"type": "string"}
+                },
+                "layout": {
+                    "type": "string",
+                    "enum": ["grid", "flex", "custom"],
+                    "description": "Layout style: grid (responsive columns), flex (flexible), or custom (custom CSS)."
+                },
+                "components": {
+                    "type": "array",
+                    "description": "List of component types to include (e.g. 'chart', 'gauge', 'button', 'info', 'switch', 'slider').",
+                    "items": {"type": "string"}
+                },
+                "theme": {
+                    "type": "string",
+                    "enum": ["light", "dark", "auto"],
+                    "description": "Color theme (light, dark, or auto-detect)."
+                },
+                "html_content": {
+                    "type": "string",
+                    "description": "Optional: Custom HTML structure for advanced users. If provided, components will be added to this template."
+                }
+            },
+            "required": ["title", "name", "entities"]
         }
     }
 ]
@@ -1515,7 +1968,67 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "IMPORTANT": "Show the user the dashboard YAML you created."
             }, ensure_ascii=False, default=str)
 
-        elif tool_name == "create_script":
+        elif tool_name == "create_html_dashboard":
+            title = tool_input.get("title", "Custom Dashboard")
+            name = tool_input.get("name", "dashboard")
+            description = tool_input.get("description", "")
+            entities = tool_input.get("entities", [])
+            layout = tool_input.get("layout", "grid")
+            components = tool_input.get("components", ["info", "chart"])
+            theme = tool_input.get("theme", "auto")
+            html_content = tool_input.get("html_content", None)
+
+            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}")
+
+            try:
+                # Create html_dashboards directory if it doesn't exist
+                html_dashboards_dir = os.path.join(api.HA_CONFIG_DIR, ".html_dashboards")
+                os.makedirs(html_dashboards_dir, exist_ok=True)
+
+                # Generate HTML content
+                html_content_generated = _generate_html_dashboard(
+                    title=title,
+                    name=name,
+                    description=description,
+                    entities=entities,
+                    layout=layout,
+                    components=components,
+                    theme=theme,
+                    html_content=html_content
+                )
+
+                # Save the file
+                safe_filename = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+                if not safe_filename.endswith(".html"):
+                    safe_filename += ".html"
+                
+                file_path = os.path.join(html_dashboards_dir, safe_filename)
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write(html_content_generated)
+
+                logger.info(f"✅ HTML dashboard saved: {file_path}")
+
+                # Build URL - the dashboard will be served via Flask at /custom_dashboards/<name>
+                dashboard_url = f"http://localhost:5010/custom_dashboards/{safe_filename.replace('.html', '')}"
+
+                return json.dumps({
+                    "status": "success",
+                    "message": f"✨ Dashboard '{title}' created successfully!",
+                    "title": title,
+                    "name": name,
+                    "filename": safe_filename,
+                    "file_path": file_path,
+                    "url": dashboard_url,
+                    "entities_count": len(entities),
+                    "components": components,
+                    "theme": theme,
+                    "IMPORTANT": f"Your dashboard is ready! Access it at: {dashboard_url}",
+                    "preview_note": "Open the URL in your browser to see the live dashboard. Use this link as a bookmark or add it to your Home Assistant sidebar."
+                }, ensure_ascii=False, default=str)
+
+            except Exception as e:
+                logger.error(f"❌ Exception creating HTML dashboard: {e}", exc_info=True)
+                return json.dumps({"error": f"Failed to create HTML dashboard: {str(e)}"}, default=str)
             import yaml
             script_id = tool_input.get("script_id", "")
             config = {

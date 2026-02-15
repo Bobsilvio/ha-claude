@@ -3598,6 +3598,70 @@ def rag_search():
         return jsonify({"error": str(e)}), 500
 
 
+# ===== CUSTOM HTML DASHBOARDS =====
+@app.route('/custom_dashboards/<name>')
+def serve_html_dashboard(name):
+    """Serve custom HTML dashboards created by create_html_dashboard tool."""
+    try:
+        # Sanitize filename to prevent directory traversal
+        safe_name = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+        if not safe_name.endswith(".html"):
+            safe_name += ".html"
+        
+        # Security: only allow alphanumeric, hyphens, and .html extension
+        if not all(c.isalnum() or c in '-.' for c in safe_name):
+            return jsonify({"error": "Invalid dashboard name"}), 400
+        
+        dashboard_path = os.path.join(HA_CONFIG_DIR, ".html_dashboards", safe_name)
+        
+        if not os.path.isfile(dashboard_path):
+            logger.warning(f"Dashboard not found: {dashboard_path}")
+            return jsonify({"error": f"Dashboard '{name}' not found"}), 404
+        
+        # Serve HTML file with proper content type
+        with open(dashboard_path, "r", encoding="utf-8") as f:
+            html_content = f.read()
+        
+        logger.info(f"📊 Serving custom dashboard: {safe_name}")
+        return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
+    
+    except Exception as e:
+        logger.error(f"❌ Error serving dashboard: {e}")
+        return jsonify({"error": f"Failed to serve dashboard: {str(e)}"}), 500
+
+
+@app.route('/custom_dashboards')
+def list_html_dashboards():
+    """List all available custom HTML dashboards."""
+    try:
+        dashboards_dir = os.path.join(HA_CONFIG_DIR, ".html_dashboards")
+        
+        if not os.path.isdir(dashboards_dir):
+            return jsonify({"dashboards": [], "count": 0}), 200
+        
+        dashboards = []
+        for filename in os.listdir(dashboards_dir):
+            if filename.endswith(".html"):
+                file_path = os.path.join(dashboards_dir, filename)
+                file_size = os.path.getsize(file_path)
+                mod_time = os.path.getmtime(file_path)
+                
+                dashboards.append({
+                    "name": filename.replace(".html", ""),
+                    "filename": filename,
+                    "url": f"/custom_dashboards/{filename.replace('.html', '')}",
+                    "size": file_size,
+                    "modified": datetime.fromtimestamp(mod_time).isoformat()
+                })
+        
+        logger.info(f"📊 Listed {len(dashboards)} custom dashboards")
+        return jsonify({"dashboards": dashboards, "count": len(dashboards)}), 200
+    
+    except Exception as e:
+        logger.error(f"❌ Error listing dashboards: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/rag/stats", methods=["GET"])
 def rag_stats():
     """Get RAG indexing statistics."""
