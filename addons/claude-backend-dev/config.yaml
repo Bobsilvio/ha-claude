@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration (DEV)
 name: "AI Assistant DEV 🚧"
-version: "3.4.4-dev"
+version: "3.4.5-dev"
 slug: claude-backend-dev
 description: >-
   [DEVELOPMENT] AI-powered smart home assistant with experimental features:
@@ -30,6 +30,7 @@ environment:
   DEBUG_MODE: "False"
   API_PORT: "5011"
 options:
+  api_port: "5011"
   anthropic_api_key: ""
   openai_api_key: ""
   google_api_key: ""
@@ -47,6 +48,7 @@ options:
   debug_mode: false
   log_level: normal
 schema:
+  api_port: int?
   anthropic_api_key: password?
   openai_api_key: password?
   google_api_key: password?

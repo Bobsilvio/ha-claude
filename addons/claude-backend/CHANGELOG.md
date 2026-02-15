@@ -1,4 +1,9 @@
 # Changelog
+## 3.4.5
+- **FIX**: Added api_port back to schema with fixed value for backward compatibility
+- Prevents "Option does not exist in schema" warning from Home Assistant Supervisor
+- Port remains fixed at 5010 - configuration ignored if user changes it
+
 ## 3.4.4
 - **FIX**: Backend post-processing added to remove unnecessary comment-only code blocks from AI responses
 - Cleans up patterns like "# (nessun YAML necessario...)" that models add for simple text responses
