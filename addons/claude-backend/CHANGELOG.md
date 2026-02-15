@@ -1,4 +1,9 @@
 # Changelog
+## 3.5.3
+- **FIX**: DELETE intent detection priority - now checked before QUERY_STATE to prevent misrouting
+- **FIX**: Delete dashboard/automation/script requests now correctly route to 'delete' intent with proper tools
+- Dashboard deletion now works when user says "cancella dashboard"
+
 ## 3.5.2
 - **FIX**: Intent detection now recognizes HTML/Vue/Web keywords and routes to create_html_dashboard
 - **FIX**: Keywords like "HTML", "Vue", "web app", "realtime", "interactive", "responsive", "custom CSS" trigger HTML dashboard tool

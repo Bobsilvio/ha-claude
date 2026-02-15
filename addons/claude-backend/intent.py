@@ -344,6 +344,11 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
         return {"intent": "control_device", "tools": INTENT_TOOL_SETS["control_device"],
                 "prompt": INTENT_PROMPTS["control_device"], "specific_target": False}
 
+    # --- DELETE --- (must come BEFORE query_state since it's more specific)
+    if any(k in msg for k in delete_kw) and (has_auto or has_script or has_dash):
+        return {"intent": "delete", "tools": INTENT_TOOL_SETS["delete"],
+                "prompt": None, "specific_target": False}
+
     # --- QUERY STATE ---
     if any(k in msg for k in query_kw):
         return {"intent": "query_state", "tools": INTENT_TOOL_SETS["query_state"],
@@ -352,11 +357,6 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     # --- HISTORY ---
     if any(k in msg for k in history_kw):
         return {"intent": "query_history", "tools": INTENT_TOOL_SETS["query_history"],
-                "prompt": None, "specific_target": False}
-
-    # --- DELETE ---
-    if any(k in msg for k in delete_kw) and (has_auto or has_script or has_dash):
-        return {"intent": "delete", "tools": INTENT_TOOL_SETS["delete"],
                 "prompt": None, "specific_target": False}
 
     # --- CONFIG EDIT ---
