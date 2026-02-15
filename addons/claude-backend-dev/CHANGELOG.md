@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.34-dev
+- **FIX**: Resolve Python SyntaxWarning in chat_ui.py regex escape sequence
+- Fixes warning: invalid escape sequence '/\/' in apiUrl function
+
 ## 3.3.33-dev
 - **NEW**: Add GPT-5.2 and GPT-5.2-mini as default OpenAI models
 - **NEW**: Add o3 and o3-mini reasoning models to OpenAI options
