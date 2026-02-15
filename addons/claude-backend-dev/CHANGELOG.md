@@ -4,6 +4,9 @@
 - **FEAT**: Dynamic API port synchronization - users can now change `api_port` in addon config
 - New `sync_ports.py` script auto-updates ingress_port and port mappings on runtime
 - Fixes issue where changing api_port had no effect without manual config.yaml editing
+- **FIX**: Add default value for ARG BUILD_FROM in Dockerfile (resolves InvalidDefaultArgInFrom warning)
+- **FIX**: Improve sync_ports.py logging with debug output for port synchronization
+- **DOCS**: Add ⚠️ rebuild warning to api_port description in all languages (EN/IT/ES/FR)
 
 ## 3.3.31-dev
 - **FIX**: Move logging/debug settings to bottom of config
