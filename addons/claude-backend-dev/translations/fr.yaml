@@ -4,7 +4,7 @@ configuration:
     description: "Sélectionnez votre fournisseur d'IA. 🆓 GRATUIT: NVIDIA, GitHub Models | 💳 PAYANT: Anthropic, OpenAI, Google"
   ai_model:
     name: Modèle d'IA
-    description: "Selon fournisseur: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-4o/o1, Google=Gemini, NVIDIA=6 modèles🧪🆓 (Kimi/Llama/Mistral/Phi/Nemotron), GitHub=40+ modèles🆓"
+    description: "Selon fournisseur: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-5.2/5/o3, Google=Gemini, NVIDIA=6 modèles🧪🆓 (Kimi/Llama/Mistral/Phi/Nemotron), GitHub=40+ modèles🆓"
   anthropic_api_key:
     name: Clé API Anthropic
     description: Clé API de console.anthropic.com (sauvegardez même si non utilisée, pour changement rapide)
