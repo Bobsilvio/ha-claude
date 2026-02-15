@@ -17,9 +17,6 @@ configuration:
   nvidia_thinking_mode:
     name: Mode Thinking NVIDIA
     description: Activez le mode Thinking NVIDIA pour un raisonnement plus profond (expérimental)
-  api_port:
-    name: Port API
-    description: Port du serveur API (par défaut : 5000)
   colored_logs:
     name: Logs Colorés
     description: Active les indicateurs emoji colorés dans les logs du module (🟢 succès, 🔴 erreur, etc.)

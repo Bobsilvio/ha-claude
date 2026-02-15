@@ -17,9 +17,6 @@ configuration:
   nvidia_thinking_mode:
     name: NVIDIA Thinking Mode
     description: Enable NVIDIA Thinking mode for deeper reasoning (experimental)
-  api_port:
-    name: API Port
-    description: Port for the API server (default: 5000)
   colored_logs:
     name: Colored Logs
     description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
