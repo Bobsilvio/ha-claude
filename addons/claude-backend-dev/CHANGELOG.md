@@ -1,4 +1,9 @@
 # Changelog
+## 3.4.6-dev
+- **FIX**: Applied response cleaning filter to provider logging output
+- Unnecessary comment-only code blocks no longer appear in server logs
+- Cleaned logging output for both NVIDIA and OpenAI responses
+
 ## 3.4.5-dev
 - **FIX**: Added api_port back to schema with fixed value for backward compatibility
 - Prevents "Option does not exist in schema" warning from Home Assistant Supervisor

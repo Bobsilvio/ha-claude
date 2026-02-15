@@ -13,6 +13,27 @@ import intent
 logger = logging.getLogger(__name__)
 
 
+def _clean_response_for_logging(text: str) -> str:
+    """Remove unnecessary comment-only code blocks from AI responses for clean logging.
+    
+    Removes patterns like:
+    - # (nessun YAML necessario...)
+    - # (no YAML needed...)
+    """
+    patterns = [
+        r'#\s*\([^)]*nessun YAML[^)]*\)',  # Italian
+        r'#\s*\([^)]*no YAML[^)]*\)',       # English
+        r'#\s*\([^)]*ningún YAML[^)]*\)',   # Spanish
+        r'#\s*\([^)]*aucun YAML[^)]*\)',    # French
+    ]
+    
+    for pattern in patterns:
+        text = re.sub(pattern + r'\s*\n?', '', text)
+        text = re.sub(f'```\n{pattern}\s*\n```\n?', '', text)
+    
+    return text
+
+
 def _is_request_too_large_error(err: Exception, error_msg: str) -> bool:
     status = getattr(err, "status_code", None)
     if status == 413:
@@ -512,7 +533,8 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                     continue
 
                 log_fn = logger.info if _is_confirmation_text(full_text) else logger.warning
-                log_fn(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'"
+                clean_text = _clean_response_for_logging(full_text)
+                log_fn(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{clean_text[:200]}...'"
                 )
                 messages.append({"role": "assistant", "content": full_text})
                 yield {"type": "clear"}
@@ -908,7 +930,8 @@ def stream_chat_openai(messages, intent_info=None):
         if not tool_calls_map:
             # No tools - stream the final text now
             full_text = accumulated
-            logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
+            clean_text = _clean_response_for_logging(full_text)
+            logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{clean_text[:200]}...'")
             logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tool_defs)} available tools")
             yield {"type": "clear"}
             for i in range(0, len(full_text), 4):
