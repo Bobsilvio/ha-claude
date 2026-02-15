@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.4
+- **FEAT**: Move config option descriptions to translations (EN/IT/ES/FR)
+- Add default values for optional settings in config schema
+- Advanced settings (debug_mode, log_level, etc.) now appear in 'Show advanced options' section
+
 ## 3.3.3
 - **FIX**: Correct apiUrl regex to prevent double-slash in API paths (`//api/chat/stream`)
 - Fixes stream error: 'Cannot write to closing transport' in HA Ingress
