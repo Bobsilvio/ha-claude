@@ -15,7 +15,7 @@ startup: application
 apparmor: false
 boot: auto
 ingress: true
-ingress_port: 5000
+ingress_port: 5000  # Must match api_port setting
 ingress_entry: /
 panel_icon: mdi:robot
 panel_title: AI Assistant
@@ -25,7 +25,7 @@ map:
 ports:
   5000/tcp: null
 ports_description:
-  5000/tcp: AI Assistant API
+  5000/tcp: AI Assistant API (must match api_port setting)
 environment:
   DEBUG_MODE: "False"
   API_PORT: "5000"

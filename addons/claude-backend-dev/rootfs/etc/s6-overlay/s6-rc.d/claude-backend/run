@@ -29,6 +29,12 @@ ENABLE_MEMORY=$(bashio::config 'enable_memory')
 ENABLE_FILE_UPLOAD=$(bashio::config 'enable_file_upload')
 ENABLE_RAG=$(bashio::config 'enable_rag')
 
+# Warn if API_PORT doesn't match the addon's ingress_port
+if [ "${API_PORT}" != "5001" ]; then
+    bashio::log.warning "API_PORT is set to ${API_PORT}. Note: Addon's ingress_port is hardcoded to 5001."
+    bashio::log.warning "For direct access, the port must be updated in addon's config.yaml (ingress_port and ports sections)."
+fi
+
 # SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
 if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
     SUPERVISOR_TOKEN="${HASSIO_TOKEN:-}"
