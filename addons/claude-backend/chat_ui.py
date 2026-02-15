@@ -1180,7 +1180,7 @@ def get_chat_ui():
             const basePath = (window.location.pathname || '/').endsWith('/')
                 ? (window.location.pathname || '/')
                 : ((window.location.pathname || '/') + '/');
-            return window.location.origin.replace(/\/$/, '') + basePath + cleanPath;
+            return window.location.origin.replace(/\\/$/, '') + basePath + cleanPath;
         }}
 
         function setStopMode(active) {{
