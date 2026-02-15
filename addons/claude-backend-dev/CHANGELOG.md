@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.31-dev
+- **FIX**: Move logging/debug settings to bottom of config
+- Settings now appear in 'Show advanced options' section in HA UI
+
 ## 3.3.30-dev
 - **FIX**: Correct config schema syntax (remove invalid bool(true))
 - Fixes Home Assistant addon validation error
