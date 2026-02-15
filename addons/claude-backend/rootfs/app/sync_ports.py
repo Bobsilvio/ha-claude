@@ -24,9 +24,14 @@ try:
     
     # Check if port needs updating
     current_ingress_port = config.get('ingress_port')
-    current_port_key = list(config.get('ports', {}).keys())[0] if config.get('ports') else None
+    current_port_keys = list(config.get('ports', {}).keys()) if config.get('ports') else []
+    target_port_key = f"{api_port_str}/tcp"
     
-    if current_ingress_port != int(api_port_str) or f"{api_port_str}/tcp" not in (current_port_key or ""):
+    # Debug logging
+    print(f"Current ingress_port: {current_ingress_port}, API_PORT: {api_port_str}")
+    print(f"Current port keys: {current_port_keys}, Target: {target_port_key}")
+    
+    if current_ingress_port != int(api_port_str) or target_port_key not in current_port_keys:
         print(f"Syncing ports: API_PORT={api_port_str}, updating ingress_port and ports...")
         
         # Update ingress_port
@@ -34,21 +39,26 @@ try:
         
         # Update ports section
         if 'ports' in config:
-            # Remove old port entry
-            if current_port_key:
-                del config['ports'][current_port_key]
+            # Remove old port entries
+            for old_key in current_port_keys:
+                if old_key != target_port_key:
+                    print(f"Removing old port: {old_key}")
+                    del config['ports'][old_key]
             # Add new port entry
-            config['ports'][f"{api_port_str}/tcp"] = None
+            config['ports'][target_port_key] = None
         
         # Update ports_description section
         if 'ports_description' in config:
-            # Remove old port description
-            if current_port_key:
-                del config['ports_description'][current_port_key]
+            # Remove old port descriptions
+            old_desc_keys = list(config['ports_description'].keys())
+            for old_key in old_desc_keys:
+                if old_key != target_port_key:
+                    print(f"Removing old port description: {old_key}")
+                    del config['ports_description'][old_key]
             # Add new port description
             is_dev = os.getenv("PANEL_TITLE", "").endswith("DEV")
             desc = f"AI Assistant API (DEV)" if is_dev else f"AI Assistant API"
-            config['ports_description'][f"{api_port_str}/tcp"] = desc
+            config['ports_description'][target_port_key] = desc
         
         # Write updated config.yaml
         with open(CONFIG_PATH, 'w') as f:
