@@ -1,67 +1,59 @@
 # AI Assistant for Home Assistant (Add-on)
 
-This add-on provides the **AI Assistant web UI** (via Home Assistant Ingress) and the **backend API** that can read states, call services, and optionally edit configuration files.
+**Multi-provider AI chat interface** for Home Assistant. Chat with Claude, GPT-4, Gemini, NVIDIA, GitHub Models, and more.
 
-**No Home Assistant long-lived token is required**: the add-on uses the Supervisor-managed Home Assistant API access.
+## Quick Start
 
-## What you get
+### 1. Add Repository
+Settings → Add-ons & Backups → Add-on Store → ⋮ → Repositories → `https://github.com/Bobsilvio/ha-claude`
 
-- Sidebar chat UI with streaming responses
-- Multi-provider agents: **Anthropic**, **OpenAI**, **Google Gemini**, **NVIDIA NIM**, **GitHub Models**
-- Optional **File Access** with automatic snapshots + restore
+### 2. Install & Configure
+- Install **AI Assistant for Home Assistant**
+- Configuration tab → Add **at least one AI provider API key** (Anthropic/OpenAI/Google/NVIDIA/GitHub)
+- Save & Start
 
-## Installation
+### 3. First Run
+Open **AI Assistant** from sidebar → Select an agent from the dropdown → Start chatting
 
-1. Add repository: **Settings → Add-ons & Backups → Add-on Store → ⋮ → Repositories**
-2. Add: `https://github.com/Bobsilvio/ha-claude`
-3. Install **AI Assistant for Home Assistant**
+## What You Get
+
+- ✅ Streaming chat with real-time responses
+- ✅ 40+ AI models across multiple providers
+- ✅ Home Assistant integration (read states, call services)
+- ✅ Multi-language UI (EN/IT/ES/FR)
+- ✅ Optional: File upload, Persistent memory, Document search
 
 ## Configuration
 
-1. Open the add-on **Configuration** tab
-2. Paste **at least one provider key** (Anthropic / OpenAI / Google / NVIDIA / GitHub)
-3. (Optional) Set **Language** and enable **File Access**
-4. **Save** and **Start**
+Add one or more provider API keys in the add-on configuration:
 
-## First run (important)
+- **Anthropic API Key**: Claude 3.5 Sonnet/Haiku (get from [console.anthropic.com](https://console.anthropic.com))
+- **OpenAI API Key**: GPT-4, o3-mini (get from [platform.openai.com](https://platform.openai.com))
+- **Google API Key**: Gemini (get from [ai.google.dev](https://ai.google.dev))
+- **NVIDIA API Key**: Open-source models (get from [build.nvidia.com](https://build.nvidia.com))
+- **GitHub Token**: Fine-grained token with no special permissions (get from GitHub Settings)
 
-Open **AI Assistant** from the sidebar and select an **agent/model** from the dropdown at the top.
-The selection is saved automatically and persists across restarts.
+**Optional Features**:
+- `enable_file_upload` → Upload PDF/DOCX/TXT for AI analysis
+- `enable_memory` → AI remembers past conversations
+- `enable_rag` → Semantic search over documents
+- `enable_file_access` → Read/write `/config` files (with snapshots)
+- `language` → UI language (en/it/es/fr)
+- `debug_mode` → Verbose logging
+- `log_level` → Log verbosity (normal/verbose/debug)
 
-## Options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| anthropic_api_key | - | Anthropic API key |
-| openai_api_key | - | OpenAI API key |
-| google_api_key | - | Google Gemini API key |
-| github_token | - | GitHub fine-grained token for GitHub Models |
-| nvidia_api_key | - | NVIDIA NIM API key |
-| nvidia_thinking_mode | false | Extra reasoning tokens (when supported) |
-| colored_logs | true | Attiva i log colorati e leggibili nella console dell'add-on. Consigliato per debug e sviluppo. |
-| language | en | UI/assistant language (en/it/es/fr) |
-| enable_file_access | false | Allow read/write of files under `/config` |
-| debug_mode | false | Enable debug logging |
-| timeout | 30 | Provider request timeout (seconds) |
-| max_retries | 3 | Retry attempts for transient failures |
+For all options and details, see **DOCS.md** tab in the add-on.
 
 ## Troubleshooting
 
-### Sidebar item not visible
-- Restart Home Assistant
-- Ensure the add-on is **Running**
-- Check add-on logs
+- **Sidebar not visible?** → Restart Home Assistant and ensure add-on is running
+- **API errors?** → Verify API key is valid and has correct permissions
+- **Chat doesn't load?** → Hard-refresh browser (Ctrl+F5) or check add-on logs
+- **More help?** → See **DOCS.md** tab or [GitHub issues](https://github.com/Bobsilvio/ha-claude/issues)
 
-### 401 / Home Assistant API issues
-- The Supervisor token is managed automatically
-- Open `/api/status` to check `ha_connection_ok`
-- Restart the add-on and re-check logs
+## Links
 
-### File Access not working
-- Set **enable_file_access: true**, save, restart the add-on
-- Verify files exist under `/config/`
+- 📖 **Full Documentation**: See **DOCS.md** tab
+- 🐛 **Issues**: https://github.com/Bobsilvio/ha-claude/issues
+- 💬 **Discussions**: https://github.com/Bobsilvio/ha-claude/discussions
 
-## Support
-
-- Issues: https://github.com/Bobsilvio/ha-claude/issues
-- Documentation: https://github.com/Bobsilvio/ha-claude
