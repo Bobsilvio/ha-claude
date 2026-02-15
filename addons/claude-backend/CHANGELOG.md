@@ -1,4 +1,12 @@
 # Changelog
+## 3.4.9
+- **FIX**: Fixed critical bug in get_dashboard_config tool that crashed with `slice(None, 10, None)` error
+- **FIX**: Added robust try-catch error handling at card/view level in get_dashboard_config
+- **FIX**: Improved type checking for entities array before slicing (prevents TypeError on non-list data)
+- **IMPROVEMENT**: Enhanced logging in update_dashboard tool to track WS requests and responses
+- Dashboard read/update operations now fail gracefully with clear error messages instead of crashing
+- Added detailed logging to diagnose dashboard operation failures
+
 ## 3.4.8
 - **IMPROVEMENT**: Enhanced dashboard creation tool with detailed logging (📊 emojis track progress)
 - **IMPROVEMENT**: System prompt reinforces that create_dashboard MUST be used (never skip to manual YAML)

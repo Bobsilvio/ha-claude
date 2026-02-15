@@ -1836,43 +1836,62 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         # ===== DASHBOARD READ/EDIT =====
         elif tool_name == "get_dashboard_config":
-            url_path = tool_input.get("url_path", None)
-            params = {}
-            if url_path and url_path != "lovelace":
-                params["url_path"] = url_path
-            result = api.call_ha_websocket("lovelace/config", **params)
-            if result.get("success"):
-                config = result.get("result", {})
-                views = config.get("views", [])
-                # Summarize to avoid huge response
-                summary_views = []
-                for v in views:
-                    cards = v.get("cards", [])
-                    card_summary = []
-                    for c in cards:
-                        card_info = {"type": c.get("type", "unknown")}
-                        if c.get("title"):
-                            card_info["title"] = c["title"]
-                        if c.get("entity"):
-                            card_info["entity"] = c["entity"]
-                        if c.get("entities"):
-                            card_info["entities"] = c["entities"][:10]
-                        # Include full card for custom types
-                        if c.get("type", "").startswith("custom:"):
-                            card_info = c
-                        card_summary.append(card_info)
-                    summary_views.append({
-                        "title": v.get("title", ""),
-                        "path": v.get("path", ""),
-                        "icon": v.get("icon", ""),
-                        "cards_count": len(cards),
-                        "cards": card_summary
-                    })
-                return json.dumps({"url_path": url_path or "lovelace",
-                                   "views": summary_views, "views_count": len(views),
-                                   "full_config": config}, ensure_ascii=False, default=str)
-            error_msg = result.get("error", {}).get("message", str(result))
-            return json.dumps({"error": f"Failed to get dashboard config: {error_msg}"}, default=str)
+            try:
+                url_path = tool_input.get("url_path", None)
+                params = {}
+                if url_path and url_path != "lovelace":
+                    params["url_path"] = url_path
+                result = api.call_ha_websocket("lovelace/config", **params)
+                if result.get("success"):
+                    config = result.get("result", {})
+                    views = config.get("views", [])
+                    # Summarize to avoid huge response
+                    summary_views = []
+                    for v in views:
+                        try:
+                            cards = v.get("cards", [])
+                            card_summary = []
+                            for c in cards:
+                                try:
+                                    card_info = {"type": c.get("type", "unknown")}
+                                    if c.get("title"):
+                                        card_info["title"] = c["title"]
+                                    if c.get("entity"):
+                                        card_info["entity"] = c["entity"]
+                                    if c.get("entities"):
+                                        entities = c.get("entities")
+                                        if isinstance(entities, list):
+                                            card_info["entities"] = entities[:10]
+                                        else:
+                                            card_info["entities"] = entities
+                                    # Include full card for custom types
+                                    if c.get("type", "").startswith("custom:"):
+                                        card_info = c
+                                    card_summary.append(card_info)
+                                except Exception as e:
+                                    logger.warning(f"⚠️ Error processing card: {e}")
+                                    card_summary.append({"type": "error", "error": str(e)})
+                            summary_views.append({
+                                "title": v.get("title", ""),
+                                "path": v.get("path", ""),
+                                "icon": v.get("icon", ""),
+                                "cards_count": len(cards),
+                                "cards": card_summary
+                            })
+                        except Exception as e:
+                            logger.warning(f"⚠️ Error processing view: {e}")
+                            summary_views.append({"title": f"Error: {e}", "cards": []})
+                    
+                    logger.info(f"📊 Dashboard config loaded: {len(views)} views, {sum(len(v.get('cards', [])) for v in views)} cards")
+                    return json.dumps({"url_path": url_path or "lovelace",
+                                       "views": summary_views, "views_count": len(views),
+                                       "full_config": config}, ensure_ascii=False, default=str)
+                error_msg = result.get("error", {}).get("message", str(result))
+                logger.error(f"❌ Lovelace API error: {error_msg}")
+                return json.dumps({"error": f"Failed to get dashboard config: {error_msg}"}, default=str)
+            except Exception as e:
+                logger.error(f"❌ Exception in get_dashboard_config: {e}")
+                return json.dumps({"error": f"Exception reading dashboard: {str(e)}"}, default=str)
 
         elif tool_name == "update_dashboard":
             import yaml
@@ -1881,6 +1900,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             old_yaml = ""
             new_yaml = ""
             snapshot_id = ""
+
+            logger.info(f"📊 Updating dashboard: url_path='{url_path}', new_views={len(views)}")
 
             # Auto-snapshot: save current dashboard config before modifying
             try:
@@ -1909,17 +1930,22 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                             # Keep original_file for list_snapshots compatibility
                             "original_file": f"lovelace:{url_path or 'lovelace'}",
                         }, mf, ensure_ascii=False)
-                    logger.info(f"Dashboard snapshot saved: {snapshot_id}")
+                    logger.info(f"📊 Dashboard snapshot saved: {snapshot_id}")
             except Exception as e:
-                logger.warning(f"Could not snapshot dashboard before update: {e}")
+                logger.warning(f"⚠️ Could not snapshot dashboard before update: {e}")
 
             new_yaml = yaml.dump({"views": views}, default_flow_style=False, allow_unicode=True)
 
             params = {"config": {"views": views}}
             if url_path and url_path != "lovelace":
                 params["url_path"] = url_path
+            
+            logger.info(f"📊 Saving dashboard config WS request: {list(params.keys())}")
             result = api.call_ha_websocket("lovelace/config/save", **params)
+            logger.info(f"📊 Dashboard config save WS response: {result}")
+            
             if result.get("success"):
+                logger.info(f"✅ Dashboard '{url_path or 'lovelace'}' updated successfully")
                 return json.dumps({
                     "status": "success",
                     "message": f"Dashboard '{url_path or 'lovelace'}' updated with {len(views)} view(s). A backup snapshot was saved.",
@@ -1930,6 +1956,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "IMPORTANT": "Show the user the before/after diff of the dashboard YAML."
                 }, ensure_ascii=False, default=str)
             error_msg = result.get("error", {}).get("message", str(result))
+            logger.error(f"❌ Failed to update dashboard: {error_msg}")
             return json.dumps({"error": f"Failed to update dashboard: {error_msg}"}, default=str)
 
         elif tool_name == "get_frontend_resources":
