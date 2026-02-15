@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.5
+- **FIX**: Correct config schema syntax (remove invalid bool(true))
+- Fixes Home Assistant addon validation error
+
 ## 3.3.4
 - **FEAT**: Move config option descriptions to translations (EN/IT/ES/FR)
 - Add default values for optional settings in config schema
