@@ -628,9 +628,9 @@ def format_message_with_image_google(text: str, media_type: str, base64_data: st
 
 PROVIDER_DEFAULTS = {
     "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
-    "openai": {"model": "gpt-4o", "name": "ChatGPT (OpenAI)"},
+    "openai": {"model": "gpt-5.2", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
-    "github": {"model": "openai/gpt-4o", "name": "GitHub Models"},
+    "github": {"model": "openai/gpt-5.2", "name": "GitHub Models"},
     "nvidia": {"model": "moonshotai/kimi-k2.5", "name": "NVIDIA NIM"},
 }
 
@@ -784,7 +784,7 @@ def get_nvidia_models_cached() -> Optional[list[str]]:
 
 PROVIDER_MODELS = {
     "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
-    "openai": ["gpt-5", "gpt-5-chat", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o3-mini"],
+    "openai": ["gpt-5.2", "gpt-5.2-mini", "gpt-5", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3", "o3-mini", "o1"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
     "nvidia": [
         "moonshotai/kimi-k2.5",
@@ -796,6 +796,7 @@ PROVIDER_MODELS = {
     ],
     "github": [
         # OpenAI (via Azure)
+        "openai/gpt-5.2", "openai/gpt-5.2-mini",
         "openai/gpt-4o", "openai/gpt-4o-mini",
         "openai/gpt-5", "openai/gpt-5-chat", "openai/gpt-5-mini", "openai/gpt-5-nano",
         "openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano",
@@ -832,13 +833,15 @@ MODEL_NAME_MAPPING = {
     "Claude: Sonnet 4": "claude-sonnet-4-20250514",
     "Claude: Opus 4": "claude-opus-4-20250514",
     "Claude: Haiku 4": "claude-haiku-4-20250514",
+    "OpenAI: GPT-5.2": "gpt-5.2",
+    "OpenAI: GPT-5.2-mini": "gpt-5.2-mini",
     "OpenAI: GPT-5": "gpt-5",
-    "OpenAI: GPT-5-chat": "gpt-5-chat",
     "OpenAI: GPT-4o": "gpt-4o",
     "OpenAI: GPT-4o-mini": "gpt-4o-mini",
     "OpenAI: GPT-4-turbo": "gpt-4-turbo",
-    "OpenAI: o1": "o1",
+    "OpenAI: o3": "o3",
     "OpenAI: o3-mini": "o3-mini",
+    "OpenAI: o1": "o1",
     "Google: Gemini 2.0 Flash": "gemini-2.0-flash",
     "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
     "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
@@ -850,6 +853,8 @@ MODEL_NAME_MAPPING = {
     "NVIDIA: Nemotron 70B": "nvidia/llama-3.1-nemotron-70b-instruct",
     
     # GitHub Models - IDs use publisher/model-name format
+    "GitHub: GPT-5.2": "openai/gpt-5.2",
+    "GitHub: GPT-5.2-mini": "openai/gpt-5.2-mini",
     "GitHub: GPT-4o": "openai/gpt-4o",
     "GitHub: GPT-4o-mini": "openai/gpt-4o-mini",
     "GitHub: GPT-5": "openai/gpt-5",
