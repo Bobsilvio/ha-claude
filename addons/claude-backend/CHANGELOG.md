@@ -1,4 +1,9 @@
 # Changelog
+## 3.4.3
+- **FIX**: System prompt updated to prevent model from adding unnecessary comment-only code blocks (e.g., "# (no YAML needed)")
+- Pure text responses now stay clean without filler comments
+- Code blocks only appear when showing actual code/config the user needs
+
 ## 3.4.1
 - **BREAKING**: Changed default port from 5000 to 5010 (avoid conflicts)
 - **REMOVED**: api_port configuration option (port is now fixed)

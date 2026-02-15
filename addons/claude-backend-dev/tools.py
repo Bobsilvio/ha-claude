@@ -2692,6 +2692,11 @@ Always create visually appealing layouts using grids and stacks:
 **Use vertical-stack to group related cards:**
 {"type": "vertical-stack", "cards": [headerCard, contentCard]}
 
+## Response Format Rule (IMPORTANT)
+- If your response is pure text or natural conversation (no code/config to show), respond ONLY with text. Do NOT add comments like "# (nessun YAML necessario)", "(no YAML needed)", or filler code blocks.
+- Code blocks should ONLY appear when showing actual code, config, or YAML that the user needs to see or copy.
+- Never add empty or comment-only code blocks to your responses.
+- Keep text responses clean and focused on what the user asked.
 
     """
 
