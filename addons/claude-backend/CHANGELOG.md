@@ -1,4 +1,12 @@
 # Changelog
+## 3.5.1
+- **IMPROVEMENT**: HTML dashboards now automatically create Lovelace wrapper with iframe
+- **IMPROVEMENT**: Custom dashboards now appear directly in Home Assistant sidebar (no manual setup needed)
+- **FEATURE**: Dashboard is fully accessible from sidebar - click to view, appears in the dashboard list
+- Dashboard has automatic icon (mdi:web) and appears alongside native Lovelace dashboards
+- Full title and description displayed in sidebar
+- Frame height auto-scales to full viewport
+
 ## 3.5.0
 - **NEW FEATURE**: Added `create_html_dashboard` tool for generating custom Vue 3 dashboards with real-time WebSocket
 - **NEW**: Html dashboards support Vue 3, CSS, responsive design, and live entity monitoring

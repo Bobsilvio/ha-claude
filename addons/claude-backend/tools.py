@@ -2006,24 +2006,91 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(html_content_generated)
 
-                logger.info(f"✅ HTML dashboard saved: {file_path}")
+                logger.info(f"✅ HTML dashboard file saved: {file_path}")
 
-                # Build URL - the dashboard will be served via Flask at /custom_dashboards/<name>
-                dashboard_url = f"http://localhost:5010/custom_dashboards/{safe_filename.replace('.html', '')}"
+                # Build URL for iframe
+                dashboard_url = f"/custom_dashboards/{safe_filename.replace('.html', '')}"
+
+                # Step 1: Create a Lovelace dashboard wrapper with iframe
+                # The dashboard will appear in the sidebar and contain the HTML dashboard in an iframe
+                safe_url_path = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+                
+                logger.info(f"🎨 Creating Lovelace wrapper dashboard at /{safe_url_path}")
+                
+                try:
+                    # Create the dashboard via WebSocket
+                    ws_result = api.call_ha_websocket(
+                        "lovelace/dashboards/create",
+                        url_path=safe_url_path,
+                        title=title,
+                        icon="mdi:web",
+                        show_in_sidebar=True,
+                        require_admin=False
+                    )
+                    logger.info(f"📊 Dashboard create WS response: {ws_result}")
+                    
+                    if ws_result.get("success") is False:
+                        error_msg = ws_result.get("error", {}).get("message", str(ws_result))
+                        logger.error(f"❌ Failed to create dashboard: {error_msg}")
+                        # Don't fail - HTML dashboard is still created, just return it
+                        dashboard_created = False
+                    else:
+                        dashboard_created = True
+                except Exception as e:
+                    logger.error(f"❌ Exception creating Lovelace dashboard: {e}")
+                    dashboard_created = False
+
+                # Step 2: Add iframe card to the dashboard
+                if dashboard_created:
+                    try:
+                        iframe_card = {
+                            "type": "iframe",
+                            "url": dashboard_url,
+                            "aspect_ratio": "100%"
+                        }
+                        
+                        view_config = {
+                            "title": title,
+                            "path": safe_url_path,
+                            "cards": [iframe_card]
+                        }
+                        
+                        ws_config = api.call_ha_websocket(
+                            "lovelace/config/save",
+                            url_path=safe_url_path,
+                            config={"views": [view_config]}
+                        )
+                        logger.info(f"📊 Dashboard config save WS response: {ws_config}")
+                        
+                        if ws_config.get("success") is True:
+                            logger.info(f"✅ Lovelace dashboard '{title}' created successfully at /{safe_url_path}")
+                            sidebar_message = f"dashboard appears in the sidebar at /{safe_url_path}"
+                        else:
+                            error_msg = ws_config.get("error", {}).get("message", str(ws_config))
+                            logger.warning(f"⚠️ Dashboard created but config failed: {error_msg}")
+                            sidebar_message = f"HTML file is ready but sidebar integration failed"
+                    except Exception as e:
+                        logger.error(f"❌ Exception saving dashboard config: {e}")
+                        sidebar_message = f"HTML file is ready but sidebar integration failed"
+                else:
+                    sidebar_message = "HTML file is ready (sidebar integration skipped)"
 
                 return json.dumps({
                     "status": "success",
-                    "message": f"✨ Dashboard '{title}' created successfully!",
+                    "message": f"✨ Dashboard '{title}' created successfully! Your {sidebar_message}",
                     "title": title,
                     "name": name,
                     "filename": safe_filename,
                     "file_path": file_path,
-                    "url": dashboard_url,
+                    "html_url": dashboard_url,
+                    "sidebar_dashboard": safe_url_path,
+                    "url_path": safe_url_path,
                     "entities_count": len(entities),
                     "components": components,
                     "theme": theme,
-                    "IMPORTANT": f"Your dashboard is ready! Access it at: {dashboard_url}",
-                    "preview_note": "Open the URL in your browser to see the live dashboard. Use this link as a bookmark or add it to your Home Assistant sidebar."
+                    "sidebar_ready": dashboard_created,
+                    "IMPORTANT": f"✨ Your dashboard '{title}' is ready in the sidebar! Click on it to view.",
+                    "preview_note": "The dashboard now appears in your Home Assistant sidebar and shows live entity updates."
                 }, ensure_ascii=False, default=str)
 
             except Exception as e:
