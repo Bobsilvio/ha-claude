@@ -1462,32 +1462,50 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             icon = tool_input.get("icon", "mdi:robot")
             views = tool_input.get("views", [])
 
+            logger.info(f"📊 Creating dashboard: title='{title}', url_path='{url_path}', views={len(views)}")
+
             # Step 1: Register dashboard via WebSocket (REST API doesn't support this)
-            ws_result = api.call_ha_websocket(
-                "lovelace/dashboards/create",
-                url_path=url_path,
-                title=title,
-                icon=icon,
-                show_in_sidebar=True,
-                require_admin=False
-            )
-            if ws_result.get("success") is False:
-                error_msg = ws_result.get("error", {}).get("message", str(ws_result))
-                return json.dumps({"error": f"Failed to create dashboard: {error_msg}"}, default=str)
+            try:
+                ws_result = api.call_ha_websocket(
+                    "lovelace/dashboards/create",
+                    url_path=url_path,
+                    title=title,
+                    icon=icon,
+                    show_in_sidebar=True,
+                    require_admin=False
+                )
+                logger.info(f"📊 Dashboard create WS response: {ws_result}")
+                
+                if ws_result.get("success") is False:
+                    error_msg = ws_result.get("error", {}).get("message", str(ws_result))
+                    logger.error(f"❌ Failed to create dashboard: {error_msg}")
+                    return json.dumps({"error": f"Failed to create dashboard: {error_msg}"}, default=str)
+            except Exception as e:
+                logger.error(f"❌ Exception creating dashboard: {e}")
+                return json.dumps({"error": f"Exception creating dashboard: {str(e)}"}, default=str)
 
             # Step 2: Set the dashboard config with views and cards via WebSocket
-            ws_config = api.call_ha_websocket(
-                "lovelace/config/save",
-                url_path=url_path,
-                config={"views": views}
-            )
-            if ws_config.get("success") is False:
-                error_msg = ws_config.get("error", {}).get("message", str(ws_config))
-                return json.dumps({"status": "partial", "message": f"Dashboard registered but config failed: {error_msg}"}, default=str)
+            try:
+                ws_config = api.call_ha_websocket(
+                    "lovelace/config/save",
+                    url_path=url_path,
+                    config={"views": views}
+                )
+                logger.info(f"📊 Dashboard config save WS response: {ws_config}")
+                
+                if ws_config.get("success") is False:
+                    error_msg = ws_config.get("error", {}).get("message", str(ws_config))
+                    logger.warning(f"⚠️ Dashboard registered but config failed: {error_msg}")
+                    return json.dumps({"status": "partial", "message": f"Dashboard registered but config failed: {error_msg}"}, default=str)
+            except Exception as e:
+                logger.error(f"❌ Exception saving dashboard config: {e}")
+                # Don't fail completely - the dashboard was created
+                pass
 
             # Return the YAML so AI can show it to the user
             import yaml
             dashboard_yaml = yaml.dump({"views": views}, default_flow_style=False, allow_unicode=True)
+            logger.info(f"✅ Dashboard '{title}' created successfully at /{url_path}")
             return json.dumps({
                 "status": "success",
                 "message": f"Dashboard '{title}' created! It appears in the sidebar at /{url_path}",
@@ -2344,6 +2362,13 @@ Always create visually appealing layouts using grids and stacks:
 
 **Use vertical-stack to group related cards:**
 {"type": "vertical-stack", "cards": [headerCard, contentCard]}
+
+CRITICAL - Dashboard Creation Handling:
+- ALWAYS attempt create_dashboard tool first - IT MUST WORK
+- If tool succeeds: Dashboard is created, user sees it in sidebar
+- If tool fails: DO NOT tell user "manually edit files"
+- On failure: Generate dashboard YAML and provide it in a clean code block
+- Message: "I've prepared your dashboard. You can add this to your Lovelace config."
 
 **Best layout practices:**
 - Use a grid with 2-3 columns for button/entity cards

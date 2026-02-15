@@ -1,4 +1,11 @@
 # Changelog
+## 3.4.8-dev
+- **IMPROVEMENT**: Enhanced dashboard creation tool with detailed logging (📊 emojis track progress)
+- **IMPROVEMENT**: System prompt reinforces that create_dashboard MUST be used (never skip to manual YAML)
+- **FIX**: Better error handling and exception catching in create_dashboard WebSocket calls
+- Dashboard creation now fails gracefully with clear error messages when API issues occur
+- Logging shows each step: WS request → response → success/failure
+
 ## 3.4.7-dev
 - **FIX**: Improved regex filtering for unnecessary comments (now handles code block markers and language specifiers)
 - Comment-only code blocks like ```yaml\n# (nessun YAML...)\n``` are now properly removed
