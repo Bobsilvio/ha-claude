@@ -209,13 +209,15 @@ def _log_request_start() -> None:
 
     g._skip_log = False
 
-    meta = _safe_request_meta()
-    logger.info(
-        f"[{g._req_id}] → {request.method} {request.path}"
-        f" | ip={meta['ip']} ua={meta['ua']}"
-        f" | ingress={meta['ingress_path']} xf_prefix={meta['xf_prefix']}",
-        extra={"context": "REQUEST"},
-    )
+    # Only log full request details in verbose/debug mode
+    if LOG_LEVEL in ("verbose", "debug"):
+        meta = _safe_request_meta()
+        logger.info(
+            f"[{g._req_id}] → {request.method} {request.path}"
+            f" | ip={meta['ip']} ua={meta['ua']}"
+            f" | ingress={meta['ingress_path']} xf_prefix={meta['xf_prefix']}",
+            extra={"context": "REQUEST"},
+        )
 
 
 @app.after_request
@@ -231,11 +233,14 @@ def _log_request_end(response: Response) -> Response:
         rid = getattr(g, "_req_id", "")
         t0 = getattr(g, "_t0", None)
         dur_ms = int((time.monotonic() - t0) * 1000) if t0 else -1
-        logger.info(
-            f"[{rid}] ← {request.method} {request.path}"
-            f" | {response.status_code} | {dur_ms}ms",
-            extra={"context": "RESPONSE"},
-        )
+        
+        # Only log response details in verbose/debug mode
+        if LOG_LEVEL in ("verbose", "debug"):
+            logger.info(
+                f"[{rid}] ← {request.method} {request.path}"
+                f" | {response.status_code} | {dur_ms}ms",
+                extra={"context": "RESPONSE"},
+            )
     except Exception:
         # Never fail a request due to logging.
         pass
