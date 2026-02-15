@@ -1,5 +1,7 @@
 # Changelog
-
+## 3.3.99
+- **BUILD**: Version bump for cache refresh - includes all fixes from 3.3.8
+- Includes: Dynamic port sync, GPT-5.2 models, rebuild warning, SyntaxWarning fix
 ## 3.3.9
 - **FIX**: Resolve Python SyntaxWarning in chat_ui.py regex escape sequence
 - Fixes warning: invalid escape sequence '/\/' in apiUrl function
