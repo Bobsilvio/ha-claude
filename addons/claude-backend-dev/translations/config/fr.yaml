@@ -1,0 +1,52 @@
+configuration:
+  anthropic_api_key:
+    name: Clé API Anthropic
+    description: Clé API pour les modèles Anthropic Claude
+  openai_api_key:
+    name: Clé API OpenAI
+    description: Clé API pour les modèles OpenAI ChatGPT
+  google_api_key:
+    name: Clé API Google
+    description: Clé API pour Google Gemini
+  github_token:
+    name: Token GitHub
+    description: Token GitHub avec permissions limitées pour accéder à l'API Models
+  nvidia_api_key:
+    name: Clé API NVIDIA
+    description: Clé API pour les modèles NVIDIA NIM
+  nvidia_thinking_mode:
+    name: Mode Thinking NVIDIA
+    description: Activez le mode Thinking NVIDIA pour un raisonnement plus profond (expérimental)
+  api_port:
+    name: Port API
+    description: Port du serveur API (par défaut : 5000)
+  colored_logs:
+    name: Logs Colorés
+    description: Active les indicateurs emoji colorés dans les logs du module (🟢 succès, 🔴 erreur, etc.)
+  debug_mode:
+    name: Mode Debug
+    description: Afficher les informations de débogage détaillées incluant les headers HTTP et traces
+  log_level:
+    name: Niveau de Log
+    description: Verbosité du log - normal (filtre le bruit), verbose (tous les logs), debug (inclut données)
+  enable_file_access:
+    name: Activer l'Accès aux Fichiers
+    description: Permettre à l'assistant IA de lire/écrire des fichiers du répertoire config d'Home Assistant
+  language:
+    name: Langue
+    description: Langue de l'interface pour les messages d'erreur et les réponses
+  timeout:
+    name: Délai d'Expiration
+    description: Délai d'expiration des requêtes API en secondes (par défaut : 30)
+  max_retries:
+    name: Tentatives Maximales
+    description: Nombre maximal de tentatives pour les requêtes API échouées (par défaut : 3)
+  enable_memory:
+    name: Activer la Mémoire (Expérimental)
+    description: Active le système de mémoire persistante pour se souvenir des conversations passées
+  enable_file_upload:
+    name: Activer l'Envoi de Fichiers (Expérimental)
+    description: Permettre d'envoyer des documents (PDF, DOCX, TXT, MD, YAML) pour analyse IA
+  enable_rag:
+    name: Activer RAG (Expérimental)
+    description: Active RAG (Retrieval-Augmented Generation) pour recherche et injection de documents
