@@ -1932,6 +1932,38 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
     return clean
 
 
+def _clean_unnecessary_comments(text: str) -> str:
+    """Remove unnecessary comment-only code blocks from AI responses.
+    
+    Removes patterns like:
+    - # (nessun YAML necessario...)
+    - # (no YAML needed...)
+    - # (ningún YAML necesario...)
+    - # (aucun YAML nécessaire...)
+    
+    These are often added by models for "simple" text responses and should not appear.
+    """
+    import re
+    
+    # Remove code blocks that contain ONLY these filler comments
+    # Pattern: ```<optional content>``` where content is mostly just the comment
+    patterns = [
+        # Remove lines with these specific comment patterns
+        r'#\s*\([^)]*nessun YAML[^)]*\)',  # Italian
+        r'#\s*\([^)]*no YAML[^)]*\)',       # English
+        r'#\s*\([^)]*ningún YAML[^)]*\)',   # Spanish
+        r'#\s*\([^)]*aucun YAML[^)]*\)',    # French
+    ]
+    
+    for pattern in patterns:
+        # If the entire line is just the comment, remove it
+        text = re.sub(pattern + r'\s*\n?', '', text)
+        # Also remove it if it appears in a code block by itself
+        text = re.sub(f'```\n{pattern}\s*\n```\n?', '', text)
+    
+    return text
+
+
 def chat_with_ai(user_message: str, session_id: str = "default") -> str:
     """Send a message to the configured AI provider with HA tools."""
     if not ai_client:
@@ -1961,6 +1993,8 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
         conversations[session_id] = messages
         conversations[session_id].append({"role": "assistant", "content": final_text})
         save_conversations()
+        # Clean unnecessary comments from response before returning
+        final_text = _clean_unnecessary_comments(final_text)
         return final_text
 
     except Exception as e:

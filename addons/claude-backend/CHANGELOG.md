@@ -1,4 +1,9 @@
 # Changelog
+## 3.4.4
+- **FIX**: Backend post-processing added to remove unnecessary comment-only code blocks from AI responses
+- Cleans up patterns like "# (nessun YAML necessario...)" that models add for simple text responses
+- Responses now stay clean - code blocks only appear when showing actual code/config
+
 ## 3.4.3
 - **FIX**: System prompt updated to prevent model from adding unnecessary comment-only code blocks (e.g., "# (no YAML needed)")
 - Pure text responses now stay clean without filler comments
