@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.28-dev
+- **FIX**: Correct apiUrl regex to prevent double-slash in API paths (`//api/chat/stream`)
+- Fixes stream error: 'Cannot write to closing transport' in HA Ingress
+
 ## 3.3.27-dev
 - **FIX**: Persistent memory not working across conversations
 - Fixed keyword extraction: was too restrictive (only words > 5 chars repeated 2+ times), now captures words > 2 chars including single mentions

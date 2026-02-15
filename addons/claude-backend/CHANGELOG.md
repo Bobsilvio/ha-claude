@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.3.3
+- **FIX**: Correct apiUrl regex to prevent double-slash in API paths (`//api/chat/stream`)
+- Fixes stream error: 'Cannot write to closing transport' in HA Ingress
+
 ## 3.3.1
 - **FIX**: Removed voice feature references accidentally included from dev addon (caused AttributeError crash on UI load)
 - Removed voice button, voice CSS, voice JS, voice API endpoints, voice env vars from public addon
