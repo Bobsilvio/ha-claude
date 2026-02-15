@@ -46,6 +46,7 @@ export GOOGLE_API_KEY
 export NVIDIA_API_KEY
 export NVIDIA_THINKING_MODE
 export GITHUB_TOKEN
+export API_PORT
 export DEBUG_MODE
 export COLORED_LOGS
 export LOG_LEVEL
