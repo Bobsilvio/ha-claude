@@ -25,7 +25,7 @@ configuration:
     description: Personal Access Token de github.com/settings/tokens (sauvegardez même si non utilisé, pour changement rapide)
   api_port:
     name: Port API
-    description: Port API interne (par défaut 5000, utilisateurs avancés uniquement)
+    description: "Port API interne (par défaut 5000, utilisateurs avancés uniquement). ⚠️ Après modification : RECONSTRUISEZ l'addon (pas seulement redémarrer) depuis Compléments > Claude DEV > Reconstruire"
   debug_mode:
     name: Mode Debug
     description: Activer la journalisation détaillée pour le dépannage (crée des journaux plus volumineux)

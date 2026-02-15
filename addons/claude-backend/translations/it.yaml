@@ -25,7 +25,7 @@ configuration:
     description: Personal Access Token da github.com/settings/tokens (salva anche se non in uso, per switch rapido)
   api_port:
     name: Porta API
-    description: Porta API interna (predefinita 5000, solo utenti avanzati)
+    description: "Porta API interna (predefinita 5000, solo utenti avanzati). ⚠️ Dopo il cambio: RICOSTRUISCI l'addon (non solo riavvia) da Addon > Claude > Ricostruisci"
   debug_mode:
     name: Modalità Debug
     description: Abilita log dettagliati per il troubleshooting (crea log più grandi)
