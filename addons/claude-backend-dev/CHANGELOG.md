@@ -1,7 +1,12 @@
 # Changelog
-## 3.3.99-dev
-- **BUILD**: Version bump for cache refresh - includes all fixes from 3.3.33-dev
-- Includes: Dynamic port sync, GPT-5.2 models, rebuild warning, SyntaxWarning fix
+## 3.4.0-dev
+- **NEW**: Dynamic API port synchronization with sync_ports.py script
+- **NEW**: GPT-5.2, GPT-5.2-mini, o3, o3-mini models added to OpenAI options
+- **FIX**: Python SyntaxWarning in chat_ui.py regex escape sequence
+- **FIX**: Invalid JSON comments in build.json causing parse error
+- **DOCS**: Added rebuild requirement warning to api_port config descriptions (EN/IT/ES/FR)
+- OpenAI default model updated to GPT-5.2 (flagship)
+- Users can now change api_port in config (requires rebuild to reload ingress proxy)
 ## 3.3.34-dev
 - **FIX**: Resolve Python SyntaxWarning in chat_ui.py regex escape sequence
 - Fixes warning: invalid escape sequence '/\/' in apiUrl function
