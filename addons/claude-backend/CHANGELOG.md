@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.3.7
+- **FEAT**: Dynamic API port synchronization - users can now change `api_port` in addon config
+- New `sync_ports.py` script auto-updates ingress_port and port mappings on runtime
+- Fixes issue where changing api_port had no effect without manual config.yaml editing
+
 ## 3.3.6
 - **FIX**: Move logging/debug settings to bottom of config
 - Settings now appear in 'Show advanced options' section in HA UI

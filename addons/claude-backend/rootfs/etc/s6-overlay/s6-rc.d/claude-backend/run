@@ -71,4 +71,9 @@ bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && 
 bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
 
 cd /app
+
+# Sync API port with ingress_port if they differ
+bashio::log.info "Synchronizing API port configuration..."
+python3 sync_ports.py
+
 exec python3 server.py
