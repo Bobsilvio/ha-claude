@@ -16,7 +16,6 @@ GOOGLE_API_KEY=$(bashio::config 'google_api_key')
 NVIDIA_API_KEY=$(bashio::config 'nvidia_api_key')
 NVIDIA_THINKING_MODE=$(bashio::config 'nvidia_thinking_mode')
 GITHUB_TOKEN=$(bashio::config 'github_token')
-API_PORT=$(bashio::config 'api_port')
 DEBUG_MODE=$(bashio::config 'debug_mode')
 COLORED_LOGS=$(bashio::config 'colored_logs')
 LOG_LEVEL=$(bashio::config 'log_level')
@@ -47,7 +46,6 @@ export GOOGLE_API_KEY
 export NVIDIA_API_KEY
 export NVIDIA_THINKING_MODE
 export GITHUB_TOKEN
-export API_PORT
 export DEBUG_MODE
 export COLORED_LOGS
 export LOG_LEVEL
@@ -69,9 +67,5 @@ bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && 
 bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
 
 cd /app
-
-# Sync API port with ingress_port if they differ
-bashio::log.info "Synchronizing API port configuration..."
-python3 sync_ports.py
 
 exec python3 server.py

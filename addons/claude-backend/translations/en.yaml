@@ -23,9 +23,6 @@ configuration:
   github_token:
     name: GitHub Token
     description: Personal Access Token from github.com/settings/tokens (save here even if not using, for quick switching)
-  api_port:
-    name: API Port
-    description: "Internal API port (default 5000, advanced users only). ⚠️ After changing: REBUILD the addon (not just restart) from Addons > Claude > Rebuild"
   debug_mode:
     name: Debug Mode
     description: Enable detailed logging for troubleshooting (creates larger logs)

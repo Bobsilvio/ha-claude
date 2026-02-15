@@ -1,4 +1,11 @@
 # Changelog
+## 3.4.1-dev
+- **BREAKING**: Changed default port from 5001 to 5011 (avoid conflicts)
+- **REMOVED**: api_port configuration option (port is now fixed)
+- **REMOVED**: sync_ports.py script (port sync was not working reliably with HA Ingress)
+- Chat UI and all features work normally with new port
+- Port 5011 is internal to container, Ingress routes transparently
+- Users needing direct access can use http://hostname:5011
 ## 3.4.0-dev
 - **NEW**: Dynamic API port synchronization with sync_ports.py script
 - **NEW**: GPT-5.2, GPT-5.2-mini, o3, o3-mini models added to OpenAI options

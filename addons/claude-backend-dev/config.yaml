@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration (DEV)
 name: "AI Assistant DEV 🚧"
-version: "3.4.0-dev"
+version: "3.4.1-dev"
 slug: claude-backend-dev
 description: >-
   [DEVELOPMENT] AI-powered smart home assistant with experimental features:
@@ -15,7 +15,7 @@ startup: application
 apparmor: false
 boot: auto
 ingress: true
-ingress_port: 5001  # Must match api_port setting
+ingress_port: 5011
 ingress_entry: /
 panel_icon: mdi:robot
 panel_title: AI Assistant DEV
@@ -23,12 +23,11 @@ homeassistant_api: true
 map:
   - config:rw
 ports:
-  5001/tcp: null
+  5011/tcp: null
 ports_description:
-  5001/tcp: AI Assistant API (DEV, must match api_port setting)
+  5011/tcp: AI Assistant API (DEV)
 environment:
   DEBUG_MODE: "False"
-  API_PORT: "5001"
 options:
   anthropic_api_key: ""
   openai_api_key: ""
@@ -36,7 +35,6 @@ options:
   github_token: ""
   nvidia_api_key: ""
   nvidia_thinking_mode: false
-  api_port: "5000"
   enable_file_access: false
   language: en
   timeout: "30"
@@ -54,7 +52,6 @@ schema:
   github_token: password?
   nvidia_api_key: password?
   nvidia_thinking_mode: bool?
-  api_port: str?
   enable_file_access: bool?
   language: list(en|it|es|fr)?
   timeout: str?

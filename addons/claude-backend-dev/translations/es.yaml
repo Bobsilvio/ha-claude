@@ -23,9 +23,6 @@ configuration:
   github_token:
     name: Token GitHub
     description: Personal Access Token de github.com/settings/tokens (guarda aunque no uses, para cambio rápido)
-  api_port:
-    name: Puerto API
-    description: "Puerto API interno (predeterminado 5000, solo usuarios avanzados). ⚠️ Después de cambiar: RECONSTRUIR el addon (no solo reiniciar) desde Complementos > Claude DEV > Reconstruir"
   debug_mode:
     name: Modo Debug
     description: Habilita registro detallado para solución de problemas (crea registros más grandes)
