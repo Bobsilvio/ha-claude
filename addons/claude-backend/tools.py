@@ -2008,8 +2008,10 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
                 logger.info(f"✅ HTML dashboard file saved: {file_path}")
 
-                # Build URL for iframe
-                dashboard_url = f"/custom_dashboards/{safe_filename.replace('.html', '')}"
+                # Build URL for iframe - must use Ingress path so HA frontend proxies to addon
+                ingress_url = api.get_addon_ingress_url()
+                dashboard_url = f"{ingress_url}/custom_dashboards/{safe_filename.replace('.html', '')}"
+                logger.info(f"🔗 Dashboard iframe URL: {dashboard_url}")
 
                 # Step 1: Create a Lovelace dashboard wrapper with iframe
                 # The dashboard will appear in the sidebar and contain the HTML dashboard in an iframe

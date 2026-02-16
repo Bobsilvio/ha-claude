@@ -1,4 +1,10 @@
 # Changelog
+## 3.5.4
+- **FIX**: HTML dashboard iframe 404 error - iframe URL now uses Ingress proxy path instead of relative URL
+- **FIX**: Added `get_addon_ingress_url()` helper that queries Supervisor API (`/addons/self/info`) to get correct Ingress path
+- **FIX**: Dashboard iframe cards now load correctly through HA Ingress proxy (URL: `/api/hassio_ingress/<token>/custom_dashboards/...`)
+- **IMPROVEMENT**: Ingress URL is cached at runtime for performance
+
 ## 3.5.3
 - **FIX**: DELETE intent detection priority - now checked before QUERY_STATE to prevent misrouting
 - **FIX**: Delete dashboard/automation/script requests now correctly route to 'delete' intent with proper tools

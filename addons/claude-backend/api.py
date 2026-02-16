@@ -1131,6 +1131,47 @@ def get_ha_headers() -> dict:
     }
 
 
+# Cache for addon ingress URL (doesn't change at runtime)
+_ingress_url_cache: Optional[str] = None
+
+
+def get_addon_ingress_url() -> str:
+    """Get the Ingress URL path for this addon from the Supervisor API.
+    
+    Returns the ingress_url (e.g., '/api/hassio_ingress/<token>') that can be
+    used as prefix for iframe URLs so HA frontend proxies to the addon.
+    Result is cached since it doesn't change at runtime.
+    """
+    global _ingress_url_cache
+    if _ingress_url_cache is not None:
+        return _ingress_url_cache
+
+    try:
+        resp = requests.get(
+            "http://supervisor/addons/self/info",
+            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+            timeout=10
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            ingress_url = data.get("data", {}).get("ingress_url", "")
+            if ingress_url:
+                # Remove trailing slash if present
+                _ingress_url_cache = ingress_url.rstrip("/")
+                logger.info(f"🔗 Addon Ingress URL: {_ingress_url_cache}")
+                return _ingress_url_cache
+            else:
+                logger.warning("⚠️ ingress_url not found in Supervisor addon info")
+        else:
+            logger.error(f"❌ Supervisor API returned {resp.status_code}: {resp.text[:200]}")
+    except Exception as e:
+        logger.error(f"❌ Failed to get addon ingress URL: {e}")
+
+    # Fallback: empty string (URL will be relative, may 404)
+    _ingress_url_cache = ""
+    return _ingress_url_cache
+
+
 # ---- Initialize AI client ----
 
 def initialize_ai_client():
