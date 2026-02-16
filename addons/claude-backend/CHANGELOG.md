@@ -1,4 +1,24 @@
 # Changelog
+## 3.6.0
+- **ENHANCEMENT**: Complete rewrite of HTML dashboard generator with major visual and functional improvements
+- **NEW**: Auto dark/light theme following HA preferences (CSS prefers-color-scheme)
+- **NEW**: Glassmorphism card design with backdrop-filter blur and hover animations
+- **NEW**: Domain-based entity grouping - entities auto-organized by domain (sensors, switches, lights, etc.)
+- **NEW**: Domain-specific icons (🔋 battery, 🌡️ temperature, ⚡ power, 💧 humidity, etc.)
+- **NEW**: Smart unit formatting - W→kW, Wh→kWh when values exceed 1000
+- **NEW**: Toggle switches for switch/light/input_boolean entities (click to toggle)
+- **NEW**: Range sliders for number/input_number entities (drag to set value)
+- **NEW**: Value color coding - green/yellow/red for battery SOC, power flow coloring for solar/grid
+- **NEW**: Search/filter bar to quickly find entities
+- **NEW**: Hero card with live stats (entity count, numeric count, toggle count)
+- **NEW**: Up to 4 gauge SVGs for percentage-based entities (battery SOC, etc.)
+- **NEW**: Chart.js auto horizontal bars for >8 entities, vertical bars otherwise
+- **NEW**: Dynamic chart palette with 12 colors and dark-mode aware grid lines
+- **IMPROVEMENT**: Responsive mobile-first grid with proper breakpoints
+- **IMPROVEMENT**: Entity rows show friendly_name, entity_id, and domain icon
+- **IMPROVEMENT**: Removed Tailwind CSS CDN dependency (pure CSS for faster loading)
+- **IMPROVEMENT**: WebSocket reconnection with debounced chart updates
+
 ## 3.5.6
 - **FIX**: HTML dashboard iframe now renders full-page instead of small centered square
 - **FIX**: Removed `aspect_ratio: "100%"` from iframe card (was constraining to 1:1 square)

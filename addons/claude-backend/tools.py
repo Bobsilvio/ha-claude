@@ -16,390 +16,601 @@ AI_SIGNATURE = "AI Assistant"
 def _generate_html_dashboard(title: str, name: str, description: str, entities: list, 
                             layout: str = "grid", components: list = None, 
                             theme: str = "auto", html_content: str = None) -> str:
-    """Generate a complete HTML dashboard with Vue 3, real-time WebSocket and API integration.
-    
-    Uses regular string with placeholder replacement (not f-strings) to avoid
-    escaping conflicts between Python {{ }} and Vue/JS {{ }} syntax.
+    """Generate a polished HTML dashboard with Vue 3, real-time WebSocket, Chart.js.
+
+    Features:
+    - Auto dark/light theme following HA
+    - Glassmorphism card design
+    - Domain-based entity grouping with icons
+    - Smart unit formatting (W→kW, etc.)
+    - Toggle switches & number sliders
+    - Live value color coding (green/yellow/red for battery SOC)
+    - Responsive mobile-first grid
+    - Chart.js bar chart for numeric sensors
+    - SVG gauge for percentage entities
+    - Search/filter entities
+    - Last-updated timestamps
     """
     import html as html_module
-    
+
     if components is None:
         components = ["info", "chart"]
-    
-    # Serialize entities as JSON array for JavaScript
+
     entities_json = json.dumps(entities, ensure_ascii=False) if entities else '[]'
-    
-    # Theme colors
-    theme_config = {
-        "light": {"bg": "#ffffff", "text": "#1f2937", "card": "#f3f4f6", "border": "#e5e7eb"},
-        "dark": {"bg": "#1a1a2e", "text": "#e2e8f0", "card": "#16213e", "border": "#2d3748"},
-    }
-    colors = theme_config.get(theme if theme != "auto" else "light", theme_config["light"])
-    color_scheme = "dark" if theme == "dark" else "light"
-    
-    # Escape title/description for HTML
     safe_title = html_module.escape(title)
     safe_description = html_module.escape(description or "")
-    
-    # Generate Vue component sections based on requested components
+
+    # Component HTML snippets (Vue template syntax, no f-string)
     component_html = ""
     if "info" in components:
         component_html += """
-            <div class="info-card">
-              <h3>{{ title }}</h3>
-              <p>{{ description }}</p>
-              <div class="entity-count">🔍 Monitored: {{ entities.length }} entities</div>
+            <div class="hero-card">
+              <div class="hero-icon">⚡</div>
+              <div class="hero-content">
+                <h2>{{ title }}</h2>
+                <p>{{ description }}</p>
+                <div class="hero-stats">
+                  <span>🔍 {{ entities.length }} entities</span>
+                  <span>📊 {{ numericCount }} numeric</span>
+                  <span>🔘 {{ toggleCount }} toggles</span>
+                </div>
+              </div>
             </div>"""
-    
+
     if "chart" in components:
         component_html += """
-            <div class="chart-container">
-              <h3>📊 Sensor Values</h3>
-              <canvas id="entityChart"></canvas>
+            <div class="card card-wide">
+              <div class="card-header">
+                <span class="card-icon">📊</span>
+                <h3>Sensor Values</h3>
+              </div>
+              <div class="chart-wrap"><canvas id="entityChart"></canvas></div>
             </div>"""
-    
+
     if "gauge" in components:
         component_html += """
-            <div class="gauge-container">
-              <h3>{{ entities[0] || 'Gauge' }}</h3>
-              <svg viewBox="0 0 200 120" width="200" height="120">
-                <path d="M 20 100 A 80 80 0 0 1 180 100" class="gauge-bg"/>
-                <path :d="gaugePath" class="gauge-fill"/>
-                <text x="100" y="90" text-anchor="middle" class="gauge-text">{{ gaugePercent }}%</text>
-              </svg>
+            <div class="card" v-for="g in gaugeEntities" :key="g.id">
+              <div class="card-header">
+                <span class="card-icon">{{ g.icon }}</span>
+                <h3>{{ g.name }}</h3>
+              </div>
+              <div class="gauge-wrap">
+                <svg viewBox="0 0 120 70">
+                  <path d="M 10 65 A 50 50 0 0 1 110 65" stroke="var(--border)" stroke-width="8" fill="none" stroke-linecap="round"/>
+                  <path :d="g.arc" :stroke="g.color" stroke-width="8" fill="none" stroke-linecap="round" style="transition:all .6s ease"/>
+                  <text x="60" y="55" text-anchor="middle" :fill="g.color" style="font-size:1.1rem;font-weight:700">{{ g.display }}</text>
+                  <text x="60" y="67" text-anchor="middle" fill="var(--text-secondary)" style="font-size:0.5rem">{{ g.unit }}</text>
+                </svg>
+              </div>
             </div>"""
 
     if html_content:
         component_html = html_content
-    
-    # Build the complete HTML template using regular string (NOT f-string)
-    # This preserves Vue {{ }} and JS { } syntax without escaping issues
-    html_template = """<!DOCTYPE html>
+
+    html_template = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>__TITLE__</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        :root {
-            --bg-primary: __BG_COLOR__;
-            --text-primary: __TEXT_COLOR__;
-            --card-bg: __CARD_COLOR__;
-            --border-color: __BORDER_COLOR__;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; color-scheme: __COLOR_SCHEME__; }
-        body {
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        #app { min-height: 100vh; padding: 1.5rem; }
-        .dashboard-header { margin-bottom: 1.5rem; }
-        .dashboard-header h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
-        .dashboard-header p { opacity: 0.7; font-size: 0.9rem; }
-        .connection-status {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            font-size: 0.8rem; padding: 0.4rem 0.8rem;
-            background: var(--card-bg); border-radius: 2rem; margin-top: 0.75rem;
-        }
-        .status-dot {
-            width: 8px; height: 8px; border-radius: 50%;
-            background: #ef4444; flex-shrink: 0;
-        }
-        .status-dot.ok { background: #10b981; animation: pulse 2s infinite; }
-        @keyframes pulse { 50% { opacity: 0.4; } }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1rem; margin-top: 1rem;
-        }
-        .card {
-            background: var(--card-bg); border: 1px solid var(--border-color);
-            border-radius: 12px; padding: 1.25rem;
-            transition: box-shadow 0.2s;
-        }
-        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
-        .entity-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 0.6rem 0.75rem; background: var(--bg-primary);
-            border-radius: 8px; margin-bottom: 0.4rem; font-size: 0.9rem;
-        }
-        .entity-row .label { opacity: 0.85; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .entity-row .value { font-weight: 600; font-size: 1.05rem; }
-        .info-card {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            color: #fff; padding: 1.5rem; border-radius: 12px; grid-column: 1 / -1;
-        }
-        .info-card h3 { font-size: 1.3rem; margin-bottom: 0.3rem; }
-        .entity-count { margin-top: 0.5rem; opacity: 0.85; font-size: 0.85rem; }
-        .chart-container {
-            background: var(--card-bg); border: 1px solid var(--border-color);
-            border-radius: 12px; padding: 1.25rem; grid-column: 1 / -1;
-        }
-        .chart-container canvas { width: 100% !important; max-height: 280px; }
-        .gauge-container {
-            background: var(--card-bg); border: 1px solid var(--border-color);
-            border-radius: 12px; padding: 1.25rem; text-align: center;
-        }
-        .gauge-bg { stroke: var(--border-color); stroke-width: 10; fill: none; stroke-linecap: round; }
-        .gauge-fill { stroke: #10b981; stroke-width: 10; fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease; }
-        .gauge-text { font-size: 1.5rem; font-weight: 700; fill: var(--text-primary); }
-        .error-box { background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
-        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
-        .fade-enter-from, .fade-leave-to { opacity: 0; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__TITLE__</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+/* ===== CSS Variables & Theme ===== */
+:root {
+  --bg: #f0f2f5; --bg2: #ffffff; --text: #1a1a2e; --text-secondary: #6b7280;
+  --card: rgba(255,255,255,0.85); --border: #e2e8f0; --shadow: rgba(0,0,0,0.06);
+  --accent: #667eea; --accent2: #764ba2; --green: #10b981; --yellow: #f59e0b;
+  --red: #ef4444; --blue: #3b82f6; --radius: 16px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f172a; --bg2: #1e293b; --text: #e2e8f0; --text-secondary: #94a3b8;
+    --card: rgba(30,41,59,0.85); --border: #334155; --shadow: rgba(0,0,0,0.3);
+  }
+}
+/* ===== Reset & Base ===== */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 15px; -webkit-font-smoothing: antialiased; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; min-height: 100vh; }
+#app { max-width: 1400px; margin: 0 auto; padding: 1.25rem; }
+a { color: var(--accent); text-decoration: none; }
+
+/* ===== Header ===== */
+.header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+.header-left h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
+.header-left p { color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.75rem; font-weight: 500; padding: 5px 12px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 20px; backdrop-filter: blur(8px);
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+.dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.search-box {
+  padding: 7px 14px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card); color: var(--text); font-size: 0.85rem; width: 220px;
+  backdrop-filter: blur(8px); outline: none; transition: border-color .2s;
+}
+.search-box:focus { border-color: var(--accent); }
+
+/* ===== Hero Info Card ===== */
+.hero-card {
+  display: flex; align-items: center; gap: 1.25rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: #fff; padding: 1.5rem; border-radius: var(--radius);
+  grid-column: 1 / -1; box-shadow: 0 8px 24px rgba(102,126,234,0.25);
+}
+.hero-icon { font-size: 2.5rem; }
+.hero-content h2 { font-size: 1.25rem; font-weight: 700; }
+.hero-content p { opacity: 0.85; font-size: 0.85rem; margin-top: 2px; }
+.hero-stats { display: flex; gap: 1rem; margin-top: 0.6rem; font-size: 0.8rem; opacity: 0.9; }
+
+/* ===== Grid ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+
+/* ===== Cards ===== */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.15rem;
+  backdrop-filter: blur(12px); transition: transform .15s, box-shadow .15s;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--shadow); }
+.card-wide { grid-column: 1 / -1; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.75rem; }
+.card-header h3 { font-size: 0.95rem; font-weight: 600; }
+.card-icon { font-size: 1.15rem; }
+.domain-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+  background: var(--accent); color: #fff; opacity: 0.85;
+}
+
+/* ===== Entity Rows ===== */
+.entity-row {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.7rem; border-radius: 10px;
+  margin-bottom: 0.35rem; background: var(--bg2);
+  transition: background .15s;
+}
+.entity-row:hover { background: var(--border); }
+.entity-icon { font-size: 1.1rem; flex-shrink: 0; width: 28px; text-align: center; }
+.entity-info { flex: 1; min-width: 0; }
+.entity-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.entity-id { font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; }
+.entity-value { font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+.entity-unit { font-size: 0.75rem; color: var(--text-secondary); margin-left: 2px; }
+.entity-updated { font-size: 0.6rem; color: var(--text-secondary); }
+
+/* Value colors */
+.val-green { color: var(--green); } .val-yellow { color: var(--yellow); } .val-red { color: var(--red); }
+.val-blue { color: var(--blue); } .val-on { color: var(--green); } .val-off { color: var(--text-secondary); }
+
+/* ===== Toggle Switch ===== */
+.toggle-wrap { display: flex; align-items: center; gap: 8px; }
+.toggle {
+  position: relative; width: 42px; height: 24px; cursor: pointer;
+  background: var(--border); border-radius: 12px; transition: background .2s; border: none;
+}
+.toggle.active { background: var(--green); }
+.toggle::after {
+  content: ''; position: absolute; top: 3px; left: 3px;
+  width: 18px; height: 18px; border-radius: 50%; background: #fff;
+  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.toggle.active::after { transform: translateX(18px); }
+
+/* ===== Slider ===== */
+.slider-wrap { display: flex; align-items: center; gap: 8px; width: 100%; }
+.slider {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
+  border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
+}
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+}
+.slider-value { font-size: 0.85rem; font-weight: 600; min-width: 45px; text-align: right; }
+
+/* ===== Chart ===== */
+.chart-wrap { position: relative; height: 260px; }
+.chart-wrap canvas { width: 100% !important; }
+
+/* ===== Gauge ===== */
+.gauge-wrap { display: flex; justify-content: center; padding: 0.5rem 0; }
+.gauge-wrap svg { width: 160px; height: auto; }
+
+/* ===== Footer ===== */
+.footer { text-align: center; padding: 1.5rem 0 0.5rem; font-size: 0.7rem; color: var(--text-secondary); }
+</style>
 </head>
 <body>
-    <div id="app">
-        <div class="dashboard-header">
-            <h1>__TITLE__</h1>
-            <p>__DESCRIPTION__</p>
-            <div class="connection-status">
-                <div :class="['status-dot', connected ? 'ok' : '']"></div>
-                <span>{{ connected ? '🟢 Connected' : '🔴 Connecting...' }}</span>
-            </div>
-        </div>
-
-        <div class="grid" v-if="entities.length > 0">
-            __COMPONENT_HTML__
-
-            <div class="card" v-for="chunk in entityChunks" :key="chunk[0]?.id">
-                <h3>Entity States</h3>
-                <div v-for="e in chunk" :key="e.id" class="entity-row">
-                    <span class="label" :title="e.id">{{ e.name }}</span>
-                    <span class="value">{{ e.state }}{{ e.unit ? ' ' + e.unit : '' }}</span>
-                </div>
-            </div>
-        </div>
-
-        <div v-if="!connected && !error" class="error-box" style="background:#fef3c7;color:#92400e;">
-            ⏳ Connecting to Home Assistant...
-        </div>
-        <div v-if="error" class="error-box">{{ error }}</div>
+<div id="app">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>__TITLE__</h1>
+      <p>__DESCRIPTION__</p>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <input v-model="search" class="search-box" placeholder="🔍 Filter entities..." />
+      <div class="status-pill">
+        <div :class="['dot', connected && 'on']"></div>
+        {{ connected ? 'Live' : 'Connecting...' }}
+      </div>
+    </div>
+  </div>
 
-    <script>
-    (function() {
-        const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick } = Vue;
+  <!-- Main Grid -->
+  <div class="grid">
+    __COMPONENT_HTML__
 
-        // Entity list injected at generation time
-        const ENTITIES = __ENTITIES_JSON__;
+    <!-- Domain-grouped entity cards -->
+    <div class="card" v-for="group in filteredGroups" :key="group.domain">
+      <div class="card-header">
+        <span class="card-icon">{{ group.icon }}</span>
+        <h3>{{ group.label }}</h3>
+        <span class="domain-badge">{{ group.entities.length }}</span>
+      </div>
+      <div v-for="e in group.entities" :key="e.id" class="entity-row">
+        <span class="entity-icon">{{ e.icon }}</span>
+        <div class="entity-info">
+          <div class="entity-name" :title="e.id">{{ e.name }}</div>
+          <div class="entity-id">{{ e.id }}</div>
+        </div>
 
-        // Get HA auth token from localStorage (same origin via Ingress)
-        function getHAToken() {
-            try {
-                const raw = localStorage.getItem('hassTokens');
-                if (raw) {
-                    const t = JSON.parse(raw);
-                    return t.access_token || '';
-                }
-            } catch(e) { console.warn('Could not read HA token:', e); }
-            return '';
+        <!-- Toggle for switch/input_boolean/light -->
+        <div v-if="e.toggleable" class="toggle-wrap">
+          <button :class="['toggle', e.isOn && 'active']" @click="toggleEntity(e.id, e.domain)"></button>
+        </div>
+
+        <!-- Slider for number/input_number -->
+        <div v-else-if="e.slideable" class="slider-wrap">
+          <input type="range" class="slider" :min="e.min" :max="e.max" :step="e.step"
+                 :value="e.numVal" @change="setNumber(e.id, e.domain, $event.target.value)" />
+          <span class="slider-value">{{ e.display }}<span class="entity-unit">{{ e.unit }}</span></span>
+        </div>
+
+        <!-- Normal value display -->
+        <div v-else>
+          <span :class="['entity-value', e.colorClass]">{{ e.display }}</span>
+          <span class="entity-unit">{{ e.unit }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Error / Loading -->
+  <div v-if="error" style="background:#fee2e2;color:#991b1b;padding:1rem;border-radius:12px;margin-top:1rem">{{ error }}</div>
+
+  <!-- Footer -->
+  <div class="footer">Dashboard generated by AI Assistant &middot; Real-time via WebSocket</div>
+</div>
+
+<script>
+(function(){
+const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
+const ENTITIES = __ENTITIES_JSON__;
+
+// Domain config: icons, labels, grouping
+const DOMAIN_META = {
+  sensor:        { icon: '📊', label: 'Sensors' },
+  binary_sensor: { icon: '🔔', label: 'Binary Sensors' },
+  switch:        { icon: '🔌', label: 'Switches' },
+  light:         { icon: '💡', label: 'Lights' },
+  climate:       { icon: '🌡️', label: 'Climate' },
+  cover:         { icon: '🪟', label: 'Covers' },
+  fan:           { icon: '🌀', label: 'Fans' },
+  input_boolean: { icon: '🔘', label: 'Toggles' },
+  input_number:  { icon: '🔢', label: 'Numbers' },
+  number:        { icon: '🔢', label: 'Numbers' },
+  input_select:  { icon: '📋', label: 'Selectors' },
+  automation:    { icon: '⚙️', label: 'Automations' },
+  script:        { icon: '📜', label: 'Scripts' },
+  person:        { icon: '👤', label: 'People' },
+  weather:       { icon: '🌤️', label: 'Weather' },
+  media_player:  { icon: '🎵', label: 'Media' },
+  camera:        { icon: '📷', label: 'Cameras' },
+  lock:          { icon: '🔒', label: 'Locks' },
+  vacuum:        { icon: '🧹', label: 'Vacuums' },
+  water_heater:  { icon: '🚿', label: 'Water Heaters' },
+};
+
+function getDomain(eid) { return eid.split('.')[0] || 'unknown'; }
+function getEntityIcon(eid, attrs) {
+  const d = getDomain(eid);
+  // Use sensor device_class for better icons
+  const dc = (attrs?.device_class || '').toLowerCase();
+  if (d === 'sensor') {
+    const sensorIcons = {
+      battery: '🔋', temperature: '🌡️', humidity: '💧', power: '⚡', energy: '🔌',
+      voltage: '🔋', current: '⚡', pressure: '🌀', illuminance: '☀️', gas: '🔥',
+      monetary: '💰', signal_strength: '📶', carbon_dioxide: '🌫️', carbon_monoxide: '⚠️',
+    };
+    if (sensorIcons[dc]) return sensorIcons[dc];
+    // Infer from unit
+    const unit = (attrs?.unit_of_measurement || '').toLowerCase();
+    if (unit === 'w' || unit === 'kw' || unit === 'wh' || unit === 'kwh') return '⚡';
+    if (unit === '°c' || unit === '°f') return '🌡️';
+    if (unit === '%') return '📊';
+  }
+  return DOMAIN_META[d]?.icon || '📦';
+}
+
+function formatValue(state, unit) {
+  const n = parseFloat(state);
+  if (isNaN(n)) return state;
+  // Smart unit conversion
+  if ((unit === 'W' || unit === 'w') && Math.abs(n) >= 1000) return (n / 1000).toFixed(2);
+  if ((unit === 'Wh' || unit === 'wh') && Math.abs(n) >= 1000) return (n / 1000).toFixed(2);
+  if (Math.abs(n) >= 10000) return n.toFixed(0);
+  if (Math.abs(n) >= 100) return n.toFixed(1);
+  if (Math.abs(n) >= 1) return n.toFixed(2);
+  return n.toFixed(3);
+}
+
+function formatUnit(unit, state) {
+  const n = parseFloat(state);
+  if (isNaN(n)) return unit || '';
+  if ((unit === 'W' || unit === 'w') && Math.abs(n) >= 1000) return 'kW';
+  if ((unit === 'Wh' || unit === 'wh') && Math.abs(n) >= 1000) return 'kWh';
+  return unit || '';
+}
+
+function getValueColor(eid, state, attrs) {
+  const n = parseFloat(state);
+  if (isNaN(n)) {
+    if (state === 'on') return 'val-on';
+    if (state === 'off') return 'val-off';
+    if (state === 'unavailable' || state === 'unknown') return 'val-red';
+    return '';
+  }
+  const dc = (attrs?.device_class || '').toLowerCase();
+  const unit = (attrs?.unit_of_measurement || '').toLowerCase();
+  // Battery SOC coloring
+  if (dc === 'battery' || eid.includes('soc') || eid.includes('battery')) {
+    if (n >= 60) return 'val-green';
+    if (n >= 25) return 'val-yellow';
+    return 'val-red';
+  }
+  // Power: green when producing (negative grid = exporting)
+  if (eid.includes('grid') && (unit === 'w' || unit === 'kw')) {
+    return n < 0 ? 'val-green' : n > 2000 ? 'val-red' : 'val-blue';
+  }
+  if (eid.includes('pv') || eid.includes('solar') || eid.includes('fotovoltaic')) {
+    return n > 100 ? 'val-green' : n > 0 ? 'val-yellow' : 'val-off';
+  }
+  return '';
+}
+
+function getHAToken() {
+  try {
+    const r = localStorage.getItem('hassTokens');
+    if (r) { const t = JSON.parse(r); return t.access_token || ''; }
+  } catch(e) {}
+  return '';
+}
+
+createApp({
+  setup() {
+    const connected = ref(false);
+    const error = ref('');
+    const search = ref('');
+    const entities = ref(ENTITIES);
+    const title = ref('__TITLE_JS__');
+    const description = ref('__DESCRIPTION_JS__');
+    const states = reactive({});
+    let ws = null, msgId = 1, chartInst = null, reconTimer = null;
+
+    // --- Enriched entity list ---
+    const entityList = computed(() => entities.value.map(eid => {
+      const s = states[eid] || {};
+      const domain = getDomain(eid);
+      const unit = s.unit || '';
+      const stateVal = s.state ?? '...';
+      const n = parseFloat(stateVal);
+      const toggleable = ['switch','light','input_boolean'].includes(domain);
+      const slideable = ['number','input_number'].includes(domain);
+      return {
+        id: eid, domain,
+        name: s.friendly_name || eid.split('.').pop().replace(/_/g, ' '),
+        icon: getEntityIcon(eid, s.attributes),
+        state: stateVal,
+        numVal: isNaN(n) ? 0 : n,
+        display: formatValue(stateVal, unit),
+        unit: formatUnit(unit, stateVal),
+        colorClass: getValueColor(eid, stateVal, s.attributes),
+        toggleable, slideable,
+        isOn: stateVal === 'on',
+        min: s.attributes?.min ?? 0,
+        max: s.attributes?.max ?? 100,
+        step: s.attributes?.step ?? 1,
+      };
+    }));
+
+    // --- Domain groups ---
+    const domainGroups = computed(() => {
+      const map = {};
+      entityList.value.forEach(e => {
+        if (!map[e.domain]) {
+          const meta = DOMAIN_META[e.domain] || { icon: '📦', label: e.domain };
+          map[e.domain] = { domain: e.domain, icon: meta.icon, label: meta.label, entities: [] };
         }
+        map[e.domain].entities.push(e);
+      });
+      // Sort: sensors first, then toggles, then numbers, then rest
+      const order = ['sensor','binary_sensor','switch','light','number','input_number','input_boolean','climate'];
+      return Object.values(map).sort((a,b) => {
+        const ia = order.indexOf(a.domain), ib = order.indexOf(b.domain);
+        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+      });
+    });
 
-        createApp({
-            setup() {
-                const connected = ref(false);
-                const error = ref('');
-                const entities = ref(ENTITIES);
-                const title = ref('__TITLE_JS__');
-                const description = ref('__DESCRIPTION_JS__');
-                const states = reactive({});  // entity_id -> {state, attributes, friendly_name, unit}
-                let ws = null;
-                let msgId = 1;
-                let chartInstance = null;
-                let reconnectTimer = null;
+    const filteredGroups = computed(() => {
+      if (!search.value.trim()) return domainGroups.value;
+      const q = search.value.toLowerCase();
+      return domainGroups.value
+        .map(g => ({ ...g, entities: g.entities.filter(e =>
+          e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)
+        )}))
+        .filter(g => g.entities.length > 0);
+    });
 
-                // Computed: enriched entity list with state
-                const entityList = computed(() => {
-                    return entities.value.map(eid => ({
-                        id: eid,
-                        name: (states[eid]?.friendly_name) || eid.split('.').pop().replace(/_/g, ' '),
-                        state: states[eid]?.state ?? '...',
-                        unit: states[eid]?.unit || '',
-                    }));
-                });
+    // Stats for hero card
+    const numericCount = computed(() => entityList.value.filter(e => !isNaN(parseFloat(e.state))).length);
+    const toggleCount = computed(() => entityList.value.filter(e => e.toggleable).length);
 
-                // Split entities into chunks of 8 for card layout
-                const entityChunks = computed(() => {
-                    const list = entityList.value;
-                    const chunks = [];
-                    for (let i = 0; i < list.length; i += 8) {
-                        chunks.push(list.slice(i, i + 8));
-                    }
-                    return chunks;
-                });
+    // Gauge entities (percentage-based)
+    const gaugeEntities = computed(() => entityList.value
+      .filter(e => {
+        const n = e.numVal;
+        return !isNaN(n) && (e.unit === '%' || e.id.includes('soc') || e.id.includes('battery'));
+      })
+      .slice(0, 4)
+      .map(e => {
+        const pct = Math.min(100, Math.max(0, e.numVal)) / 100;
+        const angle = Math.PI * (1 - pct);
+        const x = 60 + 50 * Math.cos(angle);
+        const y = 65 - 50 * Math.sin(angle);
+        const large = pct > 0.5 ? 1 : 0;
+        const color = e.numVal >= 60 ? 'var(--green)' : e.numVal >= 25 ? 'var(--yellow)' : 'var(--red)';
+        return { ...e, arc: `M 10 65 A 50 50 0 ${large} 1 ${x.toFixed(1)} ${y.toFixed(1)}`, color };
+      })
+    );
 
-                // Gauge: use first numeric entity
-                const gaugePercent = computed(() => {
-                    for (const eid of entities.value) {
-                        const s = states[eid]?.state;
-                        const n = parseFloat(s);
-                        if (!isNaN(n)) return Math.round(Math.min(100, Math.max(0, n)));
-                    }
-                    return 0;
-                });
-                const gaugePath = computed(() => {
-                    const pct = gaugePercent.value / 100;
-                    const angle = Math.PI * (1 - pct);
-                    const x = 100 + 80 * Math.cos(angle);
-                    const y = 100 - 80 * Math.sin(angle);
-                    const large = pct > 0.5 ? 1 : 0;
-                    return `M 20 100 A 80 80 0 ${large} 1 ${x.toFixed(1)} ${y.toFixed(1)}`;
-                });
+    // --- Toggle / Slider actions ---
+    function callService(domain, service, entityId, data) {
+      const token = getHAToken();
+      if (!token) return;
+      fetch('/api/services/' + domain + '/' + service, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity_id: entityId, ...data })
+      }).catch(e => console.warn('Service call failed:', e));
+    }
 
-                // --- WebSocket connection to HA ---
-                function connect() {
-                    const token = getHAToken();
-                    if (!token) {
-                        error.value = 'No HA auth token found. Please reload Home Assistant.';
-                        // Fallback to REST
-                        fetchREST();
-                        return;
-                    }
-                    try {
-                        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-                        const wsUrl = proto + '//' + location.host + '/api/websocket';
-                        ws = new WebSocket(wsUrl);
+    function toggleEntity(eid, domain) {
+      const svc = domain === 'light' ? 'light' : domain === 'input_boolean' ? 'input_boolean' : 'switch';
+      callService(svc, 'toggle', eid, {});
+    }
 
-                        ws.onmessage = (ev) => {
-                            const msg = JSON.parse(ev.data);
-                            if (msg.type === 'auth_required') {
-                                ws.send(JSON.stringify({type: 'auth', access_token: token}));
-                            } else if (msg.type === 'auth_ok') {
-                                connected.value = true;
-                                error.value = '';
-                                // Fetch initial states via REST, then subscribe for live updates
-                                fetchREST();
-                                // Subscribe to state_changed events
-                                ws.send(JSON.stringify({
-                                    id: msgId++,
-                                    type: 'subscribe_events',
-                                    event_type: 'state_changed'
-                                }));
-                            } else if (msg.type === 'auth_invalid') {
-                                error.value = 'HA auth failed. Try reloading Home Assistant.';
-                                connected.value = false;
-                            } else if (msg.type === 'event' && msg.event?.event_type === 'state_changed') {
-                                const d = msg.event.data;
-                                if (d && entities.value.includes(d.entity_id) && d.new_state) {
-                                    states[d.entity_id] = {
-                                        state: d.new_state.state,
-                                        friendly_name: d.new_state.attributes?.friendly_name || '',
-                                        unit: d.new_state.attributes?.unit_of_measurement || '',
-                                        attributes: d.new_state.attributes || {},
-                                    };
-                                    updateChart();
-                                }
-                            }
-                        };
+    function setNumber(eid, domain, value) {
+      const svc = domain === 'input_number' ? 'input_number' : 'number';
+      callService(svc, 'set_value', eid, { value: parseFloat(value) });
+    }
 
-                        ws.onerror = () => { connected.value = false; };
-                        ws.onclose = () => {
-                            connected.value = false;
-                            reconnectTimer = setTimeout(connect, 5000);
-                        };
-                    } catch(e) {
-                        error.value = 'WebSocket error: ' + e.message;
-                    }
-                }
-
-                // --- REST API fallback ---
-                function fetchREST() {
-                    const token = getHAToken();
-                    const headers = token ? {'Authorization': 'Bearer ' + token} : {};
-                    fetch('/api/states', { headers })
-                        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-                        .then(list => {
-                            list.forEach(s => {
-                                if (entities.value.includes(s.entity_id)) {
-                                    states[s.entity_id] = {
-                                        state: s.state,
-                                        friendly_name: s.attributes?.friendly_name || '',
-                                        unit: s.attributes?.unit_of_measurement || '',
-                                        attributes: s.attributes || {},
-                                    };
-                                }
-                            });
-                            nextTick(initChart);
-                        })
-                        .catch(e => {
-                            if (!connected.value) error.value = 'REST API: ' + e.message;
-                        });
-                }
-
-                // --- Chart.js ---
-                function initChart() {
-                    const canvas = document.getElementById('entityChart');
-                    if (!canvas) return;
-                    if (chartInstance) chartInstance.destroy();
-
-                    const numericEntities = entities.value.filter(eid => {
-                        const v = parseFloat(states[eid]?.state);
-                        return !isNaN(v);
-                    });
-                    if (numericEntities.length === 0) return;
-
-                    const labels = numericEntities.map(eid =>
-                        states[eid]?.friendly_name || eid.split('.').pop().replace(/_/g, ' ')
-                    );
-                    const data = numericEntities.map(eid => parseFloat(states[eid]?.state) || 0);
-                    const colors = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
-
-                    chartInstance = new Chart(canvas, {
-                        type: numericEntities.length > 4 ? 'bar' : 'doughnut',
-                        data: {
-                            labels,
-                            datasets: [{
-                                data,
-                                backgroundColor: colors.slice(0, data.length),
-                                borderWidth: 0, borderRadius: 4,
-                            }]
-                        },
-                        options: {
-                            responsive: true, maintainAspectRatio: false,
-                            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: {size: 11} } } }
-                        }
-                    });
-                }
-                function updateChart() { nextTick(initChart); }
-
-                onMounted(() => { connect(); });
-                onUnmounted(() => {
-                    if (ws) ws.close();
-                    if (reconnectTimer) clearTimeout(reconnectTimer);
-                    if (chartInstance) chartInstance.destroy();
-                });
-
-                return {
-                    connected, error, entities, title, description,
-                    states, entityList, entityChunks,
-                    gaugePercent, gaugePath,
-                };
+    // --- WebSocket ---
+    function connect() {
+      const token = getHAToken();
+      if (!token) { error.value = 'No HA token. Reload Home Assistant.'; fetchREST(); return; }
+      try {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(proto + '//' + location.host + '/api/websocket');
+        ws.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === 'auth_required') {
+            ws.send(JSON.stringify({ type: 'auth', access_token: token }));
+          } else if (msg.type === 'auth_ok') {
+            connected.value = true; error.value = '';
+            fetchREST();
+            ws.send(JSON.stringify({ id: msgId++, type: 'subscribe_events', event_type: 'state_changed' }));
+          } else if (msg.type === 'auth_invalid') {
+            error.value = 'Auth failed. Reload Home Assistant.'; connected.value = false;
+          } else if (msg.type === 'event' && msg.event?.event_type === 'state_changed') {
+            const d = msg.event.data;
+            if (d && entities.value.includes(d.entity_id) && d.new_state) {
+              states[d.entity_id] = {
+                state: d.new_state.state,
+                friendly_name: d.new_state.attributes?.friendly_name || '',
+                unit: d.new_state.attributes?.unit_of_measurement || '',
+                attributes: d.new_state.attributes || {},
+              };
+              debouncedChart();
             }
-        }).mount('#app');
-    })();
-    </script>
+          }
+        };
+        ws.onerror = () => { connected.value = false; };
+        ws.onclose = () => { connected.value = false; reconTimer = setTimeout(connect, 5000); };
+      } catch(e) { error.value = 'WebSocket: ' + e.message; }
+    }
+
+    function fetchREST() {
+      const token = getHAToken();
+      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+      fetch('/api/states', { headers })
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(list => {
+          list.forEach(s => {
+            if (entities.value.includes(s.entity_id)) {
+              states[s.entity_id] = {
+                state: s.state,
+                friendly_name: s.attributes?.friendly_name || '',
+                unit: s.attributes?.unit_of_measurement || '',
+                attributes: s.attributes || {},
+              };
+            }
+          });
+          nextTick(buildChart);
+        })
+        .catch(e => { if (!connected.value) error.value = 'REST: ' + e.message; });
+    }
+
+    // --- Chart.js ---
+    let chartDebounce = null;
+    function debouncedChart() { clearTimeout(chartDebounce); chartDebounce = setTimeout(() => nextTick(buildChart), 500); }
+    function buildChart() {
+      const canvas = document.getElementById('entityChart');
+      if (!canvas) return;
+      if (chartInst) chartInst.destroy();
+      const nums = entities.value.filter(eid => !isNaN(parseFloat(states[eid]?.state)));
+      if (!nums.length) return;
+      const labels = nums.map(eid => (states[eid]?.friendly_name || eid.split('.').pop()).replace(/_/g,' '));
+      const data = nums.map(eid => parseFloat(states[eid]?.state) || 0);
+      const palette = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#14b8a6','#6366f1','#e11d48'];
+      const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
+      chartInst = new Chart(canvas, {
+        type: 'bar',
+        data: { labels, datasets: [{ data, backgroundColor: palette.slice(0, data.length), borderRadius: 6, borderSkipped: false }] },
+        options: {
+          responsive: true, maintainAspectRatio: false, indexAxis: nums.length > 8 ? 'y' : 'x',
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#6b7280', font: { size: 10 } } },
+            y: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#6b7280', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    onMounted(connect);
+    onUnmounted(() => { ws?.close(); clearTimeout(reconTimer); chartInst?.destroy(); });
+
+    return {
+      connected, error, search, entities, title, description, states,
+      entityList, domainGroups, filteredGroups,
+      numericCount, toggleCount, gaugeEntities,
+      toggleEntity, setNumber,
+    };
+  }
+}).mount('#app');
+})();
+</script>
 </body>
 </html>"""
 
-    # Replace placeholders with actual values (safe from {{ }} escaping issues)
     html_template = html_template.replace("__TITLE__", safe_title)
     html_template = html_template.replace("__DESCRIPTION__", safe_description)
-    html_template = html_template.replace("__TITLE_JS__", title.replace("'", "\\'").replace("\\", "\\\\"))
-    html_template = html_template.replace("__DESCRIPTION_JS__", (description or "").replace("'", "\\'").replace("\\", "\\\\"))
+    html_template = html_template.replace("__TITLE_JS__", title.replace("\\", "\\\\").replace("'", "\\'"))
+    html_template = html_template.replace("__DESCRIPTION_JS__", (description or "").replace("\\", "\\\\").replace("'", "\\'"))
     html_template = html_template.replace("__ENTITIES_JSON__", entities_json)
     html_template = html_template.replace("__COMPONENT_HTML__", component_html)
-    html_template = html_template.replace("__BG_COLOR__", colors["bg"])
-    html_template = html_template.replace("__TEXT_COLOR__", colors["text"])
-    html_template = html_template.replace("__CARD_COLOR__", colors["card"])
-    html_template = html_template.replace("__BORDER_COLOR__", colors["border"])
-    html_template = html_template.replace("__COLOR_SCHEME__", color_scheme)
-    
+
     return html_template
 
 
