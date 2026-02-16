@@ -14,37 +14,21 @@ AI_SIGNATURE = "AI Assistant"
 
 
 def _build_dashboard_html(title: str, entities: list, theme: str,
-                          accent_color: str, body_html: str,
-                          custom_css: str) -> str:
-    """Build a complete HTML dashboard: shell (auth/WS/CDN) + agent's skin (body/CSS).
+                          accent_color: str, sections: list) -> str:
+    """Build HTML dashboard from structured design spec V2.
 
-    The addon provides the 'engine' (authentication, WebSocket real-time state,
-    Vue 3, Chart.js CDN, base theme CSS, utility methods).
-    The AI agent provides the 'skin' (body_html as Vue template + custom_css).
+    The agent designs the dashboard architecture (sections, layout, grouping, colors).
+    This function renders beautiful HTML with auth, WebSocket, Chart.js.
 
-    Available in agent's body_html template:
-      entities         - array of all entity_ids
-      states           - reactive: states['sensor.x'] = {state, friendly_name, unit, attributes}
-      connected        - boolean, WebSocket live
-      stateVal(eid)    - raw state string or '...'
-      formatVal(eid)   - smart formatted (W→kW auto)
-      getUnit(eid)     - unit with auto conversion
-      entityName(eid)  - friendly name
-      getAttr(eid,a)   - any attribute
-      isOn(eid)        - true/false/null
-      toggle(eid)      - toggle switch/light/input_boolean
-      setVal(eid,v)    - set number/input_number
-      callService(domain, service, eid, data) - any HA service
-    Charts: <canvas data-chart="bar" data-entities='["sensor.a"]' style="height:250px">
-    CSS vars: --accent, --accent-rgb, --bg, --bg2, --text, --text2, --card, --border,
-              --green, --yellow, --red, --blue, --r
+    Section types: hero, pills, flow, gauge, gauges, kpi, chart, entities, controls, stats, value
+    Layout: each section has 'span' (1=third, 2=two-thirds, 3=full-width, default 3).
     """
     import html as html_module
 
     safe_title = html_module.escape(title)
     entities_json = json.dumps(entities, ensure_ascii=False)
+    sections_json = json.dumps(sections, ensure_ascii=False)
 
-    # Hex accent → RGB for rgba() usage
     h = accent_color.lstrip('#')
     if len(h) == 3:
         h = h[0]*2 + h[1]*2 + h[2]*2
@@ -53,15 +37,13 @@ def _build_dashboard_html(title: str, entities: list, theme: str,
     except (ValueError, IndexError):
         accent_rgb = "102,126,234"
 
-    # Theme override CSS
-    theme_override = ""
+    theme_css = ""
     if theme == "dark":
-        theme_override = ":root{--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155}"
+        theme_css = ":root{--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155}"
     elif theme == "light":
-        theme_override = ":root{--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;--card:rgba(255,255,255,.85);--border:#e2e8f0}"
+        theme_css = ":root{--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;--card:rgba(255,255,255,.85);--border:#e2e8f0}"
 
-    # The shell: everything the agent doesn't need to write
-    shell = r"""<!DOCTYPE html>
+    html = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -73,57 +55,181 @@ def _build_dashboard_html(title: str, entities: list, theme: str,
 :root{--accent:__ACCENT__;--accent-rgb:__ACCENT_RGB__;--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;
 --card:rgba(255,255,255,.85);--border:#e2e8f0;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--blue:#3b82f6;--r:16px}
 @media(prefers-color-scheme:dark){:root{--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155}}
-__THEME_OVERRIDE__
+__THEME_CSS__
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;min-height:100vh}
-#app{max-width:1400px;margin:0 auto;padding:1.25rem}
-.conn-pill{position:fixed;top:.75rem;right:.75rem;display:inline-flex;align-items:center;gap:6px;font-size:.7rem;
+.dash{max-width:1400px;margin:0 auto;padding:1.25rem;display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.span-1{grid-column:span 1}.span-2{grid-column:span 2}.span-3{grid-column:span 3}
+@media(max-width:980px){.dash{grid-template-columns:1fr}.span-1,.span-2,.span-3{grid-column:span 1}}
+.conn{position:fixed;top:.75rem;right:.75rem;display:flex;align-items:center;gap:6px;font-size:.7rem;
 padding:5px 12px;background:var(--card);border:1px solid var(--border);border-radius:20px;backdrop-filter:blur(8px);z-index:100}
-.conn-dot{width:7px;height:7px;border-radius:50%;background:var(--red)}.conn-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
-.error-box{background:#fee2e2;color:#991b1b;padding:1rem;border-radius:12px;margin-top:1rem;font-size:.85rem}
-.dash-footer{text-align:center;padding:1.5rem 0 .5rem;font-size:.7rem;color:var(--text2)}
-canvas[data-chart]{display:block;width:100%!important}
-.chart-auto-wrap{position:relative;width:100%;min-height:0}
-__CUSTOM_CSS__
+.cdot{width:7px;height:7px;border-radius:50%;background:var(--red)}.cdot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.hero{display:flex;align-items:center;gap:1.25rem;background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent),#000 30%));color:#fff;
+padding:1.5rem;border-radius:var(--r);box-shadow:0 8px 24px rgba(var(--accent-rgb),.25);flex-wrap:wrap}
+.hero-ico{font-size:2.5rem}.hero h2{font-size:1.4rem;font-weight:800}.hero p{opacity:.85;font-size:.85rem;margin-top:2px}
+.hero-stats{display:flex;gap:1rem;flex-wrap:wrap;margin-top:.5rem;font-size:.85rem;opacity:.9}
+.pills{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.65rem}
+.pill{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:10px 12px;backdrop-filter:blur(8px)}
+.pill-l{font-size:.72rem;color:var(--text2)}.pill-v{font-size:1.1rem;font-weight:800;margin-top:2px}.pill-v small{font-weight:600;color:var(--text2);font-size:.72rem}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:1rem;backdrop-filter:blur(12px);height:100%}
+.card-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem}
+.card-t{font-weight:750;font-size:.92rem}.card-ico{margin-right:6px}
+.s-gradient{background:linear-gradient(135deg,rgba(var(--accent-rgb),.12),rgba(var(--accent-rgb),.03))}
+.s-outlined{background:transparent;border:2px solid var(--accent)}.s-flat{backdrop-filter:none;background:var(--bg2)}
+.flow{display:grid;gap:.65rem}.flow-n{border:1px solid var(--border);border-radius:14px;padding:.7rem;background:rgba(0,0,0,.04);text-align:center}
+.flow-n.mid{background:rgba(var(--accent-rgb),.12);border-color:rgba(var(--accent-rgb),.3)}
+.flow-l{font-size:.72rem;color:var(--text2);margin-bottom:2px}.flow-v{font-size:1.3rem;font-weight:900;line-height:1.1}.flow-u{font-size:.68rem;color:var(--text2)}
+.gauge-w{display:grid;grid-template-columns:130px 1fr;gap:.75rem;align-items:center}
+@media(max-width:640px){.gauge-w{grid-template-columns:1fr;justify-items:center}}
+.gauge-svg{width:130px;height:130px}.gauge-bg{fill:none;stroke:var(--border);stroke-width:10}.gauge-fg{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;
+transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dasharray .6s ease}
+.gauge-txt{font-size:18px;font-weight:900;fill:var(--text);text-anchor:middle}
+.gauge-stats{display:grid;gap:.4rem}.gs{background:var(--bg2);border-radius:10px;padding:.5rem .65rem}.gs-l{font-size:.72rem;color:var(--text2)}.gs-v{font-weight:800;margin-top:1px}
+.gauges{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:.6rem}
+.gi{text-align:center}.gi svg{width:85px;height:85px}.gi .gn{font-size:.7rem;color:var(--text2);margin-top:.1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi{display:grid;grid-template-columns:repeat(auto-fill,minmax(115px,1fr));gap:.55rem}
+.ki{background:var(--bg2);border-radius:12px;padding:.65rem;text-align:center}
+.ki-l{font-size:.7rem;color:var(--text2)}.ki-v{font-size:1.2rem;font-weight:900;margin-top:2px;line-height:1.1}.ki-u{font-size:.65rem;color:var(--text2)}
+.chart-box{position:relative;width:100%;height:250px}.chart-box canvas{display:block;width:100%!important;height:100%!important}
+.elist .er{display:flex;align-items:center;gap:.4rem;padding:.45rem .6rem;border-radius:10px;margin-bottom:.25rem;background:var(--bg2)}
+.er:hover{background:var(--border)}.er-ico{font-size:1rem;width:22px;text-align:center;flex-shrink:0}
+.er-nm{flex:1;font-size:.83rem;font-weight:500;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.er-v{font-weight:700;font-size:.95rem;white-space:nowrap}.er-u{font-size:.68rem;color:var(--text2);margin-left:2px}
+.tog{position:relative;width:40px;height:22px;cursor:pointer;background:var(--border);border-radius:11px;transition:background .2s;border:none;flex-shrink:0}
+.tog.on{background:var(--green)}.tog::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tog.on::after{transform:translateX(18px)}
+.sl-w{display:flex;align-items:center;gap:6px;flex-shrink:0;width:110px}
+.sl{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:3px;background:var(--border);outline:none;cursor:pointer}
+.sl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent);cursor:pointer}.sl-v{font-size:.78rem;font-weight:600}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:.6rem}
+.cb{text-align:center;padding:.85rem .4rem;border-radius:14px;background:var(--bg2);cursor:pointer;transition:all .2s;border:2px solid transparent}
+.cb:hover{border-color:var(--accent)}.cb.on{background:rgba(var(--accent-rgb),.15);border-color:var(--accent)}
+.cb-ico{font-size:1.5rem;margin-bottom:.1rem}.cb-nm{font-size:.75rem;font-weight:500}.cb-st{font-size:.6rem;color:var(--text2);margin-top:.1rem}
+.stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.6rem}
+.si{text-align:center;padding:.65rem;background:var(--bg2);border-radius:12px}
+.si-ico{font-size:1.2rem;margin-bottom:.05rem}.si-v{font-size:1.4rem;font-weight:900;line-height:1}.si-u{font-size:.62rem;color:var(--text2)}.si-n{font-size:.7rem;color:var(--text2);margin-top:.1rem}
+.bigv{text-align:center;padding:.75rem}.bigv-v{font-size:2.3rem;font-weight:900;line-height:1}.bigv-u{font-size:.9rem;color:var(--text2);margin-left:3px}.bigv-l{color:var(--text2);margin-top:.2rem;font-size:.82rem}
+.err{background:#fee2e2;color:#991b1b;padding:1rem;border-radius:12px;margin-top:1rem;font-size:.85rem}
+.ft{text-align:center;padding:1rem 0 .5rem;font-size:.68rem;color:var(--text2);grid-column:1/-1}
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="conn-pill"><div :class="['conn-dot',connected&&'on']"></div>{{ connected ? 'Live' : '...' }}</div>
-  __BODY_HTML__
-  <div v-if="error" class="error-box">{{ error }}</div>
-  <div class="dash-footer">Dashboard by AI Assistant</div>
-</div>
+<div class="conn"><div :class="['cdot',connected&&'on']"></div>{{ connected ? 'Live' : '...' }}</div>
+<div class="dash">
+<template v-for="(s,i) in sections" :key="i">
+
+<div v-if="s.type==='hero'" class="hero span-3">
+<div class="hero-ico">{{ s.icon || '\u26a1' }}</div>
+<div><h2>{{ s.title }}</h2><p v-if="s.description">{{ s.description }}</p>
+<div class="hero-stats"><span v-for="it in items(s)" :key="it.e">{{ it.label || nm(it.e) }}: <b>{{ fv(it.e) }} {{ fu(it.e) }}</b></span></div>
+</div></div>
+
+<div v-else-if="s.type==='pills'" class="pills span-3">
+<div v-for="it in items(s)" :key="it.e" class="pill"><div class="pill-l">{{ it.label || nm(it.e) }}</div>
+<div class="pill-v">{{ fv(it.e) }} <small>{{ fu(it.e) }}</small></div></div></div>
+
+<div v-else :class="['span-'+(s.span||3)]"><div :class="['card',s.style?'s-'+s.style:'']">
+<div v-if="s.title" class="card-h"><div><span v-if="s.icon" class="card-ico">{{ s.icon }}</span><span class="card-t">{{ s.title }}</span></div></div>
+
+<div v-if="s.type==='flow'" class="flow" :style="{gridTemplateColumns:'repeat('+(s.nodes||[]).length+',1fr)'}">
+<div v-for="nd in s.nodes||[]" :key="nd.entity" :class="['flow-n',nd.highlight&&'mid']">
+<div class="flow-l">{{ nd.label || nm(nd.entity) }}</div><div class="flow-v">{{ fv(nd.entity) }}</div><div class="flow-u">{{ fu(nd.entity) }}</div></div></div>
+
+<div v-else-if="s.type==='gauge'" class="gauge-w">
+<svg viewBox="0 0 120 120" class="gauge-svg"><circle cx="60" cy="60" r="48" class="gauge-bg"/>
+<circle cx="60" cy="60" r="48" class="gauge-fg" :style="{strokeDasharray:gPct(s.entity)*3.014+' 301.4'}"/>
+<text x="60" y="64" class="gauge-txt">{{ sv(s.entity) }}%</text></svg>
+<div class="gauge-stats"><div v-for="st in s.stats||[]" :key="st.entity" class="gs">
+<div class="gs-l">{{ st.label || nm(st.entity) }}</div><div class="gs-v">{{ fv(st.entity) }} {{ fu(st.entity) }}</div></div></div></div>
+
+<div v-else-if="s.type==='gauges'" class="gauges">
+<div v-for="it in items(s)" :key="it.e" class="gi">
+<svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="2.5"/>
+<circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--accent)" stroke-width="2.5" :stroke-dasharray="gPct(it.e)+' 100'"
+stroke-linecap="round" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .6s ease"/>
+<text x="18" y="17" text-anchor="middle" fill="var(--text)" style="font-size:.55rem;font-weight:700">{{ sv(it.e) }}</text>
+<text x="18" y="22" text-anchor="middle" fill="var(--text2)" style="font-size:.28rem">{{ fu(it.e) || it.label }}</text>
+</svg><div class="gn">{{ it.label || nm(it.e) }}</div></div></div>
+
+<div v-else-if="s.type==='kpi'" class="kpi">
+<div v-for="it in items(s)" :key="it.e" class="ki"><div class="ki-l">{{ it.label || nm(it.e) }}</div>
+<div class="ki-v">{{ fv(it.e) }}</div><div class="ki-u">{{ fu(it.e) }}</div></div></div>
+
+<div v-else-if="s.type==='chart'" class="chart-box"><canvas :id="'ch-'+i"></canvas></div>
+
+<div v-else-if="s.type==='entities'" class="elist">
+<div v-for="it in items(s)" :key="it.e" class="er">
+<span class="er-ico">{{ dIco(it.e) }}</span><span class="er-nm">{{ it.label || nm(it.e) }}</span>
+<template v-if="togDom(it.e)"><button :class="['tog',isOn(it.e)&&'on']" @click="toggle(it.e)"></button></template>
+<template v-else-if="slDom(it.e)"><div class="sl-w"><input type="range" class="sl" :min="slMin(it.e)" :max="slMax(it.e)" :step="slStep(it.e)"
+:value="numVal(it.e)" @change="setVal(it.e,$event.target.value)"/><span class="sl-v">{{ sv(it.e) }}</span></div></template>
+<template v-else><span class="er-v">{{ fv(it.e) }}</span><span class="er-u">{{ fu(it.e) }}</span></template>
+</div></div>
+
+<div v-else-if="s.type==='controls'" class="ctrls">
+<div v-for="it in items(s)" :key="it.e" :class="['cb',isOn(it.e)&&'on']" @click="toggle(it.e)">
+<div class="cb-ico">{{ dIco(it.e) }}</div><div class="cb-nm">{{ it.label || nm(it.e) }}</div>
+<div class="cb-st">{{ isOn(it.e) ? 'ON' : 'OFF' }}</div></div></div>
+
+<div v-else-if="s.type==='stats'" class="stats">
+<div v-for="it in items(s)" :key="it.e" class="si"><div class="si-ico">{{ dIco(it.e) }}</div>
+<div class="si-v">{{ fv(it.e) }}</div><div class="si-u">{{ fu(it.e) }}</div>
+<div class="si-n">{{ it.label || nm(it.e) }}</div></div></div>
+
+<div v-else-if="s.type==='value'" class="bigv">
+<div class="bigv-v">{{ fv(s.entity) }}<span class="bigv-u">{{ fu(s.entity) }}</span></div>
+<div v-if="s.subtitle" class="bigv-l">{{ s.subtitle }}</div>
+<div v-else class="bigv-l">{{ nm(s.entity) }}</div></div>
+
+</div></div>
+</template>
+<div v-if="error" class="err">{{ error }}</div>
+<div class="ft">Dashboard by AI Assistant &middot; Real-time</div>
+</div></div>
+
 <script>
 (function(){
 const{createApp,ref,reactive,onMounted,onUnmounted,nextTick}=Vue;
 const ENTITIES=__ENTITIES_JSON__;
+const SECTIONS=__SECTIONS_JSON__;
 const PAL=['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#14b8a6'];
+const DICO={sensor:'\ud83d\udcca',binary_sensor:'\ud83d\udd14',switch:'\ud83d\udd0c',light:'\ud83d\udca1',climate:'\ud83c\udf21\ufe0f',cover:'\ud83e\ude9f',fan:'\ud83c\udf00',
+input_boolean:'\ud83d\udd18',input_number:'\ud83d\udd22',number:'\ud83d\udd22',automation:'\u2699\ufe0f',script:'\ud83d\udcdc',person:'\ud83d\udc64',weather:'\ud83c\udf24\ufe0f',
+media_player:'\ud83c\udfb5',camera:'\ud83d\udcf7',lock:'\ud83d\udd12',vacuum:'\ud83e\uddf9'};
 function getToken(){try{return JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''}catch(e){return''}}
 
 createApp({setup(){
-const connected=ref(false),error=ref(''),states=reactive({});
+const connected=ref(false),error=ref(''),sections=ref(SECTIONS),states=reactive({});
 let ws,msgId=1,charts={},reconTimer;
 
-/* --- Helpers exposed to agent template --- */
-function entityName(eid){const s=states[eid];return s?.friendly_name||eid.split('.').pop().replace(/_/g,' ')}
-function stateVal(eid){return states[eid]?.state??'...'}
-function formatVal(eid){const s=states[eid];if(!s)return'...';const n=parseFloat(s.state),u=(s.unit||'').toLowerCase();
+function nm(e){return states[e]?.friendly_name||e.split('.').pop().replace(/_/g,' ')}
+function sv(e){return states[e]?.state??'...'}
+function fv(e){const s=states[e];if(!s)return'...';const n=parseFloat(s.state),u=(s.unit||'').toLowerCase();
 if(isNaN(n))return s.state;if((u==='w'||u==='wh')&&Math.abs(n)>=1000)return(n/1000).toFixed(2);
-return Math.abs(n)>=100?n.toFixed(1):Math.abs(n)>=1?n.toFixed(2):n.toFixed(3)}
-function getUnit(eid){const s=states[eid];if(!s)return'';const n=parseFloat(s.state),u=s.unit||'';
+return Math.abs(n)>=10000?n.toFixed(0):Math.abs(n)>=100?n.toFixed(1):Math.abs(n)>=1?n.toFixed(2):n.toFixed(3)}
+function fu(e){const s=states[e];if(!s)return'';const n=parseFloat(s.state),u=s.unit||'';
 if(u.toLowerCase()==='w'&&Math.abs(n)>=1000)return'kW';if(u.toLowerCase()==='wh'&&Math.abs(n)>=1000)return'kWh';return u}
-function getAttr(eid,attr){return states[eid]?.attributes?.[attr]}
-function isOn(eid){const s=states[eid]?.state;return s==='on'?true:s==='off'?false:null}
-function callService(domain,service,eid,data){const t=getToken();if(!t)return;
-fetch('/api/services/'+domain+'/'+service,{method:'POST',headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},
-body:JSON.stringify({entity_id:eid,...(data||{})})}).catch(e=>console.warn(e))}
-function toggle(eid){const d=eid.split('.')[0];callService(d==='light'?'light':d==='input_boolean'?'input_boolean':'switch','toggle',eid,{})}
-function setVal(eid,v){const d=eid.split('.')[0];callService(d==='input_number'?'input_number':'number','set_value',eid,{value:parseFloat(v)})}
+function isOn(e){const s=sv(e);return s==='on'}
+function numVal(e){return parseFloat(sv(e))||0}
+function gPct(e){return Math.min(100,Math.max(0,numVal(e)))}
+function dIco(e){return DICO[e.split('.')[0]]||'\ud83d\udce6'}
+function togDom(e){const d=e.split('.')[0];return['switch','light','input_boolean'].includes(d)}
+function slDom(e){const d=e.split('.')[0];return['number','input_number'].includes(d)}
+function slMin(e){return states[e]?.attributes?.min??0}
+function slMax(e){return states[e]?.attributes?.max??100}
+function slStep(e){return states[e]?.attributes?.step??1}
+function items(sec){if(sec.items)return sec.items.map(it=>typeof it==='string'?{e:it,label:''}:{e:it.entity,label:it.label||''});
+if(sec.entities)return sec.entities.map(e=>({e,label:''}));return ENTITIES.map(e=>({e,label:''}))}
 
-/* --- WebSocket --- */
+function callSvc(d,svc,eid,data){const t=getToken();if(!t)return;
+fetch('/api/services/'+d+'/'+svc,{method:'POST',headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},
+body:JSON.stringify({entity_id:eid,...(data||{})})}).catch(x=>console.warn(x))}
+function toggle(eid){const d=eid.split('.')[0];callSvc(d==='light'?'light':d==='input_boolean'?'input_boolean':'switch','toggle',eid,{})}
+function setVal(eid,v){const d=eid.split('.')[0];callSvc(d==='input_number'?'input_number':'number','set_value',eid,{value:parseFloat(v)})}
+
 function connect(){const token=getToken();
-if(!token){error.value='No HA token. Reload Home Assistant.';fetchREST();return}
+if(!token){error.value='No HA token.';fetchREST();return}
 try{const p=location.protocol==='https:'?'wss:':'ws:';
 ws=new WebSocket(p+'//'+location.host+'/api/websocket');
 ws.onmessage=ev=>{const m=JSON.parse(ev.data);
@@ -143,41 +249,39 @@ list.forEach(s=>{if(ENTITIES.includes(s.entity_id))states[s.entity_id]={state:s.
 unit:s.attributes?.unit_of_measurement||'',attributes:s.attributes||{}}});
 nextTick(initCharts)}).catch(e=>{if(!connected.value)error.value='REST: '+e.message})}
 
-/* --- Auto Chart.js: <canvas data-chart="bar" data-entities='["e1","e2"]'> --- */
-function initCharts(){document.querySelectorAll('canvas[data-chart]').forEach((cv,i)=>{
-/* Auto-wrap canvas in a fixed-height container to prevent CSS Grid infinite expansion */
-if(!cv.parentElement.classList.contains('chart-auto-wrap')){
-const h=cv.style.height||cv.getAttribute('height')||'250px';const w=document.createElement('div');
-w.className='chart-auto-wrap';w.style.height=h;cv.style.height='100%';
-cv.parentElement.insertBefore(w,cv);w.appendChild(cv)}
-if(charts[i])charts[i].destroy();const ct=cv.dataset.chart||'bar';
-let eids;try{eids=JSON.parse(cv.dataset.entities||'[]')}catch(e){eids=[]}
-if(!eids.length)return;const dk=window.matchMedia('(prefers-color-scheme:dark)').matches;
-const labels=eids.map(e=>(states[e]?.friendly_name||e.split('.').pop()).replace(/_/g,' '));
-const data=eids.map(e=>parseFloat(states[e]?.state)||0);
+function initCharts(){const dk=window.matchMedia('(prefers-color-scheme:dark)').matches;
+SECTIONS.forEach((sec,i)=>{if(sec.type!=='chart')return;
+const cv=document.getElementById('ch-'+i);if(!cv)return;
+if(charts[i])charts[i].destroy();
+const eids=sec.entities||ENTITIES;
+const nums=eids.filter(e=>!isNaN(parseFloat(states[e]?.state)));if(!nums.length)return;
+const labels=nums.map(e=>(states[e]?.friendly_name||e.split('.').pop()).replace(/_/g,' '));
+const data=nums.map(e=>parseFloat(states[e]?.state)||0);const ct=sec.chart_type||'bar';
 charts[i]=new Chart(cv,{type:ct,data:{labels,datasets:[{data,backgroundColor:PAL.slice(0,data.length),borderWidth:0,
-borderRadius:ct==='bar'?6:0}]},options:{responsive:true,maintainAspectRatio:false,
-plugins:{legend:{display:ct!=='bar',labels:{color:dk?'#94a3b8':'#6b7280'}}},
-scales:ct==='bar'||ct==='line'?{x:{ticks:{color:dk?'#94a3b8':'#6b7280'}},y:{ticks:{color:dk?'#94a3b8':'#6b7280'}}}:{}}})})}
+borderRadius:ct==='bar'?6:0,borderSkipped:false}]},
+options:{responsive:true,maintainAspectRatio:false,
+plugins:{legend:{display:ct!=='bar',position:'bottom',labels:{boxWidth:12,padding:8,font:{size:11},color:dk?'#94a3b8':'#6b7280'}}},
+scales:ct==='bar'||ct==='line'?{x:{grid:{color:dk?'#334155':'#e2e8f0'},ticks:{color:dk?'#94a3b8':'#6b7280',font:{size:10}}},
+y:{grid:{color:dk?'#334155':'#e2e8f0'},ticks:{color:dk?'#94a3b8':'#6b7280',font:{size:10}}}}:{}}
+})})}
 
 onMounted(connect);
 onUnmounted(()=>{ws?.close();clearTimeout(reconTimer);Object.values(charts).forEach(c=>c.destroy())});
-return{entities:ENTITIES,states,connected,error,entityName,stateVal,formatVal,getUnit,getAttr,isOn,callService,toggle,setVal}
+return{sections,connected,error,nm,sv,fv,fu,isOn,numVal,gPct,dIco,togDom,slDom,slMin,slMax,slStep,items,toggle,setVal}
 }}).mount('#app');
 })();
 </script>
 </body>
 </html>"""
 
-    shell = shell.replace("__TITLE__", safe_title)
-    shell = shell.replace("__ENTITIES_JSON__", entities_json)
-    shell = shell.replace("__ACCENT__", accent_color)
-    shell = shell.replace("__ACCENT_RGB__", accent_rgb)
-    shell = shell.replace("__THEME_OVERRIDE__", theme_override)
-    shell = shell.replace("__CUSTOM_CSS__", custom_css or "")
-    shell = shell.replace("__BODY_HTML__", body_html or "")
+    html = html.replace("__TITLE__", safe_title)
+    html = html.replace("__ENTITIES_JSON__", entities_json)
+    html = html.replace("__SECTIONS_JSON__", sections_json)
+    html = html.replace("__ACCENT__", accent_color)
+    html = html.replace("__ACCENT_RGB__", accent_rgb)
+    html = html.replace("__THEME_CSS__", theme_css)
 
-    return shell
+    return html
 
 
 def _stamp_description(description: str, action: str = "create") -> str:
@@ -222,7 +326,7 @@ TOOL_DESCRIPTIONS = {
     "get_dashboard_config": "Leggo config dashboard",
     "update_dashboard": "Modifico dashboard",
     "create_dashboard": "Creo dashboard",
-    "create_html_dashboard": "Creo dashboard HTML personalizzata (shell+skin dall'agent)",
+    "create_html_dashboard": "Creo dashboard HTML (sezioni strutturate)",
     "delete_dashboard": "Elimino dashboard",
     "get_frontend_resources": "Verifico card installate",
     "get_scenes": "Carico scene",
@@ -743,7 +847,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with full creative freedom. The addon provides the 'engine' (auth, WebSocket, Vue 3, Chart.js, base theme). YOU provide the 'skin' (body_html + custom_css).\n\nYour body_html is a Vue 3 template placed inside #app. Available in template:\n- entities: array of entity_ids\n- states: reactive object — states['sensor.x'] = {state, friendly_name, unit, attributes}\n- connected: boolean (WebSocket live)\n- stateVal(eid): raw state string\n- formatVal(eid): smart value (W→kW auto)\n- getUnit(eid): unit string\n- entityName(eid): friendly name\n- getAttr(eid, attr): any attribute\n- isOn(eid): true/false/null\n- toggle(eid): toggle switch/light\n- setVal(eid, value): set number value\n- callService(domain, service, eid, data): any HA service\n\nCSS variables: --accent, --accent-rgb, --bg, --bg2, --text, --text2, --card, --border, --green, --yellow, --red, --blue, --r\n\nCharts: <canvas data-chart='bar' data-entities='[\"sensor.a\",\"sensor.b\"]' style='height:250px'></canvas>\n\nDesign creatively with full HTML/CSS freedom: gradients, glassmorphism, animations, grids, SVG, anything you imagine!",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring. Design it with structured sections (visual blocks).\n\nSection types:\n- hero: Gradient banner. Props: title, description, icon, items[{entity,label}]\n- pills: KPI pill row. Props: items[{entity,label}]\n- flow: Energy flow (2-5 nodes with arrows). Props: title, nodes[{entity,label,highlight?}]\n- gauge: Single circular gauge + side stats. Props: title, entity, stats[{entity,label}]\n- gauges: Multiple small gauges. Props: items[{entity,label}]\n- kpi: Stat cards grid. Props: title, items[{entity,label}]\n- chart: Chart.js visualization. Props: title, chart_type(bar/line/doughnut/radar/pie), entities[]\n- entities: Entity list with auto toggles/sliders. Props: items[{entity,label}]\n- controls: Big toggle buttons. Props: items[{entity,label}]\n- stats: Big number cards with icon. Props: items[{entity,label}]\n- value: Single prominent value. Props: entity, subtitle\n\nLayout: each section has 'span' (1=third, 2=two-thirds, 3=full, default 3). Combine span:2 + span:1 for multi-column layouts.\nCard styles: 'gradient', 'outlined', 'flat' (optional per section).\n\nDesign tips: start with hero or pills for overview → flow+gauge for energy → kpi for periods → chart for trends → entities/controls for interaction.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -752,11 +856,32 @@ HA_TOOLS_DESCRIPTION = [
                 "icon": {"type": "string", "description": "MDI icon for sidebar (e.g. 'mdi:solar-power'). Default: mdi:web."},
                 "entities": {"type": "array", "items": {"type": "string"}, "description": "ALL entity_ids to monitor via WebSocket."},
                 "theme": {"type": "string", "enum": ["auto", "light", "dark"], "description": "Color theme. 'auto' follows OS."},
-                "accent_color": {"type": "string", "description": "Accent color hex (e.g. '#667eea'). Available as var(--accent)."},
-                "body_html": {"type": "string", "description": "Vue 3 template HTML for the dashboard body. Use v-for, v-if, @click, {{ }} bindings with the available helpers. This is your creative canvas — design the layout, cards, sections, hero banners, gauges, grids freely."},
-                "custom_css": {"type": "string", "description": "Custom CSS styles for your dashboard. Can use CSS variables. Add classes referenced in body_html."}
+                "accent_color": {"type": "string", "description": "Accent color hex (e.g. '#667eea')."},
+                "sections": {
+                    "type": "array",
+                    "description": "Array of dashboard sections. Each has a 'type' + type-specific props.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "enum": ["hero", "pills", "flow", "gauge", "gauges", "kpi", "chart", "entities", "controls", "stats", "value"]},
+                            "title": {"type": "string", "description": "Section title."},
+                            "icon": {"type": "string", "description": "Emoji icon."},
+                            "span": {"type": "integer", "description": "Layout: 1=third, 2=two-thirds, 3=full (default)."},
+                            "style": {"type": "string", "enum": ["gradient", "outlined", "flat"]},
+                            "description": {"type": "string", "description": "Hero description."},
+                            "entity": {"type": "string", "description": "Single entity for gauge/value."},
+                            "subtitle": {"type": "string", "description": "Value subtitle."},
+                            "chart_type": {"type": "string", "enum": ["bar", "line", "doughnut", "radar", "pie"]},
+                            "entities": {"type": "array", "items": {"type": "string"}, "description": "Entity IDs."},
+                            "items": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}}, "required": ["entity"]}, "description": "Entities with custom labels."},
+                            "nodes": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}, "highlight": {"type": "boolean"}}, "required": ["entity"]}, "description": "Flow nodes."},
+                            "stats": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}}, "required": ["entity"]}, "description": "Gauge side stats."}
+                        },
+                        "required": ["type"]
+                    }
+                }
             },
-            "required": ["title", "name", "entities", "body_html"]
+            "required": ["title", "name", "entities", "sections"]
         }
     }
 ]
@@ -1708,11 +1833,10 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             entities = tool_input.get("entities", [])
             theme = tool_input.get("theme", "auto")
             accent_color = tool_input.get("accent_color", "#667eea")
-            body_html = tool_input.get("body_html", "")
-            custom_css = tool_input.get("custom_css", "")
+            sections = tool_input.get("sections", [])
 
-            if not body_html:
-                return json.dumps({"error": "body_html is required. Provide Vue 3 template HTML for the dashboard body."}, default=str)
+            if not sections:
+                return json.dumps({"error": "sections is required. Provide an array of section objects (type: hero/pills/flow/gauge/kpi/chart/entities/controls/stats/value)."}, default=str)
             if not entities:
                 return json.dumps({"error": "entities is required. Provide an array of entity_ids to monitor."}, default=str)
 
@@ -1742,10 +1866,10 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             entities = valid_entities
 
-            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}/{original_count} valid, body_html={len(body_html)} chars, css={len(custom_css)} chars")
+            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}/{original_count} valid, sections={len(sections)}")
 
-            # Build HTML: shell (auth/WS/CDN) + agent's skin (body_html/css)
-            html_content = _build_dashboard_html(title, entities, theme, accent_color, body_html, custom_css)
+            # Build HTML from structured sections spec
+            html_content = _build_dashboard_html(title, entities, theme, accent_color, sections)
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
@@ -1819,7 +1943,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "url_path": safe_url_path,
                     "sidebar_ready": dashboard_created,
                     "entities_count": len(entities),
+                    "sections_count": len(sections),
                     "IMPORTANT": f"✨ Your dashboard '{title}' is ready in the sidebar! Click on it to view.",
+                    "DISPLAY_NOTE": "Do NOT show HTML/CSS/JS code to the user. Just confirm the dashboard was created and where to find it."
                 }
                 if invalid_entities:
                     result["filtered_entities"] = invalid_entities

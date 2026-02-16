@@ -1,4 +1,19 @@
 # Changelog
+## 3.8.0
+- **ARCHITECTURE**: Sections V2 — structured JSON spec with 11 section types and layout system replaces body_html
+- **FIX**: GPT-5.2 sending `args: {}` — body_html was too large (~2000 tokens), sections spec is ~350 tokens
+- **FIX**: Agent no longer shows HTML code walls in chat responses (DISPLAY_NOTE added)
+- **NEW**: 11 section types: hero, pills, flow, gauge, gauges, kpi, chart, entities, controls, stats, value
+- **NEW**: CSS Grid 3-column layout with span-1/span-2/span-3 for multi-column designs
+- **NEW**: Per-entity label overrides via items[{entity, label}] in every section type
+- **NEW**: Card style variants: gradient, outlined, flat
+- **NEW**: Flow diagram section for energy flow visualization (PV → House → Grid)
+- **NEW**: Gauge section with SVG donut + side stats for battery/SOC monitoring
+- **NEW**: Pills section for top KPI row with live values
+- **NEW**: Value section for single prominent number display
+- **REMOVED**: body_html and custom_css parameters — agent now sends compact sections JSON
+- **BENEFIT**: Agent has architectural creative control (sections, grouping, layout, colors) while addon renders beautiful HTML
+
 ## 3.7.6
 - **NEW**: HTML dashboard entity validation — filters out entities that don't exist or are in unknown/unavailable state before building the dashboard
 - **NEW**: Agent receives feedback on filtered entities (count + list) so it knows which sensors were removed
