@@ -82,6 +82,8 @@ padding:5px 12px;background:var(--card);border:1px solid var(--border);border-ra
 .conn-dot{width:7px;height:7px;border-radius:50%;background:var(--red)}.conn-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
 .error-box{background:#fee2e2;color:#991b1b;padding:1rem;border-radius:12px;margin-top:1rem;font-size:.85rem}
 .dash-footer{text-align:center;padding:1.5rem 0 .5rem;font-size:.7rem;color:var(--text2)}
+canvas[data-chart]{display:block;width:100%!important}
+.chart-auto-wrap{position:relative;width:100%;min-height:0}
 __CUSTOM_CSS__
 </style>
 </head>
@@ -143,6 +145,11 @@ nextTick(initCharts)}).catch(e=>{if(!connected.value)error.value='REST: '+e.mess
 
 /* --- Auto Chart.js: <canvas data-chart="bar" data-entities='["e1","e2"]'> --- */
 function initCharts(){document.querySelectorAll('canvas[data-chart]').forEach((cv,i)=>{
+/* Auto-wrap canvas in a fixed-height container to prevent CSS Grid infinite expansion */
+if(!cv.parentElement.classList.contains('chart-auto-wrap')){
+const h=cv.style.height||cv.getAttribute('height')||'250px';const w=document.createElement('div');
+w.className='chart-auto-wrap';w.style.height=h;cv.style.height='100%';
+cv.parentElement.insertBefore(w,cv);w.appendChild(cv)}
 if(charts[i])charts[i].destroy();const ct=cv.dataset.chart||'bar';
 let eids;try{eids=JSON.parse(cv.dataset.entities||'[]')}catch(e){eids=[]}
 if(!eids.length)return;const dk=window.matchMedia('(prefers-color-scheme:dark)').matches;

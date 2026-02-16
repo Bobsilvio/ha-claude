@@ -1,4 +1,10 @@
 # Changelog
+## 3.7.5
+- **FIX**: Chart.js canvases inside CSS Grid cards caused infinite height expansion
+- **FIX**: Shell now auto-wraps `<canvas data-chart>` in a fixed-height `.chart-auto-wrap` container before Chart.js init
+- **FIX**: Canvas height is read from inline `style.height` or `height` attribute (default 250px) and applied to wrapper
+- **NEW**: Shell CSS adds `canvas[data-chart]{display:block;width:100%!important}` and `.chart-auto-wrap{position:relative;width:100%;min-height:0}` to prevent grid sizing issues
+
 ## 3.7.4
 - **FIX**: Dockerfile still had `EXPOSE 5000` and `ENV API_PORT=5000` — changed to 5010
 - **FIX**: api.py fallback `os.getenv("API_PORT", 5000)` — changed to 5010
