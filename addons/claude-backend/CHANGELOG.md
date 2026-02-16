@@ -1,4 +1,7 @@
 # Changelog
+## 3.7.1
+- **FIX**: Removed `api_port` from config options and schema - port is fixed at 5010 via environment variable and should not be visible to users in the addon settings UI
+
 ## 3.7.0
 - **BREAKING**: HTML dashboard generation moved from addon template to AI agent
 - **REMOVED**: `_generate_html_dashboard()` function (~600 lines) - no more hardcoded HTML template
