@@ -1,4 +1,14 @@
 # Changelog
+## 3.7.3
+- **ARCHITECTURE**: Shell + Skin approach — addon provides the "engine" (auth, WebSocket, Vue 3, Chart.js, theme CSS), agent provides the "skin" (body_html + custom_css)
+- **FIX**: v3.7.2 was effectively a fixed template (agent only picked section types/colors) — now agent has FULL creative freedom over HTML/CSS
+- **NEW**: `body_html` parameter — Vue 3 template with full access to reactive state, helpers (formatVal, entityName, toggle, callService, etc.)
+- **NEW**: `custom_css` parameter — agent writes any CSS (gradients, glassmorphism, animations, grids, SVG)
+- **NEW**: Auto Chart.js — agent adds `<canvas data-chart="bar" data-entities='[...]'>` and charts render automatically
+- **NEW**: CSS variables exposed: --accent, --accent-rgb, --bg, --bg2, --text, --text2, --card, --border, --green/yellow/red/blue
+- **REMOVED**: Structured sections spec (hero/gauges/chart/entities/controls/stats) — replaced by freeform body_html
+- **BENEFIT**: Body HTML is ~500 tokens (vs ~3000 for full HTML) — fits in tool args. Agent keeps full creative control.
+
 ## 3.7.2
 - **FIX**: HTML dashboard tool now uses structured design spec instead of raw HTML in tool args
 - **REASON**: LLMs (GPT-5.2) truncate large tool call arguments - sending full HTML (~3000+ tokens) as a single parameter fails silently (args become `{}`)
