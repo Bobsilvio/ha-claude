@@ -1,4 +1,10 @@
 # Changelog
+## 3.7.6
+- **NEW**: HTML dashboard entity validation — filters out entities that don't exist or are in unknown/unavailable state before building the dashboard
+- **NEW**: Agent receives feedback on filtered entities (count + list) so it knows which sensors were removed
+- **FIX**: Prevents broken `...` values in dashboard for non-existent entities
+- **FIX**: Returns clear error if ALL entities are invalid
+
 ## 3.7.5
 - **FIX**: Chart.js canvases inside CSS Grid cards caused infinite height expansion
 - **FIX**: Shell now auto-wraps `<canvas data-chart>` in a fixed-height `.chart-auto-wrap` container before Chart.js init

@@ -1716,7 +1716,33 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             if not entities:
                 return json.dumps({"error": "entities is required. Provide an array of entity_ids to monitor."}, default=str)
 
-            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}, body_html={len(body_html)} chars, css={len(custom_css)} chars")
+            # Validate entities: only keep those that exist and are not unknown/unavailable
+            original_count = len(entities)
+            valid_entities = []
+            invalid_entities = []
+            try:
+                all_states = api.call_ha_api("GET", "states")
+                states_map = {s["entity_id"]: s["state"] for s in all_states} if isinstance(all_states, list) else {}
+                for eid in entities:
+                    if eid not in states_map:
+                        invalid_entities.append(f"{eid} (not found)")
+                    elif states_map[eid] in ("unknown", "unavailable"):
+                        invalid_entities.append(f"{eid} ({states_map[eid]})")
+                    else:
+                        valid_entities.append(eid)
+            except Exception as e:
+                logger.warning(f"⚠️ Could not validate entities, using all: {e}")
+                valid_entities = entities
+
+            if invalid_entities:
+                logger.info(f"🧹 Filtered {len(invalid_entities)}/{original_count} entities: {invalid_entities}")
+
+            if not valid_entities:
+                return json.dumps({"error": f"No valid entities found. All {original_count} entities are either missing or unknown/unavailable: {invalid_entities}"}, default=str)
+
+            entities = valid_entities
+
+            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}/{original_count} valid, body_html={len(body_html)} chars, css={len(custom_css)} chars")
 
             # Build HTML: shell (auth/WS/CDN) + agent's skin (body_html/css)
             html_content = _build_dashboard_html(title, entities, theme, accent_color, body_html, custom_css)
@@ -1783,7 +1809,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                         logger.error(f"❌ Exception saving dashboard config: {e}")
                         sidebar_message = "HTML file is ready but sidebar integration failed"
 
-                return json.dumps({
+                result = {
                     "status": "success",
                     "message": f"✨ Dashboard '{title}' created successfully! Your {sidebar_message}",
                     "title": title,
@@ -1792,8 +1818,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "html_url": dashboard_url,
                     "url_path": safe_url_path,
                     "sidebar_ready": dashboard_created,
+                    "entities_count": len(entities),
                     "IMPORTANT": f"✨ Your dashboard '{title}' is ready in the sidebar! Click on it to view.",
-                }, ensure_ascii=False, default=str)
+                }
+                if invalid_entities:
+                    result["filtered_entities"] = invalid_entities
+                    result["warning"] = f"{len(invalid_entities)} entities were removed (not found or unknown/unavailable). The dashboard only monitors {len(entities)} valid entities."
+                return json.dumps(result, ensure_ascii=False, default=str)
 
             except Exception as e:
                 logger.error(f"❌ Exception creating HTML dashboard: {e}", exc_info=True)
