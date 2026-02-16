@@ -1,4 +1,16 @@
 # Changelog
+## 3.7.0
+- **BREAKING**: HTML dashboard generation moved from addon template to AI agent
+- **REMOVED**: `_generate_html_dashboard()` function (~600 lines) - no more hardcoded HTML template
+- **NEW**: AI agent now generates the COMPLETE HTML code for dashboards (creative, unique designs per request)
+- **NEW**: `create_html_dashboard` tool now accepts `html_content` as required parameter with full HTML document
+- **NEW**: Tool description includes HA authentication snippets (WebSocket, REST API, service calls) so agent knows how to build functional dashboards
+- **NEW**: Agent can create purpose-specific dashboards (energy flow, climate control, security, lighting scenes) with unique layouts
+- **IMPROVEMENT**: `create_dashboard` tool description enhanced - agent now designs creative card layouts (gauge for %, history-graph for trends, thermostat for climate, etc.)
+- **IMPROVEMENT**: `update_dashboard` tool description enhanced - encourages creative redesign while preserving user content
+- **IMPROVEMENT**: Removed ~600 lines of template code from addon, replaced with ~10 lines of instructions in tool description
+- **IMPROVEMENT**: Dashboard icon is now configurable via `icon` parameter (defaults to mdi:web)
+
 ## 3.6.0
 - **ENHANCEMENT**: Complete rewrite of HTML dashboard generator with major visual and functional improvements
 - **NEW**: Auto dark/light theme following HA preferences (CSS prefers-color-scheme)

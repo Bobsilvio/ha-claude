@@ -13,606 +13,6 @@ logger = logging.getLogger(__name__)
 AI_SIGNATURE = "AI Assistant"
 
 
-def _generate_html_dashboard(title: str, name: str, description: str, entities: list, 
-                            layout: str = "grid", components: list = None, 
-                            theme: str = "auto", html_content: str = None) -> str:
-    """Generate a polished HTML dashboard with Vue 3, real-time WebSocket, Chart.js.
-
-    Features:
-    - Auto dark/light theme following HA
-    - Glassmorphism card design
-    - Domain-based entity grouping with icons
-    - Smart unit formatting (W→kW, etc.)
-    - Toggle switches & number sliders
-    - Live value color coding (green/yellow/red for battery SOC)
-    - Responsive mobile-first grid
-    - Chart.js bar chart for numeric sensors
-    - SVG gauge for percentage entities
-    - Search/filter entities
-    - Last-updated timestamps
-    """
-    import html as html_module
-
-    if components is None:
-        components = ["info", "chart"]
-
-    entities_json = json.dumps(entities, ensure_ascii=False) if entities else '[]'
-    safe_title = html_module.escape(title)
-    safe_description = html_module.escape(description or "")
-
-    # Component HTML snippets (Vue template syntax, no f-string)
-    component_html = ""
-    if "info" in components:
-        component_html += """
-            <div class="hero-card">
-              <div class="hero-icon">⚡</div>
-              <div class="hero-content">
-                <h2>{{ title }}</h2>
-                <p>{{ description }}</p>
-                <div class="hero-stats">
-                  <span>🔍 {{ entities.length }} entities</span>
-                  <span>📊 {{ numericCount }} numeric</span>
-                  <span>🔘 {{ toggleCount }} toggles</span>
-                </div>
-              </div>
-            </div>"""
-
-    if "chart" in components:
-        component_html += """
-            <div class="card card-wide">
-              <div class="card-header">
-                <span class="card-icon">📊</span>
-                <h3>Sensor Values</h3>
-              </div>
-              <div class="chart-wrap"><canvas id="entityChart"></canvas></div>
-            </div>"""
-
-    if "gauge" in components:
-        component_html += """
-            <div class="card" v-for="g in gaugeEntities" :key="g.id">
-              <div class="card-header">
-                <span class="card-icon">{{ g.icon }}</span>
-                <h3>{{ g.name }}</h3>
-              </div>
-              <div class="gauge-wrap">
-                <svg viewBox="0 0 120 70">
-                  <path d="M 10 65 A 50 50 0 0 1 110 65" stroke="var(--border)" stroke-width="8" fill="none" stroke-linecap="round"/>
-                  <path :d="g.arc" :stroke="g.color" stroke-width="8" fill="none" stroke-linecap="round" style="transition:all .6s ease"/>
-                  <text x="60" y="55" text-anchor="middle" :fill="g.color" style="font-size:1.1rem;font-weight:700">{{ g.display }}</text>
-                  <text x="60" y="67" text-anchor="middle" fill="var(--text-secondary)" style="font-size:0.5rem">{{ g.unit }}</text>
-                </svg>
-              </div>
-            </div>"""
-
-    if html_content:
-        component_html = html_content
-
-    html_template = r"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>__TITLE__</title>
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-<style>
-/* ===== CSS Variables & Theme ===== */
-:root {
-  --bg: #f0f2f5; --bg2: #ffffff; --text: #1a1a2e; --text-secondary: #6b7280;
-  --card: rgba(255,255,255,0.85); --border: #e2e8f0; --shadow: rgba(0,0,0,0.06);
-  --accent: #667eea; --accent2: #764ba2; --green: #10b981; --yellow: #f59e0b;
-  --red: #ef4444; --blue: #3b82f6; --radius: 16px;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f172a; --bg2: #1e293b; --text: #e2e8f0; --text-secondary: #94a3b8;
-    --card: rgba(30,41,59,0.85); --border: #334155; --shadow: rgba(0,0,0,0.3);
-  }
-}
-/* ===== Reset & Base ===== */
-*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; -webkit-font-smoothing: antialiased; }
-body { background: var(--bg); color: var(--text); font-family: 'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; min-height: 100vh; }
-#app { max-width: 1400px; margin: 0 auto; padding: 1.25rem; }
-a { color: var(--accent); text-decoration: none; }
-
-/* ===== Header ===== */
-.header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
-.header-left h1 { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
-.header-left p { color: var(--text-secondary); font-size: 0.85rem; margin-top: 2px; }
-.status-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 0.75rem; font-weight: 500; padding: 5px 12px;
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: 20px; backdrop-filter: blur(8px);
-}
-.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
-.dot.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.search-box {
-  padding: 7px 14px; border: 1px solid var(--border); border-radius: 10px;
-  background: var(--card); color: var(--text); font-size: 0.85rem; width: 220px;
-  backdrop-filter: blur(8px); outline: none; transition: border-color .2s;
-}
-.search-box:focus { border-color: var(--accent); }
-
-/* ===== Hero Info Card ===== */
-.hero-card {
-  display: flex; align-items: center; gap: 1.25rem;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #fff; padding: 1.5rem; border-radius: var(--radius);
-  grid-column: 1 / -1; box-shadow: 0 8px 24px rgba(102,126,234,0.25);
-}
-.hero-icon { font-size: 2.5rem; }
-.hero-content h2 { font-size: 1.25rem; font-weight: 700; }
-.hero-content p { opacity: 0.85; font-size: 0.85rem; margin-top: 2px; }
-.hero-stats { display: flex; gap: 1rem; margin-top: 0.6rem; font-size: 0.8rem; opacity: 0.9; }
-
-/* ===== Grid ===== */
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1rem;
-}
-@media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
-
-/* ===== Cards ===== */
-.card {
-  background: var(--card); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 1.15rem;
-  backdrop-filter: blur(12px); transition: transform .15s, box-shadow .15s;
-}
-.card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--shadow); }
-.card-wide { grid-column: 1 / -1; }
-.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 0.75rem; }
-.card-header h3 { font-size: 0.95rem; font-weight: 600; }
-.card-icon { font-size: 1.15rem; }
-.domain-badge {
-  display: inline-block; padding: 2px 8px; border-radius: 6px;
-  font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-  background: var(--accent); color: #fff; opacity: 0.85;
-}
-
-/* ===== Entity Rows ===== */
-.entity-row {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.55rem 0.7rem; border-radius: 10px;
-  margin-bottom: 0.35rem; background: var(--bg2);
-  transition: background .15s;
-}
-.entity-row:hover { background: var(--border); }
-.entity-icon { font-size: 1.1rem; flex-shrink: 0; width: 28px; text-align: center; }
-.entity-info { flex: 1; min-width: 0; }
-.entity-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.entity-id { font-size: 0.65rem; color: var(--text-secondary); font-family: monospace; }
-.entity-value { font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
-.entity-unit { font-size: 0.75rem; color: var(--text-secondary); margin-left: 2px; }
-.entity-updated { font-size: 0.6rem; color: var(--text-secondary); }
-
-/* Value colors */
-.val-green { color: var(--green); } .val-yellow { color: var(--yellow); } .val-red { color: var(--red); }
-.val-blue { color: var(--blue); } .val-on { color: var(--green); } .val-off { color: var(--text-secondary); }
-
-/* ===== Toggle Switch ===== */
-.toggle-wrap { display: flex; align-items: center; gap: 8px; }
-.toggle {
-  position: relative; width: 42px; height: 24px; cursor: pointer;
-  background: var(--border); border-radius: 12px; transition: background .2s; border: none;
-}
-.toggle.active { background: var(--green); }
-.toggle::after {
-  content: ''; position: absolute; top: 3px; left: 3px;
-  width: 18px; height: 18px; border-radius: 50%; background: #fff;
-  transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-}
-.toggle.active::after { transform: translateX(18px); }
-
-/* ===== Slider ===== */
-.slider-wrap { display: flex; align-items: center; gap: 8px; width: 100%; }
-.slider {
-  -webkit-appearance: none; appearance: none; width: 100%; height: 6px;
-  border-radius: 3px; background: var(--border); outline: none; cursor: pointer;
-}
-.slider::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%;
-  background: var(--accent); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-}
-.slider-value { font-size: 0.85rem; font-weight: 600; min-width: 45px; text-align: right; }
-
-/* ===== Chart ===== */
-.chart-wrap { position: relative; height: 260px; }
-.chart-wrap canvas { width: 100% !important; }
-
-/* ===== Gauge ===== */
-.gauge-wrap { display: flex; justify-content: center; padding: 0.5rem 0; }
-.gauge-wrap svg { width: 160px; height: auto; }
-
-/* ===== Footer ===== */
-.footer { text-align: center; padding: 1.5rem 0 0.5rem; font-size: 0.7rem; color: var(--text-secondary); }
-</style>
-</head>
-<body>
-<div id="app">
-  <!-- Header -->
-  <div class="header">
-    <div class="header-left">
-      <h1>__TITLE__</h1>
-      <p>__DESCRIPTION__</p>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <input v-model="search" class="search-box" placeholder="🔍 Filter entities..." />
-      <div class="status-pill">
-        <div :class="['dot', connected && 'on']"></div>
-        {{ connected ? 'Live' : 'Connecting...' }}
-      </div>
-    </div>
-  </div>
-
-  <!-- Main Grid -->
-  <div class="grid">
-    __COMPONENT_HTML__
-
-    <!-- Domain-grouped entity cards -->
-    <div class="card" v-for="group in filteredGroups" :key="group.domain">
-      <div class="card-header">
-        <span class="card-icon">{{ group.icon }}</span>
-        <h3>{{ group.label }}</h3>
-        <span class="domain-badge">{{ group.entities.length }}</span>
-      </div>
-      <div v-for="e in group.entities" :key="e.id" class="entity-row">
-        <span class="entity-icon">{{ e.icon }}</span>
-        <div class="entity-info">
-          <div class="entity-name" :title="e.id">{{ e.name }}</div>
-          <div class="entity-id">{{ e.id }}</div>
-        </div>
-
-        <!-- Toggle for switch/input_boolean/light -->
-        <div v-if="e.toggleable" class="toggle-wrap">
-          <button :class="['toggle', e.isOn && 'active']" @click="toggleEntity(e.id, e.domain)"></button>
-        </div>
-
-        <!-- Slider for number/input_number -->
-        <div v-else-if="e.slideable" class="slider-wrap">
-          <input type="range" class="slider" :min="e.min" :max="e.max" :step="e.step"
-                 :value="e.numVal" @change="setNumber(e.id, e.domain, $event.target.value)" />
-          <span class="slider-value">{{ e.display }}<span class="entity-unit">{{ e.unit }}</span></span>
-        </div>
-
-        <!-- Normal value display -->
-        <div v-else>
-          <span :class="['entity-value', e.colorClass]">{{ e.display }}</span>
-          <span class="entity-unit">{{ e.unit }}</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Error / Loading -->
-  <div v-if="error" style="background:#fee2e2;color:#991b1b;padding:1rem;border-radius:12px;margin-top:1rem">{{ error }}</div>
-
-  <!-- Footer -->
-  <div class="footer">Dashboard generated by AI Assistant &middot; Real-time via WebSocket</div>
-</div>
-
-<script>
-(function(){
-const { createApp, ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } = Vue;
-const ENTITIES = __ENTITIES_JSON__;
-
-// Domain config: icons, labels, grouping
-const DOMAIN_META = {
-  sensor:        { icon: '📊', label: 'Sensors' },
-  binary_sensor: { icon: '🔔', label: 'Binary Sensors' },
-  switch:        { icon: '🔌', label: 'Switches' },
-  light:         { icon: '💡', label: 'Lights' },
-  climate:       { icon: '🌡️', label: 'Climate' },
-  cover:         { icon: '🪟', label: 'Covers' },
-  fan:           { icon: '🌀', label: 'Fans' },
-  input_boolean: { icon: '🔘', label: 'Toggles' },
-  input_number:  { icon: '🔢', label: 'Numbers' },
-  number:        { icon: '🔢', label: 'Numbers' },
-  input_select:  { icon: '📋', label: 'Selectors' },
-  automation:    { icon: '⚙️', label: 'Automations' },
-  script:        { icon: '📜', label: 'Scripts' },
-  person:        { icon: '👤', label: 'People' },
-  weather:       { icon: '🌤️', label: 'Weather' },
-  media_player:  { icon: '🎵', label: 'Media' },
-  camera:        { icon: '📷', label: 'Cameras' },
-  lock:          { icon: '🔒', label: 'Locks' },
-  vacuum:        { icon: '🧹', label: 'Vacuums' },
-  water_heater:  { icon: '🚿', label: 'Water Heaters' },
-};
-
-function getDomain(eid) { return eid.split('.')[0] || 'unknown'; }
-function getEntityIcon(eid, attrs) {
-  const d = getDomain(eid);
-  // Use sensor device_class for better icons
-  const dc = (attrs?.device_class || '').toLowerCase();
-  if (d === 'sensor') {
-    const sensorIcons = {
-      battery: '🔋', temperature: '🌡️', humidity: '💧', power: '⚡', energy: '🔌',
-      voltage: '🔋', current: '⚡', pressure: '🌀', illuminance: '☀️', gas: '🔥',
-      monetary: '💰', signal_strength: '📶', carbon_dioxide: '🌫️', carbon_monoxide: '⚠️',
-    };
-    if (sensorIcons[dc]) return sensorIcons[dc];
-    // Infer from unit
-    const unit = (attrs?.unit_of_measurement || '').toLowerCase();
-    if (unit === 'w' || unit === 'kw' || unit === 'wh' || unit === 'kwh') return '⚡';
-    if (unit === '°c' || unit === '°f') return '🌡️';
-    if (unit === '%') return '📊';
-  }
-  return DOMAIN_META[d]?.icon || '📦';
-}
-
-function formatValue(state, unit) {
-  const n = parseFloat(state);
-  if (isNaN(n)) return state;
-  // Smart unit conversion
-  if ((unit === 'W' || unit === 'w') && Math.abs(n) >= 1000) return (n / 1000).toFixed(2);
-  if ((unit === 'Wh' || unit === 'wh') && Math.abs(n) >= 1000) return (n / 1000).toFixed(2);
-  if (Math.abs(n) >= 10000) return n.toFixed(0);
-  if (Math.abs(n) >= 100) return n.toFixed(1);
-  if (Math.abs(n) >= 1) return n.toFixed(2);
-  return n.toFixed(3);
-}
-
-function formatUnit(unit, state) {
-  const n = parseFloat(state);
-  if (isNaN(n)) return unit || '';
-  if ((unit === 'W' || unit === 'w') && Math.abs(n) >= 1000) return 'kW';
-  if ((unit === 'Wh' || unit === 'wh') && Math.abs(n) >= 1000) return 'kWh';
-  return unit || '';
-}
-
-function getValueColor(eid, state, attrs) {
-  const n = parseFloat(state);
-  if (isNaN(n)) {
-    if (state === 'on') return 'val-on';
-    if (state === 'off') return 'val-off';
-    if (state === 'unavailable' || state === 'unknown') return 'val-red';
-    return '';
-  }
-  const dc = (attrs?.device_class || '').toLowerCase();
-  const unit = (attrs?.unit_of_measurement || '').toLowerCase();
-  // Battery SOC coloring
-  if (dc === 'battery' || eid.includes('soc') || eid.includes('battery')) {
-    if (n >= 60) return 'val-green';
-    if (n >= 25) return 'val-yellow';
-    return 'val-red';
-  }
-  // Power: green when producing (negative grid = exporting)
-  if (eid.includes('grid') && (unit === 'w' || unit === 'kw')) {
-    return n < 0 ? 'val-green' : n > 2000 ? 'val-red' : 'val-blue';
-  }
-  if (eid.includes('pv') || eid.includes('solar') || eid.includes('fotovoltaic')) {
-    return n > 100 ? 'val-green' : n > 0 ? 'val-yellow' : 'val-off';
-  }
-  return '';
-}
-
-function getHAToken() {
-  try {
-    const r = localStorage.getItem('hassTokens');
-    if (r) { const t = JSON.parse(r); return t.access_token || ''; }
-  } catch(e) {}
-  return '';
-}
-
-createApp({
-  setup() {
-    const connected = ref(false);
-    const error = ref('');
-    const search = ref('');
-    const entities = ref(ENTITIES);
-    const title = ref('__TITLE_JS__');
-    const description = ref('__DESCRIPTION_JS__');
-    const states = reactive({});
-    let ws = null, msgId = 1, chartInst = null, reconTimer = null;
-
-    // --- Enriched entity list ---
-    const entityList = computed(() => entities.value.map(eid => {
-      const s = states[eid] || {};
-      const domain = getDomain(eid);
-      const unit = s.unit || '';
-      const stateVal = s.state ?? '...';
-      const n = parseFloat(stateVal);
-      const toggleable = ['switch','light','input_boolean'].includes(domain);
-      const slideable = ['number','input_number'].includes(domain);
-      return {
-        id: eid, domain,
-        name: s.friendly_name || eid.split('.').pop().replace(/_/g, ' '),
-        icon: getEntityIcon(eid, s.attributes),
-        state: stateVal,
-        numVal: isNaN(n) ? 0 : n,
-        display: formatValue(stateVal, unit),
-        unit: formatUnit(unit, stateVal),
-        colorClass: getValueColor(eid, stateVal, s.attributes),
-        toggleable, slideable,
-        isOn: stateVal === 'on',
-        min: s.attributes?.min ?? 0,
-        max: s.attributes?.max ?? 100,
-        step: s.attributes?.step ?? 1,
-      };
-    }));
-
-    // --- Domain groups ---
-    const domainGroups = computed(() => {
-      const map = {};
-      entityList.value.forEach(e => {
-        if (!map[e.domain]) {
-          const meta = DOMAIN_META[e.domain] || { icon: '📦', label: e.domain };
-          map[e.domain] = { domain: e.domain, icon: meta.icon, label: meta.label, entities: [] };
-        }
-        map[e.domain].entities.push(e);
-      });
-      // Sort: sensors first, then toggles, then numbers, then rest
-      const order = ['sensor','binary_sensor','switch','light','number','input_number','input_boolean','climate'];
-      return Object.values(map).sort((a,b) => {
-        const ia = order.indexOf(a.domain), ib = order.indexOf(b.domain);
-        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-      });
-    });
-
-    const filteredGroups = computed(() => {
-      if (!search.value.trim()) return domainGroups.value;
-      const q = search.value.toLowerCase();
-      return domainGroups.value
-        .map(g => ({ ...g, entities: g.entities.filter(e =>
-          e.name.toLowerCase().includes(q) || e.id.toLowerCase().includes(q)
-        )}))
-        .filter(g => g.entities.length > 0);
-    });
-
-    // Stats for hero card
-    const numericCount = computed(() => entityList.value.filter(e => !isNaN(parseFloat(e.state))).length);
-    const toggleCount = computed(() => entityList.value.filter(e => e.toggleable).length);
-
-    // Gauge entities (percentage-based)
-    const gaugeEntities = computed(() => entityList.value
-      .filter(e => {
-        const n = e.numVal;
-        return !isNaN(n) && (e.unit === '%' || e.id.includes('soc') || e.id.includes('battery'));
-      })
-      .slice(0, 4)
-      .map(e => {
-        const pct = Math.min(100, Math.max(0, e.numVal)) / 100;
-        const angle = Math.PI * (1 - pct);
-        const x = 60 + 50 * Math.cos(angle);
-        const y = 65 - 50 * Math.sin(angle);
-        const large = pct > 0.5 ? 1 : 0;
-        const color = e.numVal >= 60 ? 'var(--green)' : e.numVal >= 25 ? 'var(--yellow)' : 'var(--red)';
-        return { ...e, arc: `M 10 65 A 50 50 0 ${large} 1 ${x.toFixed(1)} ${y.toFixed(1)}`, color };
-      })
-    );
-
-    // --- Toggle / Slider actions ---
-    function callService(domain, service, entityId, data) {
-      const token = getHAToken();
-      if (!token) return;
-      fetch('/api/services/' + domain + '/' + service, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entity_id: entityId, ...data })
-      }).catch(e => console.warn('Service call failed:', e));
-    }
-
-    function toggleEntity(eid, domain) {
-      const svc = domain === 'light' ? 'light' : domain === 'input_boolean' ? 'input_boolean' : 'switch';
-      callService(svc, 'toggle', eid, {});
-    }
-
-    function setNumber(eid, domain, value) {
-      const svc = domain === 'input_number' ? 'input_number' : 'number';
-      callService(svc, 'set_value', eid, { value: parseFloat(value) });
-    }
-
-    // --- WebSocket ---
-    function connect() {
-      const token = getHAToken();
-      if (!token) { error.value = 'No HA token. Reload Home Assistant.'; fetchREST(); return; }
-      try {
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(proto + '//' + location.host + '/api/websocket');
-        ws.onmessage = (ev) => {
-          const msg = JSON.parse(ev.data);
-          if (msg.type === 'auth_required') {
-            ws.send(JSON.stringify({ type: 'auth', access_token: token }));
-          } else if (msg.type === 'auth_ok') {
-            connected.value = true; error.value = '';
-            fetchREST();
-            ws.send(JSON.stringify({ id: msgId++, type: 'subscribe_events', event_type: 'state_changed' }));
-          } else if (msg.type === 'auth_invalid') {
-            error.value = 'Auth failed. Reload Home Assistant.'; connected.value = false;
-          } else if (msg.type === 'event' && msg.event?.event_type === 'state_changed') {
-            const d = msg.event.data;
-            if (d && entities.value.includes(d.entity_id) && d.new_state) {
-              states[d.entity_id] = {
-                state: d.new_state.state,
-                friendly_name: d.new_state.attributes?.friendly_name || '',
-                unit: d.new_state.attributes?.unit_of_measurement || '',
-                attributes: d.new_state.attributes || {},
-              };
-              debouncedChart();
-            }
-          }
-        };
-        ws.onerror = () => { connected.value = false; };
-        ws.onclose = () => { connected.value = false; reconTimer = setTimeout(connect, 5000); };
-      } catch(e) { error.value = 'WebSocket: ' + e.message; }
-    }
-
-    function fetchREST() {
-      const token = getHAToken();
-      const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
-      fetch('/api/states', { headers })
-        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-        .then(list => {
-          list.forEach(s => {
-            if (entities.value.includes(s.entity_id)) {
-              states[s.entity_id] = {
-                state: s.state,
-                friendly_name: s.attributes?.friendly_name || '',
-                unit: s.attributes?.unit_of_measurement || '',
-                attributes: s.attributes || {},
-              };
-            }
-          });
-          nextTick(buildChart);
-        })
-        .catch(e => { if (!connected.value) error.value = 'REST: ' + e.message; });
-    }
-
-    // --- Chart.js ---
-    let chartDebounce = null;
-    function debouncedChart() { clearTimeout(chartDebounce); chartDebounce = setTimeout(() => nextTick(buildChart), 500); }
-    function buildChart() {
-      const canvas = document.getElementById('entityChart');
-      if (!canvas) return;
-      if (chartInst) chartInst.destroy();
-      const nums = entities.value.filter(eid => !isNaN(parseFloat(states[eid]?.state)));
-      if (!nums.length) return;
-      const labels = nums.map(eid => (states[eid]?.friendly_name || eid.split('.').pop()).replace(/_/g,' '));
-      const data = nums.map(eid => parseFloat(states[eid]?.state) || 0);
-      const palette = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f97316','#14b8a6','#6366f1','#e11d48'];
-      const isDark = window.matchMedia('(prefers-color-scheme:dark)').matches;
-      chartInst = new Chart(canvas, {
-        type: 'bar',
-        data: { labels, datasets: [{ data, backgroundColor: palette.slice(0, data.length), borderRadius: 6, borderSkipped: false }] },
-        options: {
-          responsive: true, maintainAspectRatio: false, indexAxis: nums.length > 8 ? 'y' : 'x',
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#6b7280', font: { size: 10 } } },
-            y: { grid: { color: isDark ? '#334155' : '#e2e8f0' }, ticks: { color: isDark ? '#94a3b8' : '#6b7280', font: { size: 10 } } }
-          }
-        }
-      });
-    }
-
-    onMounted(connect);
-    onUnmounted(() => { ws?.close(); clearTimeout(reconTimer); chartInst?.destroy(); });
-
-    return {
-      connected, error, search, entities, title, description, states,
-      entityList, domainGroups, filteredGroups,
-      numericCount, toggleCount, gaugeEntities,
-      toggleEntity, setNumber,
-    };
-  }
-}).mount('#app');
-})();
-</script>
-</body>
-</html>"""
-
-    html_template = html_template.replace("__TITLE__", safe_title)
-    html_template = html_template.replace("__DESCRIPTION__", safe_description)
-    html_template = html_template.replace("__TITLE_JS__", title.replace("\\", "\\\\").replace("'", "\\'"))
-    html_template = html_template.replace("__DESCRIPTION_JS__", (description or "").replace("\\", "\\\\").replace("'", "\\'"))
-    html_template = html_template.replace("__ENTITIES_JSON__", entities_json)
-    html_template = html_template.replace("__COMPONENT_HTML__", component_html)
-
-    return html_template
-
 
 def _stamp_description(description: str, action: str = "create") -> str:
     """Add AI Assistant watermark to a description field.
@@ -656,7 +56,7 @@ TOOL_DESCRIPTIONS = {
     "get_dashboard_config": "Leggo config dashboard",
     "update_dashboard": "Modifico dashboard",
     "create_dashboard": "Creo dashboard",
-    "create_html_dashboard": "Creo dashboard HTML/Vue",
+    "create_html_dashboard": "Creo dashboard HTML personalizzata (l'agent genera tutto l'HTML)",
     "delete_dashboard": "Elimino dashboard",
     "get_frontend_resources": "Verifico card installate",
     "get_scenes": "Carico scene",
@@ -903,7 +303,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_dashboard",
-        "description": "Create a NEW Lovelace dashboard (does NOT modify existing ones). The AI builds the views and cards config. Common card types: entities, gauge, history-graph, weather-forecast, light, thermostat, button, markdown, grid, horizontal-stack, vertical-stack.",
+        "description": "Create a NEW Lovelace YAML dashboard. YOU design the complete views and cards structure creatively based on the user's request. Use the best card types for each entity: gauge for percentages, history-graph for trends, thermostat for climate, light for lights, button for scripts/scenes, weather-forecast for weather, glance for quick overview, picture-elements for floorplans. Group entities logically. Use grid/horizontal-stack/vertical-stack for layout. Add markdown cards for section headers. Use themed titles and icons. Available card types: entities, gauge, history-graph, weather-forecast, light, thermostat, button, markdown, grid, horizontal-stack, vertical-stack, glance, picture-entity, sensor, alarm-panel, media-control, map, logbook, energy-distribution, statistics-graph, tile, mushroom (if HACS installed).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1057,7 +457,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "update_dashboard",
-        "description": "Update/modify an existing Lovelace dashboard configuration. First use get_dashboard_config to read the current config, modify it, then save with this tool. Supports all card types including custom cards (card-mod, bubble-card, mushroom, etc.).",
+        "description": "Update/modify an existing Lovelace dashboard. ALWAYS call get_dashboard_config first to read current config, then creatively redesign or modify based on user request. You can add/remove/rearrange views and cards. Supports all native card types and custom cards (card-mod, bubble-card, mushroom, etc. if installed - check with get_frontend_resources). When modifying, preserve existing content the user wants to keep while improving the layout and design.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1177,39 +577,19 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with Vue 3, CSS, JavaScript and real-time WebSocket connection to Home Assistant. Generates a complete standalone HTML app with responsive design, charts, controls, and live entity updates.",
+        "description": "Create a custom HTML dashboard. YOU generate the COMPLETE HTML code (<!DOCTYPE html>...) with your own creative design, layout, charts, and controls tailored to the user's request. The addon simply saves the file and creates a sidebar link.\n\nIMPORTANT - HA Authentication (MUST include in your HTML):\n- Get token: const token = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;\n- REST API: fetch('/api/states', {headers:{'Authorization':'Bearer '+token}}) returns array of {entity_id, state, attributes:{friendly_name, unit_of_measurement, ...}}\n- WebSocket: new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/api/websocket'); on message 'auth_required' send {type:'auth',access_token:token}; after 'auth_ok' send {id:1,type:'subscribe_events',event_type:'state_changed'}\n- Toggle: fetch('/api/services/switch/toggle',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({entity_id:'switch.xxx'})})\n- Call service: fetch('/api/services/{domain}/{service}',{method:'POST',headers:{...},body:JSON.stringify({entity_id:...,...data})})\n\nDesign guidelines: Use modern CSS (no frameworks needed), responsive mobile-first, dark/light auto via prefers-color-scheme. Use Vue 3 CDN (unpkg.com/vue@3/dist/vue.global.prod.js) or vanilla JS. Use Chart.js 4 CDN for charts. Be creative - design unique layouts for the specific use case (energy flow, climate control, security, lighting scenes, etc.).",
         "parameters": {
             "type": "object",
             "properties": {
-                "title": {"type": "string", "description": "Dashboard title (e.g. 'Smart Energy Dashboard')."},
-                "name": {"type": "string", "description": "URL-safe filename (lowercase, no spaces, e.g. 'energie-smart'). Will create file as HTML file."},
-                "description": {"type": "string", "description": "Description of the dashboard purpose."},
-                "entities": {
-                    "type": "array",
-                    "description": "List of entity_ids to monitor/display (e.g. ['sensor.epcube_soc', 'switch.carica_batteria']).",
-                    "items": {"type": "string"}
-                },
-                "layout": {
-                    "type": "string",
-                    "enum": ["grid", "flex", "custom"],
-                    "description": "Layout style: grid (responsive columns), flex (flexible), or custom (custom CSS)."
-                },
-                "components": {
-                    "type": "array",
-                    "description": "List of component types to include (e.g. 'chart', 'gauge', 'button', 'info', 'switch', 'slider').",
-                    "items": {"type": "string"}
-                },
-                "theme": {
-                    "type": "string",
-                    "enum": ["light", "dark", "auto"],
-                    "description": "Color theme (light, dark, or auto-detect)."
-                },
+                "title": {"type": "string", "description": "Dashboard title shown in HA sidebar."},
+                "name": {"type": "string", "description": "URL-safe filename (lowercase, hyphens, e.g. 'energy-flow')."},
                 "html_content": {
                     "type": "string",
-                    "description": "Optional: Custom HTML structure for advanced users. If provided, components will be added to this template."
-                }
+                    "description": "The COMPLETE HTML document you generated (<!DOCTYPE html><html>...). Must include HA auth code, entity monitoring, and your creative UI design."
+                },
+                "icon": {"type": "string", "description": "MDI icon for sidebar (e.g. 'mdi:solar-power', 'mdi:home'). Default: mdi:web."}
             },
-            "required": ["title", "name", "entities"]
+            "required": ["title", "name", "html_content"]
         }
     }
 ]
@@ -2157,40 +1537,27 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "create_html_dashboard":
             title = tool_input.get("title", "Custom Dashboard")
             name = tool_input.get("name", "dashboard")
-            description = tool_input.get("description", "")
-            entities = tool_input.get("entities", [])
-            layout = tool_input.get("layout", "grid")
-            components = tool_input.get("components", ["info", "chart"])
-            theme = tool_input.get("theme", "auto")
-            html_content = tool_input.get("html_content", None)
+            html_content = tool_input.get("html_content", "")
+            icon = tool_input.get("icon", "mdi:web")
 
-            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}")
+            if not html_content or not html_content.strip():
+                return json.dumps({"error": "html_content is required. You must generate the complete HTML document."}, default=str)
+
+            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', html_size={len(html_content)}")
 
             try:
                 # Create html_dashboards directory if it doesn't exist
                 html_dashboards_dir = os.path.join(api.HA_CONFIG_DIR, ".html_dashboards")
                 os.makedirs(html_dashboards_dir, exist_ok=True)
 
-                # Generate HTML content
-                html_content_generated = _generate_html_dashboard(
-                    title=title,
-                    name=name,
-                    description=description,
-                    entities=entities,
-                    layout=layout,
-                    components=components,
-                    theme=theme,
-                    html_content=html_content
-                )
-
-                # Save the file
+                # Save the agent-generated HTML file
                 safe_filename = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
                 if not safe_filename.endswith(".html"):
                     safe_filename += ".html"
                 
                 file_path = os.path.join(html_dashboards_dir, safe_filename)
                 with open(file_path, "w", encoding="utf-8") as f:
-                    f.write(html_content_generated)
+                    f.write(html_content)
 
                 logger.info(f"✅ HTML dashboard file saved: {file_path}")
 
@@ -2199,69 +1566,44 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 dashboard_url = f"{ingress_url}/custom_dashboards/{safe_filename.replace('.html', '')}"
                 logger.info(f"🔗 Dashboard iframe URL: {dashboard_url}")
 
-                # Step 1: Create a Lovelace dashboard wrapper with iframe
-                # The dashboard will appear in the sidebar and contain the HTML dashboard in an iframe
+                # Create a Lovelace dashboard wrapper with iframe in sidebar
                 safe_url_path = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
-                
-                logger.info(f"🎨 Creating Lovelace wrapper dashboard at /{safe_url_path}")
+                dashboard_created = False
                 
                 try:
-                    # Create the dashboard via WebSocket
                     ws_result = api.call_ha_websocket(
                         "lovelace/dashboards/create",
                         url_path=safe_url_path,
                         title=title,
-                        icon="mdi:web",
+                        icon=icon,
                         show_in_sidebar=True,
                         require_admin=False
                     )
                     logger.info(f"📊 Dashboard create WS response: {ws_result}")
-                    
-                    if ws_result.get("success") is False:
-                        error_msg = ws_result.get("error", {}).get("message", str(ws_result))
-                        logger.error(f"❌ Failed to create dashboard: {error_msg}")
-                        # Don't fail - HTML dashboard is still created, just return it
-                        dashboard_created = False
-                    else:
+                    if ws_result.get("success") is not False:
                         dashboard_created = True
                 except Exception as e:
                     logger.error(f"❌ Exception creating Lovelace dashboard: {e}")
-                    dashboard_created = False
 
-                # Step 2: Add iframe card to the dashboard
+                # Add iframe card pointing to our HTML file
+                sidebar_message = "HTML file is ready (sidebar integration skipped)"
                 if dashboard_created:
                     try:
-                        iframe_card = {
-                            "type": "iframe",
-                            "url": dashboard_url,
-                        }
-                        
-                        view_config = {
-                            "title": title,
-                            "path": safe_url_path,
-                            "type": "panel",
-                            "cards": [iframe_card]
-                        }
-                        
                         ws_config = api.call_ha_websocket(
                             "lovelace/config/save",
                             url_path=safe_url_path,
-                            config={"views": [view_config]}
+                            config={"views": [{
+                                "title": title, "path": safe_url_path, "type": "panel",
+                                "cards": [{"type": "iframe", "url": dashboard_url}]
+                            }]}
                         )
-                        logger.info(f"📊 Dashboard config save WS response: {ws_config}")
-                        
                         if ws_config.get("success") is True:
-                            logger.info(f"✅ Lovelace dashboard '{title}' created successfully at /{safe_url_path}")
                             sidebar_message = f"dashboard appears in the sidebar at /{safe_url_path}"
                         else:
-                            error_msg = ws_config.get("error", {}).get("message", str(ws_config))
-                            logger.warning(f"⚠️ Dashboard created but config failed: {error_msg}")
-                            sidebar_message = f"HTML file is ready but sidebar integration failed"
+                            sidebar_message = "HTML file is ready but sidebar integration failed"
                     except Exception as e:
                         logger.error(f"❌ Exception saving dashboard config: {e}")
-                        sidebar_message = f"HTML file is ready but sidebar integration failed"
-                else:
-                    sidebar_message = "HTML file is ready (sidebar integration skipped)"
+                        sidebar_message = "HTML file is ready but sidebar integration failed"
 
                 return json.dumps({
                     "status": "success",
@@ -2269,16 +1611,10 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "title": title,
                     "name": name,
                     "filename": safe_filename,
-                    "file_path": file_path,
                     "html_url": dashboard_url,
-                    "sidebar_dashboard": safe_url_path,
                     "url_path": safe_url_path,
-                    "entities_count": len(entities),
-                    "components": components,
-                    "theme": theme,
                     "sidebar_ready": dashboard_created,
                     "IMPORTANT": f"✨ Your dashboard '{title}' is ready in the sidebar! Click on it to view.",
-                    "preview_note": "The dashboard now appears in your Home Assistant sidebar and shows live entity updates."
                 }, ensure_ascii=False, default=str)
 
             except Exception as e:
