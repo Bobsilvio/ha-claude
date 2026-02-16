@@ -865,7 +865,7 @@ HA_TOOLS_DESCRIPTION = [
                         "properties": {
                             "type": {"type": "string", "enum": ["hero", "pills", "flow", "gauge", "gauges", "kpi", "chart", "entities", "controls", "stats", "value"]},
                             "title": {"type": "string", "description": "Section title."},
-                            "icon": {"type": "string", "description": "Emoji icon."},
+                            "icon": {"type": "string", "description": "Emoji character (e.g. ⚡🏠💡🌡️🔋🔌🛡️). Do NOT use mdi: icons, only emoji."},
                             "span": {"type": "integer", "description": "Layout: 1=third, 2=two-thirds, 3=full (default)."},
                             "style": {"type": "string", "enum": ["gradient", "outlined", "flat"]},
                             "description": {"type": "string", "description": "Hero description."},
