@@ -2023,12 +2023,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                         iframe_card = {
                             "type": "iframe",
                             "url": dashboard_url,
-                            "aspect_ratio": "100%"
                         }
                         
                         view_config = {
                             "title": title,
                             "path": safe_url_path,
+                            "type": "panel",
                             "cards": [iframe_card]
                         }
                         

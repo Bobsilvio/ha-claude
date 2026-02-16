@@ -1,4 +1,9 @@
 # Changelog
+## 3.5.6
+- **FIX**: HTML dashboard iframe now renders full-page instead of small centered square
+- **FIX**: Removed `aspect_ratio: "100%"` from iframe card (was constraining to 1:1 square)
+- **FIX**: Lovelace wrapper view now uses `type: "panel"` for true full-page layout (no margins/max-width)
+
 ## 3.5.5
 - **FIX**: Complete rewrite of HTML dashboard template - was rendering blank white page
 - **FIX**: CSS custom properties had quoted values (`'#ffffff'` → `#ffffff`) - colors not applied
