@@ -44,12 +44,12 @@ RUN chmod +x /etc/s6-overlay/s6-rc.d/claude-backend/run \
     && chmod +x /etc/s6-overlay/s6-rc.d/claude-backend/finish
 
 # Expose API port
-EXPOSE 5000
+EXPOSE 5010
 
 # Set environment defaults
 ENV DEBUG_MODE=False
 ENV ENABLE_FILE_ACCESS=False
-ENV API_PORT=5000
+ENV API_PORT=5010
 ENV HA_URL=http://supervisor/core
 ENV TIMEOUT=30
 ENV MAX_RETRIES=3

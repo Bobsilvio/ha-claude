@@ -77,7 +77,7 @@ NVIDIA_THINKING_MODE = os.getenv("NVIDIA_THINKING_MODE", "False").lower() == "tr
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
-API_PORT = int(os.getenv("API_PORT", 5000))
+API_PORT = int(os.getenv("API_PORT", 5010))
 DEBUG_MODE = os.getenv("DEBUG_MODE", "False").lower() == "true"
 COLORED_LOGS = os.getenv("COLORED_LOGS", "False").lower() == "true"
 ENABLE_FILE_ACCESS = os.getenv("ENABLE_FILE_ACCESS", "False").lower() == "true"

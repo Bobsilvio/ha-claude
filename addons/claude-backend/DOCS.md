@@ -200,7 +200,7 @@ Use via YAML config or environment variable `LOG_LEVEL`.
 
 ## API Reference
 
-The add-on exposes a REST API at `/ha-claude/api/` (or direct port 5000 if not using Ingress).
+The add-on exposes a REST API at `/ha-claude/api/` (or direct port 5010 if not using Ingress).
 
 ### Chat Endpoints
 

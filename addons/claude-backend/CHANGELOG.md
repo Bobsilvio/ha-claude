@@ -1,4 +1,10 @@
 # Changelog
+## 3.7.4
+- **FIX**: Dockerfile still had `EXPOSE 5000` and `ENV API_PORT=5000` — changed to 5010
+- **FIX**: api.py fallback `os.getenv("API_PORT", 5000)` — changed to 5010
+- **FIX**: DOCS.md referenced port 5000 — changed to 5010
+- **FIX**: Supervisor warning `Option 'api_port' does not exist in the schema` — added `api_port: port?` to schema for backward compatibility (optional, value ignored, port comes from environment section)
+
 ## 3.7.3
 - **ARCHITECTURE**: Shell + Skin approach — addon provides the "engine" (auth, WebSocket, Vue 3, Chart.js, theme CSS), agent provides the "skin" (body_html + custom_css)
 - **FIX**: v3.7.2 was effectively a fixed template (agent only picked section types/colors) — now agent has FULL creative freedom over HTML/CSS
