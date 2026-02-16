@@ -1,4 +1,18 @@
 # Changelog
+## 3.5.5
+- **FIX**: Complete rewrite of HTML dashboard template - was rendering blank white page
+- **FIX**: CSS custom properties had quoted values (`'#ffffff'` → `#ffffff`) - colors not applied
+- **FIX**: Tailwind CSS loaded as `<link>` instead of `<script>` - styles not loading
+- **FIX**: Vue.js template syntax broken - Python f-string `{{ }}` escaping produced single `{ }` instead of Vue `{{ }}`
+- **FIX**: `template: '#app'` conflicted with `.mount('#app')` - Vue couldn't render
+- **FIX**: WebSocket/REST API calls now authenticate with HA token from localStorage (same-origin Ingress)
+- **IMPROVEMENT**: Switched from f-string to placeholder-based template (avoids all `{{ }}` escaping issues)
+- **IMPROVEMENT**: Entity cards show friendly_name and unit_of_measurement
+- **IMPROVEMENT**: Chart.js auto-selects bar/doughnut based on entity count
+- **IMPROVEMENT**: Gauge SVG uses proper arc path calculation
+- **IMPROVEMENT**: Entities split into chunks of 8 per card for better layout
+- **IMPROVEMENT**: WebSocket subscribes to state_changed events with proper HA auth flow
+
 ## 3.5.4
 - **FIX**: HTML dashboard iframe 404 error - iframe URL now uses Ingress proxy path instead of relative URL
 - **FIX**: Added `get_addon_ingress_url()` helper that queries Supervisor API (`/addons/self/info`) to get correct Ingress path

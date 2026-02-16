@@ -16,414 +16,389 @@ AI_SIGNATURE = "AI Assistant"
 def _generate_html_dashboard(title: str, name: str, description: str, entities: list, 
                             layout: str = "grid", components: list = None, 
                             theme: str = "auto", html_content: str = None) -> str:
-    """Generate a complete HTML dashboard with Vue 3, real-time WebSocket and API integration."""
+    """Generate a complete HTML dashboard with Vue 3, real-time WebSocket and API integration.
+    
+    Uses regular string with placeholder replacement (not f-strings) to avoid
+    escaping conflicts between Python {{ }} and Vue/JS {{ }} syntax.
+    """
+    import html as html_module
     
     if components is None:
         components = ["info", "chart"]
     
-    # Sanitize filename
-    safe_name = name.lower().replace(" ", "-").replace("_", "-")
-    
-    # Build entity watch list
-    entity_list_str = ", ".join([f'"{e}"' for e in entities]) if entities else '""'
+    # Serialize entities as JSON array for JavaScript
+    entities_json = json.dumps(entities, ensure_ascii=False) if entities else '[]'
     
     # Theme colors
     theme_config = {
-        "light": {
-            "bg": "#ffffff",
-            "text": "#1f2937",
-            "card": "#f3f4f6",
-            "border": "#e5e7eb"
-        },
-        "dark": {
-            "bg": "#1f2937",
-            "text": "#f3f4f6",
-            "card": "#111827",
-            "border": "#374151"
-        }
+        "light": {"bg": "#ffffff", "text": "#1f2937", "card": "#f3f4f6", "border": "#e5e7eb"},
+        "dark": {"bg": "#1a1a2e", "text": "#e2e8f0", "card": "#16213e", "border": "#2d3748"},
     }
-    
     colors = theme_config.get(theme if theme != "auto" else "light", theme_config["light"])
+    color_scheme = "dark" if theme == "dark" else "light"
     
-    # Generate Vue template based on components
+    # Escape title/description for HTML
+    safe_title = html_module.escape(title)
+    safe_description = html_module.escape(description or "")
+    
+    # Generate Vue component sections based on requested components
     component_html = ""
     if "info" in components:
         component_html += """
-        <div class="info-card">
-          <h3>{{title}}</h3>
-          <p>{{description}}</p>
-          <div class="entity-count">Monitored: {{entities.length}} entities</div>
-        </div>"""
+            <div class="info-card">
+              <h3>{{ title }}</h3>
+              <p>{{ description }}</p>
+              <div class="entity-count">🔍 Monitored: {{ entities.length }} entities</div>
+            </div>"""
     
     if "chart" in components:
         component_html += """
-        <div class="chart-container">
-          <canvas id="entityChart"></canvas>
-        </div>"""
+            <div class="chart-container">
+              <h3>📊 Sensor Values</h3>
+              <canvas id="entityChart"></canvas>
+            </div>"""
     
     if "gauge" in components:
         component_html += """
-        <div class="gauge-container">
-          <svg viewBox="0 0 200 120">
-            <path d="M 20 100 A 80 80 0 0 1 180 100" class="gauge-background"/>
-            <path :d="`M 20 100 A 80 80 0 0 1 ${gaugeValue} 100`" class="gauge-fill"/>
-          </svg>
-          <div class="gauge-value">{{gaugePercent}}%</div>
-        </div>"""
+            <div class="gauge-container">
+              <h3>{{ entities[0] || 'Gauge' }}</h3>
+              <svg viewBox="0 0 200 120" width="200" height="120">
+                <path d="M 20 100 A 80 80 0 0 1 180 100" class="gauge-bg"/>
+                <path :d="gaugePath" class="gauge-fill"/>
+                <text x="100" y="90" text-anchor="middle" class="gauge-text">{{ gaugePercent }}%</text>
+              </svg>
+            </div>"""
+
+    if html_content:
+        component_html = html_content
     
-    # Build HTML template
-    html_template = f"""<!DOCTYPE html>
+    # Build the complete HTML template using regular string (NOT f-string)
+    # This preserves Vue {{ }} and JS { } syntax without escaping issues
+    html_template = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{title}</title>
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@3"></script>
-    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+    <title>__TITLE__</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        :root {{
-            --bg-primary: '{colors["bg"]}';
-            --text-primary: '{colors["text"]}';
-            --card-bg: '{colors["card"]}';
-            --border-color: '{colors["border"]}';
-        }}
-        
-        * {{
-            color-scheme: {'dark' if theme == 'dark' else 'light'};
-        }}
-        
-        body {{
+        :root {
+            --bg-primary: __BG_COLOR__;
+            --text-primary: __TEXT_COLOR__;
+            --card-bg: __CARD_COLOR__;
+            --border-color: __BORDER_COLOR__;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; color-scheme: __COLOR_SCHEME__; }
+        body {
             background-color: var(--bg-primary);
             color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
-        }}
-        
-        #app {{
-            min-height: 100vh;
-            padding: 2rem;
-        }}
-        
-        .dashboard-header {{
-            margin-bottom: 2rem;
-        }}
-        
-        .dashboard-header h1 {{
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }}
-        
-        .dashboard-header p {{
-            opacity: 0.7;
-            font-size: 0.95rem;
-        }}
-        
-        .connection-status {{
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.85rem;
-            padding: 0.5rem 1rem;
-            background-color: var(--card-bg);
-            border-radius: 0.5rem;
-            margin-top: 1rem;
-        }}
-        
-        .status-indicator {{
-            width: 0.75rem;
-            height: 0.75rem;
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }}
-        
-        .status-indicator.connected {{
-            background-color: #10b981;
-        }}
-        
-        .status-indicator.disconnected {{
-            background-color: #ef4444;
-            animation: none;
-        }}
-        
-        @keyframes pulse {{
-            0%, 100% {{ opacity: 1; }}
-            50% {{ opacity: 0.5; }}
-        }}
-        
-        .dashboard-grid {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #app { min-height: 100vh; padding: 1.5rem; }
+        .dashboard-header { margin-bottom: 1.5rem; }
+        .dashboard-header h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; }
+        .dashboard-header p { opacity: 0.7; font-size: 0.9rem; }
+        .connection-status {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            font-size: 0.8rem; padding: 0.4rem 0.8rem;
+            background: var(--card-bg); border-radius: 2rem; margin-top: 0.75rem;
+        }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #ef4444; flex-shrink: 0;
+        }
+        .status-dot.ok { background: #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 50% { opacity: 0.4; } }
+        .grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-top: 2rem;
-        }}
-        
-        .card {{
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            transition: all 0.3s ease;
-        }}
-        
-        .card:hover {{
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        }}
-        
-        .card h3 {{
-            font-size: 1.125rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-        }}
-        
-        .entity-item {{
-            padding: 0.75rem;
-            background-color: var(--bg-primary);
-            border-radius: 0.5rem;
-            margin-bottom: 0.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-        
-        .entity-value {{
-            font-weight: 600;
-            font-size: 1.1rem;
-        }}
-        
-        .info-card {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            margin-bottom: 2rem;
-        }}
-        
-        .info-card h3 {{
-            font-size: 1.5rem;
-            margin-bottom: 0.5rem;
-        }}
-        
-        .entity-count {{
-            margin-top: 1rem;
-            opacity: 0.9;
-            font-size: 0.9rem;
-        }}
-        
-        .chart-container {{
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            position: relative;
-            height: 300px;
-        }}
-        
-        .gauge-container {{
-            background-color: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            text-align: center;
-        }}
-        
-        .gauge-background {{
-            stroke: var(--border-color);
-            stroke-width: 8;
-            fill: none;
-        }}
-        
-        .gauge-fill {{
-            stroke: #10b981;
-            stroke-width: 8;
-            fill: none;
-            transition: d 0.3s ease;
-        }}
-        
-        .gauge-value {{
-            margin-top: 1rem;
-            font-size: 2rem;
-            font-weight: bold;
-        }}
-        
-        .error {{
-            background-color: #fee2e2;
-            color: #991b1b;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-top: 1rem;
-        }}
-        
-        .loading {{
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }}
-        
-        .loading span {{
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 50%;
-            background-color: var(--text-primary);
-            animation: bounce 1.4s infinite;
-        }}
-        
-        .loading span:nth-child(2) {{ animation-delay: 0.2s; }}
-        .loading span:nth-child(3) {{ animation-delay: 0.4s; }}
-        
-        @keyframes bounce {{
-            0%, 100% {{ transform: translateY(0); }}
-            50% {{ transform: translateY(-10px); }}
-        }}
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem; margin-top: 1rem;
+        }
+        .card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 1.25rem;
+            transition: box-shadow 0.2s;
+        }
+        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+        .entity-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0.6rem 0.75rem; background: var(--bg-primary);
+            border-radius: 8px; margin-bottom: 0.4rem; font-size: 0.9rem;
+        }
+        .entity-row .label { opacity: 0.85; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .entity-row .value { font-weight: 600; font-size: 1.05rem; }
+        .info-card {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff; padding: 1.5rem; border-radius: 12px; grid-column: 1 / -1;
+        }
+        .info-card h3 { font-size: 1.3rem; margin-bottom: 0.3rem; }
+        .entity-count { margin-top: 0.5rem; opacity: 0.85; font-size: 0.85rem; }
+        .chart-container {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 1.25rem; grid-column: 1 / -1;
+        }
+        .chart-container canvas { width: 100% !important; max-height: 280px; }
+        .gauge-container {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 1.25rem; text-align: center;
+        }
+        .gauge-bg { stroke: var(--border-color); stroke-width: 10; fill: none; stroke-linecap: round; }
+        .gauge-fill { stroke: #10b981; stroke-width: 10; fill: none; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease; }
+        .gauge-text { font-size: 1.5rem; font-weight: 700; fill: var(--text-primary); }
+        .error-box { background: #fee2e2; color: #991b1b; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+        .fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+        .fade-enter-from, .fade-leave-to { opacity: 0; }
     </style>
 </head>
 <body>
     <div id="app">
         <div class="dashboard-header">
-            <h1>{title}</h1>
-            <p>{description}</p>
+            <h1>__TITLE__</h1>
+            <p>__DESCRIPTION__</p>
             <div class="connection-status">
-                <div :class="['status-indicator', connected ? 'connected' : 'disconnected']"></div>
-                <span>{{connected ? 'Connected' : 'Connecting...'}}</span>
+                <div :class="['status-dot', connected ? 'ok' : '']"></div>
+                <span>{{ connected ? '🟢 Connected' : '🔴 Connecting...' }}</span>
             </div>
         </div>
-        
-        <div class="dashboard-grid" v-if="entities.length > 0">
-            {component_html if html_content is None else html_content}
-            
-            <div class="card">
+
+        <div class="grid" v-if="entities.length > 0">
+            __COMPONENT_HTML__
+
+            <div class="card" v-for="chunk in entityChunks" :key="chunk[0]?.id">
                 <h3>Entity States</h3>
-                <div v-for="(state, entity) in entityStates" :key="entity" class="entity-item">
-                    <span>{{ entity }}</span>
-                    <span class="entity-value">{{ state }}</span>
+                <div v-for="e in chunk" :key="e.id" class="entity-row">
+                    <span class="label" :title="e.id">{{ e.name }}</span>
+                    <span class="value">{{ e.state }}{{ e.unit ? ' ' + e.unit : '' }}</span>
                 </div>
             </div>
         </div>
-        
-        <div v-else class="error">
-            No entities to display
+
+        <div v-if="!connected && !error" class="error-box" style="background:#fef3c7;color:#92400e;">
+            ⏳ Connecting to Home Assistant...
         </div>
-        
-        <div v-if="error" class="error">
-            {{ error }}
-        </div>
+        <div v-if="error" class="error-box">{{ error }}</div>
     </div>
-    
+
     <script>
-        const {{ createApp, ref, reactive, onMounted, computed }} = Vue;
-        
-        createApp({{
-            template: '#app',
-            setup() {{
+    (function() {
+        const { createApp, ref, reactive, computed, onMounted, onUnmounted, nextTick } = Vue;
+
+        // Entity list injected at generation time
+        const ENTITIES = __ENTITIES_JSON__;
+
+        // Get HA auth token from localStorage (same origin via Ingress)
+        function getHAToken() {
+            try {
+                const raw = localStorage.getItem('hassTokens');
+                if (raw) {
+                    const t = JSON.parse(raw);
+                    return t.access_token || '';
+                }
+            } catch(e) { console.warn('Could not read HA token:', e); }
+            return '';
+        }
+
+        createApp({
+            setup() {
                 const connected = ref(false);
                 const error = ref('');
-                const entityStates = reactive({{}});
-                const entities = ref({entities});
+                const entities = ref(ENTITIES);
+                const title = ref('__TITLE_JS__');
+                const description = ref('__DESCRIPTION_JS__');
+                const states = reactive({});  // entity_id -> {state, attributes, friendly_name, unit}
                 let ws = null;
-                
-                const gaugeValue = computed(() => {{
-                    // Calculate gauge value based on first entity
-                    if (entities.value.length === 0) return 0;
-                    const state = entityStates[entities.value[0]];
-                    const num = parseFloat(state) || 0;
-                    return Math.min(100, Math.max(0, num));
-                }});
-                
-                const gaugePercent = computed(() => Math.round(gaugeValue.value));
-                
-                const connectWebSocket = () => {{
-                    try {{
-                        // Get websocket endpoint from current location
-                        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                        const wsUrl = `${{protocol}}//${{window.location.host}}/api/websocket`;
-                        
+                let msgId = 1;
+                let chartInstance = null;
+                let reconnectTimer = null;
+
+                // Computed: enriched entity list with state
+                const entityList = computed(() => {
+                    return entities.value.map(eid => ({
+                        id: eid,
+                        name: (states[eid]?.friendly_name) || eid.split('.').pop().replace(/_/g, ' '),
+                        state: states[eid]?.state ?? '...',
+                        unit: states[eid]?.unit || '',
+                    }));
+                });
+
+                // Split entities into chunks of 8 for card layout
+                const entityChunks = computed(() => {
+                    const list = entityList.value;
+                    const chunks = [];
+                    for (let i = 0; i < list.length; i += 8) {
+                        chunks.push(list.slice(i, i + 8));
+                    }
+                    return chunks;
+                });
+
+                // Gauge: use first numeric entity
+                const gaugePercent = computed(() => {
+                    for (const eid of entities.value) {
+                        const s = states[eid]?.state;
+                        const n = parseFloat(s);
+                        if (!isNaN(n)) return Math.round(Math.min(100, Math.max(0, n)));
+                    }
+                    return 0;
+                });
+                const gaugePath = computed(() => {
+                    const pct = gaugePercent.value / 100;
+                    const angle = Math.PI * (1 - pct);
+                    const x = 100 + 80 * Math.cos(angle);
+                    const y = 100 - 80 * Math.sin(angle);
+                    const large = pct > 0.5 ? 1 : 0;
+                    return `M 20 100 A 80 80 0 ${large} 1 ${x.toFixed(1)} ${y.toFixed(1)}`;
+                });
+
+                // --- WebSocket connection to HA ---
+                function connect() {
+                    const token = getHAToken();
+                    if (!token) {
+                        error.value = 'No HA auth token found. Please reload Home Assistant.';
+                        // Fallback to REST
+                        fetchREST();
+                        return;
+                    }
+                    try {
+                        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                        const wsUrl = proto + '//' + location.host + '/api/websocket';
                         ws = new WebSocket(wsUrl);
-                        
-                        ws.onopen = () => {{
-                            connected.value = true;
-                            error.value = '';
-                            console.log('✅ WebSocket connected');
-                            
-                            // Subscribe to state changes for our entities
-                            entities.value.forEach(entity => {{
-                                ws.send(JSON.stringify({{
-                                    id: 1,
-                                    type: 'subscribe_entities',
-                                    entity_ids: [entity]
-                                }}));
-                            }});
-                        }};
-                        
-                        ws.onmessage = (event) => {{
-                            const msg = JSON.parse(event.data);
-                            
-                            if (msg.type === 'result' && msg.success) {{
-                                // Initial state loaded
-                                if (msg.result) {{
-                                    Object.entries(msg.result).forEach(([entity, state]) => {{
-                                        entityStates[entity] = state.state;
-                                    }});
-                                }}
-                            }} else if (msg.type === 'event' && msg.event) {{
-                                // Live update
-                                const entity = msg.event.entity_id;
-                                const state = msg.event.new_state?.state || 'unknown';
-                                entityStates[entity] = state;
-                            }}
-                        }};
-                        
-                        ws.onerror = (error) => {{
+
+                        ws.onmessage = (ev) => {
+                            const msg = JSON.parse(ev.data);
+                            if (msg.type === 'auth_required') {
+                                ws.send(JSON.stringify({type: 'auth', access_token: token}));
+                            } else if (msg.type === 'auth_ok') {
+                                connected.value = true;
+                                error.value = '';
+                                // Fetch initial states via REST, then subscribe for live updates
+                                fetchREST();
+                                // Subscribe to state_changed events
+                                ws.send(JSON.stringify({
+                                    id: msgId++,
+                                    type: 'subscribe_events',
+                                    event_type: 'state_changed'
+                                }));
+                            } else if (msg.type === 'auth_invalid') {
+                                error.value = 'HA auth failed. Try reloading Home Assistant.';
+                                connected.value = false;
+                            } else if (msg.type === 'event' && msg.event?.event_type === 'state_changed') {
+                                const d = msg.event.data;
+                                if (d && entities.value.includes(d.entity_id) && d.new_state) {
+                                    states[d.entity_id] = {
+                                        state: d.new_state.state,
+                                        friendly_name: d.new_state.attributes?.friendly_name || '',
+                                        unit: d.new_state.attributes?.unit_of_measurement || '',
+                                        attributes: d.new_state.attributes || {},
+                                    };
+                                    updateChart();
+                                }
+                            }
+                        };
+
+                        ws.onerror = () => { connected.value = false; };
+                        ws.onclose = () => {
                             connected.value = false;
-                            console.error('❌ WebSocket error:', error);
-                        }};
-                        
-                        ws.onclose = () => {{
-                            connected.value = false;
-                            console.log('⚠️ WebSocket disconnected, retrying...');
-                            setTimeout(connectWebSocket, 3000);
-                        }};
-                    }} catch (err) {{
-                        error.value = `Connection error: ${{err.message}}`;
-                        console.error('❌ WebSocket setup failed:', err);
-                    }}
-                }};
-                
-                const fetchEntityStates = () => {{
-                    // Fallback: fetch via REST API if WebSocket not available
-                    fetch('/api/states')
-                        .then(r => r.json())
-                        .then(states => {{
-                            states.forEach(state => {{
-                                if (entities.value.includes(state.entity_id)) {{
-                                    entityStates[state.entity_id] = state.state;
-                                }}
-                            }});
-                        }})
-                        .catch(err => {{
-                            error.value = `REST API error: ${{err.message}}`;
-                        }});
-                }};
-                
-                onMounted(() => {{
-                    connectWebSocket();
-                    fetchEntityStates();
-                }});
-                
-                return {{
-                    connected,
-                    error,
-                    entityStates,
-                    entities,
-                    gaugeValue,
-                    gaugePercent
-                }};
-            }}
-        }}).mount('#app');
+                            reconnectTimer = setTimeout(connect, 5000);
+                        };
+                    } catch(e) {
+                        error.value = 'WebSocket error: ' + e.message;
+                    }
+                }
+
+                // --- REST API fallback ---
+                function fetchREST() {
+                    const token = getHAToken();
+                    const headers = token ? {'Authorization': 'Bearer ' + token} : {};
+                    fetch('/api/states', { headers })
+                        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+                        .then(list => {
+                            list.forEach(s => {
+                                if (entities.value.includes(s.entity_id)) {
+                                    states[s.entity_id] = {
+                                        state: s.state,
+                                        friendly_name: s.attributes?.friendly_name || '',
+                                        unit: s.attributes?.unit_of_measurement || '',
+                                        attributes: s.attributes || {},
+                                    };
+                                }
+                            });
+                            nextTick(initChart);
+                        })
+                        .catch(e => {
+                            if (!connected.value) error.value = 'REST API: ' + e.message;
+                        });
+                }
+
+                // --- Chart.js ---
+                function initChart() {
+                    const canvas = document.getElementById('entityChart');
+                    if (!canvas) return;
+                    if (chartInstance) chartInstance.destroy();
+
+                    const numericEntities = entities.value.filter(eid => {
+                        const v = parseFloat(states[eid]?.state);
+                        return !isNaN(v);
+                    });
+                    if (numericEntities.length === 0) return;
+
+                    const labels = numericEntities.map(eid =>
+                        states[eid]?.friendly_name || eid.split('.').pop().replace(/_/g, ' ')
+                    );
+                    const data = numericEntities.map(eid => parseFloat(states[eid]?.state) || 0);
+                    const colors = ['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+
+                    chartInstance = new Chart(canvas, {
+                        type: numericEntities.length > 4 ? 'bar' : 'doughnut',
+                        data: {
+                            labels,
+                            datasets: [{
+                                data,
+                                backgroundColor: colors.slice(0, data.length),
+                                borderWidth: 0, borderRadius: 4,
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8, font: {size: 11} } } }
+                        }
+                    });
+                }
+                function updateChart() { nextTick(initChart); }
+
+                onMounted(() => { connect(); });
+                onUnmounted(() => {
+                    if (ws) ws.close();
+                    if (reconnectTimer) clearTimeout(reconnectTimer);
+                    if (chartInstance) chartInstance.destroy();
+                });
+
+                return {
+                    connected, error, entities, title, description,
+                    states, entityList, entityChunks,
+                    gaugePercent, gaugePath,
+                };
+            }
+        }).mount('#app');
+    })();
     </script>
 </body>
 </html>"""
+
+    # Replace placeholders with actual values (safe from {{ }} escaping issues)
+    html_template = html_template.replace("__TITLE__", safe_title)
+    html_template = html_template.replace("__DESCRIPTION__", safe_description)
+    html_template = html_template.replace("__TITLE_JS__", title.replace("'", "\\'").replace("\\", "\\\\"))
+    html_template = html_template.replace("__DESCRIPTION_JS__", (description or "").replace("'", "\\'").replace("\\", "\\\\"))
+    html_template = html_template.replace("__ENTITIES_JSON__", entities_json)
+    html_template = html_template.replace("__COMPONENT_HTML__", component_html)
+    html_template = html_template.replace("__BG_COLOR__", colors["bg"])
+    html_template = html_template.replace("__TEXT_COLOR__", colors["text"])
+    html_template = html_template.replace("__CARD_COLOR__", colors["card"])
+    html_template = html_template.replace("__BORDER_COLOR__", colors["border"])
+    html_template = html_template.replace("__COLOR_SCHEME__", color_scheme)
     
     return html_template
 
