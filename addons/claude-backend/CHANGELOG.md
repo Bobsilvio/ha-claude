@@ -1,4 +1,15 @@
 # Changelog
+## 3.7.2
+- **FIX**: HTML dashboard tool now uses structured design spec instead of raw HTML in tool args
+- **REASON**: LLMs (GPT-5.2) truncate large tool call arguments - sending full HTML (~3000+ tokens) as a single parameter fails silently (args become `{}`)
+- **NEW**: Agent now sends a compact JSON design spec: sections (hero/gauges/chart/entities/controls/stats), entity grouping, colors, chart types
+- **NEW**: Addon builds the HTML from the spec with `_build_dashboard_html()` - handles auth, WebSocket, CSS theming, Chart.js
+- **NEW**: 6 section types: hero (gradient banner), gauges (SVG donut), chart (bar/line/doughnut/radar/pie), entities (rows with toggles/sliders), controls (big toggle buttons), stats (KPI cards)
+- **NEW**: `accent_color` parameter - agent chooses primary color for gradients and highlights
+- **NEW**: Per-section `style` parameter: gradient, glassmorphism, flat, outlined
+- **IMPROVEMENT**: Agent retains full creative control (layout architecture, entity grouping, colors, visualization choices) while output stays within token limits
+- **IMPROVEMENT**: Auth boilerplate always correct - no risk of agent forgetting WebSocket auth flow
+
 ## 3.7.1
 - **FIX**: Removed `api_port` from config options and schema - port is fixed at 5010 via environment variable and should not be visible to users in the addon settings UI
 
