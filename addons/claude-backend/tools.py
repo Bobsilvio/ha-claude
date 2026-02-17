@@ -354,6 +354,8 @@ TOOL_DESCRIPTIONS = {
     "list_snapshots": "Elenco snapshot",
     "restore_snapshot": "Ripristino snapshot",
     "manage_helpers": "Gestisco helper",
+    "get_repairs": "Carico riparazioni",
+    "dismiss_repair": "Ignoro riparazione",
 }
 
 
@@ -887,6 +889,38 @@ HA_TOOLS_DESCRIPTION = [
             },
             "required": ["title", "name", "entities", "sections"]
         }
+    },
+    {
+        "name": "get_repairs",
+        "description": "Get active issues/repairs from Home Assistant and system health info. Returns open repair issues (deprecated integrations, config problems, broken devices) and resolution suggestions.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "include_ignored": {
+                    "type": "boolean",
+                    "description": "Include issues already dismissed/ignored by user. Default: false."
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "dismiss_repair",
+        "description": "Dismiss/ignore a specific repair issue in Home Assistant. Use after the user has reviewed and acknowledged an issue.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "issue_id": {
+                    "type": "string",
+                    "description": "The issue_id to dismiss (from get_repairs results)"
+                },
+                "domain": {
+                    "type": "string",
+                    "description": "The domain/integration of the issue (from get_repairs results)"
+                }
+            },
+            "required": ["issue_id", "domain"]
+        }
     }
 ]
 
@@ -984,6 +1018,7 @@ WRITE_TOOLS = {
     "create_dashboard", "update_dashboard", "delete_dashboard",
     "call_service", "write_config_file", "send_notification",
     "manage_entity", "create_backup", "manage_helpers",
+    "dismiss_repair",
 }
 # Tools that are write-only when action is NOT "list"
 WRITE_WHEN_NOT_LIST = {"manage_areas", "shopping_list"}
@@ -2754,6 +2789,71 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
             return json.dumps({"error": f"Unknown action: {action}"}, ensure_ascii=False)
+
+        elif tool_name == "get_repairs":
+            include_ignored = tool_input.get("include_ignored", False)
+            repairs_result = api.call_ha_websocket("repairs/list_issues")
+            resolution_result = api.call_ha_websocket("resolution/info")
+
+            # Parse repair issues
+            issues = []
+            if repairs_result.get("success"):
+                raw_issues = repairs_result.get("result", {}).get("issues", [])
+                for issue in raw_issues:
+                    if not include_ignored and issue.get("ignored", False):
+                        continue
+                    issues.append({
+                        "issue_id": issue.get("issue_id"),
+                        "domain": issue.get("domain"),
+                        "severity": issue.get("severity"),
+                        "is_fixable": issue.get("is_fixable", False),
+                        "ignored": issue.get("ignored", False),
+                        "created": issue.get("created"),
+                        "translation_key": issue.get("translation_key"),
+                        "translation_placeholders": issue.get("translation_placeholders"),
+                        "learn_more_url": issue.get("learn_more_url"),
+                    })
+
+            # Parse resolution/health info
+            health = {}
+            suggestions = []
+            if resolution_result.get("success"):
+                res_data = resolution_result.get("result", {})
+                health = {
+                    "unsupported": res_data.get("unsupported", []),
+                    "unhealthy": res_data.get("unhealthy", []),
+                }
+                for sug in res_data.get("suggestions", []):
+                    suggestions.append({
+                        "uuid": sug.get("uuid"),
+                        "type": sug.get("type"),
+                        "context": sug.get("context"),
+                        "reference": sug.get("reference"),
+                    })
+
+            return json.dumps({
+                "issues_count": len(issues),
+                "issues": issues,
+                "suggestions": suggestions,
+                "health": health,
+            }, ensure_ascii=False, default=str)
+
+        elif tool_name == "dismiss_repair":
+            issue_id = tool_input.get("issue_id", "")
+            domain = tool_input.get("domain", "")
+            if not issue_id or not domain:
+                return json.dumps({"error": "Both issue_id and domain are required"})
+            result = api.call_ha_websocket("repairs/ignore_issue",
+                                           issue_id=issue_id, domain=domain)
+            if result.get("success"):
+                return json.dumps({
+                    "status": "success",
+                    "message": f"Issue '{issue_id}' from '{domain}' dismissed."
+                }, ensure_ascii=False, default=str)
+            error_msg = result.get("error", {})
+            if isinstance(error_msg, dict):
+                error_msg = error_msg.get("message", str(error_msg))
+            return json.dumps({"error": f"Failed to dismiss: {error_msg}"}, default=str)
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:

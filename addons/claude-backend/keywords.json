@@ -13,6 +13,7 @@
       "dashboard": ["dashboard", "dash", "lovelace", "scheda", "card", "pannello"],
       "helper": ["helper", "aiutante", "input_boolean", "input_number", "input_select", "input_text", "input_datetime", "variabile", "toggle", "contatore", "booleano"],
       "chat": ["ciao", "buongiorno", "buonasera", "buonanotte", "salve", "hey", "come stai", "come va", "grazie", "bravo", "ok", "perfetto", "arrivederci", "a dopo"],
+      "repair": ["riparazione", "riparazioni", "repair", "repairs", "problemi", "issue", "errori", "warning", "salute", "health", "diagnos"],
       "stop_words": ["questa", "questo", "quella", "quello", "della", "delle", "dello", "degli", "dalla", "dalle", "stessa", "stesso", "altra", "altro", "prima", "dopo", "quando", "perché", "quindi", "anche", "ancora", "molto", "troppo", "sempre", "dovremmo", "dovrebbe", "potrebbe", "voglio", "vorrei", "puoi", "fammi", "invia", "manda", "notifica"]
     },
     "en": {
@@ -28,6 +29,7 @@
       "dashboard": ["dashboard", "dash", "lovelace", "card", "panel", "view"],
       "helper": ["helper", "input_boolean", "input_number", "input_select", "input_text", "input_datetime", "variable", "toggle", "counter", "boolean"],
       "chat": ["hello", "hi", "hey", "good morning", "good evening", "good night", "how are you", "thanks", "thank you", "goodbye", "bye", "great", "ok", "perfect"],
+      "repair": ["repair", "repairs", "issue", "issues", "problem", "problems", "warning", "warnings", "health", "diagnos", "broken", "fix issues"],
       "stop_words": ["this", "that", "with", "from", "have", "which", "there", "their", "would", "should", "could", "very", "too", "always", "want", "please", "send", "notification", "the", "a", "an", "of"]
     },
     "es": {
@@ -43,6 +45,7 @@
       "dashboard": ["dashboard", "dash", "tablero", "tarjeta", "panel", "vista"],
       "helper": ["helper", "ayudante", "input_boolean", "input_number", "input_select", "input_text", "input_datetime", "variable", "contador", "booleano"],
       "chat": ["hola", "buenos días", "buenas tardes", "buenas noches", "cómo estás", "gracias", "adiós", "hasta luego", "perfecto", "genial", "ok"],
+      "repair": ["reparación", "reparaciones", "repair", "problema", "problemas", "issue", "advertencia", "salud", "diagnós", "roto", "arreglar problemas"],
       "stop_words": ["este", "ese", "aquello", "del", "de la", "desde", "la", "el", "un", "una", "por", "para", "con", "sin", "que", "es", "son", "está", "están", "muy", "mucho", "siempre", "quiero", "quisiera", "por favor", "envía", "enviar", "notificación"]
     },
     "fr": {
@@ -58,6 +61,7 @@
       "dashboard": ["tableau de bord", "dashboard", "dash", "carte", "panneau", "vue"],
       "helper": ["helper", "assistant", "input_boolean", "input_number", "input_select", "input_text", "input_datetime", "variable", "compteur", "booléen"],
       "chat": ["bonjour", "bonsoir", "bonne nuit", "salut", "comment vas-tu", "merci", "au revoir", "à bientôt", "parfait", "super", "ok"],
+      "repair": ["réparation", "réparations", "repair", "problème", "problèmes", "issue", "avertissement", "santé", "diagnos", "cassé", "corriger problèmes"],
       "stop_words": ["ce", "cet", "cette", "celui", "du", "de", "la", "le", "un", "une", "par", "pour", "avec", "sans", "que", "est", "sont", "très", "beaucoup", "toujours", "je veux", "je voudrais", "s'il vous plaît", "envoie", "envoyer", "notification"]
     }
   }

@@ -1,4 +1,10 @@
 # Changelog
+## 3.8.2
+- **NEW**: `get_repairs` tool — read active HA repair issues and system health diagnostics (unsupported/unhealthy components, resolution suggestions)
+- **NEW**: `dismiss_repair` tool — dismiss/ignore specific repair issues after user review (write-guarded in read-only mode)
+- **NEW**: Intent detection for repairs — multilingual keywords (IT/EN/ES/FR) route repair queries to focused tool set
+- **NEW**: Focused prompt for repairs intent — guides AI to present issues clearly with severity, suggest fixes, and ask confirmation before dismissing
+
 ## 3.8.1
 - **FIX**: Dashboard HTML iframe 401 Unauthorized — browser-side `localStorage.hassTokens` may be expired, missing, or blocked by storage partitioning
 - **NEW**: Dashboard API proxy endpoints (`/dashboard_api/states`, `/dashboard_api/services/<domain>/<service>`) — server-side auth via SUPERVISOR_TOKEN, no browser token needed

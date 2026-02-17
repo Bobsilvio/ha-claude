@@ -42,6 +42,12 @@ Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 - **YAML Diff View**: See exactly what changed with before/after comparison
 - **Smart Suggestions**: AI understands your devices and suggests improvements
 
+### 🔧 System Diagnostics & Repairs
+- **Read Repairs**: View active HA repair issues and warnings
+- **Health Check**: System health diagnostics (unsupported/unhealthy components)
+- **AI Suggestions**: AI analyzes issues and suggests concrete fixes
+- **Dismiss Issues**: Acknowledge and dismiss resolved repairs
+
 ### 👁️ Vision Support *(New in v3.0!)*
 - **📸 Image Upload**: Send screenshots, photos, or dashboard images
 - **Visual Analysis**: AI can see and understand images

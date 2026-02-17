@@ -33,6 +33,7 @@ INTENT_TOOL_SETS = {
     "areas": ["manage_areas", "manage_entity", "get_areas", "get_devices"],
     "notifications": ["send_notification", "search_entities"],
     "helpers": ["manage_helpers", "search_entities"],
+    "query_repairs": ["get_repairs", "dismiss_repair"],
 }
 
 # Compact focused prompts by intent
@@ -150,6 +151,16 @@ WORKFLOW:
 3. If modifying: show what will change, ask confirmation, then call manage_helpers with action="update".
 4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
 - Respond in the user's language. Be concise.""",
+
+    "query_repairs": """You are a Home Assistant diagnostics assistant. The user wants to check system issues and repairs.
+WORKFLOW:
+1. Call get_repairs to get the current list of issues and system health status.
+2. Present the issues clearly: severity (error/warning), integration/domain, description, whether it's auto-fixable.
+3. For each issue, suggest a concrete fix if possible (reload integration, update config, install update, etc.).
+4. Show system health info: any unsupported or unhealthy components.
+5. If the user wants to dismiss an issue, call dismiss_repair with the issue_id and domain.
+6. NEVER dismiss issues automatically - always ask for user confirmation first.
+Respond in the user's language. Be concise.""",
 }
 
 
@@ -369,6 +380,12 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     if any(k in msg for k in helper_kw):
         return {"intent": "helpers", "tools": INTENT_TOOL_SETS["helpers"],
                 "prompt": INTENT_PROMPTS["helpers"], "specific_target": False}
+
+    # --- REPAIRS / DIAGNOSTICS ---
+    repair_kw = lang_keywords.get("repair", [])
+    if any(k in msg for k in repair_kw):
+        return {"intent": "query_repairs", "tools": INTENT_TOOL_SETS["query_repairs"],
+                "prompt": INTENT_PROMPTS["query_repairs"], "specific_target": False}
 
     # --- GENERIC (full mode) ---
     return {"intent": "generic", "tools": None, "prompt": None, "specific_target": False}
