@@ -274,54 +274,124 @@ When **Enable File Access** is enabled, the AI can:
 
 ## 💡 Usage Examples
 
-### Vision / Image Upload *(New in v3.0!)*
-```
-📸 Upload an image, then ask:
-"Create dashboard cards like this image"
-"Analyze this layout and suggest improvements"
-"Recreate these cards for my energy sensors"
-"What cards are shown in this screenshot?"
-"Make a similar dashboard for my living room"
-```
+The AI assistant uses keyword-based intent detection to route your request to the right tools. Below are example phrases that work well, in all supported languages.
 
 ### Device Control
-```
-"Turn on the living room lights"
-"Set thermostat to 22 degrees"
-"What's the temperature in the bedroom?"
-"Show me all lights that are currently on"
-```
 
-### Automation Management
-```
-"Create an automation that turns on lights at sunset"
-"Add a condition to check if I'm home before turning on lights"
-"Show me all automations for the kitchen"
-"Delete the automation called 'old routine'"
-```
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Accendi le luci del soggiorno"* / *"Spegni il climatizzatore"* |
+| 🇬🇧 EN | *"Turn on the living room lights"* / *"Set thermostat to 22 degrees"* |
+| 🇪🇸 ES | *"Enciende las luces del salón"* / *"Apaga el aire acondicionado"* |
+| 🇫🇷 FR | *"Allume les lumières du salon"* / *"Éteins la climatisation"* |
 
-### Configuration Files *(requires File Access enabled)*
-```
-"Show me the files in my lovelace folder"
-"Read the content of automations.yaml"
-"List all my custom YAML files"
-"What's in the yaml/sensors.yaml file?"
-```
+### Query State
 
-### Dashboard Creation
-```
-"Create a dashboard for living room lights"
-"Make a dashboard with all temperature sensors"
-"Create an HTML dashboard for my energy monitoring"
-"Build an interactive dashboard with gauges and charts for solar panels"
-```
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Qual è lo stato della temperatura in camera?"* / *"Quanta energia produce il fotovoltaico?"* |
+| 🇬🇧 EN | *"What is the temperature in the bedroom?"* / *"How much power is the solar producing?"* |
+| 🇪🇸 ES | *"¿Cuál es la temperatura del dormitorio?"* / *"¿Cuánta energía produce el solar?"* |
+| 🇫🇷 FR | *"Quel est l'état de la température dans la chambre?"* / *"Combien d'énergie produit le solaire?"* |
+
+### Create Automation
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Crea un'automazione che accende le luci al tramonto"* / *"Fammi una nuova automazione per la sera"* |
+| 🇬🇧 EN | *"Create an automation that turns on lights at sunset"* / *"Make a new automation for the morning routine"* |
+| 🇪🇸 ES | *"Crea una automatización que encienda las luces al atardecer"* / *"Haz una nueva automatización para la mañana"* |
+| 🇫🇷 FR | *"Crée une automatisation qui allume les lumières au coucher du soleil"* / *"Fais une nouvelle automatisation pour le matin"* |
+
+### Modify Automation
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Modifica l'automazione delle luci del corridoio"* / *"Cambia l'orario dell'automazione serale"* |
+| 🇬🇧 EN | *"Modify the hallway lights automation"* / *"Change the schedule of the evening automation"* |
+| 🇪🇸 ES | *"Modifica la automatización de las luces del pasillo"* / *"Cambia el horario de la automatización nocturna"* |
+| 🇫🇷 FR | *"Modifie l'automatisation des lumières du couloir"* / *"Change l'horaire de l'automatisation du soir"* |
+
+### Create Dashboard (Lovelace)
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Crea una dashboard per l'energia solare"* / *"Fammi un pannello con i sensori di temperatura"* |
+| 🇬🇧 EN | *"Create a dashboard for the living room lights"* / *"Build a panel with all temperature sensors"* |
+| 🇪🇸 ES | *"Crea un dashboard para la energía solar"* / *"Haz un tablero con los sensores de temperatura"* |
+| 🇫🇷 FR | *"Crée un dashboard pour l'énergie solaire"* / *"Fais un tableau de bord avec les capteurs de température"* |
+
+### Create HTML Dashboard (Interactive)
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Crea una dashboard HTML interattiva per il fotovoltaico"* / *"Fammi un pannello web live con i dati energia"* |
+| 🇬🇧 EN | *"Create an interactive HTML dashboard for solar monitoring"* / *"Build a responsive web app for energy data"* |
+| 🇪🇸 ES | *"Crea un dashboard HTML interactivo para el solar"* / *"Haz una app web responsive con datos de energía"* |
+| 🇫🇷 FR | *"Crée un dashboard HTML interactif pour le solaire"* / *"Fais une app web responsive avec les données d'énergie"* |
 
 ### History & Statistics
-```
-"What was the temperature yesterday at noon?"
-"Show me the average humidity over the last week"
-"When was the last time the front door opened?"
-```
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Mostrami lo storico della temperatura di ieri"* / *"Qual è la media dei consumi dell'ultima settimana?"* |
+| 🇬🇧 EN | *"Show me the temperature history from yesterday"* / *"What's the average consumption over the last week?"* |
+| 🇪🇸 ES | *"Muéstrame el historial de temperatura de ayer"* / *"¿Cuál es la media de consumo de la última semana?"* |
+| 🇫🇷 FR | *"Montre-moi l'historique de température d'hier"* / *"Quelle est la moyenne de consommation de la semaine dernière?"* |
+
+### Scripts
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Crea uno script che accende tutte le luci"* / *"Esegui lo script della routine mattutina"* |
+| 🇬🇧 EN | *"Create a script that turns on all lights"* / *"Run the morning routine script"* |
+| 🇪🇸 ES | *"Crea un script que encienda todas las luces"* / *"Ejecuta la rutina de la mañana"* |
+| 🇫🇷 FR | *"Crée un script qui allume toutes les lumières"* / *"Lance le script de la routine du matin"* |
+
+### Helpers
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Crea un helper input_boolean per la modalità vacanza"* / *"Mostra tutti gli helper"* |
+| 🇬🇧 EN | *"Create an input_boolean helper for vacation mode"* / *"List all helpers"* |
+| 🇪🇸 ES | *"Crea un helper input_boolean para el modo vacaciones"* / *"Muestra todos los helpers"* |
+| 🇫🇷 FR | *"Crée un helper input_boolean pour le mode vacances"* / *"Affiche tous les helpers"* |
+
+### Repairs & Diagnostics
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Ci sono riparazioni o problemi?"* / *"Mostrami la salute del sistema"* |
+| 🇬🇧 EN | *"Are there any repairs or issues?"* / *"Show me the system health"* |
+| 🇪🇸 ES | *"¿Hay reparaciones o problemas?"* / *"Muéstrame la salud del sistema"* |
+| 🇫🇷 FR | *"Y a-t-il des réparations ou problèmes?"* / *"Montre-moi la santé du système"* |
+
+### Delete
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Elimina l'automazione 'vecchia routine'"* / *"Cancella la dashboard energia"* |
+| 🇬🇧 EN | *"Delete the automation 'old routine'"* / *"Remove the energy dashboard"* |
+| 🇪🇸 ES | *"Elimina la automatización 'rutina vieja'"* / *"Borra el dashboard de energía"* |
+| 🇫🇷 FR | *"Supprime l'automatisation 'ancienne routine'"* / *"Efface le dashboard énergie"* |
+
+### Configuration Files *(requires File Access enabled)*
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *"Mostrami il file configuration.yaml"* / *"Elenca i file nella cartella config"* |
+| 🇬🇧 EN | *"Show me the configuration.yaml file"* / *"List files in the config folder"* |
+| 🇪🇸 ES | *"Muéstrame el archivo configuration.yaml"* / *"Lista los archivos en la carpeta config"* |
+| 🇫🇷 FR | *"Montre-moi le fichier configuration.yaml"* / *"Liste les fichiers dans le dossier config"* |
+
+### Vision / Image Upload
+
+| Language | Example |
+|----------|---------|
+| 🇮🇹 IT | *📸 Carica un'immagine, poi chiedi: "Ricrea queste card per i miei sensori"* |
+| 🇬🇧 EN | *📸 Upload an image, then ask: "Recreate these cards for my sensors"* |
+| 🇪🇸 ES | *📸 Sube una imagen, luego pregunta: "Recrea estas tarjetas para mis sensores"* |
+| 🇫🇷 FR | *📸 Télécharge une image, puis demande: "Recrée ces cartes pour mes capteurs"* |
 
 ---
 
