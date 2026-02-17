@@ -1812,6 +1812,26 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             icon = tool_input.get("icon", "mdi:robot")
             views = tool_input.get("views", [])
 
+            # Reject empty dashboards - force the model to include views with cards
+            if not views or len(views) == 0:
+                logger.warning(f"⚠️ create_dashboard called WITHOUT views - rejecting. Args: {tool_input}")
+                return json.dumps({
+                    "error": "REJECTED: views array is REQUIRED and must contain at least one view with cards. "
+                             "Do NOT call create_dashboard without views. "
+                             "STEP 1: Call search_entities to find the correct entity_ids. "
+                             "STEP 2: Build a complete views array with cards (gauge, entities, history-graph, etc.). "
+                             "STEP 3: Call create_dashboard again with title, url_path, icon, AND the complete views array."
+                }, ensure_ascii=False, default=str)
+
+            # Also reject views that have no cards
+            empty_views = [i for i, v in enumerate(views) if not v.get("cards")]
+            if empty_views and len(empty_views) == len(views):
+                logger.warning(f"⚠️ create_dashboard called with views but ALL views have no cards - rejecting")
+                return json.dumps({
+                    "error": "REJECTED: All views are empty (no cards). Each view MUST contain a 'cards' array with at least one card. "
+                             "Build proper cards (gauge, entities, history-graph, button, etc.) for each view before calling create_dashboard."
+                }, ensure_ascii=False, default=str)
+
             logger.info(f"📊 Creating dashboard: title='{title}', url_path='{url_path}', views={len(views)}")
 
             # Step 1: Register dashboard via WebSocket (REST API doesn't support this)

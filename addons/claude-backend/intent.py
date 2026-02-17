@@ -21,7 +21,7 @@ INTENT_TOOL_SETS = {
     "modify_script": ["update_script"],
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
-    "create_dashboard": ["create_dashboard", "search_entities", "get_frontend_resources"],
+    "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_frontend_resources"],
     "create_html_dashboard": ["create_html_dashboard", "search_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
     "control_device": ["call_service", "search_entities", "get_entity_state"],
@@ -152,21 +152,25 @@ WORKFLOW:
 4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
 - Respond in the user's language. Be concise.""",
 
-    "create_dashboard": """You are a Home Assistant dashboard builder. The user wants to create a NEW Lovelace dashboard.
-CRITICAL WORKFLOW:
-1. FIRST call search_entities to find the correct entity_ids for devices the user mentioned. NEVER guess entity_ids.
-2. Design a creative dashboard with VIEWS containing CARDS. Choose the best card type for each entity:
-   - gauge for percentages/battery/SOC
-   - history-graph for trends (power, temperature)
-   - thermostat for climate
-   - entities for groups of sensors
-   - button for scripts/scenes
-   - glance for quick overview
-   - sensor for single values
-   Group entities logically by function.
-3. Build the COMPLETE views array with cards BEFORE calling create_dashboard. NEVER create a dashboard with empty views.
-4. Show the user a brief summary of what will be created, then call create_dashboard with title, url_path, and the COMPLETE views array.
-Respond in the user's language. Be concise.""",
+    "create_dashboard": """You are a Home Assistant Lovelace dashboard builder. The user wants a NEW dashboard with cards.
+MANDATORY STEPS - follow this EXACT order:
+1. Call search_entities to find the correct entity_ids for devices the user mentioned. NEVER guess entity_ids.
+2. Build a COMPLETE views array in memory. Each view MUST have: title, path, icon, and a 'cards' array.
+   Card types to use:
+   - gauge: percentages, battery, SOC, humidity
+   - history-graph: power trends, temperature over time
+   - thermostat: climate entities
+   - entities: groups of related sensors/switches
+   - button: scripts, scenes, switches
+   - glance: quick overview of multiple entities
+   - sensor: single important values
+   - energy-distribution: energy flow
+   Group entities logically into views by function (e.g. "Produzione", "Consumo", "Batteria").
+3. Call create_dashboard with ALL parameters: title, url_path, icon, AND the complete views array.
+   The views parameter is MANDATORY - the tool will REJECT calls without views.
+   Example structure: views=[{"title":"Overview","path":"overview","icon":"mdi:home","cards":[{"type":"gauge","entity":"sensor.battery_soc","name":"Battery"}]}]
+NEVER call create_dashboard without the views array. NEVER create empty views without cards.
+Respond in the user's language.""",
 
     "query_repairs": """You are a Home Assistant diagnostics assistant. The user wants to check system issues and repairs.
 WORKFLOW:

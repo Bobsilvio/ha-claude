@@ -1,4 +1,10 @@
 # Changelog
+## 3.8.4
+- **FIX**: `create_dashboard` now REJECTS calls with empty/missing views — returns error with step-by-step instructions forcing model to build complete views with cards before retrying
+- **FIX**: Also rejects views arrays where ALL views have no cards
+- **IMPROVEMENT**: Strengthened `create_dashboard` focused prompt — explicit mandatory steps, example views structure, card type recommendations per entity type
+- **IMPROVEMENT**: Added `update_dashboard` to `create_dashboard` intent tool set — model can populate views as fallback after creation
+
 ## 3.8.3
 - **FIX**: Dashboard creation with typos (e.g. "crarmi" instead of "crearmi") now correctly detected as create_dashboard intent
 - **FIX**: "dashboard" keyword alone (without explicit "crea") now defaults to create intent instead of falling through to query_state
