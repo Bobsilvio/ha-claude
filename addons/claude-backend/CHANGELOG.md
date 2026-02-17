@@ -1,4 +1,13 @@
 # Changelog
+## 3.8.1
+- **FIX**: Dashboard HTML iframe 401 Unauthorized — browser-side `localStorage.hassTokens` may be expired, missing, or blocked by storage partitioning
+- **NEW**: Dashboard API proxy endpoints (`/dashboard_api/states`, `/dashboard_api/services/<domain>/<service>`) — server-side auth via SUPERVISOR_TOKEN, no browser token needed
+- **NEW**: Dashboard JS now uses proxy for REST API calls and service calls (toggle, slider, etc.)
+- **NEW**: Automatic fallback: WebSocket (if token available) → polling via proxy every 5s (always works)
+- **NEW**: Input validation on proxy endpoints (alphanumeric + underscore only for domain/service)
+- **FIX**: No more "No HA token" or "Auth failed" errors in dashboard iframes
+- **IMPROVEMENT**: Dashboards work reliably regardless of browser token state, Ingress configuration, or HA session expiry
+
 ## 3.8.0
 - **ARCHITECTURE**: Sections V2 — structured JSON spec with 11 section types and layout system replaces body_html
 - **FIX**: GPT-5.2 sending `args: {}` — body_html was too large (~2000 tokens), sections spec is ~350 tokens

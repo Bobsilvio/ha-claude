@@ -197,11 +197,12 @@ const PAL=['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4'
 const DICO={sensor:'\ud83d\udcca',binary_sensor:'\ud83d\udd14',switch:'\ud83d\udd0c',light:'\ud83d\udca1',climate:'\ud83c\udf21\ufe0f',cover:'\ud83e\ude9f',fan:'\ud83c\udf00',
 input_boolean:'\ud83d\udd18',input_number:'\ud83d\udd22',number:'\ud83d\udd22',automation:'\u2699\ufe0f',script:'\ud83d\udcdc',person:'\ud83d\udc64',weather:'\ud83c\udf24\ufe0f',
 media_player:'\ud83c\udfb5',camera:'\ud83d\udcf7',lock:'\ud83d\udd12',vacuum:'\ud83e\uddf9'};
+const PROXY_BASE=(function(){const p=location.pathname,i=p.indexOf('/custom_dashboards/');return i>=0?p.substring(0,i):''})();
 function getToken(){try{return JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''}catch(e){return''}}
 
 createApp({setup(){
 const connected=ref(false),error=ref(''),sections=ref(SECTIONS),states=reactive({});
-let ws,msgId=1,charts={},reconTimer;
+let ws,msgId=1,charts={},reconTimer,pollTimer;
 
 function nm(e){return states[e]?.friendly_name||e.split('.').pop().replace(/_/g,' ')}
 function sv(e){return states[e]?.state??'...'}
@@ -222,32 +223,35 @@ function slStep(e){return states[e]?.attributes?.step??1}
 function items(sec){if(sec.items)return sec.items.map(it=>typeof it==='string'?{e:it,label:''}:{e:it.entity,label:it.label||''});
 if(sec.entities)return sec.entities.map(e=>({e,label:''}));return ENTITIES.map(e=>({e,label:''}))}
 
-function callSvc(d,svc,eid,data){const t=getToken();if(!t)return;
-fetch('/api/services/'+d+'/'+svc,{method:'POST',headers:{'Authorization':'Bearer '+t,'Content-Type':'application/json'},
+function callSvc(d,svc,eid,data){
+fetch(PROXY_BASE+'/dashboard_api/services/'+d+'/'+svc,{method:'POST',headers:{'Content-Type':'application/json'},
 body:JSON.stringify({entity_id:eid,...(data||{})})}).catch(x=>console.warn(x))}
 function toggle(eid){const d=eid.split('.')[0];callSvc(d==='light'?'light':d==='input_boolean'?'input_boolean':'switch','toggle',eid,{})}
 function setVal(eid,v){const d=eid.split('.')[0];callSvc(d==='input_number'?'input_number':'number','set_value',eid,{value:parseFloat(v)})}
 
+function applyStates(list){list.forEach(s=>{if(ENTITIES.includes(s.entity_id))states[s.entity_id]={state:s.state,friendly_name:s.attributes?.friendly_name||'',
+unit:s.attributes?.unit_of_measurement||'',attributes:s.attributes||{}}});nextTick(initCharts)}
+
+function fetchProxy(){
+fetch(PROXY_BASE+'/dashboard_api/states').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(applyStates)
+.catch(e=>{if(!connected.value)error.value='REST: '+e.message})}
+
+function startPolling(){if(pollTimer)return;fetchProxy();pollTimer=setInterval(fetchProxy,5000)}
+
 function connect(){const token=getToken();
-if(!token){error.value='No HA token.';fetchREST();return}
+if(!token){error.value='';startPolling();return}
 try{const p=location.protocol==='https:'?'wss:':'ws:';
 ws=new WebSocket(p+'//'+location.host+'/api/websocket');
 ws.onmessage=ev=>{const m=JSON.parse(ev.data);
 if(m.type==='auth_required')ws.send(JSON.stringify({type:'auth',access_token:token}));
-else if(m.type==='auth_ok'){connected.value=true;error.value='';fetchREST();ws.send(JSON.stringify({id:msgId++,type:'subscribe_events',event_type:'state_changed'}))}
-else if(m.type==='auth_invalid'){error.value='Auth failed.';connected.value=false}
+else if(m.type==='auth_ok'){connected.value=true;error.value='';fetchProxy();ws.send(JSON.stringify({id:msgId++,type:'subscribe_events',event_type:'state_changed'}))}
+else if(m.type==='auth_invalid'){error.value='';connected.value=false;startPolling()}
 else if(m.type==='event'&&m.event?.event_type==='state_changed'){const d=m.event.data;
 if(d&&ENTITIES.includes(d.entity_id)&&d.new_state){states[d.entity_id]={state:d.new_state.state,friendly_name:d.new_state.attributes?.friendly_name||'',
 unit:d.new_state.attributes?.unit_of_measurement||'',attributes:d.new_state.attributes||{}};initCharts()}}};
-ws.onerror=()=>{connected.value=false};
-ws.onclose=()=>{connected.value=false;reconTimer=setTimeout(connect,5000)};
-}catch(e){error.value='WS: '+e.message}}
-
-function fetchREST(){const t=getToken(),h=t?{'Authorization':'Bearer '+t}:{};
-fetch('/api/states',{headers:h}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(list=>{
-list.forEach(s=>{if(ENTITIES.includes(s.entity_id))states[s.entity_id]={state:s.state,friendly_name:s.attributes?.friendly_name||'',
-unit:s.attributes?.unit_of_measurement||'',attributes:s.attributes||{}}});
-nextTick(initCharts)}).catch(e=>{if(!connected.value)error.value='REST: '+e.message})}
+ws.onerror=()=>{connected.value=false;startPolling()};
+ws.onclose=()=>{connected.value=false;reconTimer=setTimeout(connect,10000)};
+}catch(e){startPolling()}}
 
 function initCharts(){const dk=window.matchMedia('(prefers-color-scheme:dark)').matches;
 SECTIONS.forEach((sec,i)=>{if(sec.type!=='chart')return;
@@ -266,7 +270,7 @@ y:{grid:{color:dk?'#334155':'#e2e8f0'},ticks:{color:dk?'#94a3b8':'#6b7280',font:
 })})}
 
 onMounted(connect);
-onUnmounted(()=>{ws?.close();clearTimeout(reconTimer);Object.values(charts).forEach(c=>c.destroy())});
+onUnmounted(()=>{ws?.close();clearTimeout(reconTimer);clearInterval(pollTimer);Object.values(charts).forEach(c=>c.destroy())});
 return{sections,connected,error,nm,sv,fv,fu,isOn,numVal,gPct,dIco,togDom,slDom,slMin,slMax,slStep,items,toggle,setVal}
 }}).mount('#app');
 })();

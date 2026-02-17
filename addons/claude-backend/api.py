@@ -3639,6 +3639,46 @@ def rag_search():
         return jsonify({"error": str(e)}), 500
 
 
+# ===== DASHBOARD API PROXY =====
+# These endpoints proxy HA API calls using the SUPERVISOR_TOKEN so that
+# dashboard iframes don't need browser-side authentication tokens.
+
+@app.route('/dashboard_api/states')
+def dashboard_api_states():
+    """Proxy GET /api/states using server-side SUPERVISOR_TOKEN."""
+    try:
+        resp = requests.get(
+            f"{HA_URL}/api/states",
+            headers=get_ha_headers(),
+            timeout=30
+        )
+        return resp.json(), resp.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        logger.error(f"Dashboard API proxy /states error: {e}")
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route('/dashboard_api/services/<domain>/<service>', methods=['POST'])
+def dashboard_api_service(domain, service):
+    """Proxy POST /api/services/<domain>/<service> using server-side SUPERVISOR_TOKEN."""
+    try:
+        # Validate domain and service: only alphanumeric + underscore
+        if not re.match(r'^[a-z_]+$', domain) or not re.match(r'^[a-z_]+$', service):
+            return jsonify({"error": "Invalid domain or service name"}), 400
+
+        data = request.get_json(silent=True) or {}
+        resp = requests.post(
+            f"{HA_URL}/api/services/{domain}/{service}",
+            headers=get_ha_headers(),
+            json=data,
+            timeout=30
+        )
+        return resp.json(), resp.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        logger.error(f"Dashboard API proxy /services/{domain}/{service} error: {e}")
+        return jsonify({"error": str(e)}), 502
+
+
 # ===== CUSTOM HTML DASHBOARDS =====
 @app.route('/custom_dashboards/<name>')
 def serve_html_dashboard(name):

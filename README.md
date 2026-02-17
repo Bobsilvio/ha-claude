@@ -70,6 +70,9 @@ Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 
 ### 🛠️ Dashboard Creation
 - **Lovelace Dashboards**: Create custom dashboards with cards
+- **HTML Dashboards**: AI-generated Vue 3 interactive dashboards with real-time data
+- **11 Section Types**: Hero, pills, flow, gauge, gauges, kpi, chart, entities, controls, stats, value
+- **Live Data**: WebSocket real-time updates with automatic proxy fallback (no browser auth needed)
 - **Card Library**: Supports standard and custom cards
 - **View Organization**: Multiple views with icons and titles
 
@@ -238,7 +241,7 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 | **Language** | AI response language (en/it/es/fr) | `en` | ❌ |
 | **Enable File Access** | Allow AI to read/write config files | `false` | ❌ |
 | **Debug Mode** | Enable detailed logging | `false` | ❌ |
-| **API Port** | Internal API port | `5000` | ❌ |
+| **API Port** | Internal API port | `5010` | ❌ |
 | **Timeout** | API request timeout (seconds) | `30` | ❌ |
 | **Max Retries** | Retry attempts for failed API calls | `3` | ❌ |
 
@@ -303,7 +306,8 @@ When **Enable File Access** is enabled, the AI can:
 ```
 "Create a dashboard for living room lights"
 "Make a dashboard with all temperature sensors"
-"Show me how to add a thermostat card"
+"Create an HTML dashboard for my energy monitoring"
+"Build an interactive dashboard with gauges and charts for solar panels"
 ```
 
 ### History & Statistics
