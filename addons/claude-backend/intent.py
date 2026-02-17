@@ -152,6 +152,22 @@ WORKFLOW:
 4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
 - Respond in the user's language. Be concise.""",
 
+    "create_dashboard": """You are a Home Assistant dashboard builder. The user wants to create a NEW Lovelace dashboard.
+CRITICAL WORKFLOW:
+1. FIRST call search_entities to find the correct entity_ids for devices the user mentioned. NEVER guess entity_ids.
+2. Design a creative dashboard with VIEWS containing CARDS. Choose the best card type for each entity:
+   - gauge for percentages/battery/SOC
+   - history-graph for trends (power, temperature)
+   - thermostat for climate
+   - entities for groups of sensors
+   - button for scripts/scenes
+   - glance for quick overview
+   - sensor for single values
+   Group entities logically by function.
+3. Build the COMPLETE views array with cards BEFORE calling create_dashboard. NEVER create a dashboard with empty views.
+4. Show the user a brief summary of what will be created, then call create_dashboard with title, url_path, and the COMPLETE views array.
+Respond in the user's language. Be concise.""",
+
     "query_repairs": """You are a Home Assistant diagnostics assistant. The user wants to check system issues and repairs.
 WORKFLOW:
 1. Call get_repairs to get the current list of issues and system health status.
@@ -345,10 +361,18 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                     "prompt": None, "specific_target": False}
         # Otherwise use standard Lovelace dashboard
         return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
-                "prompt": None, "specific_target": False}
+                "prompt": INTENT_PROMPTS.get("create_dashboard"), "specific_target": False}
     if has_dash and has_modify:
         return {"intent": "modify_dashboard", "tools": INTENT_TOOL_SETS["modify_dashboard"],
                 "prompt": None, "specific_target": False}
+    # Fallback: "dashboard" without explicit create/modify/delete → assume creation
+    # e.g. "puoi farmi una dashboard sull'energia" with typos in the verb
+    if has_dash and not any(k in msg for k in delete_kw):
+        if has_html_dash:
+            return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
+                    "prompt": None, "specific_target": False}
+        return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
+                "prompt": INTENT_PROMPTS.get("create_dashboard"), "specific_target": False}
 
     # --- DEVICE CONTROL ---
     if any(k in msg for k in control_kw):

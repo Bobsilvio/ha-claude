@@ -246,8 +246,12 @@ def stream_chat_anthropic(messages, intent_info=None):
                         try:
                             rdata = json.loads(tr["content"])
                             if rdata.get("status") == "success":
-                                auto_stop = True
-                                full_text = api._format_write_tool_response(tool["name"], rdata)
+                                # Skip auto-stop for empty dashboards (0 views) - model needs to continue
+                                if tool["name"] == "create_dashboard" and rdata.get("views_count", 1) == 0:
+                                    logger.info("Auto-stop skipped: create_dashboard with 0 views, letting model continue")
+                                else:
+                                    auto_stop = True
+                                    full_text = api._format_write_tool_response(tool["name"], rdata)
                         except (json.JSONDecodeError, KeyError):
                             pass
                         break

@@ -1020,6 +1020,10 @@ def stream_chat_openai(messages, intent_info=None):
                 try:
                     rdata = json.loads(result)
                     if rdata.get("status") == "success":
+                        # Skip auto-stop for empty dashboards (0 views) - model needs to continue
+                        if fn_name == "create_dashboard" and rdata.get("views_count", 1) == 0:
+                            logger.info("Auto-stop skipped: create_dashboard with 0 views, letting model continue")
+                            continue
                         auto_stop = True
                         full_text = api._format_write_tool_response(fn_name, rdata)
                         break

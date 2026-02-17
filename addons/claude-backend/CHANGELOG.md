@@ -1,4 +1,12 @@
 # Changelog
+## 3.8.3
+- **FIX**: Dashboard creation with typos (e.g. "crarmi" instead of "crearmi") now correctly detected as create_dashboard intent
+- **FIX**: "dashboard" keyword alone (without explicit "crea") now defaults to create intent instead of falling through to query_state
+- **FIX**: Empty dashboards (0 views/cards) no longer auto-stop — model continues to populate views after creation
+- **NEW**: Focused prompt for `create_dashboard` intent — guides model to search entities first, choose appropriate card types, and build complete views
+- **NEW**: Typo-tolerant create keywords for Italian ("crar", "puoi crearmi", "puoi crarmi")
+- **FIX**: Auto-stop skip applies to both OpenAI and Anthropic providers
+
 ## 3.8.2
 - **NEW**: `get_repairs` tool — read active HA repair issues and system health diagnostics (unsupported/unhealthy components, resolution suggestions)
 - **NEW**: `dismiss_repair` tool — dismiss/ignore specific repair issues after user review (write-guarded in read-only mode)
