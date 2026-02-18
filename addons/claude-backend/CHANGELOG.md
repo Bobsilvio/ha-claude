@@ -1,4 +1,9 @@
 # Changelog
+## 3.9.4
+- **FIX**: Safety net for GPT-5.2 calling `create_html_dashboard` with empty args — model writes HTML as streaming text instead of in tool parameters
+- Automatically extracts HTML from assistant text, entity_ids from HTML code, and infers title/name from user message
+- Applied to both OpenAI and NVIDIA provider streams
+
 ## 3.9.3
 - **FIX**: HTML dashboard focused prompt was NEVER injected — intent detection returned `prompt: None` instead of the creative raw HTML prompt
 - Model was falling back to structured mode because it never saw the raw HTML instructions

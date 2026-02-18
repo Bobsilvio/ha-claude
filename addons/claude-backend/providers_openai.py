@@ -330,6 +330,64 @@ def _normalize_entity_id_for_query_state(messages: list[dict], raw_entity_id: st
     return raw_entity_id
 
 
+_ENTITY_DOMAIN_RE = re.compile(
+    r'(?:sensor|switch|light|climate|binary_sensor|input_boolean|automation|number|select|button|cover|fan|lock|'
+    r'media_player|vacuum|weather|water_heater|scene|script|input_number|input_select|input_text|person|'
+    r'device_tracker|calendar|camera|update|group|sun)\.[a-z0-9_]+'
+)
+
+
+def _rescue_html_dashboard_args(args: dict, accumulated: str, messages: list[dict]) -> dict:
+    """Safety net: GPT-5.2 sometimes writes HTML as text instead of in tool args.
+    Extract HTML from accumulated assistant text and entity_ids from the HTML."""
+    if args.get("html") or args.get("sections"):
+        return args  # already has content, nothing to fix
+
+    if not accumulated or len(accumulated) < 100:
+        return args
+
+    # Extract HTML from accumulated text (may be in ```html code block or raw)
+    html_code = None
+    # Try code block first
+    m = re.search(r'```(?:html)?\s*\n(<!DOCTYPE[\s\S]+?</html>)\s*```', accumulated, re.IGNORECASE)
+    if m:
+        html_code = m.group(1)
+    else:
+        # Try raw HTML
+        m = re.search(r'(<!DOCTYPE[\s\S]+</html>)', accumulated, re.IGNORECASE)
+        if m:
+            html_code = m.group(1)
+
+    if not html_code:
+        return args  # no HTML found in text
+
+    args["html"] = html_code
+    logger.info(f"Safety net: extracted HTML ({len(html_code)} chars) from assistant text")
+
+    # Extract entity_ids from HTML code
+    if not args.get("entities"):
+        entity_ids = _ENTITY_DOMAIN_RE.findall(html_code)
+        if entity_ids:
+            args["entities"] = list(dict.fromkeys(entity_ids))  # dedupe preserving order
+            logger.info(f"Safety net: extracted {len(args['entities'])} entities from HTML")
+
+    # Infer title from user message if missing
+    if not args.get("title"):
+        for msg in reversed(messages or []):
+            if msg.get("role") == "user":
+                text = msg.get("content", "")
+                if isinstance(text, str) and len(text) > 5:
+                    args["title"] = text[:60].strip()
+                    break
+
+    # Generate slug from title
+    if not args.get("name") and args.get("title"):
+        slug = re.sub(r'[^a-z0-9]+', '-', args["title"].lower()).strip('-')[:40]
+        args["name"] = slug or "dashboard"
+
+    return args
+
+
 # ---- NVIDIA Direct Streaming ----
 
 def stream_chat_nvidia_direct(messages, intent_info=None):
@@ -578,6 +636,10 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                     result = json.dumps({"error": f"Invalid JSON arguments: {args_str}"})
                     tool_call_results[tc_id] = (fn_name, result)
                     continue
+
+                # Safety net: model writes HTML as text instead of tool args
+                if fn_name == "create_html_dashboard" and isinstance(args, dict):
+                    args = _rescue_html_dashboard_args(args, accumulated, messages)
 
                 # Normalize entity_id for query_state when model passes a bare token like 'epcube'
                 if fn_name == "get_entity_state" and isinstance(args, dict):
@@ -969,6 +1031,10 @@ def stream_chat_openai(messages, intent_info=None):
                 args = json.loads(args_str) if args_str.strip() else {}
             except json.JSONDecodeError:
                 args = {}
+
+            # Safety net: GPT-5.2 writes HTML as text instead of tool args
+            if fn_name == "create_html_dashboard" and isinstance(args, dict):
+                args = _rescue_html_dashboard_args(args, accumulated, messages)
 
             # Safety net for GitHub small-context models: avoid huge get_automations payloads
             if api.AI_PROVIDER == "github" and fn_name == "get_automations" and isinstance(args, dict):
