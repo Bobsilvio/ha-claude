@@ -999,7 +999,7 @@ HA_TOOLS_DESCRIPTION = [
                             "chart_type": {"type": "string", "enum": ["bar", "line", "doughnut", "radar", "pie"]},
                             "hours": {"type": "integer", "description": "Hours of history for trend charts (1-168, default 24)."},
                             "entities": {"type": "array", "items": {"type": "string"}, "description": "Entity IDs."},
-                            "items": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}, "color": {"type": "string", "description": "CSS color hex (e.g. '#ef4444') for trend badge and chart line."}, "icon": {"type": "string", "description": "Emoji icon for trend KPI badge (e.g. '\ud83c\udf21\ufe0f')."}}, "required": ["entity"]}, "description": "Entities with custom labels."},
+                            "items": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}, "color": {"type": "string", "description": "CSS color hex (e.g. '#ef4444') for trend badge and chart line."}, "icon": {"type": "string", "description": "Emoji icon for trend KPI badge."}}, "required": ["entity"]}, "description": "Entities with custom labels."},
                             "nodes": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}, "highlight": {"type": "boolean"}}, "required": ["entity"]}, "description": "Flow nodes."},
                             "stats": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}}, "required": ["entity"]}, "description": "Gauge side stats."}
                         },
