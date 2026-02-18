@@ -337,6 +337,55 @@ _ENTITY_DOMAIN_RE = re.compile(
 )
 
 
+def _repair_html_dashboard_json(args_str: str) -> dict:
+    """Parse a malformed JSON from create_html_dashboard where the 'html' value
+    contains unescaped characters that break json.loads().
+    Uses regex to extract individual fields."""
+    result = {}
+    if not args_str or len(args_str) < 50:
+        return result
+
+    # Extract simple string fields via regex
+    for field in ("title", "name", "icon", "theme", "accent_color", "lang"):
+        m = re.search(rf'"{field}"\s*:\s*"([^"]*)"', args_str)
+        if m:
+            result[field] = m.group(1)
+
+    # Extract entities array
+    m = re.search(r'"entities"\s*:\s*\[([^\]]*)\]', args_str)
+    if m:
+        entities = re.findall(r'"([^"]+)"', m.group(1))
+        if entities:
+            result["entities"] = list(dict.fromkeys(entities))  # dedupe
+
+    # Extract HTML from the "html" field value
+    m = re.search(r'"html"\s*:\s*"', args_str)
+    if m:
+        start = m.end()
+        remaining = args_str[start:]
+        # Find <!DOCTYPE or <html or <head in the remaining string
+        html_m = re.search(r'(<!doctype|<html|<head)', remaining, re.IGNORECASE)
+        if html_m:
+            html_raw = remaining[html_m.start():]
+            # Find </html> to terminate
+            end_m = re.search(r'</html>', html_raw, re.IGNORECASE)
+            if end_m:
+                html_raw = html_raw[:end_m.end()]
+            # Strip trailing JSON artifacts: "} or "}
+            html_raw = re.sub(r'["\s}]+$', '', html_raw)
+            # Unescape JSON string escapes
+            html_raw = (html_raw
+                .replace('\\n', '\n')
+                .replace('\\t', '\t')
+                .replace('\\/', '/')
+                .replace('\\"', '"')
+                .replace('\\\\', '\\'))
+            if len(html_raw) > 200:
+                result["html"] = html_raw
+
+    return result
+
+
 def _rescue_html_dashboard_args(args: dict, accumulated: str, messages: list[dict], raw_args_str: str = "") -> dict:
     """Safety net: GPT-5.2 sometimes writes HTML as text instead of in tool args,
     or puts HTML directly in the arguments string (not valid JSON).
@@ -661,14 +710,12 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                     args = json.loads(args_str) if args_str.strip() else {}
                 except json.JSONDecodeError:
                     logger.warning(f"NVIDIA: JSONDecodeError for {fn_name}, args_str ({len(args_str)} chars): {args_str[:300]}...")
-                    # For HTML dashboard, try to rescue HTML from malformed args
-                    if fn_name == "create_html_dashboard":
-                        args = {}
-                        args = _rescue_html_dashboard_args(args, accumulated, messages, args_str)
-                        if not args.get("html"):
-                            result = json.dumps({"error": f"Invalid JSON arguments: {args_str[:200]}"})
-                            tool_call_results[tc_id] = (fn_name, result)
-                            continue
+                    if fn_name == "create_html_dashboard" and len(args_str) > 200:
+                        args = _repair_html_dashboard_json(args_str)
+                        if args.get("html"):
+                            logger.info(f"Repaired malformed JSON: extracted {len(args)} fields, html={len(args['html'])} chars")
+                        else:
+                            args = {}
                     else:
                         result = json.dumps({"error": f"Invalid JSON arguments: {args_str[:200]}"})
                         tool_call_results[tc_id] = (fn_name, result)
@@ -1068,7 +1115,15 @@ def stream_chat_openai(messages, intent_info=None):
                 args = json.loads(args_str) if args_str.strip() else {}
             except json.JSONDecodeError:
                 logger.warning(f"OpenAI: JSONDecodeError for {fn_name}, args_str ({len(args_str)} chars): {args_str[:300]}...")
-                args = {}
+                # For HTML dashboard: the JSON is well-structured but html value has unescaped chars
+                if fn_name == "create_html_dashboard" and len(args_str) > 200:
+                    args = _repair_html_dashboard_json(args_str)
+                    if args.get("html"):
+                        logger.info(f"Repaired malformed JSON: extracted {len(args)} fields, html={len(args['html'])} chars")
+                    else:
+                        args = {}
+                else:
+                    args = {}
 
             # Safety net: GPT-5.2 writes HTML as text instead of tool args
             if fn_name == "create_html_dashboard" and isinstance(args, dict):

@@ -1,4 +1,10 @@
 # Changelog
+## 3.9.8
+- **FIX**: Repair malformed JSON from GPT-5.2 `create_html_dashboard` tool calls
+- Root cause found: model sends valid JSON structure (12K+ chars) with title, name, entities, html — but HTML value contains unescaped characters breaking `json.loads()`
+- New `_repair_html_dashboard_json()` extracts fields via regex: simple string fields, entities array, and raw HTML value with JSON unescape
+- Applied to both OpenAI and NVIDIA provider streams
+
 ## 3.9.7
 - **FIX**: Safety net now also searches raw tool arguments string for HTML (not just accumulated text)
 - GPT-5.2 may put HTML directly in arguments (invalid JSON), causing silent JSONDecodeError → empty args
