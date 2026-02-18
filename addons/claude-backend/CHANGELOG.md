@@ -1,4 +1,10 @@
 # Changelog
+## 3.9.7
+- **FIX**: Safety net now also searches raw tool arguments string for HTML (not just accumulated text)
+- GPT-5.2 may put HTML directly in arguments (invalid JSON), causing silent JSONDecodeError → empty args
+- Added debug logging for JSONDecodeError and safety net search to diagnose the exact failure mode
+- Safety net logs first 300 chars of each source when no HTML is found
+
 ## 3.9.6
 - **FIX**: Focused prompt now explicitly tells model to pass HTML inside tool call arguments JSON, not as text
 - **FIX**: Error message for missing html/sections now explains exactly how to structure the tool call

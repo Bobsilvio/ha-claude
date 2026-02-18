@@ -337,43 +337,59 @@ _ENTITY_DOMAIN_RE = re.compile(
 )
 
 
-def _rescue_html_dashboard_args(args: dict, accumulated: str, messages: list[dict]) -> dict:
-    """Safety net: GPT-5.2 sometimes writes HTML as text instead of in tool args.
-    Extract HTML from accumulated assistant text and entity_ids from the HTML."""
+def _rescue_html_dashboard_args(args: dict, accumulated: str, messages: list[dict], raw_args_str: str = "") -> dict:
+    """Safety net: GPT-5.2 sometimes writes HTML as text instead of in tool args,
+    or puts HTML directly in the arguments string (not valid JSON).
+    Extract HTML from accumulated text OR raw args string, plus entity_ids."""
     if args.get("html") or args.get("sections"):
         return args  # already has content, nothing to fix
 
-    if not accumulated or len(accumulated) < 100:
+    # Search for HTML in both accumulated text AND raw args string
+    sources = []
+    if accumulated and len(accumulated) >= 100:
+        sources.append(("accumulated", accumulated))
+    if raw_args_str and len(raw_args_str) >= 100:
+        sources.append(("args_str", raw_args_str))
+
+    if not sources:
+        logger.info(f"Safety net: nothing to search (accumulated={len(accumulated or '')} chars, args_str={len(raw_args_str or '')} chars)")
         return args
 
-    # Extract HTML from accumulated text (may be in ```html code block or raw)
     html_code = None
-    # Try code block first
-    m = re.search(r'```(?:html)?\s*\n(<!DOCTYPE[\s\S]+?</html>)\s*```', accumulated, re.IGNORECASE)
-    if m:
-        html_code = m.group(1)
-    if not html_code:
+    source_name = ""
+    for src_name, text in sources:
+        # Try code block first
+        m = re.search(r'```(?:html)?\s*\n(<!DOCTYPE[\s\S]+?</html>)\s*```', text, re.IGNORECASE)
+        if m:
+            html_code = m.group(1)
+            source_name = src_name
+            break
         # Try raw <!DOCTYPE...
-        m = re.search(r'(<!DOCTYPE[\s\S]+</html>)', accumulated, re.IGNORECASE)
+        m = re.search(r'(<!DOCTYPE[\s\S]+</html>)', text, re.IGNORECASE)
         if m:
             html_code = m.group(1)
-    if not html_code:
+            source_name = src_name
+            break
         # Try <html>...</html> without DOCTYPE
-        m = re.search(r'(<html[\s\S]+</html>)', accumulated, re.IGNORECASE)
+        m = re.search(r'(<html[\s\S]+</html>)', text, re.IGNORECASE)
         if m:
             html_code = m.group(1)
-    if not html_code:
+            source_name = src_name
+            break
         # Last resort: any substantial block with <head> and <body>
-        m = re.search(r'(<head[\s\S]+</body>)', accumulated, re.IGNORECASE)
+        m = re.search(r'(<head[\s\S]+</body>)', text, re.IGNORECASE)
         if m:
             html_code = '<!DOCTYPE html><html>' + m.group(1) + '</html>'
+            source_name = src_name
+            break
 
     if not html_code:
-        logger.info(f"Safety net: no HTML found in {len(accumulated)} chars of assistant text")
-        return args  # no HTML found in text
+        for src_name, text in sources:
+            logger.info(f"Safety net: no HTML found in {src_name} ({len(text)} chars), first 300: {text[:300]}")
+        return args  # no HTML found
 
     args["html"] = html_code
-    logger.info(f"Safety net: extracted HTML ({len(html_code)} chars) from assistant text")
+    logger.info(f"Safety net: extracted HTML ({len(html_code)} chars) from {source_name}")
 
     # Extract entity_ids from HTML code
     if not args.get("entities"):
@@ -644,13 +660,23 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 try:
                     args = json.loads(args_str) if args_str.strip() else {}
                 except json.JSONDecodeError:
-                    result = json.dumps({"error": f"Invalid JSON arguments: {args_str}"})
-                    tool_call_results[tc_id] = (fn_name, result)
-                    continue
+                    logger.warning(f"NVIDIA: JSONDecodeError for {fn_name}, args_str ({len(args_str)} chars): {args_str[:300]}...")
+                    # For HTML dashboard, try to rescue HTML from malformed args
+                    if fn_name == "create_html_dashboard":
+                        args = {}
+                        args = _rescue_html_dashboard_args(args, accumulated, messages, args_str)
+                        if not args.get("html"):
+                            result = json.dumps({"error": f"Invalid JSON arguments: {args_str[:200]}"})
+                            tool_call_results[tc_id] = (fn_name, result)
+                            continue
+                    else:
+                        result = json.dumps({"error": f"Invalid JSON arguments: {args_str[:200]}"})
+                        tool_call_results[tc_id] = (fn_name, result)
+                        continue
 
                 # Safety net: model writes HTML as text instead of tool args
                 if fn_name == "create_html_dashboard" and isinstance(args, dict):
-                    args = _rescue_html_dashboard_args(args, accumulated, messages)
+                    args = _rescue_html_dashboard_args(args, accumulated, messages, args_str)
 
                 # Normalize entity_id for query_state when model passes a bare token like 'epcube'
                 if fn_name == "get_entity_state" and isinstance(args, dict):
@@ -1041,11 +1067,12 @@ def stream_chat_openai(messages, intent_info=None):
             try:
                 args = json.loads(args_str) if args_str.strip() else {}
             except json.JSONDecodeError:
+                logger.warning(f"OpenAI: JSONDecodeError for {fn_name}, args_str ({len(args_str)} chars): {args_str[:300]}...")
                 args = {}
 
             # Safety net: GPT-5.2 writes HTML as text instead of tool args
             if fn_name == "create_html_dashboard" and isinstance(args, dict):
-                args = _rescue_html_dashboard_args(args, accumulated, messages)
+                args = _rescue_html_dashboard_args(args, accumulated, messages, args_str)
 
             # Safety net for GitHub small-context models: avoid huge get_automations payloads
             if api.AI_PROVIDER == "github" and fn_name == "get_automations" and isinstance(args, dict):
