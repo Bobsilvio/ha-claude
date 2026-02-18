@@ -1,4 +1,10 @@
 # Changelog
+## 3.10.3
+- **FIX**: Detect truncated Vue.createApp scripts (has `createApp` but no `.mount()`) and force chunked/draft mode retry
+- Previously, truncated scripts passed the `createApp` check and were saved as broken dashboards
+- Now returns a clear error instructing the model to use draft mode (2-3 chunks under 6000 chars each)
+- Covers the case where GPT-5.2 writes CSS + template + starts JS but hits token limit mid-computed/methods
+
 ## 3.10.2
 - **FIX**: Intent detection now correctly routes HTML dashboard modification requests to focused `create_html_dashboard` intent
 - Requests like "aggiungi sensori al pannello" with smart_context referencing `/local/dashboards/*.html` no longer fall through to generic intent (44 tools)

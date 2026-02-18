@@ -2234,7 +2234,19 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 html_lower = raw_html.lower()
                 if "createapp" not in html_lower:
                     raw_html = _autocomplete_truncated_html(raw_html, entities)
-                    logger.info(f"Auto-completed truncated HTML: added Vue boilerplate ({len(raw_html)} chars total)")
+                    logger.info(f"Auto-completed truncated HTML (no createApp): added Vue boilerplate ({len(raw_html)} chars total)")
+                elif ".mount(" not in raw_html:
+                    # createApp exists but script is truncated (no .mount call)
+                    # The HTML is too large for a single call — force chunked mode
+                    logger.warning(f"Truncated Vue app detected: createApp present but .mount() missing ({len(raw_html)} chars)")
+                    return json.dumps({"error": (
+                        "TRUNCATED HTML: Your script is incomplete (createApp exists but .mount() is missing — you hit the output token limit). "
+                        "You MUST use CHUNKED/DRAFT mode to send the HTML in 2-3 smaller parts:\n"
+                        "  Call 1: create_html_dashboard(title=..., name=..., entities=[...], html='<!DOCTYPE html>...<style>CSS</style></head><body>...template HTML...', draft=true)\n"
+                        "  Call 2: create_html_dashboard(name=..., html='<script>...complete Vue.createApp({...}).mount(\"#app\")</script></body></html>')\n"
+                        "Each chunk MUST be under 6000 chars. The tool concatenates all parts automatically. "
+                        "Do NOT omit draft=true on intermediate calls. The LAST call must NOT have draft."
+                    )}, default=str)
             else:
                 if not sections:
                     return json.dumps({"error": (
