@@ -2025,6 +2025,17 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     return json.dumps({"error": "html must be a non-empty string when provided."}, default=str)
                 if len(raw_html) > 900_000:
                     return json.dumps({"error": f"html is too large ({len(raw_html)} chars). Please reduce size."}, default=str)
+                # Validate that the HTML has a functional Vue app, not just CSS/placeholder
+                html_lower = raw_html.lower()
+                if "createapp" not in html_lower and "vue.createapp" not in html_lower:
+                    return json.dumps({"error": (
+                        "INCOMPLETE HTML: Your code is missing the Vue.js application. "
+                        "The HTML must include: 1) A Vue template inside #app with v-for/v-if directives showing entity data, "
+                        "2) Vue.createApp({setup(){...}}).mount('#app') with reactive state, "
+                        "3) WebSocket connection to /api/websocket for live updates, "
+                        "4) Bearer token from localStorage.hassTokens for authentication. "
+                        "Please provide the COMPLETE HTML with all CSS + template + JavaScript."
+                    )}, default=str)
             else:
                 if not sections:
                     return json.dumps({"error": "Provide either 'sections' (structured mode) OR 'html' (raw HTML mode)."}, default=str)

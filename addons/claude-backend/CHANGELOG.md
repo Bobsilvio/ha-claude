@@ -1,4 +1,7 @@
 # Changelog
+## 3.9.5
+- **FIX**: Validate raw HTML has functional Vue app — reject incomplete HTML (CSS only, missing `createApp`, no WebSocket logic) with detailed error guiding the model to include full template + JS
+
 ## 3.9.4
 - **FIX**: Safety net for GPT-5.2 calling `create_html_dashboard` with empty args — model writes HTML as streaming text instead of in tool parameters
 - Automatically extracts HTML from assistant text, entity_ids from HTML code, and infers title/name from user message
