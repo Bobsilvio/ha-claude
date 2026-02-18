@@ -211,9 +211,16 @@ JS DATA CONNECTION:
 - WebSocket: connect to (location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/api/websocket'
   → auth_required: send {type:'auth',access_token:token}
   → auth_ok: send {type:'subscribe_events',event_type:'state_changed'} + fetch /api/states with Bearer
-- REST fallback: GET /api/states with Authorization: Bearer <token>, poll every 5s
+  → IMPORTANT: on ws.onclose, ALWAYS reconnect with setTimeout(connectWs, 5000) — do NOT leave it disconnected
+- REST fallback: GET /api/states with Authorization: Bearer <token>, poll every 5s while WS is not connected
 - Service calls: POST /api/services/{domain}/{service} with Bearer token
 - History: GET /api/history/period/{ISO_start}?filter_entity_id=...&end_time={ISO_end}&minimal_response&no_attributes
+
+UI RULES:
+- Do NOT show debug/technical info (connection status pills, token values, accent color hex, series counts, entity_id strings)
+- The dashboard is for END USERS, not developers — show only useful data: entity values, labels, charts, status indicators
+- A small colored dot (green=live, grey=offline) in the header is OK, but do NOT label it "WebSocket"/"REST" — just use "Live"/"Offline"
+- Do NOT show raw entity_ids in badges — use friendly names or short labels
 
 DESIGN FREEDOM — be creative! Vary these across dashboards:
 - Color schemes: warm, cool, neon, pastel, monochrome, earth tones, gradients

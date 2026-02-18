@@ -1,4 +1,9 @@
 # Changelog
+## 3.10.1
+- **FIX**: Prompt now requires WebSocket auto-reconnect on close (`setTimeout(connectWs, 5000)`)
+- **FIX**: Prompt forbids debug/technical UI (connection status pills, entity_id badges, accent hex, series counts)
+- Dashboard is for end users: only show useful data, friendly names, a simple Live/Offline dot indicator
+
 ## 3.10.0
 - **NEW**: Chunked/draft mode for HTML dashboards — model sends HTML in 2-3 parts under 6000 chars each
 - `draft=true` buffers HTML chunks, omitting `draft` on last call finalizes and saves the dashboard
