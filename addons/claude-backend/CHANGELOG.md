@@ -1,4 +1,10 @@
 # Changelog
+## 3.10.2
+- **FIX**: Intent detection now correctly routes HTML dashboard modification requests to focused `create_html_dashboard` intent
+- Requests like "aggiungi sensori al pannello" with smart_context referencing `/local/dashboards/*.html` no longer fall through to generic intent (44 tools)
+- Added `has_html_dash_ref` check: detects dashboard names, paths, and `.html` references in message and smart_context
+- Auto-detect: if smart_context mentions an HTML dashboard file and user has modify intent, route to focused HTML dashboard intent (3 tools)
+
 ## 3.10.1
 - **FIX**: Prompt now requires WebSocket auto-reconnect on close (`setTimeout(connectWs, 5000)`)
 - **FIX**: Prompt forbids debug/technical UI (connection status pills, entity_id badges, accent hex, series counts)
