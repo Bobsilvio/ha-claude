@@ -1,7 +1,10 @@
 # Changelog
-## 3.8.6
-- **FIX**: HTML dashboard iframe 401 Unauthorized after addon restart/update — Ingress token changes on restart, causing stale iframe URLs in Lovelace configs
-- **NEW**: Startup auto-fix: on boot, scans all Lovelace dashboards for iframe cards with old Ingress tokens and updates them to the current one
+## 3.9.0
+- **ARCHITECTURE**: HTML dashboards now served from `/config/www/dashboards/` via HA's static file server (`/local/`) — eliminates Ingress token dependency entirely
+- **FIX**: HTML dashboard 401 Unauthorized permanently fixed — iframe URLs now use `/local/dashboards/name.html` (stable, never changes on addon restart/update)
+- **IMPROVEMENT**: Dashboard JS uses direct HA REST API with Bearer token instead of addon proxy — simpler, no Ingress routing needed
+- **NEW**: Automatic migration on startup — copies dashboards from old `.html_dashboards/` to `www/dashboards/` and updates all Lovelace iframe URLs
+- **IMPROVEMENT**: Backward compatibility — serve route checks both new and old paths, list route scans both directories
 
 ## 3.8.5
 - **NEW**: `trend` section type for HTML dashboards — KPI badges with live values + historical area chart with gradient fill

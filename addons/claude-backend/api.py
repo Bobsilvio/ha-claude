@@ -3759,30 +3759,29 @@ def dashboard_api_service(domain, service):
 # ===== CUSTOM HTML DASHBOARDS =====
 @app.route('/custom_dashboards/<name>')
 def serve_html_dashboard(name):
-    """Serve custom HTML dashboards created by create_html_dashboard tool."""
+    """Serve custom HTML dashboards (legacy route, kept for backward compat)."""
     try:
-        # Sanitize filename to prevent directory traversal
         safe_name = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
         if not safe_name.endswith(".html"):
             safe_name += ".html"
-        
-        # Security: only allow alphanumeric, hyphens, and .html extension
+
         if not all(c.isalnum() or c in '-.' for c in safe_name):
             return jsonify({"error": "Invalid dashboard name"}), 400
-        
-        dashboard_path = os.path.join(HA_CONFIG_DIR, ".html_dashboards", safe_name)
-        
+
+        # Try new path first (www/dashboards/), then legacy (.html_dashboards/)
+        dashboard_path = os.path.join(HA_CONFIG_DIR, "www", "dashboards", safe_name)
         if not os.path.isfile(dashboard_path):
-            logger.warning(f"Dashboard not found: {dashboard_path}")
+            dashboard_path = os.path.join(HA_CONFIG_DIR, ".html_dashboards", safe_name)
+
+        if not os.path.isfile(dashboard_path):
             return jsonify({"error": f"Dashboard '{name}' not found"}), 404
-        
-        # Serve HTML file with proper content type
+
         with open(dashboard_path, "r", encoding="utf-8") as f:
             html_content = f.read()
-        
+
         logger.info(f"📊 Serving custom dashboard: {safe_name}")
         return html_content, 200, {"Content-Type": "text/html; charset=utf-8"}
-    
+
     except Exception as e:
         logger.error(f"❌ Error serving dashboard: {e}")
         return jsonify({"error": f"Failed to serve dashboard: {str(e)}"}), 500
@@ -3792,29 +3791,32 @@ def serve_html_dashboard(name):
 def list_html_dashboards():
     """List all available custom HTML dashboards."""
     try:
-        dashboards_dir = os.path.join(HA_CONFIG_DIR, ".html_dashboards")
-        
-        if not os.path.isdir(dashboards_dir):
-            return jsonify({"dashboards": [], "count": 0}), 200
-        
         dashboards = []
-        for filename in os.listdir(dashboards_dir):
-            if filename.endswith(".html"):
-                file_path = os.path.join(dashboards_dir, filename)
-                file_size = os.path.getsize(file_path)
-                mod_time = os.path.getmtime(file_path)
-                
-                dashboards.append({
-                    "name": filename.replace(".html", ""),
-                    "filename": filename,
-                    "url": f"/custom_dashboards/{filename.replace('.html', '')}",
-                    "size": file_size,
-                    "modified": datetime.fromtimestamp(mod_time).isoformat()
-                })
-        
+
+        # Scan both new path (www/dashboards/) and legacy (.html_dashboards/)
+        for subdir in [os.path.join("www", "dashboards"), ".html_dashboards"]:
+            dashboards_dir = os.path.join(HA_CONFIG_DIR, subdir)
+            if not os.path.isdir(dashboards_dir):
+                continue
+
+            for filename in os.listdir(dashboards_dir):
+                if filename.endswith(".html"):
+                    file_path = os.path.join(dashboards_dir, filename)
+                    dash_name = filename.replace(".html", "")
+                    # Skip if already listed (new path takes priority)
+                    if any(d["name"] == dash_name for d in dashboards):
+                        continue
+                    dashboards.append({
+                        "name": dash_name,
+                        "filename": filename,
+                        "url": f"/local/dashboards/{filename}",
+                        "size": os.path.getsize(file_path),
+                        "modified": datetime.fromtimestamp(os.path.getmtime(file_path)).isoformat()
+                    })
+
         logger.info(f"📊 Listed {len(dashboards)} custom dashboards")
         return jsonify({"dashboards": dashboards, "count": len(dashboards)}), 200
-    
+
     except Exception as e:
         logger.error(f"❌ Error listing dashboards: {e}")
         return jsonify({"error": str(e)}), 500
@@ -3867,28 +3869,39 @@ if __name__ == "__main__":
             }
             logger.warning(fix_msgs.get(LANGUAGE, fix_msgs["en"]))
 
-    # --- Fix stale Ingress URLs in HTML dashboard iframes ---
-    def fix_stale_ingress_urls():
-        """On startup, update Lovelace iframe URLs if the Ingress token has changed."""
+    # --- Migrate old HTML dashboards to /config/www/dashboards/ and fix iframe URLs ---
+    def migrate_html_dashboards():
+        """Move dashboards from .html_dashboards/ to www/dashboards/ and update Lovelace iframe URLs."""
         try:
-            current_ingress = get_addon_ingress_url()
-            if not current_ingress:
-                return
+            old_dir = os.path.join(HA_CONFIG_DIR, ".html_dashboards")
+            new_dir = os.path.join(HA_CONFIG_DIR, "www", "dashboards")
 
-            dashboards_dir = os.path.join(HA_CONFIG_DIR, ".html_dashboards")
-            if not os.path.isdir(dashboards_dir):
-                return
+            # Migrate files from old to new location
+            migrated_files = set()
+            if os.path.isdir(old_dir):
+                os.makedirs(new_dir, exist_ok=True)
+                import shutil
+                for fname in os.listdir(old_dir):
+                    if fname.endswith(".html"):
+                        src = os.path.join(old_dir, fname)
+                        dst = os.path.join(new_dir, fname)
+                        if not os.path.exists(dst):
+                            shutil.copy2(src, dst)
+                            migrated_files.add(fname.replace(".html", ""))
+                            logger.info(f"📦 Migrated dashboard: {fname} → www/dashboards/")
 
-            # Get list of our HTML dashboard filenames
+            # Collect all dashboard names (both migrated and existing)
             html_names = set()
-            for fname in os.listdir(dashboards_dir):
-                if fname.endswith(".html"):
-                    html_names.add(fname.replace(".html", ""))
+            for d in [new_dir, old_dir]:
+                if os.path.isdir(d):
+                    for fname in os.listdir(d):
+                        if fname.endswith(".html"):
+                            html_names.add(fname.replace(".html", ""))
 
             if not html_names:
                 return
 
-            # List all Lovelace dashboards
+            # Update Lovelace iframe URLs: /api/hassio_ingress/.../custom_dashboards/x → /local/dashboards/x.html
             ws_dashboards = call_ha_websocket("lovelace/dashboards/list")
             if not isinstance(ws_dashboards, list):
                 ws_dashboards = ws_dashboards.get("result", []) if isinstance(ws_dashboards, dict) else []
@@ -3899,7 +3912,6 @@ if __name__ == "__main__":
                 if url_path not in html_names:
                     continue
 
-                # Get this dashboard's config
                 try:
                     config = call_ha_websocket("lovelace/config", url_path=url_path)
                     if isinstance(config, dict) and "result" in config:
@@ -3910,7 +3922,6 @@ if __name__ == "__main__":
                 if not isinstance(config, dict):
                     continue
 
-                # Search for iframe cards with stale ingress URLs
                 views = config.get("views", [])
                 changed = False
                 for view in views:
@@ -3918,29 +3929,31 @@ if __name__ == "__main__":
                         if card.get("type") != "iframe":
                             continue
                         card_url = card.get("url", "")
-                        # Check if URL has an old ingress token
+                        # Fix old Ingress URLs → stable /local/ URL
                         if "/api/hassio_ingress/" in card_url and "/custom_dashboards/" in card_url:
-                            # Extract the dashboard name from the URL
-                            dash_part = card_url.split("/custom_dashboards/")[-1]
-                            new_url = f"{current_ingress}/custom_dashboards/{dash_part}"
-                            if card_url != new_url:
-                                card["url"] = new_url
-                                changed = True
+                            dash_name = card_url.split("/custom_dashboards/")[-1]
+                            if not dash_name.endswith(".html"):
+                                dash_name += ".html"
+                            new_url = f"/local/dashboards/{dash_name}"
+                            card["url"] = new_url
+                            changed = True
 
                 if changed:
                     try:
                         call_ha_websocket("lovelace/config/save", url_path=url_path, config={"views": views})
                         fixed += 1
-                        logger.info(f"🔗 Fixed stale Ingress URL for dashboard: {url_path}")
+                        logger.info(f"🔗 Migrated iframe URL for dashboard: {url_path} → /local/dashboards/")
                     except Exception as e:
                         logger.warning(f"⚠️ Failed to update iframe URL for {url_path}: {e}")
 
+            if migrated_files:
+                logger.info(f"📦 Migrated {len(migrated_files)} dashboard file(s) to www/dashboards/")
             if fixed:
-                logger.info(f"🔗 Updated {fixed} HTML dashboard iframe URL(s) with current Ingress token")
+                logger.info(f"🔗 Updated {fixed} Lovelace iframe URL(s) to /local/dashboards/")
         except Exception as e:
-            logger.warning(f"⚠️ Error fixing stale Ingress URLs: {e}")
+            logger.warning(f"⚠️ Dashboard migration error: {e}")
 
-    fix_stale_ingress_urls()
+    migrate_html_dashboards()
 
     # Use Waitress production WSGI server instead of Flask development server
     from waitress import serve

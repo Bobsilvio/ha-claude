@@ -226,8 +226,8 @@ const PAL=['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4'
 const DICO={sensor:'\ud83d\udcca',binary_sensor:'\ud83d\udd14',switch:'\ud83d\udd0c',light:'\ud83d\udca1',climate:'\ud83c\udf21\ufe0f',cover:'\ud83e\ude9f',fan:'\ud83c\udf00',
 input_boolean:'\ud83d\udd18',input_number:'\ud83d\udd22',number:'\ud83d\udd22',automation:'\u2699\ufe0f',script:'\ud83d\udcdc',person:'\ud83d\udc64',weather:'\ud83c\udf24\ufe0f',
 media_player:'\ud83c\udfb5',camera:'\ud83d\udcf7',lock:'\ud83d\udd12',vacuum:'\ud83e\uddf9'};
-const PROXY_BASE=(function(){const p=location.pathname,i=p.indexOf('/custom_dashboards/');return i>=0?p.substring(0,i):''})();
 function getToken(){try{return JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''}catch(e){return''}}
+function haHeaders(){const t=getToken();return t?{'Authorization':'Bearer '+t,'Content-Type':'application/json'}:{'Content-Type':'application/json'}}
 
 createApp({setup(){
 const connected=ref(false),error=ref(''),sections=ref(SECTIONS),states=reactive({});
@@ -253,7 +253,7 @@ function items(sec){if(sec.items)return sec.items.map(it=>typeof it==='string'?{
 if(sec.entities)return sec.entities.map(e=>({e,label:'',color:'',icon:''}));return ENTITIES.map(e=>({e,label:'',color:'',icon:''}))}
 
 function callSvc(d,svc,eid,data){
-fetch(PROXY_BASE+'/dashboard_api/services/'+d+'/'+svc,{method:'POST',headers:{'Content-Type':'application/json'},
+fetch('/api/services/'+d+'/'+svc,{method:'POST',headers:haHeaders(),
 body:JSON.stringify({entity_id:eid,...(data||{})})}).catch(x=>console.warn(x))}
 function toggle(eid){const d=eid.split('.')[0];callSvc(d==='light'?'light':d==='input_boolean'?'input_boolean':'switch','toggle',eid,{})}
 function setVal(eid,v){const d=eid.split('.')[0];callSvc(d==='input_number'?'input_number':'number','set_value',eid,{value:parseFloat(v)})}
@@ -261,11 +261,11 @@ function setVal(eid,v){const d=eid.split('.')[0];callSvc(d==='input_number'?'inp
 function applyStates(list){list.forEach(s=>{if(ENTITIES.includes(s.entity_id))states[s.entity_id]={state:s.state,friendly_name:s.attributes?.friendly_name||'',
 unit:s.attributes?.unit_of_measurement||'',attributes:s.attributes||{}}});nextTick(()=>{initCharts();initTrends()})}
 
-function fetchProxy(){
-fetch(PROXY_BASE+'/dashboard_api/states').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(applyStates)
+function fetchStates(){
+fetch('/api/states',{headers:haHeaders()}).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(applyStates)
 .catch(e=>{if(!connected.value)error.value='REST: '+e.message})}
 
-function startPolling(){if(pollTimer)return;fetchProxy();pollTimer=setInterval(fetchProxy,5000)}
+function startPolling(){if(pollTimer)return;fetchStates();pollTimer=setInterval(fetchStates,5000)}
 
 function connect(){const token=getToken();
 if(!token){error.value='';startPolling();return}
@@ -273,7 +273,7 @@ try{const p=location.protocol==='https:'?'wss:':'ws:';
 ws=new WebSocket(p+'//'+location.host+'/api/websocket');
 ws.onmessage=ev=>{const m=JSON.parse(ev.data);
 if(m.type==='auth_required')ws.send(JSON.stringify({type:'auth',access_token:token}));
-else if(m.type==='auth_ok'){connected.value=true;error.value='';fetchProxy();ws.send(JSON.stringify({id:msgId++,type:'subscribe_events',event_type:'state_changed'}))}
+else if(m.type==='auth_ok'){connected.value=true;error.value='';fetchStates();ws.send(JSON.stringify({id:msgId++,type:'subscribe_events',event_type:'state_changed'}))}
 else if(m.type==='auth_invalid'){error.value='';connected.value=false;startPolling()}
 else if(m.type==='event'&&m.event?.event_type==='state_changed'){const d=m.event.data;
 if(d&&ENTITIES.includes(d.entity_id)&&d.new_state){states[d.entity_id]={state:d.new_state.state,friendly_name:d.new_state.attributes?.friendly_name||'',
@@ -305,7 +305,8 @@ SECTIONS.forEach((sec,i)=>{if(sec.type!=='trend')return;
 const cv=document.getElementById('trend-'+i);if(!cv)return;
 const eids=(sec.items||[]).map(it=>typeof it==='string'?it:it.entity);
 if(!eids.length)return;const hours=sec.hours||24;
-fetch(PROXY_BASE+'/dashboard_api/history?entity_ids='+eids.join(',')+'&hours='+hours)
+const end=new Date().toISOString(),start=new Date(Date.now()-hours*3600000).toISOString();
+fetch('/api/history/period/'+start+'?filter_entity_id='+eids.join(',')+'&end_time='+end+'&minimal_response&no_attributes',{headers:haHeaders()})
 .then(r=>r.json()).then(histData=>{
 if(!Array.isArray(histData)||!histData.length)return;
 const datasets=[];
@@ -2085,24 +2086,24 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
             try:
-                # Create html_dashboards directory if it doesn't exist
-                html_dashboards_dir = os.path.join(api.HA_CONFIG_DIR, ".html_dashboards")
+                # Save HTML to /config/www/dashboards/ - served by HA at /local/dashboards/
+                # This avoids Ingress token dependency entirely (stable URL, same-origin)
+                html_dashboards_dir = os.path.join(api.HA_CONFIG_DIR, "www", "dashboards")
                 os.makedirs(html_dashboards_dir, exist_ok=True)
 
                 # Save the agent-generated HTML file
                 safe_filename = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
                 if not safe_filename.endswith(".html"):
                     safe_filename += ".html"
-                
+
                 file_path = os.path.join(html_dashboards_dir, safe_filename)
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
 
                 logger.info(f"✅ HTML dashboard file saved: {file_path}")
 
-                # Build URL for iframe - must use Ingress path so HA frontend proxies to addon
-                ingress_url = api.get_addon_ingress_url()
-                dashboard_url = f"{ingress_url}/custom_dashboards/{safe_filename.replace('.html', '')}"
+                # URL for iframe - /local/ is HA's static file server (no Ingress token needed)
+                dashboard_url = f"/local/dashboards/{safe_filename}"
                 logger.info(f"🔗 Dashboard iframe URL: {dashboard_url}")
 
                 # Create a Lovelace dashboard wrapper with iframe in sidebar
