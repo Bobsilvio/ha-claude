@@ -1,4 +1,9 @@
 # Changelog
+## 3.9.6
+- **FIX**: Focused prompt now explicitly tells model to pass HTML inside tool call arguments JSON, not as text
+- **FIX**: Error message for missing html/sections now explains exactly how to structure the tool call
+- **FIX**: Safety net regex more robust — catches `<html>` without DOCTYPE, `<head>...<body>` fragments
+
 ## 3.9.5
 - **FIX**: Validate raw HTML has functional Vue app — reject incomplete HTML (CSS only, missing `createApp`, no WebSocket logic) with detailed error guiding the model to include full template + JS
 

@@ -177,8 +177,12 @@ The user wants a UNIQUE, beautiful HTML dashboard page with real Home Assistant 
 
 WORKFLOW:
 1. Call search_entities to find the correct entity_ids. NEVER guess entity_ids.
-2. Call create_html_dashboard using RAW HTML mode: pass the full HTML/CSS/JS in the 'html' parameter.
+2. Call create_html_dashboard with the COMPLETE HTML as the 'html' parameter in the tool arguments JSON.
    Design a UNIQUE page every time — vary colors, layouts, typography, animations, card styles.
+
+CRITICAL: The HTML code MUST be passed as the value of the 'html' key in the tool call arguments.
+Do NOT write HTML as text in your response — put it INSIDE the tool call: {"title":"...","name":"...","entities":[...],"html":"<!DOCTYPE html>..."}
+The tool will REJECT the call if 'html' is missing from the arguments.
 
 PLACEHOLDER REFERENCE (the tool replaces these in your HTML):
 - __ENTITIES_JSON__ → JS array of entity_id strings, e.g. ["sensor.power","sensor.temp"] (MANDATORY)

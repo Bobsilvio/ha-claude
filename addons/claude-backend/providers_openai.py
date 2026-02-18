@@ -352,13 +352,24 @@ def _rescue_html_dashboard_args(args: dict, accumulated: str, messages: list[dic
     m = re.search(r'```(?:html)?\s*\n(<!DOCTYPE[\s\S]+?</html>)\s*```', accumulated, re.IGNORECASE)
     if m:
         html_code = m.group(1)
-    else:
-        # Try raw HTML
+    if not html_code:
+        # Try raw <!DOCTYPE...
         m = re.search(r'(<!DOCTYPE[\s\S]+</html>)', accumulated, re.IGNORECASE)
         if m:
             html_code = m.group(1)
+    if not html_code:
+        # Try <html>...</html> without DOCTYPE
+        m = re.search(r'(<html[\s\S]+</html>)', accumulated, re.IGNORECASE)
+        if m:
+            html_code = m.group(1)
+    if not html_code:
+        # Last resort: any substantial block with <head> and <body>
+        m = re.search(r'(<head[\s\S]+</body>)', accumulated, re.IGNORECASE)
+        if m:
+            html_code = '<!DOCTYPE html><html>' + m.group(1) + '</html>'
 
     if not html_code:
+        logger.info(f"Safety net: no HTML found in {len(accumulated)} chars of assistant text")
         return args  # no HTML found in text
 
     args["html"] = html_code

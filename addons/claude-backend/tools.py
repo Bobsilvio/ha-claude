@@ -2038,7 +2038,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     )}, default=str)
             else:
                 if not sections:
-                    return json.dumps({"error": "Provide either 'sections' (structured mode) OR 'html' (raw HTML mode)."}, default=str)
+                    return json.dumps({"error": (
+                        "MISSING CONTENT: You must pass your HTML code as the 'html' parameter in the tool call arguments. "
+                        "Do NOT write HTML as text — put it in the tool arguments JSON: "
+                        "{\"title\":\"...\",\"name\":\"...\",\"entities\":[...],\"html\":\"<!DOCTYPE html><html>...</html>\"} "
+                        "Include title, name, entities array, and the complete html string."
+                    )}, default=str)
             if not entities:
                 return json.dumps({"error": "entities is required. Provide an array of entity_ids to monitor."}, default=str)
 
