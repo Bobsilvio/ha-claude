@@ -1,4 +1,10 @@
 # Changelog
+## 3.9.1
+- **IMPROVEMENT**: HTML dashboards now default to RAW HTML mode — agent writes full HTML/CSS/JS for unique creative designs
+- **IMPROVEMENT**: Focused prompt encourages varied styles: glass morphism, neon, neumorphism, gradients, animations, bento grids
+- **IMPROVEMENT**: Complete WebSocket/REST guide in prompt — agent builds live-updating dashboards with full creative freedom
+- **FIX**: Removed surrogate unicode character in schema description that caused UTF-8 encode error on chat messages
+
 ## 3.9.0
 - **ARCHITECTURE**: HTML dashboards now served from `/config/www/dashboards/` via HA's static file server (`/local/`) — eliminates Ingress token dependency entirely
 - **FIX**: HTML dashboard 401 Unauthorized permanently fixed — iframe URLs now use `/local/dashboards/name.html` (stable, never changes on addon restart/update)
