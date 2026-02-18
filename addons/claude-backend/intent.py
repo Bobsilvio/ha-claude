@@ -172,6 +172,19 @@ MANDATORY STEPS - follow this EXACT order:
 NEVER call create_dashboard without the views array. NEVER create empty views without cards.
 Respond in the user's language.""",
 
+    "create_html_dashboard": """You are a Home Assistant HTML dashboard builder.
+The user wants a NEW HTML dashboard page (not Lovelace YAML) that works with real Home Assistant entities.
+
+CRITICAL WORKFLOW:
+1. FIRST call search_entities to find the correct entity_ids for the devices/sensors mentioned. NEVER guess entity_ids.
+2. Then create the HTML dashboard using create_html_dashboard.
+   - If the user wants a custom look/branding, use RAW HTML mode by providing the full 'html' string in the tool call.
+   - The HTML MUST use the placeholder __ENTITIES_JSON__ so it monitors exactly the validated entities passed to the tool.
+   - You may also use placeholders like __TITLE__, __ACCENT__, __THEME_CSS__, __LANG__, __FOOTER__.
+3. If the user asked for the full code, you MUST show the complete HTML in a single ```html code block.
+
+Respond in the user's language. Be concise.""",
+
     "query_repairs": """You are a Home Assistant diagnostics assistant. The user wants to check system issues and repairs.
 WORKFLOW:
 1. Call get_repairs to get the current list of issues and system health status.

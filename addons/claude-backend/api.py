@@ -95,6 +95,15 @@ RUNTIME_SELECTION_FILE = "/config/.storage/claude_runtime_selection.json"
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
 
+# Agent personalization (from add-on config)
+AGENT_NAME = (os.getenv("AGENT_NAME", "AI Assistant") or "AI Assistant").strip()
+AGENT_AVATAR = (os.getenv("AGENT_AVATAR", "🤖") or "🤖").strip()
+AGENT_INSTRUCTIONS = (os.getenv("AGENT_INSTRUCTIONS", "") or "").strip()
+HTML_DASHBOARD_FOOTER = (os.getenv("HTML_DASHBOARD_FOOTER", "") or "").strip()
+
+# Persist system prompt override across restarts
+CUSTOM_SYSTEM_PROMPT_FILE = "/config/.storage/claude_custom_system_prompt.txt"
+
 _LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
 
 
@@ -160,6 +169,42 @@ logger.info(f"ENABLE_FILE_ACCESS env var: {os.getenv('ENABLE_FILE_ACCESS', 'NOT 
 logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
 logger.info(f"LANGUAGE: {LANGUAGE}")
+
+
+def _load_custom_system_prompt_from_disk() -> Optional[str]:
+    try:
+        if not os.path.isfile(CUSTOM_SYSTEM_PROMPT_FILE):
+            return None
+        with open(CUSTOM_SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
+            prompt = (f.read() or "").strip()
+        # Guardrail: ignore absurdly large prompts
+        if len(prompt) > 200_000:
+            logger.warning(f"Custom system prompt file too large ({len(prompt)} chars) - ignoring")
+            return None
+        return prompt or None
+    except Exception as e:
+        logger.warning(f"Could not load custom system prompt from disk: {e}")
+        return None
+
+
+def _persist_custom_system_prompt_to_disk(prompt: Optional[str]) -> None:
+    try:
+        os.makedirs(os.path.dirname(CUSTOM_SYSTEM_PROMPT_FILE), exist_ok=True)
+        if not prompt:
+            if os.path.isfile(CUSTOM_SYSTEM_PROMPT_FILE):
+                os.remove(CUSTOM_SYSTEM_PROMPT_FILE)
+            return
+        with open(CUSTOM_SYSTEM_PROMPT_FILE, "w", encoding="utf-8") as f:
+            f.write(str(prompt))
+    except Exception as e:
+        logger.warning(f"Could not persist custom system prompt to disk: {e}")
+
+
+# Load persisted system prompt override (if any)
+_persisted_prompt = _load_custom_system_prompt_from_disk()
+if _persisted_prompt:
+    CUSTOM_SYSTEM_PROMPT = _persisted_prompt
+    logger.info(f"Loaded custom system prompt from disk ({len(CUSTOM_SYSTEM_PROMPT)} chars)")
 
 
 def _truncate(s: str, max_len: int = 160) -> str:
@@ -2769,6 +2814,7 @@ def api_set_system_prompt():
         
         if new_prompt.lower() == 'reset':
             CUSTOM_SYSTEM_PROMPT = None
+            _persist_custom_system_prompt_to_disk(None)
             logger.info("System prompt reset to default")
             return jsonify({
                 "success": True,
@@ -2777,6 +2823,7 @@ def api_set_system_prompt():
             })
         
         CUSTOM_SYSTEM_PROMPT = new_prompt
+        _persist_custom_system_prompt_to_disk(CUSTOM_SYSTEM_PROMPT)
         logger.info(f"System prompt overridden ({len(new_prompt)} chars)")
         
         return jsonify({
@@ -3655,6 +3702,36 @@ def dashboard_api_states():
         return resp.json(), resp.status_code, {"Content-Type": "application/json"}
     except Exception as e:
         logger.error(f"Dashboard API proxy /states error: {e}")
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route('/dashboard_api/history')
+def dashboard_api_history():
+    """Proxy GET /api/history/period using server-side SUPERVISOR_TOKEN."""
+    try:
+        entity_ids = request.args.get('entity_ids', '')
+        hours = min(int(request.args.get('hours', 24)), 168)
+
+        if not entity_ids:
+            return jsonify({"error": "entity_ids parameter required"}), 400
+
+        # Validate entity_id format
+        for eid in entity_ids.split(','):
+            if not re.match(r'^[a-z_]+\.[a-z0-9_]+$', eid.strip()):
+                return jsonify({"error": f"Invalid entity_id: {eid}"}), 400
+
+        end_time = datetime.utcnow()
+        start_time = end_time - timedelta(hours=hours)
+
+        url = (f"{HA_URL}/api/history/period/{start_time.isoformat()}Z"
+               f"?filter_entity_id={entity_ids}"
+               f"&end_time={end_time.isoformat()}Z"
+               f"&minimal_response&no_attributes")
+
+        resp = requests.get(url, headers=get_ha_headers(), timeout=30)
+        return resp.json(), resp.status_code, {"Content-Type": "application/json"}
+    except Exception as e:
+        logger.error(f"Dashboard API proxy /history error: {e}")
         return jsonify({"error": str(e)}), 502
 
 

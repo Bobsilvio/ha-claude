@@ -10,17 +10,19 @@ import api
 
 logger = logging.getLogger(__name__)
 
-AI_SIGNATURE = "AI Assistant"
+AI_SIGNATURE = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
 
 
 def _build_dashboard_html(title: str, entities: list, theme: str,
-                          accent_color: str, sections: list) -> str:
+                          accent_color: str, sections: list,
+                          *, lang: str | None = None,
+                          footer_text: str | None = None) -> str:
     """Build HTML dashboard from structured design spec V2.
 
     The agent designs the dashboard architecture (sections, layout, grouping, colors).
     This function renders beautiful HTML with auth, WebSocket, Chart.js.
 
-    Section types: hero, pills, flow, gauge, gauges, kpi, chart, entities, controls, stats, value
+    Section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value
     Layout: each section has 'span' (1=third, 2=two-thirds, 3=full-width, default 3).
     """
     import html as html_module
@@ -43,14 +45,26 @@ def _build_dashboard_html(title: str, entities: list, theme: str,
     elif theme == "light":
         theme_css = ":root{--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;--card:rgba(255,255,255,.85);--border:#e2e8f0}"
 
+    if not lang:
+        lang = getattr(api, "LANGUAGE", "en") or "en"
+    lang = (str(lang).lower() or "en")
+    if lang not in ("en", "it", "es", "fr"):
+        lang = "en"
+
+    agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+    default_footer = getattr(api, "HTML_DASHBOARD_FOOTER", "") or ""
+    if not footer_text:
+        footer_text = default_footer.strip() or f"Dashboard by {agent_name} · Real-time"
+
     html = r"""<!DOCTYPE html>
-<html lang="en">
+<html lang="__LANG__">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>__TITLE__</title>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
 :root{--accent:__ACCENT__;--accent-rgb:__ACCENT_RGB__;--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;
 --card:rgba(255,255,255,.85);--border:#e2e8f0;--green:#10b981;--yellow:#f59e0b;--red:#ef4444;--blue:#3b82f6;--r:16px}
@@ -109,6 +123,11 @@ transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke-dasharray 
 .si{text-align:center;padding:.65rem;background:var(--bg2);border-radius:12px}
 .si-ico{font-size:1.2rem;margin-bottom:.05rem}.si-v{font-size:1.4rem;font-weight:900;line-height:1}.si-u{font-size:.62rem;color:var(--text2)}.si-n{font-size:.7rem;color:var(--text2);margin-top:.1rem}
 .bigv{text-align:center;padding:.75rem}.bigv-v{font-size:2.3rem;font-weight:900;line-height:1}.bigv-u{font-size:.9rem;color:var(--text2);margin-left:3px}.bigv-l{color:var(--text2);margin-top:.2rem;font-size:.82rem}
+.trend-kpis{display:flex;gap:.75rem;margin-bottom:.85rem;flex-wrap:wrap}
+.trend-kpi{display:flex;align-items:center;gap:.6rem;background:var(--bg2);border-radius:14px;padding:.55rem .85rem;flex:1;min-width:120px}
+.trend-kpi-ico{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;color:#fff}
+.trend-kpi-v{font-size:1.25rem;font-weight:900;line-height:1.1}.trend-kpi-l{font-size:.7rem;color:var(--text2)}
+.trend-chart{position:relative;width:100%;height:220px}.trend-chart canvas{display:block;width:100%!important;height:100%!important}
 .err{background:#fee2e2;color:#991b1b;padding:1rem;border-radius:12px;margin-top:1rem;font-size:.85rem}
 .ft{text-align:center;padding:1rem 0 .5rem;font-size:.68rem;color:var(--text2);grid-column:1/-1}
 </style>
@@ -182,10 +201,20 @@ stroke-linecap="round" transform="rotate(-90 18 18)" style="transition:stroke-da
 <div v-if="s.subtitle" class="bigv-l">{{ s.subtitle }}</div>
 <div v-else class="bigv-l">{{ nm(s.entity) }}</div></div>
 
+<div v-else-if="s.type==='trend'">
+<div class="trend-kpis">
+<div v-for="(it,j) in items(s)" :key="it.e" class="trend-kpi">
+<div class="trend-kpi-ico" :style="{background:it.color||PAL[j%PAL.length]}">{{ it.icon || dIco(it.e) }}</div>
+<div><div class="trend-kpi-v">{{ fv(it.e) }} <small style="font-size:.65rem;color:var(--text2)">{{ fu(it.e) }}</small></div>
+<div class="trend-kpi-l">{{ it.label || nm(it.e) }}</div></div>
+</div></div>
+<div class="trend-chart"><canvas :id="'trend-'+i"></canvas></div>
+</div>
+
 </div></div>
 </template>
 <div v-if="error" class="err">{{ error }}</div>
-<div class="ft">Dashboard by AI Assistant &middot; Real-time</div>
+<div class="ft">__FOOTER__</div>
 </div></div>
 
 <script>
@@ -220,8 +249,8 @@ function slDom(e){const d=e.split('.')[0];return['number','input_number'].includ
 function slMin(e){return states[e]?.attributes?.min??0}
 function slMax(e){return states[e]?.attributes?.max??100}
 function slStep(e){return states[e]?.attributes?.step??1}
-function items(sec){if(sec.items)return sec.items.map(it=>typeof it==='string'?{e:it,label:''}:{e:it.entity,label:it.label||''});
-if(sec.entities)return sec.entities.map(e=>({e,label:''}));return ENTITIES.map(e=>({e,label:''}))}
+function items(sec){if(sec.items)return sec.items.map(it=>typeof it==='string'?{e:it,label:'',color:'',icon:''}:{e:it.entity,label:it.label||'',color:it.color||'',icon:it.icon||''});
+if(sec.entities)return sec.entities.map(e=>({e,label:'',color:'',icon:''}));return ENTITIES.map(e=>({e,label:'',color:'',icon:''}))}
 
 function callSvc(d,svc,eid,data){
 fetch(PROXY_BASE+'/dashboard_api/services/'+d+'/'+svc,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -230,7 +259,7 @@ function toggle(eid){const d=eid.split('.')[0];callSvc(d==='light'?'light':d==='
 function setVal(eid,v){const d=eid.split('.')[0];callSvc(d==='input_number'?'input_number':'number','set_value',eid,{value:parseFloat(v)})}
 
 function applyStates(list){list.forEach(s=>{if(ENTITIES.includes(s.entity_id))states[s.entity_id]={state:s.state,friendly_name:s.attributes?.friendly_name||'',
-unit:s.attributes?.unit_of_measurement||'',attributes:s.attributes||{}}});nextTick(initCharts)}
+unit:s.attributes?.unit_of_measurement||'',attributes:s.attributes||{}}});nextTick(()=>{initCharts();initTrends()})}
 
 function fetchProxy(){
 fetch(PROXY_BASE+'/dashboard_api/states').then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(applyStates)
@@ -269,9 +298,39 @@ scales:ct==='bar'||ct==='line'?{x:{grid:{color:dk?'#334155':'#e2e8f0'},ticks:{co
 y:{grid:{color:dk?'#334155':'#e2e8f0'},ticks:{color:dk?'#94a3b8':'#6b7280',font:{size:10}}}}:{}}
 })})}
 
+let trendsLoaded=false;
+function initTrends(){if(trendsLoaded)return;trendsLoaded=true;
+const dk=window.matchMedia('(prefers-color-scheme:dark)').matches;
+SECTIONS.forEach((sec,i)=>{if(sec.type!=='trend')return;
+const cv=document.getElementById('trend-'+i);if(!cv)return;
+const eids=(sec.items||[]).map(it=>typeof it==='string'?it:it.entity);
+if(!eids.length)return;const hours=sec.hours||24;
+fetch(PROXY_BASE+'/dashboard_api/history?entity_ids='+eids.join(',')+'&hours='+hours)
+.then(r=>r.json()).then(histData=>{
+if(!Array.isArray(histData)||!histData.length)return;
+const datasets=[];
+histData.forEach((entityHist,j)=>{if(!entityHist.length)return;
+const eid=entityHist[0].entity_id;
+const item=(sec.items||[]).find(it=>(typeof it==='string'?it:it.entity)===eid)||{};
+const color=item.color||PAL[j%PAL.length];
+const pts=entityHist.filter(p=>!isNaN(parseFloat(p.state))).map(p=>({x:new Date(p.last_changed),y:parseFloat(p.state)}));
+datasets.push({label:item.label||eid.split('.').pop().replace(/_/g,' '),data:pts,borderColor:color,
+backgroundColor:function(ctx){const c=ctx.chart.ctx,area=ctx.chart.chartArea;if(!area)return color+'33';
+const g=c.createLinearGradient(0,area.top,0,area.bottom);g.addColorStop(0,color+'66');g.addColorStop(1,color+'05');return g},
+fill:true,tension:.4,borderWidth:2,pointRadius:0,pointHitRadius:8})});
+if(charts['t'+i])charts['t'+i].destroy();
+charts['t'+i]=new Chart(cv,{type:'line',data:{datasets},
+options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+plugins:{legend:{display:datasets.length>1,position:'bottom',labels:{boxWidth:10,padding:8,font:{size:11},color:dk?'#94a3b8':'#6b7280',usePointStyle:true}},
+tooltip:{callbacks:{label:function(ctx){return ctx.dataset.label+': '+ctx.parsed.y.toFixed(1)}}}},
+scales:{x:{type:'time',time:{tooltipFormat:'HH:mm',displayFormats:{hour:'HH:mm',day:'MMM d'}},
+grid:{color:dk?'#33415522':'#e2e8f022'},ticks:{color:dk?'#94a3b8':'#6b7280',font:{size:10},maxTicksLimit:8}},
+y:{grid:{color:dk?'#33415522':'#e2e8f022'},ticks:{color:dk?'#94a3b8':'#6b7280',font:{size:10}}}}}
+})}).catch(e=>console.warn('Trend fetch error:',e))})}
+
 onMounted(connect);
 onUnmounted(()=>{ws?.close();clearTimeout(reconTimer);clearInterval(pollTimer);Object.values(charts).forEach(c=>c.destroy())});
-return{sections,connected,error,nm,sv,fv,fu,isOn,numVal,gPct,dIco,togDom,slDom,slMin,slMax,slStep,items,toggle,setVal}
+return{sections,connected,error,nm,sv,fv,fu,isOn,numVal,gPct,dIco,togDom,slDom,slMin,slMax,slStep,items,toggle,setVal,PAL}
 }}).mount('#app');
 })();
 </script>
@@ -284,8 +343,63 @@ return{sections,connected,error,nm,sv,fv,fu,isOn,numVal,gPct,dIco,togDom,slDom,s
     html = html.replace("__ACCENT__", accent_color)
     html = html.replace("__ACCENT_RGB__", accent_rgb)
     html = html.replace("__THEME_CSS__", theme_css)
+    html = html.replace("__LANG__", lang)
+    html = html.replace("__FOOTER__", html_module.escape(str(footer_text)))
 
     return html
+
+
+def _fill_html_placeholders(
+    html: str,
+    *,
+    title: str,
+    entities: list,
+    theme: str,
+    accent_color: str,
+    lang: str | None = None,
+    footer_text: str | None = None,
+) -> str:
+    import html as html_module
+
+    safe_title = html_module.escape(title)
+    title_json = json.dumps(title, ensure_ascii=False)
+    entities_json = json.dumps(entities, ensure_ascii=False)
+
+    h = (accent_color or "").lstrip('#')
+    if len(h) == 3:
+        h = h[0]*2 + h[1]*2 + h[2]*2
+    try:
+        accent_rgb = f"{int(h[0:2],16)},{int(h[2:4],16)},{int(h[4:6],16)}"
+    except (ValueError, IndexError):
+        accent_rgb = "102,126,234"
+
+    theme_css = ""
+    if theme == "dark":
+        theme_css = ":root{--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155}"
+    elif theme == "light":
+        theme_css = ":root{--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;--card:rgba(255,255,255,.85);--border:#e2e8f0}"
+
+    if not lang:
+        lang = getattr(api, "LANGUAGE", "en") or "en"
+    lang = (str(lang).lower() or "en")
+    if lang not in ("en", "it", "es", "fr"):
+        lang = "en"
+
+    agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+    default_footer = getattr(api, "HTML_DASHBOARD_FOOTER", "") or ""
+    if not footer_text:
+        footer_text = default_footer.strip() or f"Dashboard by {agent_name} · Real-time"
+
+    out = str(html)
+    out = out.replace("__TITLE__", safe_title)
+    out = out.replace("__TITLE_JSON__", title_json)
+    out = out.replace("__ENTITIES_JSON__", entities_json)
+    out = out.replace("__ACCENT__", accent_color)
+    out = out.replace("__ACCENT_RGB__", accent_rgb)
+    out = out.replace("__THEME_CSS__", theme_css)
+    out = out.replace("__LANG__", lang)
+    out = out.replace("__FOOTER__", html_module.escape(str(footer_text)))
+    return out
 
 
 def _stamp_description(description: str, action: str = "create") -> str:
@@ -853,7 +967,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring. Design it with structured sections (visual blocks).\n\nSection types:\n- hero: Gradient banner. Props: title, description, icon, items[{entity,label}]\n- pills: KPI pill row. Props: items[{entity,label}]\n- flow: Energy flow (2-5 nodes with arrows). Props: title, nodes[{entity,label,highlight?}]\n- gauge: Single circular gauge + side stats. Props: title, entity, stats[{entity,label}]\n- gauges: Multiple small gauges. Props: items[{entity,label}]\n- kpi: Stat cards grid. Props: title, items[{entity,label}]\n- chart: Chart.js visualization. Props: title, chart_type(bar/line/doughnut/radar/pie), entities[]\n- entities: Entity list with auto toggles/sliders. Props: items[{entity,label}]\n- controls: Big toggle buttons. Props: items[{entity,label}]\n- stats: Big number cards with icon. Props: items[{entity,label}]\n- value: Single prominent value. Props: entity, subtitle\n\nLayout: each section has 'span' (1=third, 2=two-thirds, 3=full, default 3). Combine span:2 + span:1 for multi-column layouts.\nCard styles: 'gradient', 'outlined', 'flat' (optional per section).\n\nDesign tips: start with hero or pills for overview → flow+gauge for energy → kpi for periods → chart for trends → entities/controls for interaction.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nYou have TWO modes:\n1) Structured mode (recommended for reliability): provide 'sections' (visual blocks).\n2) Raw HTML mode (full customization): provide a complete 'html' string (the agent writes the full HTML/CSS/JS).\n\nRaw HTML placeholders you can use (the tool will replace them):\n- __TITLE__ (HTML-escaped title)\n- __TITLE_JSON__ (JSON string of title)\n- __ENTITIES_JSON__ (JSON array of entity_ids to monitor)\n- __ACCENT__ (hex color)\n- __ACCENT_RGB__ (r,g,b)\n- __THEME_CSS__ (CSS vars for light/dark)\n- __LANG__ (en/it/es/fr)\n- __FOOTER__ (HTML-escaped footer)\n\nSection types (structured mode):\n- hero: Gradient banner. Props: title, description, icon, items[{entity,label}]\n- pills: KPI pill row. Props: items[{entity,label}]\n- flow: Energy flow (2-5 nodes with arrows). Props: title, nodes[{entity,label,highlight?}]\n- gauge: Single circular gauge + side stats. Props: title, entity, stats[{entity,label}]\n- gauges: Multiple small gauges. Props: items[{entity,label}]\n- kpi: Stat cards grid. Props: title, items[{entity,label}]\n- chart: Chart.js visualization. Props: title, chart_type(bar/line/doughnut/radar/pie), entities[]\n- trend: KPI badges + historical area chart with gradient fill. Props: title, items[{entity,label,color,icon}], hours(1-168, default 24). Great for temperature/humidity, energy trends.\n- entities: Entity list with auto toggles/sliders. Props: items[{entity,label}]\n- controls: Big toggle buttons. Props: items[{entity,label}]\n- stats: Big number cards with icon. Props: items[{entity,label}]\n- value: Single prominent value. Props: entity, subtitle\n\nLayout: each section has 'span' (1=third, 2=two-thirds, 3=full, default 3). Combine span:2 + span:1 for multi-column layouts.\nCard styles: 'gradient', 'outlined', 'flat' (optional per section).",
         "parameters": {
             "type": "object",
             "properties": {
@@ -863,13 +977,17 @@ HA_TOOLS_DESCRIPTION = [
                 "entities": {"type": "array", "items": {"type": "string"}, "description": "ALL entity_ids to monitor via WebSocket."},
                 "theme": {"type": "string", "enum": ["auto", "light", "dark"], "description": "Color theme. 'auto' follows OS."},
                 "accent_color": {"type": "string", "description": "Accent color hex (e.g. '#667eea')."},
+                "lang": {"type": "string", "enum": ["en", "it", "es", "fr"], "description": "HTML lang attribute. Default: add-on language."},
+                "footer_text": {"type": "string", "description": "Footer text. Default: configured html_dashboard_footer or 'Dashboard by <agent_name> · Real-time'."},
+                "html": {"type": "string", "description": "Raw HTML mode: full HTML/CSS/JS code. If provided, 'sections' is optional."},
+                "return_html": {"type": "boolean", "description": "If true, include the generated/saved HTML content in the tool response (useful when user asked for the full code)."},
                 "sections": {
                     "type": "array",
                     "description": "Array of dashboard sections. Each has a 'type' + type-specific props.",
                     "items": {
                         "type": "object",
                         "properties": {
-                            "type": {"type": "string", "enum": ["hero", "pills", "flow", "gauge", "gauges", "kpi", "chart", "entities", "controls", "stats", "value"]},
+                            "type": {"type": "string", "enum": ["hero", "pills", "flow", "gauge", "gauges", "kpi", "chart", "trend", "entities", "controls", "stats", "value"]},
                             "title": {"type": "string", "description": "Section title."},
                             "icon": {"type": "string", "description": "Emoji character (e.g. ⚡🏠💡🌡️🔋🔌🛡️). Do NOT use mdi: icons, only emoji."},
                             "span": {"type": "integer", "description": "Layout: 1=third, 2=two-thirds, 3=full (default)."},
@@ -878,8 +996,9 @@ HA_TOOLS_DESCRIPTION = [
                             "entity": {"type": "string", "description": "Single entity for gauge/value."},
                             "subtitle": {"type": "string", "description": "Value subtitle."},
                             "chart_type": {"type": "string", "enum": ["bar", "line", "doughnut", "radar", "pie"]},
+                            "hours": {"type": "integer", "description": "Hours of history for trend charts (1-168, default 24)."},
                             "entities": {"type": "array", "items": {"type": "string"}, "description": "Entity IDs."},
-                            "items": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}}, "required": ["entity"]}, "description": "Entities with custom labels."},
+                            "items": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}, "color": {"type": "string", "description": "CSS color hex (e.g. '#ef4444') for trend badge and chart line."}, "icon": {"type": "string", "description": "Emoji icon for trend KPI badge (e.g. '\ud83c\udf21\ufe0f')."}}, "required": ["entity"]}, "description": "Entities with custom labels."},
                             "nodes": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}, "highlight": {"type": "boolean"}}, "required": ["entity"]}, "description": "Flow nodes."},
                             "stats": {"type": "array", "items": {"type": "object", "properties": {"entity": {"type": "string"}, "label": {"type": "string"}}, "required": ["entity"]}, "description": "Gauge side stats."}
                         },
@@ -887,7 +1006,7 @@ HA_TOOLS_DESCRIPTION = [
                     }
                 }
             },
-            "required": ["title", "name", "entities", "sections"]
+            "required": ["title", "name", "entities"]
         }
     },
     {
@@ -1893,9 +2012,19 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             theme = tool_input.get("theme", "auto")
             accent_color = tool_input.get("accent_color", "#667eea")
             sections = tool_input.get("sections", [])
+            lang = tool_input.get("lang")
+            footer_text = tool_input.get("footer_text")
+            raw_html = tool_input.get("html")
+            return_html = bool(tool_input.get("return_html", False))
 
-            if not sections:
-                return json.dumps({"error": "sections is required. Provide an array of section objects (type: hero/pills/flow/gauge/kpi/chart/entities/controls/stats/value)."}, default=str)
+            if raw_html is not None:
+                if not isinstance(raw_html, str) or not raw_html.strip():
+                    return json.dumps({"error": "html must be a non-empty string when provided."}, default=str)
+                if len(raw_html) > 900_000:
+                    return json.dumps({"error": f"html is too large ({len(raw_html)} chars). Please reduce size."}, default=str)
+            else:
+                if not sections:
+                    return json.dumps({"error": "Provide either 'sections' (structured mode) OR 'html' (raw HTML mode)."}, default=str)
             if not entities:
                 return json.dumps({"error": "entities is required. Provide an array of entity_ids to monitor."}, default=str)
 
@@ -1925,10 +2054,33 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             entities = valid_entities
 
-            logger.info(f"🎨 Creating HTML dashboard: title='{title}', name='{name}', entities={len(entities)}/{original_count} valid, sections={len(sections)}")
+            mode = "raw" if raw_html is not None else "structured"
+            logger.info(
+                f"🎨 Creating HTML dashboard ({mode}): title='{title}', name='{name}', "
+                f"entities={len(entities)}/{original_count} valid, sections={len(sections) if isinstance(sections, list) else 0}"
+            )
 
-            # Build HTML from structured sections spec
-            html_content = _build_dashboard_html(title, entities, theme, accent_color, sections)
+            if raw_html is not None:
+                html_content = _fill_html_placeholders(
+                    raw_html,
+                    title=title,
+                    entities=entities,
+                    theme=theme,
+                    accent_color=accent_color,
+                    lang=lang,
+                    footer_text=footer_text,
+                )
+            else:
+                # Build HTML from structured sections spec
+                html_content = _build_dashboard_html(
+                    title,
+                    entities,
+                    theme,
+                    accent_color,
+                    sections,
+                    lang=lang,
+                    footer_text=footer_text,
+                )
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
@@ -2002,10 +2154,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "url_path": safe_url_path,
                     "sidebar_ready": dashboard_created,
                     "entities_count": len(entities),
-                    "sections_count": len(sections),
+                    "mode": mode,
+                    "sections_count": len(sections) if isinstance(sections, list) else 0,
                     "IMPORTANT": f"✨ Your dashboard '{title}' is ready in the sidebar! Click on it to view.",
-                    "DISPLAY_NOTE": "Do NOT show HTML/CSS/JS code to the user. Just confirm the dashboard was created and where to find it."
+                    "DISPLAY_NOTE": "If the user asked for the full HTML code, show it in a single ```html code block. Otherwise, just confirm the dashboard was created and where to find it."
                 }
+                if return_html:
+                    result["html"] = html_content
                 if invalid_entities:
                     result["filtered_entities"] = invalid_entities
                     result["warning"] = f"{len(invalid_entities)} entities were removed (not found or unknown/unavailable). The dashboard only monitors {len(entities)} valid entities."
@@ -2930,6 +3085,11 @@ IMPORTANT for config editing:
 - Use **get_frontend_resources** to check which custom cards (HACS) are installed
 - Use **delete_dashboard** to remove a dashboard
 
+## Custom HTML Dashboards
+- Use **create_html_dashboard** to create a custom HTML dashboard.
+- For FULL customization, provide the full HTML in the tool input field **html** and use placeholder **__ENTITIES_JSON__** to bind exactly the validated entities.
+- If the user explicitly asks for the full HTML code, show it in a single ```html code block.
+
 IMPORTANT: When modifying a dashboard, ALWAYS:
 1. First call get_dashboard_config to read the current config
 2. Modify the views/cards as needed
@@ -3092,13 +3252,17 @@ def get_compact_prompt():
     confirm_delete_rule = api.get_lang_text("confirm_delete_rule")
     example_vs_create_rule = api.get_lang_text("example_vs_create_rule")
 
-    return f"""You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, create automations, create dashboards.
+    agent_instr = getattr(api, "AGENT_INSTRUCTIONS", "") or ""
+    agent_block = f"\nAssistant persona (user-configured):\n{agent_instr.strip()}\n" if agent_instr.strip() else ""
+
+    return f"""You are a Home Assistant AI assistant. Control devices, query states, search entities, check history, create automations, create dashboards.{agent_block}
 {example_vs_create_rule}
 {confirm_entity_rule}
 {show_yaml_rule}
 {confirm_delete_rule}
 When users ask about specific devices, use search_entities. Use get_history for past data.
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
+To create a CUSTOM HTML dashboard, you may pass full HTML in create_html_dashboard.html and MUST use __ENTITIES_JSON__.
 {lang_instruction} Be concise."""
 
 
@@ -3112,7 +3276,10 @@ def get_compact_prompt_with_files():
     confirm_delete_rule = api.get_lang_text("confirm_delete_rule")
     example_vs_create_rule = api.get_lang_text("example_vs_create_rule")
 
-    return f"""You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.
+    agent_instr = getattr(api, "AGENT_INSTRUCTIONS", "") or ""
+    agent_block = f"\nAssistant persona (user-configured):\n{agent_instr.strip()}\n" if agent_instr.strip() else ""
+
+    return f"""You are a Home Assistant AI assistant. Control devices, query states, create automations/dashboards, and READ CONFIG FILES.{agent_block}
 Use list_config_files to explore folders (e.g., 'lovelace', 'yaml'). Use read_config_file to read YAML/JSON files.
 Use get_automations, get_scripts, get_dashboards to list existing configs.
 When users ask about files/folders, use list_config_files first to show what's available.
@@ -3137,6 +3304,8 @@ When you MODIFY configs, show ONLY the changed sections in diff format:
 ```
 
 For NEW creations, show the complete YAML.
+
+For CUSTOM HTML dashboards, you may pass full HTML in create_html_dashboard.html and MUST use __ENTITIES_JSON__.
 
 {lang_instruction} Be concise."""
 
@@ -3237,7 +3406,16 @@ def get_system_prompt() -> str:
     if api.CUSTOM_SYSTEM_PROMPT is not None:
         return api.CUSTOM_SYSTEM_PROMPT
 
-    base_prompt = """You are an AI assistant integrated into Home Assistant. You help users manage their smart home.
+    agent_instr = getattr(api, "AGENT_INSTRUCTIONS", "") or ""
+    agent_block = ""
+    if agent_instr.strip():
+        agent_block = (
+            "## Assistant Persona (user-configured)\n"
+            + agent_instr.strip()
+            + "\n\n"
+        )
+
+    base_prompt = agent_block + """You are an AI assistant integrated into Home Assistant. You help users manage their smart home.
 
 You can:
 1. **Query entities** - See device states (lights, sensors, switches, climate, covers, etc.)

@@ -1,4 +1,11 @@
 # Changelog
+## 3.8.5
+- **NEW**: `trend` section type for HTML dashboards — KPI badges with live values + historical area chart with gradient fill
+- **NEW**: `/dashboard_api/history` proxy endpoint — fetches entity history data server-side via SUPERVISOR_TOKEN (1h-168h range)
+- **NEW**: Chart.js date-fns adapter for time-based X axis on trend charts
+- **NEW**: `color` and `icon` properties on section items — custom colors for trend badges/lines, emoji icons for KPI badges
+- **NEW**: `hours` property on sections — configure history range for trend charts (default 24h)
+
 ## 3.8.4
 - **FIX**: `create_dashboard` now REJECTS calls with empty/missing views — returns error with step-by-step instructions forcing model to build complete views with cards before retrying
 - **FIX**: Also rejects views arrays where ALL views have no cards
