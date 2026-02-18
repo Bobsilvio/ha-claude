@@ -1,4 +1,10 @@
 # Changelog
+## 3.9.2
+- **FIX**: `__THEME_CSS__` in raw HTML mode now outputs CSS properties only (no `:root{}` wrapper) — prevents invalid nested `:root{:root{...}}` CSS
+- **FIX**: Prompt explicitly warns NOT to use `var(--primary-background-color)` or HA frontend CSS variables (not available in `/local/` iframes)
+- **IMPROVEMENT**: Full placeholder reference in prompt — explains exact output of each placeholder with examples
+- **IMPROVEMENT**: Better tool description documents `__THEME_CSS__` usage pattern: `:root{__THEME_CSS__}`
+
 ## 3.9.1
 - **IMPROVEMENT**: HTML dashboards now default to RAW HTML mode — agent writes full HTML/CSS/JS for unique creative designs
 - **IMPROVEMENT**: Focused prompt encourages varied styles: glass morphism, neon, neumorphism, gradients, animations, bento grids

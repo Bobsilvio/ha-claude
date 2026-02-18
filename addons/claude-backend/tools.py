@@ -374,11 +374,13 @@ def _fill_html_placeholders(
     except (ValueError, IndexError):
         accent_rgb = "102,126,234"
 
+    # For raw HTML: __THEME_CSS__ outputs just CSS properties (no :root{} wrapper)
+    # so the agent can embed them in any selector: :root { __THEME_CSS__ }
     theme_css = ""
     if theme == "dark":
-        theme_css = ":root{--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155}"
+        theme_css = "--bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155"
     elif theme == "light":
-        theme_css = ":root{--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;--card:rgba(255,255,255,.85);--border:#e2e8f0}"
+        theme_css = "--bg:#f0f2f5;--bg2:#fff;--text:#1a1a2e;--text2:#6b7280;--card:rgba(255,255,255,.85);--border:#e2e8f0"
 
     if not lang:
         lang = getattr(api, "LANGUAGE", "en") or "en"
@@ -968,7 +970,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped title)\n- __TITLE_JSON__ (JSON string of title)\n- __ACCENT__ (hex color), __ACCENT_RGB__ (r,g,b)\n- __THEME_CSS__ (CSS vars for light/dark)\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nRaw HTML must include: Vue 3 CDN, WebSocket connection to /api/websocket for live data, Bearer token auth from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
         "parameters": {
             "type": "object",
             "properties": {

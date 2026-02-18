@@ -180,27 +180,41 @@ WORKFLOW:
 2. Call create_html_dashboard using RAW HTML mode: pass the full HTML/CSS/JS in the 'html' parameter.
    Design a UNIQUE page every time — vary colors, layouts, typography, animations, card styles.
 
-RAW HTML RULES:
-- Use __ENTITIES_JSON__ placeholder for the entity list (MANDATORY — the tool replaces it).
-- Use __TITLE__, __ACCENT__, __ACCENT_RGB__, __THEME_CSS__, __LANG__, __FOOTER__ placeholders as needed.
-- Include Vue 3 CDN: <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-- Include Chart.js 4 CDN if you need charts: <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-- For chart time axes add: <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-- Connect to HA via WebSocket for live updates:
-  const token = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;
-  const ws = new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/api/websocket');
-  ws.onmessage: auth_required → send auth, auth_ok → fetch /api/states with Bearer token + subscribe_events state_changed
-- Fallback: poll GET /api/states with Authorization: Bearer <token> every 5s if WS fails.
-- For service calls: POST /api/services/{domain}/{service} with Bearer token.
-- For history: GET /api/history/period/{ISO_start}?filter_entity_id=...&end_time={ISO_end}&minimal_response&no_attributes
+PLACEHOLDER REFERENCE (the tool replaces these in your HTML):
+- __ENTITIES_JSON__ → JS array of entity_id strings, e.g. ["sensor.power","sensor.temp"] (MANDATORY)
+- __TITLE__ → HTML-escaped title string
+- __TITLE_JSON__ → JSON string of title (for JS: const title = __TITLE_JSON__)
+- __ACCENT__ → hex color string, e.g. #22c55e
+- __ACCENT_RGB__ → r,g,b string, e.g. 34,197,94 (for rgba())
+- __THEME_CSS__ → CSS custom properties WITHOUT :root{} wrapper, e.g. --bg:#0f172a;--bg2:#1e293b;--text:#e2e8f0;--text2:#94a3b8;--card:rgba(30,41,59,.85);--border:#334155
+  Usage: :root { __THEME_CSS__ } or define your own colors entirely.
+- __LANG__ → language code (en/it/es/fr)
+- __FOOTER__ → HTML-escaped footer text
+
+IMPORTANT CSS RULES:
+- Do NOT use var(--primary-background-color) or other HA frontend variables — they don't exist in /local/ iframes.
+- Define ALL your colors directly in CSS or use __ACCENT__, __ACCENT_RGB__, __THEME_CSS__.
+- The page is served at /local/dashboards/name.html (same-origin as HA, localStorage works).
+
+JS DATA CONNECTION:
+- Vue 3 CDN: <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+- Chart.js 4: <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+- Date adapter: <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+- Auth token: JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token
+- WebSocket: connect to (location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/api/websocket'
+  → auth_required: send {type:'auth',access_token:token}
+  → auth_ok: send {type:'subscribe_events',event_type:'state_changed'} + fetch /api/states with Bearer
+- REST fallback: GET /api/states with Authorization: Bearer <token>, poll every 5s
+- Service calls: POST /api/services/{domain}/{service} with Bearer token
+- History: GET /api/history/period/{ISO_start}?filter_entity_id=...&end_time={ISO_end}&minimal_response&no_attributes
 
 DESIGN FREEDOM — be creative! Vary these across dashboards:
 - Color schemes: warm, cool, neon, pastel, monochrome, earth tones, gradients
 - Card styles: glass morphism, neumorphism, flat material, outlined, floating shadows
 - Layouts: CSS Grid, masonry, bento grid, sidebar+main, full-width hero sections
-- Typography: large stat numbers, condensed labels, accent fonts
+- Typography: large stat numbers, condensed labels, accent fonts via Google Fonts
 - Animations: smooth transitions, subtle pulse on live values, hover effects
-- Dark/light themes with CSS variables or @media(prefers-color-scheme)
+- Dark/light: use @media(prefers-color-scheme) or hardcode based on theme parameter
 - Background: solid, gradient, subtle patterns, mesh gradients
 
 Respond in the user's language.""",
