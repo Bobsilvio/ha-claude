@@ -1,4 +1,11 @@
 # Changelog
+## 3.9.9
+- **FIX**: Auto-complete truncated raw HTML dashboards instead of rejecting them
+- GPT-5.2 hits output token limit before writing Vue.createApp JS section (~12K chars of CSS + template)
+- New `_autocomplete_truncated_html()` closes unclosed tags and appends standard Vue + WebSocket boilerplate
+- Boilerplate includes: reactive state, WebSocket live updates, `fmt()`, `powerText()`, `entityName()`, and common energy computed properties (solarW, gridW, battW, price, solarShare)
+- Result: the model's beautiful CSS and partial template work with live data instead of being rejected
+
 ## 3.9.8
 - **FIX**: Repair malformed JSON from GPT-5.2 `create_html_dashboard` tool calls
 - Root cause found: model sends valid JSON structure (12K+ chars) with title, name, entities, html — but HTML value contains unescaped characters breaking `json.loads()`

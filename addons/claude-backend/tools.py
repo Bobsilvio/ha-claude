@@ -350,6 +350,151 @@ return{sections,connected,error,nm,sv,fv,fu,isOn,numVal,gPct,dIco,togDom,slDom,s
     return html
 
 
+# Standard Vue + WebSocket boilerplate for auto-completing truncated HTML dashboards
+_VUE_BOILERPLATE = """
+<script>
+const ENTITIES = __ENTITIES_JSON__;
+const {createApp, ref, reactive, computed, onMounted, onUnmounted} = Vue;
+createApp({
+  setup() {
+    const states = reactive({});
+    const conn = reactive({ok: false, mode: 'connecting'});
+    const title = __TITLE_JSON__;
+    const nowText = ref('');
+
+    const sv = (eid) => (states[eid]||{}).state || '';
+    const nv = (eid) => parseFloat(sv(eid)) || 0;
+    const fmt = (v, d) => v != null && !isNaN(v) ? Number(v).toFixed(d != null ? d : 1) : '--';
+    const entityName = (eid) => (states[eid]||{}).friendly_name || eid.split('.').pop().replace(/_/g, ' ');
+    const powerText = (w) => {
+      const a = Math.abs(w||0);
+      return a >= 1000 ? {val: fmt(a/1000,1), unit:'kW'} : {val: fmt(a,0), unit:'W'};
+    };
+
+    // Generic entity value getters - model templates may use specific vars
+    // We expose all entity values as computed properties via Proxy
+    const entityProxy = new Proxy({}, {
+      get(_, prop) {
+        // Try to find an entity matching the prop name
+        for (const eid of ENTITIES) {
+          const short = eid.split('.').pop();
+          if (short === prop || short.replace(/_/g,'') === prop.replace(/_/g,'')) {
+            return nv(eid);
+          }
+        }
+        return undefined;
+      }
+    });
+
+    // Common computed shortcuts the model might use
+    const solarW = computed(() => {
+      for (const e of ENTITIES) { if (/solar.*power|solar.*watt|solarpower/i.test(e)) return nv(e); }
+      return 0;
+    });
+    const gridW = computed(() => {
+      for (const e of ENTITIES) { if (/grid.*power|gridpower/i.test(e)) return nv(e); }
+      return 0;
+    });
+    const battW = computed(() => {
+      for (const e of ENTITIES) { if (/batter.*power|battery_power/i.test(e)) return nv(e); }
+      return 0;
+    });
+    const battSoc = computed(() => {
+      for (const e of ENTITIES) { if (/batterysoc|battery.*soc|battery.*level/i.test(e)) return nv(e); }
+      return null;
+    });
+    const price = computed(() => {
+      for (const e of ENTITIES) { if (/prezzo|price|costo.*kwh/i.test(e)) return nv(e); }
+      return null;
+    });
+    const solarShare = computed(() => {
+      for (const e of ENTITIES) { if (/contributo.*solar|solar.*share|solar.*percent/i.test(e)) return nv(e); }
+      return null;
+    });
+    const solarTodayKwh = computed(() => {
+      for (const e of ENTITIES) { if (/solar.*oggi|solar.*today|solare_oggi/i.test(e)) return nv(e); }
+      return null;
+    });
+
+    let timeInterval, ws;
+    const updateTime = () => { nowText.value = new Date().toLocaleTimeString(); };
+
+    const connectWS = () => {
+      const tokensRaw = localStorage.getItem('hassTokens');
+      if (!tokensRaw) { conn.mode = 'no token'; return; }
+      const token = JSON.parse(tokensRaw).access_token;
+      fetch('/api/states', {headers:{'Authorization':'Bearer '+token}})
+        .then(r=>r.json()).then(list => {
+          if (Array.isArray(list)) list.forEach(s => {
+            if (ENTITIES.includes(s.entity_id))
+              states[s.entity_id] = {state: s.state, friendly_name: (s.attributes||{}).friendly_name || s.entity_id, unit: (s.attributes||{}).unit_of_measurement || ''};
+          });
+        });
+      const proto = location.protocol==='https:'?'wss:':'ws:';
+      ws = new WebSocket(proto+'//'+location.host+'/api/websocket');
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type==='auth_required') ws.send(JSON.stringify({type:'auth',access_token:token}));
+        if (msg.type==='auth_ok') {
+          conn.ok=true; conn.mode='WebSocket';
+          ws.send(JSON.stringify({id:1,type:'subscribe_events',event_type:'state_changed'}));
+        }
+        if (msg.type==='event' && msg.event?.data?.new_state) {
+          const ns = msg.event.data.new_state;
+          if (ENTITIES.includes(ns.entity_id))
+            states[ns.entity_id] = {state: ns.state, friendly_name: (ns.attributes||{}).friendly_name || ns.entity_id, unit: (ns.attributes||{}).unit_of_measurement || ''};
+        }
+      };
+      ws.onclose = () => { conn.ok=false; conn.mode='reconnecting'; setTimeout(connectWS, 5000); };
+    };
+
+    onMounted(() => { connectWS(); updateTime(); timeInterval = setInterval(updateTime, 1000); });
+    onUnmounted(() => { ws?.close(); clearInterval(timeInterval); });
+
+    return {
+      states, conn, title, nowText, sv, nv, fmt, entityName, powerText,
+      solarW, gridW, battW, battSoc, price, solarShare, solarTodayKwh,
+      ENTITIES
+    };
+  }
+}).mount('#app');
+</script>
+"""
+
+
+def _autocomplete_truncated_html(html: str, entities: list) -> str:
+    """Auto-complete truncated HTML that's missing the Vue.createApp script.
+    GPT-5.2 often hits output token limits before writing the JS section."""
+    import re
+
+    # Strip any trailing incomplete tags/attributes
+    # Find the last complete closing tag
+    last_close = max(html.rfind('>'), html.rfind('\n'))
+    if last_close > 0 and last_close < len(html) - 1:
+        html = html[:last_close + 1]
+
+    # Close unclosed divs/sections
+    open_divs = html.lower().count('<div') - html.lower().count('</div')
+    open_sections = html.lower().count('<section') - html.lower().count('</section')
+    closers = '</div>' * max(0, open_divs)
+    closers += '</section>' * max(0, open_sections)
+
+    # Check if we need to close body/html
+    has_body_close = '</body>' in html.lower()
+    has_html_close = '</html>' in html.lower()
+
+    # Build the completion
+    completion = closers
+    if not has_body_close:
+        completion += '\n<footer style="margin-top:16px;color:rgba(255,255,255,.4);font-size:12px;text-align:center">__FOOTER__</footer>\n'
+        completion += _VUE_BOILERPLATE
+        completion += '</body>'
+    if not has_html_close:
+        completion += '</html>'
+
+    return html + completion
+
+
 def _fill_html_placeholders(
     html: str,
     *,
@@ -2025,17 +2170,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     return json.dumps({"error": "html must be a non-empty string when provided."}, default=str)
                 if len(raw_html) > 900_000:
                     return json.dumps({"error": f"html is too large ({len(raw_html)} chars). Please reduce size."}, default=str)
-                # Validate that the HTML has a functional Vue app, not just CSS/placeholder
+                # Auto-complete truncated HTML: GPT-5.2 often hits output token limit
+                # before writing the Vue.createApp script section
                 html_lower = raw_html.lower()
-                if "createapp" not in html_lower and "vue.createapp" not in html_lower:
-                    return json.dumps({"error": (
-                        "INCOMPLETE HTML: Your code is missing the Vue.js application. "
-                        "The HTML must include: 1) A Vue template inside #app with v-for/v-if directives showing entity data, "
-                        "2) Vue.createApp({setup(){...}}).mount('#app') with reactive state, "
-                        "3) WebSocket connection to /api/websocket for live updates, "
-                        "4) Bearer token from localStorage.hassTokens for authentication. "
-                        "Please provide the COMPLETE HTML with all CSS + template + JavaScript."
-                    )}, default=str)
+                if "createapp" not in html_lower:
+                    raw_html = _autocomplete_truncated_html(raw_html, entities)
+                    logger.info(f"Auto-completed truncated HTML: added Vue boilerplate ({len(raw_html)} chars total)")
             else:
                 if not sections:
                     return json.dumps({"error": (
