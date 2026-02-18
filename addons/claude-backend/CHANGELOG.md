@@ -1,4 +1,8 @@
 # Changelog
+## 3.9.3
+- **FIX**: HTML dashboard focused prompt was NEVER injected — intent detection returned `prompt: None` instead of the creative raw HTML prompt
+- Model was falling back to structured mode because it never saw the raw HTML instructions
+
 ## 3.9.2
 - **FIX**: `__THEME_CSS__` in raw HTML mode now outputs CSS properties only (no `:root{}` wrapper) — prevents invalid nested `:root{:root{...}}` CSS
 - **FIX**: Prompt explicitly warns NOT to use `var(--primary-background-color)` or HA frontend CSS variables (not available in `/local/` iframes)

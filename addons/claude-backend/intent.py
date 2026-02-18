@@ -409,7 +409,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
         # Route to HTML dashboard if user mentions HTML/Vue/Web features
         if has_html_dash:
             return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
-                    "prompt": None, "specific_target": False}
+                    "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
         # Otherwise use standard Lovelace dashboard
         return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
                 "prompt": INTENT_PROMPTS.get("create_dashboard"), "specific_target": False}
@@ -421,7 +421,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     if has_dash and not any(k in msg for k in delete_kw):
         if has_html_dash:
             return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
-                    "prompt": None, "specific_target": False}
+                    "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
         return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
                 "prompt": INTENT_PROMPTS.get("create_dashboard"), "specific_target": False}
 
