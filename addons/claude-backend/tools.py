@@ -12,6 +12,10 @@ logger = logging.getLogger(__name__)
 
 AI_SIGNATURE = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
 
+# Buffer for chunked HTML dashboard creation (draft mode)
+# Key: dashboard name (slug), Value: {"html": str, "title": str, "entities": list, ...}
+_html_drafts: dict = {}
+
 
 def _build_dashboard_html(title: str, entities: list, theme: str,
                           accent_color: str, sections: list,
@@ -1115,7 +1119,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1127,7 +1131,8 @@ HA_TOOLS_DESCRIPTION = [
                 "accent_color": {"type": "string", "description": "Accent color hex (e.g. '#667eea')."},
                 "lang": {"type": "string", "enum": ["en", "it", "es", "fr"], "description": "HTML lang attribute. Default: add-on language."},
                 "footer_text": {"type": "string", "description": "Footer text. Default: configured html_dashboard_footer or 'Dashboard by <agent_name> · Real-time'."},
-                "html": {"type": "string", "description": "Raw HTML mode: full HTML/CSS/JS code. If provided, 'sections' is optional."},
+                "html": {"type": "string", "description": "Raw HTML mode: full HTML/CSS/JS code. If provided, 'sections' is optional. For large HTML (>6000 chars), use draft=true and send in multiple calls."},
+                "draft": {"type": "boolean", "description": "If true, buffer this HTML chunk without creating the dashboard. Call again with same 'name' to append more chunks. Omit draft (or false) on the last call to finalize."},
                 "return_html": {"type": "boolean", "description": "If true, include the generated/saved HTML content in the tool response (useful when user asked for the full code)."},
                 "sections": {
                     "type": "array",
@@ -2164,6 +2169,60 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             footer_text = tool_input.get("footer_text")
             raw_html = tool_input.get("html")
             return_html = bool(tool_input.get("return_html", False))
+            is_draft = bool(tool_input.get("draft", False))
+
+            # --- Draft (chunked) mode ---
+            if is_draft and raw_html:
+                if name in _html_drafts:
+                    _html_drafts[name]["html"] += raw_html
+                    chunk_num = _html_drafts[name].get("chunks", 1) + 1
+                    _html_drafts[name]["chunks"] = chunk_num
+                    total = len(_html_drafts[name]["html"])
+                    logger.info(f"📝 Draft chunk #{chunk_num} appended for '{name}': +{len(raw_html)} chars (total: {total})")
+                    return json.dumps({
+                        "status": "draft_appended",
+                        "message": f"Chunk #{chunk_num} appended ({len(raw_html)} chars). Total so far: {total} chars. "
+                                   f"Send more chunks with draft=true, or omit draft to finalize and save.",
+                        "name": name, "total_chars": total
+                    }, default=str)
+                else:
+                    _html_drafts[name] = {
+                        "html": raw_html, "title": title, "icon": icon,
+                        "entities": entities, "theme": theme, "accent_color": accent_color,
+                        "lang": lang, "footer_text": footer_text, "chunks": 1
+                    }
+                    logger.info(f"📝 Draft started for '{name}': {len(raw_html)} chars, {len(entities)} entities")
+                    return json.dumps({
+                        "status": "draft_started",
+                        "message": f"Draft started ({len(raw_html)} chars). Send more chunks with draft=true and same name='{name}', "
+                                   f"or omit draft to finalize and save.",
+                        "name": name, "total_chars": len(raw_html)
+                    }, default=str)
+
+            # --- Finalize: merge draft if exists ---
+            if name in _html_drafts:
+                draft = _html_drafts.pop(name)
+                draft_html = draft["html"]
+                if raw_html:
+                    draft_html += raw_html
+                raw_html = draft_html
+                # Use draft metadata if current call doesn't provide them
+                if not entities and draft.get("entities"):
+                    entities = draft["entities"]
+                if title == "Custom Dashboard" and draft.get("title"):
+                    title = draft["title"]
+                if icon == "mdi:web" and draft.get("icon"):
+                    icon = draft["icon"]
+                if theme == "auto" and draft.get("theme"):
+                    theme = draft["theme"]
+                if accent_color == "#667eea" and draft.get("accent_color"):
+                    accent_color = draft["accent_color"]
+                if not lang and draft.get("lang"):
+                    lang = draft["lang"]
+                if not footer_text and draft.get("footer_text"):
+                    footer_text = draft["footer_text"]
+                chunks = draft.get("chunks", 1) + (1 if tool_input.get("html") else 0)
+                logger.info(f"📝 Draft finalized for '{name}': {chunks} chunks, {len(raw_html)} chars total")
 
             if raw_html is not None:
                 if not isinstance(raw_html, str) or not raw_html.strip():

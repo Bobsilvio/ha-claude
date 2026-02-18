@@ -1,4 +1,11 @@
 # Changelog
+## 3.10.0
+- **NEW**: Chunked/draft mode for HTML dashboards — model sends HTML in 2-3 parts under 6000 chars each
+- `draft=true` buffers HTML chunks, omitting `draft` on last call finalizes and saves the dashboard
+- Solves GPT-5.2 output token limit causing truncated HTML (CSS+template but no JS)
+- Prompt updated to instruct model: chunk 1 = head+CSS, chunk 2 = template, chunk 3 = script+closing
+- Auto-complete with Vue boilerplate kept as fallback if model doesn't use chunked mode
+
 ## 3.9.9
 - **FIX**: Auto-complete truncated raw HTML dashboards instead of rejecting them
 - GPT-5.2 hits output token limit before writing Vue.createApp JS section (~12K chars of CSS + template)
