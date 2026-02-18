@@ -3867,6 +3867,81 @@ if __name__ == "__main__":
             }
             logger.warning(fix_msgs.get(LANGUAGE, fix_msgs["en"]))
 
+    # --- Fix stale Ingress URLs in HTML dashboard iframes ---
+    def fix_stale_ingress_urls():
+        """On startup, update Lovelace iframe URLs if the Ingress token has changed."""
+        try:
+            current_ingress = get_addon_ingress_url()
+            if not current_ingress:
+                return
+
+            dashboards_dir = os.path.join(HA_CONFIG_DIR, ".html_dashboards")
+            if not os.path.isdir(dashboards_dir):
+                return
+
+            # Get list of our HTML dashboard filenames
+            html_names = set()
+            for fname in os.listdir(dashboards_dir):
+                if fname.endswith(".html"):
+                    html_names.add(fname.replace(".html", ""))
+
+            if not html_names:
+                return
+
+            # List all Lovelace dashboards
+            ws_dashboards = call_ha_websocket("lovelace/dashboards/list")
+            if not isinstance(ws_dashboards, list):
+                ws_dashboards = ws_dashboards.get("result", []) if isinstance(ws_dashboards, dict) else []
+
+            fixed = 0
+            for dash in ws_dashboards:
+                url_path = dash.get("url_path", "")
+                if url_path not in html_names:
+                    continue
+
+                # Get this dashboard's config
+                try:
+                    config = call_ha_websocket("lovelace/config", url_path=url_path)
+                    if isinstance(config, dict) and "result" in config:
+                        config = config["result"]
+                except Exception:
+                    continue
+
+                if not isinstance(config, dict):
+                    continue
+
+                # Search for iframe cards with stale ingress URLs
+                views = config.get("views", [])
+                changed = False
+                for view in views:
+                    for card in view.get("cards", []):
+                        if card.get("type") != "iframe":
+                            continue
+                        card_url = card.get("url", "")
+                        # Check if URL has an old ingress token
+                        if "/api/hassio_ingress/" in card_url and "/custom_dashboards/" in card_url:
+                            # Extract the dashboard name from the URL
+                            dash_part = card_url.split("/custom_dashboards/")[-1]
+                            new_url = f"{current_ingress}/custom_dashboards/{dash_part}"
+                            if card_url != new_url:
+                                card["url"] = new_url
+                                changed = True
+
+                if changed:
+                    try:
+                        call_ha_websocket("lovelace/config/save", url_path=url_path, config={"views": views})
+                        fixed += 1
+                        logger.info(f"🔗 Fixed stale Ingress URL for dashboard: {url_path}")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Failed to update iframe URL for {url_path}: {e}")
+
+            if fixed:
+                logger.info(f"🔗 Updated {fixed} HTML dashboard iframe URL(s) with current Ingress token")
+        except Exception as e:
+            logger.warning(f"⚠️ Error fixing stale Ingress URLs: {e}")
+
+    fix_stale_ingress_urls()
+
     # Use Waitress production WSGI server instead of Flask development server
     from waitress import serve
     logger.info(f"Starting production server on 0.0.0.0:{API_PORT}")

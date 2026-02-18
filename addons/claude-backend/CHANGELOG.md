@@ -1,4 +1,8 @@
 # Changelog
+## 3.8.6
+- **FIX**: HTML dashboard iframe 401 Unauthorized after addon restart/update — Ingress token changes on restart, causing stale iframe URLs in Lovelace configs
+- **NEW**: Startup auto-fix: on boot, scans all Lovelace dashboards for iframe cards with old Ingress tokens and updates them to the current one
+
 ## 3.8.5
 - **NEW**: `trend` section type for HTML dashboards — KPI badges with live values + historical area chart with gradient fill
 - **NEW**: `/dashboard_api/history` proxy endpoint — fetches entity history data server-side via SUPERVISOR_TOKEN (1h-168h range)
