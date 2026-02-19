@@ -1,0 +1,123 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+        Please provide as much detail as possible to help us investigate.
+
+  - type: input
+    id: addon-version
+    attributes:
+      label: Add-on Version
+      description: Which version of the add-on are you running? (Check Settings > Add-ons > Claude Assistant)
+      placeholder: "e.g., 3.11.7"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: AI Provider
+      description: Which AI provider are you using?
+      options:
+        - Anthropic (Claude)
+        - OpenAI (GPT)
+        - Google (Gemini)
+        - GitHub Models
+        - NVIDIA NIM
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: AI Model
+      description: Which specific model? (visible in the chat dropdown)
+      placeholder: "e.g., claude-sonnet-4-20250514, gpt-4o, gemini-2.0-flash"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ha-installation
+    attributes:
+      label: Home Assistant Installation Type
+      options:
+        - Home Assistant OS
+        - Home Assistant Container
+        - Home Assistant Supervised
+        - Home Assistant Core
+    validations:
+      required: true
+
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant Version
+      placeholder: "e.g., 2025.2.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: "What happened? What did you expect to happen?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Go to '...'
+        2. Click on '...'
+        3. Type '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Add-on Logs
+      description: |
+        Paste the relevant logs from Settings > Add-ons > Claude Assistant > Log tab.
+        Include the ERROR lines and a few lines before/after for context.
+      render: shell
+      placeholder: |
+        [17:35:52] [SYSTEM] 🔴 ERROR:providers_anthropic:Anthropic API error: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context about the problem (configuration, recent changes, etc.)
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have updated to the latest add-on version before reporting
+          required: true
+        - label: I have searched existing issues for duplicates
+          required: true
