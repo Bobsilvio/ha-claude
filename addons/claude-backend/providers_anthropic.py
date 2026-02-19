@@ -187,7 +187,9 @@ def stream_chat_anthropic(messages, intent_info=None):
         yield {"type": "status", "message": api.tr("status_actions_received")}
         # For Anthropic, use the full content list which includes tool_use blocks
         assistant_content = final_message.content
-        # RIMOSSO: messages.append({"role": "assistant", "content": assistant_content})  # Doppione
+        # REQUIRED: Anthropic needs the assistant message with tool_use blocks
+        # before the user message with tool_result blocks
+        messages.append({"role": "assistant", "content": assistant_content})
 
         tool_results = []
         redundant_blocked = 0

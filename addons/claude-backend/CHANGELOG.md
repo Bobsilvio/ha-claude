@@ -1,4 +1,7 @@
 # Changelog
+## 3.11.6
+- **FIX**: Anthropic tool_use
+
 ## 3.11.5
 - **FIX**: Google Gemini chat hangs silently when model returns text without tool calls
 - Root cause: Gemini SDK raises `ValueError` when accessing `response.text` on blocked/empty responses. `getattr(response, "text", None)` catches `AttributeError` but NOT `ValueError`, so the generator crashed silently — no error in logs, no SSE events, chat stuck on "risposta ricevuta"
