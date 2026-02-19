@@ -1,4 +1,10 @@
 # Changelog
+## 3.10.6
+- **FIX**: `write_config_file` removed from auto-stop — model now explains changes and shows diff before/after writing
+- **NEW**: Focused prompt for `config_edit` intent with mandatory confirmation workflow:
+  1. Read file → 2. Explain changes → 3. Show diff → 4. Ask confirmation → 5. Write only after "sì"
+- Previously, auto-stop silently wrote files without showing the user what changed
+
 ## 3.10.5
 - **FIX**: Chat response disappearing after HTML dashboard creation — `create_html_dashboard` now triggers auto-stop
 - After successful dashboard creation, the response is formatted and sent immediately instead of making another API call

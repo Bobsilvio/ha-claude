@@ -764,7 +764,6 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 "create_script",
                 "create_dashboard",
                 "update_dashboard",
-                "write_config_file",
                 "create_html_dashboard",
             }
             auto_stop = False
@@ -1173,7 +1172,7 @@ def stream_chat_openai(messages, intent_info=None):
         # AUTO-STOP: If a write tool succeeded, format response directly
         WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
                    "create_automation", "create_script", "create_dashboard", "update_dashboard",
-                   "write_config_file", "create_html_dashboard"}
+                   "create_html_dashboard"}
         auto_stop = False
         for tc_id, (fn_name, result) in tool_call_results.items():
             if fn_name in WRITE_TOOLS:

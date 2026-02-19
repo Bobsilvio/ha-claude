@@ -82,6 +82,24 @@ CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
 - NEVER call get_scripts or read_config_file — the data is already provided.
 - If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
 
+    "config_edit": """You are a Home Assistant YAML config file editor.
+The user wants to modify a YAML configuration file (sensors.yaml, automations.yaml, etc.).
+
+CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE WRITING:
+1. FIRST read the file with read_config_file to understand the current content.
+2. Analyze the user's request and identify EXACTLY what needs to change.
+3. EXPLAIN clearly what you will modify, add, or remove — in simple language.
+4. Show a DIFF or summary of the changes (what was before → what will be after).
+5. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo salvare queste modifiche? (sì/no)"
+6. WAIT for the user to confirm — DO NOT call write_config_file until user says "sì" or "si" or "yes".
+7. Only AFTER confirmation, call write_config_file with the complete file content.
+8. After writing, suggest calling check_config to validate.
+
+IMPORTANT:
+- When writing, include the ENTIRE file content (not just the changed part).
+- Never silently add, remove, or rename sensors/automations without telling the user.
+- Respond in the user's language. Be concise but clear about changes.""",
+
     "create_automation": """You are a Home Assistant automation builder. The user wants to create a NEW automation.
 CRITICAL WORKFLOW - follow these steps IN ORDER:
 1. FIRST call search_entities to find the correct entity_id for the device the user mentioned.
@@ -477,7 +495,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     # --- CONFIG EDIT ---
     if any(k in msg for k in config_kw):
         return {"intent": "config_edit", "tools": INTENT_TOOL_SETS["config_edit"],
-                "prompt": None, "specific_target": False}
+                "prompt": INTENT_PROMPTS.get("config_edit"), "specific_target": False}
 
     # --- HELPERS ---
     helper_kw = lang_keywords.get("helper", [])
