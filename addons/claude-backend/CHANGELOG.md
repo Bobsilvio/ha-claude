@@ -1,4 +1,13 @@
 # Changelog
+## 3.12.1 — Chat Bubble UX Improvements
+- **Draggable button**: long-press (400ms) to enter drag mode (like iPhone app icons), position saved in localStorage
+- **Resizable chat panel**: CSS `resize: both` with size persistence via ResizeObserver + localStorage
+- **Draggable panel**: drag via header bar to reposition anywhere on screen
+- **Panel auto-positioning**: panel intelligently positions near the button (above/below, clamped to viewport)
+- **Auto-reload after update**: when AI modifies an automation/script/dashboard you're viewing, the page auto-reloads after 2.5s with a green notice
+- **HTML dashboard context**: on lovelace pages, extracts entity_ids from dashboard iframes and includes them in context prefix — AI knows what entities are shown and can match the existing style when adding more
+- **Tool badges in chat**: shows tool execution badges during streaming (same as main UI)
+
 ## 3.12.0 — Floating Chat Bubble
 - **NEW**: Context-aware floating chat bubble on every Home Assistant page
   - Enable via `enable_chat_bubble: true` in add-on config

@@ -34,6 +34,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "thinking": "Thinking",
             "new_chat": "New chat",
             "error_connection": "Connection error. Retrying...",
+            "page_reload": "Updated! Reloading page...",
+            "drag_hint": "Hold to drag",
         },
         "it": {
             "placeholder": "Chiedi qualcosa su questa pagina...",
@@ -47,6 +49,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "thinking": "Sto pensando",
             "new_chat": "Nuova chat",
             "error_connection": "Errore di connessione. Riprovo...",
+            "page_reload": "Aggiornato! Ricarico la pagina...",
+            "drag_hint": "Tieni premuto per spostare",
         },
         "es": {
             "placeholder": "Pregunta sobre esta página...",
@@ -60,6 +64,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "thinking": "Pensando",
             "new_chat": "Nuevo chat",
             "error_connection": "Error de conexión. Reintentando...",
+            "page_reload": "Actualizado! Recargando página...",
+            "drag_hint": "Mantén presionado para mover",
         },
         "fr": {
             "placeholder": "Posez une question sur cette page...",
@@ -73,6 +79,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "thinking": "Réflexion",
             "new_chat": "Nouveau chat",
             "error_connection": "Erreur de connexion. Réessai...",
+            "page_reload": "Mis à jour! Rechargement...",
+            "drag_hint": "Maintenez pour déplacer",
         },
     }
 
@@ -81,7 +89,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     return f"""/**
  * AI Assistant - Floating Chat Bubble for Home Assistant
  * Injected as a Lovelace resource, appears on every HA page.
- * Context-aware: detects current automation/script/entity from URL.
+ * Context-aware: detects current automation/script/entity/dashboard from URL.
+ * Features: draggable button, resizable panel, auto-reload after updates.
  */
 (function() {{
   'use strict';
@@ -93,10 +102,20 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // Prevent double injection
   if (document.getElementById('ha-claude-bubble')) return;
 
+  // ---- Persistence helpers (localStorage) ----
+  const STORE_PREFIX = 'ha-claude-bubble-';
+  function loadSetting(key, fallback) {{
+    try {{ const v = localStorage.getItem(STORE_PREFIX + key); return v ? JSON.parse(v) : fallback; }}
+    catch(e) {{ return fallback; }}
+  }}
+  function saveSetting(key, val) {{
+    try {{ localStorage.setItem(STORE_PREFIX + key, JSON.stringify(val)); }} catch(e) {{}}
+  }}
+
   // ---- Context Detection ----
   function detectContext() {{
     const path = window.location.pathname;
-    const ctx = {{ type: null, id: null, label: null }};
+    const ctx = {{ type: null, id: null, label: null, entities: null }};
 
     // /config/automation/edit/<id>
     let m = path.match(/\\/config\\/automation\\/edit\\/([^/]+)/);
@@ -125,7 +144,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       return ctx;
     }}
 
-    // /config/entities → entity registry
+    // /config/entities -> entity registry
     if (path.includes('/config/entities')) {{
       ctx.type = 'entities';
       ctx.label = T.context_entity + ' registry';
@@ -141,12 +160,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       return ctx;
     }}
 
-    // /lovelace/<path> or /lovelace-<name>/<path>
+    // /lovelace/<path> or /lovelace-<name>/<path> — detect HTML dashboard entities
     m = path.match(/\\/(lovelace[^/]*)\\/?(.*)/);
     if (m) {{
       ctx.type = 'dashboard';
       ctx.id = m[1];
       ctx.label = T.context_dashboard + ': ' + (m[1] || 'default');
+      // Try to extract entities from HTML dashboard iframe
+      ctx.entities = extractDashboardEntities();
       return ctx;
     }}
 
@@ -158,6 +179,39 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
 
     return ctx;
+  }}
+
+  // ---- Extract entities from HTML dashboard (iframe) ----
+  function extractDashboardEntities() {{
+    try {{
+      const iframes = document.querySelectorAll('iframe[src*="/local/"], iframe[src*="hacsfiles"]');
+      const entities = new Set();
+      for (const iframe of iframes) {{
+        try {{
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          if (!doc) continue;
+          const html = doc.documentElement.innerHTML || '';
+          // Match entity_id patterns in the HTML
+          const re = /(?:sensor|switch|light|climate|binary_sensor|input_boolean|automation|number|select|button|cover|fan|lock|media_player|vacuum|weather|water_heater|scene|script|input_number|input_select|input_text|person|device_tracker|calendar|camera|update|group|sun)\\.[a-z0-9_]+/g;
+          let match;
+          while ((match = re.exec(html)) !== null) {{
+            entities.add(match[0]);
+          }}
+        }} catch(e) {{
+          // Cross-origin iframe — can't access content
+        }}
+      }}
+      // Also check the main page for web-component dashboards with entity references
+      const mainHtml = document.body.innerHTML || '';
+      const re2 = /(?:sensor|switch|light|climate|binary_sensor|input_boolean)\\.[a-z0-9_]+/g;
+      let m2;
+      while ((m2 = re2.exec(mainHtml)) !== null) {{
+        entities.add(m2[0]);
+      }}
+      return entities.size > 0 ? Array.from(entities) : null;
+    }} catch(e) {{
+      return null;
+    }}
   }}
 
   // ---- Build context message prefix ----
@@ -178,7 +232,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         + 'Use search_entities to find its entities.] ';
     }}
     if (ctx.type === 'dashboard' && ctx.id) {{
-      return '[CONTEXT: User is viewing dashboard "' + ctx.id + '".] ';
+      let prefix = '[CONTEXT: User is viewing dashboard "' + ctx.id + '".';
+      if (ctx.entities && ctx.entities.length > 0) {{
+        prefix += ' This dashboard currently shows these entities: ' + ctx.entities.join(', ') + '.';
+        prefix += ' If the user asks to add something, use the same style/layout already present in the dashboard HTML.';
+        prefix += ' Use get_dashboard_config to read the current dashboard, then update it with the additions.';
+      }}
+      prefix += '] ';
+      return prefix;
     }}
     return '';
   }}
@@ -200,17 +261,20 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     return sid;
   }}
 
+  // ---- Saved position/size ----
+  const savedPos = loadSetting('btn-pos', null);    // {{x, y}}
+  const savedSize = loadSetting('panel-size', null); // {{w, h}}
+
   // ---- Styles ----
   const style = document.createElement('style');
   style.textContent = `
     #ha-claude-bubble {{
       position: fixed;
-      bottom: 24px;
-      right: 24px;
       z-index: 99999;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }}
     #ha-claude-bubble .bubble-btn {{
+      position: fixed;
       width: 56px;
       height: 56px;
       border-radius: 50%;
@@ -223,14 +287,24 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       align-items: center;
       justify-content: center;
       font-size: 24px;
-      transition: transform 0.2s, box-shadow 0.2s;
+      transition: box-shadow 0.2s;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
     }}
     #ha-claude-bubble .bubble-btn:hover {{
-      transform: scale(1.1);
       box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+    }}
+    #ha-claude-bubble .bubble-btn.dragging {{
+      opacity: 0.8;
+      transform: scale(1.15);
+      transition: none;
     }}
     #ha-claude-bubble .bubble-btn.has-context {{
       animation: bubble-pulse 2s infinite;
+    }}
+    #ha-claude-bubble .bubble-btn.dragging.has-context {{
+      animation: none;
     }}
     @keyframes bubble-pulse {{
       0%, 100% {{ box-shadow: 0 4px 16px rgba(0,0,0,0.3); }}
@@ -242,6 +316,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       bottom: 90px;
       right: 24px;
       width: 380px;
+      min-width: 300px;
+      min-height: 350px;
       max-width: calc(100vw - 48px);
       height: 520px;
       max-height: calc(100vh - 120px);
@@ -251,6 +327,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       flex-direction: column;
       overflow: hidden;
       border: 1px solid var(--divider-color, #e0e0e0);
+      resize: both;
     }}
     #ha-claude-bubble .chat-panel.open {{
       display: flex;
@@ -264,6 +341,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       color: white;
       font-weight: 600;
       font-size: 14px;
+      cursor: move;
     }}
     #ha-claude-bubble .chat-header-actions {{
       display: flex;
@@ -328,11 +406,25 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       color: var(--secondary-text-color, #999);
       font-style: italic;
     }}
+    #ha-claude-bubble .msg.status {{
+      align-self: center;
+      background: transparent;
+      color: var(--secondary-text-color, #999);
+      font-size: 11px;
+      padding: 2px 8px;
+    }}
     #ha-claude-bubble .msg.error {{
       align-self: center;
       background: var(--error-color, #db4437);
       color: white;
       font-size: 12px;
+    }}
+    #ha-claude-bubble .msg.reload-notice {{
+      align-self: center;
+      background: var(--success-color, #4caf50);
+      color: white;
+      font-size: 12px;
+      padding: 6px 12px;
     }}
     #ha-claude-bubble .chat-input-area {{
       display: flex;
@@ -375,20 +467,33 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       opacity: 0.5;
       cursor: not-allowed;
     }}
+    #ha-claude-bubble .tool-badges {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 4px 0;
+    }}
+    #ha-claude-bubble .tool-badge {{
+      display: inline-block;
+      background: var(--primary-color, #03a9f4);
+      color: white;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      opacity: 0.8;
+    }}
     @media (max-width: 480px) {{
       #ha-claude-bubble .chat-panel {{
-        width: calc(100vw - 16px);
-        height: calc(100vh - 100px);
-        right: 8px;
-        bottom: 80px;
+        width: calc(100vw - 16px) !important;
+        height: calc(100vh - 100px) !important;
+        right: 8px !important;
+        bottom: 80px !important;
         border-radius: 12px;
       }}
       #ha-claude-bubble .bubble-btn {{
         width: 48px;
         height: 48px;
         font-size: 20px;
-        bottom: 16px;
-        right: 16px;
       }}
     }}
   `;
@@ -399,7 +504,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   root.id = 'ha-claude-bubble';
   root.innerHTML = `
     <div class="chat-panel" id="haChatPanel">
-      <div class="chat-header">
+      <div class="chat-header" id="haChatHeader">
         <span>AI Assistant</span>
         <div class="chat-header-actions">
           <button id="haChatNew" title="${{T.new_chat}}">+</button>
@@ -420,6 +525,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // ---- Elements ----
   const panel = document.getElementById('haChatPanel');
   const btn = document.getElementById('haChatBubbleBtn');
+  const header = document.getElementById('haChatHeader');
   const input = document.getElementById('haChatInput');
   const sendBtn = document.getElementById('haChatSend');
   const messagesEl = document.getElementById('haChatMessages');
@@ -430,13 +536,167 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   let isOpen = false;
   let isStreaming = false;
 
+  // ---- Apply saved button position ----
+  if (savedPos) {{
+    btn.style.left = savedPos.x + 'px';
+    btn.style.top = savedPos.y + 'px';
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+  }} else {{
+    btn.style.bottom = '24px';
+    btn.style.right = '24px';
+  }}
+
+  // ---- Apply saved panel size ----
+  if (savedSize) {{
+    panel.style.width = savedSize.w + 'px';
+    panel.style.height = savedSize.h + 'px';
+  }}
+
+  // Save panel size on resize (via ResizeObserver)
+  const panelResizeObserver = new ResizeObserver((entries) => {{
+    for (const entry of entries) {{
+      if (panel.classList.contains('open')) {{
+        const rect = entry.contentRect;
+        if (rect.width > 100 && rect.height > 100) {{
+          saveSetting('panel-size', {{ w: Math.round(rect.width), h: Math.round(rect.height) }});
+        }}
+      }}
+    }}
+  }});
+  panelResizeObserver.observe(panel);
+
+  // ---- Draggable Button (long-press to drag, like iPhone) ----
+  let isDragging = false;
+  let dragStarted = false;
+  let longPressTimer = null;
+  let dragOffsetX = 0;
+  let dragOffsetY = 0;
+
+  function startDragCheck(clientX, clientY) {{
+    dragOffsetX = clientX - btn.getBoundingClientRect().left;
+    dragOffsetY = clientY - btn.getBoundingClientRect().top;
+    longPressTimer = setTimeout(() => {{
+      isDragging = true;
+      dragStarted = true;
+      btn.classList.add('dragging');
+    }}, 400); // 400ms long-press threshold
+  }}
+
+  function handleDragMove(clientX, clientY) {{
+    if (!isDragging) return;
+    const x = Math.max(0, Math.min(window.innerWidth - 56, clientX - dragOffsetX));
+    const y = Math.max(0, Math.min(window.innerHeight - 56, clientY - dragOffsetY));
+    btn.style.left = x + 'px';
+    btn.style.top = y + 'px';
+    btn.style.right = 'auto';
+    btn.style.bottom = 'auto';
+
+    // Also move panel relative to button
+    positionPanelNearButton();
+  }}
+
+  function endDrag() {{
+    if (longPressTimer) {{
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }}
+    if (isDragging) {{
+      isDragging = false;
+      btn.classList.remove('dragging');
+      // Save position
+      saveSetting('btn-pos', {{
+        x: parseInt(btn.style.left) || 0,
+        y: parseInt(btn.style.top) || 0,
+      }});
+    }}
+  }}
+
+  // Mouse events for drag
+  btn.addEventListener('mousedown', (e) => {{
+    e.preventDefault();
+    dragStarted = false;
+    startDragCheck(e.clientX, e.clientY);
+  }});
+  document.addEventListener('mousemove', (e) => {{
+    if (longPressTimer && !isDragging) {{
+      // Cancel long-press if moved too much before threshold
+      const dx = e.clientX - (btn.getBoundingClientRect().left + dragOffsetX);
+      const dy = e.clientY - (btn.getBoundingClientRect().top + dragOffsetY);
+      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {{
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }}
+    }}
+    handleDragMove(e.clientX, e.clientY);
+  }});
+  document.addEventListener('mouseup', () => {{
+    const wasDragging = dragStarted;
+    endDrag();
+    // Only toggle if was not dragging
+    if (!wasDragging) {{
+      // click handled by click event
+    }}
+  }});
+
+  // Touch events for drag
+  btn.addEventListener('touchstart', (e) => {{
+    dragStarted = false;
+    const touch = e.touches[0];
+    startDragCheck(touch.clientX, touch.clientY);
+  }}, {{ passive: true }});
+  document.addEventListener('touchmove', (e) => {{
+    if (isDragging) {{
+      e.preventDefault();
+      const touch = e.touches[0];
+      handleDragMove(touch.clientX, touch.clientY);
+    }}
+  }}, {{ passive: false }});
+  document.addEventListener('touchend', () => {{
+    const wasDragging = dragStarted;
+    endDrag();
+    if (!wasDragging) {{
+      // tap — toggle panel
+      togglePanel();
+    }}
+  }});
+
+  // ---- Position panel near button ----
+  function positionPanelNearButton() {{
+    const rect = btn.getBoundingClientRect();
+    const pw = panel.offsetWidth || 380;
+    const ph = panel.offsetHeight || 520;
+
+    // Prefer above the button; if not enough space, below
+    let top = rect.top - ph - 10;
+    if (top < 10) top = rect.bottom + 10;
+
+    // Prefer aligned to button right edge; clamp to viewport
+    let left = rect.right - pw;
+    if (left < 10) left = 10;
+    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+
+    panel.style.top = top + 'px';
+    panel.style.left = left + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }}
+
   // ---- Toggle Panel ----
-  btn.addEventListener('click', () => {{
+  function togglePanel() {{
     isOpen = !isOpen;
     panel.classList.toggle('open', isOpen);
     if (isOpen) {{
+      positionPanelNearButton();
       updateContextBar();
       input.focus();
+    }}
+  }}
+
+  btn.addEventListener('click', (e) => {{
+    // Only toggle on click if not dragging (mouse users)
+    if (!dragStarted) {{
+      togglePanel();
     }}
   }});
 
@@ -451,12 +711,41 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     updateContextBar();
   }});
 
+  // ---- Draggable Panel (via header) ----
+  let panelDragging = false;
+  let panelDragOffX = 0;
+  let panelDragOffY = 0;
+
+  header.addEventListener('mousedown', (e) => {{
+    if (e.target.tagName === 'BUTTON') return;
+    panelDragging = true;
+    panelDragOffX = e.clientX - panel.getBoundingClientRect().left;
+    panelDragOffY = e.clientY - panel.getBoundingClientRect().top;
+    e.preventDefault();
+  }});
+  document.addEventListener('mousemove', (e) => {{
+    if (!panelDragging) return;
+    const x = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, e.clientX - panelDragOffX));
+    const y = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, e.clientY - panelDragOffY));
+    panel.style.left = x + 'px';
+    panel.style.top = y + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  }});
+  document.addEventListener('mouseup', () => {{
+    panelDragging = false;
+  }});
+
   // ---- Context Bar ----
   function updateContextBar() {{
     const ctx = detectContext();
     if (ctx.label) {{
+      let text = ctx.label;
+      if (ctx.entities && ctx.entities.length > 0) {{
+        text += ' (' + ctx.entities.length + ' entities)';
+      }}
       contextBar.style.display = 'block';
-      contextBar.textContent = '📍 ' + ctx.label;
+      contextBar.textContent = text;
       btn.classList.add('has-context');
     }} else {{
       contextBar.style.display = 'none';
@@ -497,11 +786,17 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     return div;
   }}
 
+  // ---- Auto-reload: tools that modify what the user is viewing ----
+  const RELOAD_TOOLS = new Set([
+    'update_automation', 'update_script', 'update_dashboard_card',
+    'update_dashboard', 'create_automation', 'create_script',
+  ]);
+
   async function sendMessage() {{
     const text = input.value.trim();
     if (!text || isStreaming) return;
 
-    // Add context prefix (invisible to user, sent to AI)
+    const ctx = detectContext();
     const contextPrefix = buildContextPrefix();
     const fullMessage = contextPrefix + text;
 
@@ -512,6 +807,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     sendBtn.disabled = true;
 
     const thinkingEl = addMessage('thinking', T.thinking + '...');
+    let toolBadgesEl = null;  // Container for tool badges
+    let writeToolCalled = false; // Track if a write tool was called for auto-reload
 
     try {{
       const response = await fetch(API_BASE + '/api/chat/stream', {{
@@ -532,7 +829,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       let buffer = '';
       let assistantText = '';
 
-      // Remove thinking indicator
       thinkingEl.remove();
       const assistantEl = addMessage('assistant', '');
 
@@ -555,6 +851,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             }} else if (evt.type === 'clear') {{
               assistantText = '';
               assistantEl.textContent = '';
+              // Remove tool badges on clear (final response coming)
+              if (toolBadgesEl) {{ toolBadgesEl.remove(); toolBadgesEl = null; }}
             }} else if (evt.type === 'done') {{
               if (evt.full_text) {{
                 assistantText = evt.full_text;
@@ -563,6 +861,25 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             }} else if (evt.type === 'error') {{
               assistantEl.className = 'msg error';
               assistantEl.textContent = evt.message || 'Error';
+            }} else if (evt.type === 'tool') {{
+              // Show tool badge
+              if (!toolBadgesEl) {{
+                toolBadgesEl = document.createElement('div');
+                toolBadgesEl.className = 'tool-badges';
+                messagesEl.insertBefore(toolBadgesEl, assistantEl);
+              }}
+              const badge = document.createElement('span');
+              badge.className = 'tool-badge';
+              badge.textContent = evt.name || 'tool';
+              toolBadgesEl.appendChild(badge);
+              messagesEl.scrollTop = messagesEl.scrollHeight;
+              // Track write tools for auto-reload
+              if (RELOAD_TOOLS.has(evt.name)) {{
+                writeToolCalled = true;
+              }}
+            }} else if (evt.type === 'status') {{
+              // Update thinking indicator
+              thinkingEl.textContent = evt.message || '';
             }}
           }} catch (parseErr) {{
             // Ignore malformed SSE lines
@@ -572,6 +889,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
       if (!assistantText && assistantEl.className.indexOf('error') === -1) {{
         assistantEl.textContent = '...';
+      }}
+
+      // ---- Auto-reload if a write tool modified the current page ----
+      if (writeToolCalled && ctx.type) {{
+        const shouldReload = (
+          (ctx.type === 'automation' && ctx.id) ||
+          (ctx.type === 'script' && ctx.id) ||
+          (ctx.type === 'dashboard')
+        );
+        if (shouldReload) {{
+          addMessage('reload-notice', T.page_reload);
+          setTimeout(() => {{
+            window.location.reload();
+          }}, 2500);
+        }}
       }}
 
     }} catch (err) {{
