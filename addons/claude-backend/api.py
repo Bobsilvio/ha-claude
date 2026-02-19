@@ -2906,38 +2906,55 @@ def setup_chat_bubble():
         logger.info(f"Chat bubble: JS saved to {js_path} ({len(js_content)} chars)")
 
         # Register as Lovelace resource via websocket
+        # Use timestamp for aggressive cache-busting (browser ignores ?v=version)
+        import hashlib
+        content_hash = hashlib.md5(js_content.encode()).hexdigest()[:8]
         resource_url = "/local/ha-claude-chat-bubble.js"
+        cache_bust_url = f"{resource_url}?v={VERSION}&h={content_hash}"
         try:
-            # First check if already registered
-            existing = call_ha_websocket("lovelace/resources/list")
+            ws_result = call_ha_websocket("lovelace/resources/list")
+            # WS returns {"type":"result","success":true,"result":[...]}
+            resources = ws_result
+            if isinstance(ws_result, dict):
+                resources = ws_result.get("result", [])
             already_registered = False
-            if isinstance(existing, list):
-                for res in existing:
-                    if res.get("url", "").startswith("/local/ha-claude-chat-bubble"):
-                        already_registered = True
-                        # Update the URL with cache-busting
-                        try:
-                            call_ha_websocket(
-                                "lovelace/resources/update",
-                                resource_id=res["id"],
-                                url=resource_url + "?v=" + VERSION,
-                                res_type="module",
-                            )
-                            logger.info(f"Chat bubble: Updated existing Lovelace resource (v{VERSION})")
-                        except Exception as e:
-                            logger.warning(f"Chat bubble: Could not update resource: {e}")
-                        break
+            duplicates = []
+            if isinstance(resources, list):
+                for res in resources:
+                    if isinstance(res, dict) and res.get("url", "").startswith("/local/ha-claude-chat-bubble"):
+                        if not already_registered:
+                            already_registered = True
+                            logger.info(f"Chat bubble: Found existing resource id={res.get('id')}, url={res.get('url')}")
+                            try:
+                                call_ha_websocket(
+                                    "lovelace/resources/update",
+                                    resource_id=res["id"],
+                                    url=cache_bust_url,
+                                    res_type="js",
+                                )
+                                logger.info(f"Chat bubble: Updated Lovelace resource ({cache_bust_url})")
+                            except Exception as e:
+                                logger.warning(f"Chat bubble: Could not update resource: {e}")
+                        else:
+                            duplicates.append(res)
+                # Clean up duplicate registrations
+                for dup in duplicates:
+                    try:
+                        call_ha_websocket("lovelace/resources/delete", resource_id=dup["id"])
+                        logger.info(f"Chat bubble: Removed duplicate resource id={dup.get('id')}")
+                    except Exception:
+                        pass
 
             if not already_registered:
-                call_ha_websocket(
+                create_result = call_ha_websocket(
                     "lovelace/resources/create",
-                    url=resource_url + "?v=" + VERSION,
-                    res_type="module",
+                    url=cache_bust_url,
+                    res_type="js",
                 )
-                logger.info(f"Chat bubble: Registered as Lovelace resource ({resource_url})")
+                logger.info(f"Chat bubble: Registered Lovelace resource ({cache_bust_url}) -> {create_result}")
         except Exception as e:
             logger.warning(f"Chat bubble: Could not register Lovelace resource: {e}")
-            logger.info(f"Chat bubble: Add manually in HA → Settings → Dashboards → Resources: {resource_url}")
+            logger.info(f"Chat bubble: Add manually in HA -> Settings -> Dashboards -> Resources: {resource_url}")
 
         _chat_bubble_registered = True
 

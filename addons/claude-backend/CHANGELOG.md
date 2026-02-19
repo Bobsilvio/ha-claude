@@ -1,4 +1,13 @@
 # Changelog
+## 3.13.1
+- **FIX**: Chat bubble not loading — Lovelace resource registration was broken
+  - Root cause: `call_ha_websocket` returns `{"type":"result","result":[...]}` but code checked `isinstance(result, list)` → always `False`, resource never found/updated
+  - Fix: properly extract `result` from WS response dict
+  - Changed `res_type` from `"module"` to `"js"` (IIFE script, not ES module)
+  - Added content-hash cache-busting (`?v=VERSION&h=HASH`) to force browser reload on updates
+  - Added duplicate resource cleanup (removes extra registrations from previous broken attempts)
+  - After update: go to HA → Settings → Dashboards → Resources, delete any duplicate `ha-claude-chat-bubble` entries, then restart the addon
+
 ## 3.13.0 — Chat Bubble V2: Markdown, Voice, Quick Actions, Abort
 - **Markdown rendering**: AI responses now render bold, italic, code blocks, inline code, lists, links, headers
 - **Message history persistence**: chat messages survive page reload (stored in localStorage, last 50 messages)
