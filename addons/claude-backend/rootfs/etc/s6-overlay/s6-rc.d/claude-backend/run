@@ -27,6 +27,12 @@ ENABLE_MEMORY=$(bashio::config 'enable_memory')
 ENABLE_FILE_UPLOAD=$(bashio::config 'enable_file_upload')
 ENABLE_RAG=$(bashio::config 'enable_rag')
 
+# Agent personalization
+AGENT_NAME=$(bashio::config 'agent_name')
+AGENT_AVATAR=$(bashio::config 'agent_avatar')
+AGENT_INSTRUCTIONS=$(bashio::config 'agent_instructions')
+HTML_DASHBOARD_FOOTER=$(bashio::config 'html_dashboard_footer')
+MAX_CONVERSATIONS=$(bashio::config 'max_conversations')
 
 
 # SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
@@ -57,6 +63,12 @@ export ENABLE_MEMORY
 export ENABLE_FILE_UPLOAD
 export ENABLE_RAG
 export SUPERVISOR_TOKEN
+
+export AGENT_NAME
+export AGENT_AVATAR
+export AGENT_INSTRUCTIONS
+export HTML_DASHBOARD_FOOTER
+export MAX_CONVERSATIONS
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
 bashio::log.info "ENABLE_FILE_ACCESS: ${ENABLE_FILE_ACCESS}"

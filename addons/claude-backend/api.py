@@ -100,6 +100,7 @@ AGENT_NAME = (os.getenv("AGENT_NAME", "AI Assistant") or "AI Assistant").strip()
 AGENT_AVATAR = (os.getenv("AGENT_AVATAR", "🤖") or "🤖").strip()
 AGENT_INSTRUCTIONS = (os.getenv("AGENT_INSTRUCTIONS", "") or "").strip()
 HTML_DASHBOARD_FOOTER = (os.getenv("HTML_DASHBOARD_FOOTER", "") or "").strip()
+MAX_CONVERSATIONS = max(1, min(100, int(os.getenv("MAX_CONVERSATIONS", "10") or "10")))
 
 # Persist system prompt override across restarts
 CUSTOM_SYSTEM_PROMPT_FILE = "/config/.storage/claude_custom_system_prompt.txt"
@@ -1497,9 +1498,9 @@ def save_conversations():
     tmp_path = f"{CONVERSATIONS_FILE}.tmp"
     try:
         os.makedirs(os.path.dirname(CONVERSATIONS_FILE), exist_ok=True)
-        # Keep only last 10 sessions, 50 messages each
+        # Keep only last N sessions (configurable), 50 messages each
         trimmed: Dict[str, List[Dict]] = {}
-        for sid, msgs in list(conversations.items())[-10:]:
+        for sid, msgs in list(conversations.items())[-MAX_CONVERSATIONS:]:
             if not isinstance(msgs, list):
                 continue
             # Strip image data from messages to reduce file size
@@ -2951,7 +2952,7 @@ def api_conversations_list():
         })
     # Sort by ID (timestamp) descending
     result.sort(key=lambda x: x["id"], reverse=True)
-    return jsonify({"conversations": result[:10]}), 200  # Return last 10
+    return jsonify({"conversations": result[:MAX_CONVERSATIONS]}), 200
 
 
 @app.route('/api/conversations/<session_id>', methods=['GET'])

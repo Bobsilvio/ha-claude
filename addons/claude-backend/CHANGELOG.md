@@ -1,4 +1,9 @@
 # Changelog
+## 3.10.4
+- **NEW**: Configurable `max_conversations` setting — number of chat conversations to keep in history (1-100, default 10)
+- Previously hardcoded to 10 in both save and list endpoints
+- Available in add-on configuration UI with translations (EN, IT, ES, FR)
+
 ## 3.10.3
 - **FIX**: Detect truncated Vue.createApp scripts (has `createApp` but no `.mount()`) and force chunked/draft mode retry
 - Previously, truncated scripts passed the `createApp` check and were saved as broken dashboards

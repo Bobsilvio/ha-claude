@@ -47,3 +47,19 @@ configuration:
   enable_rag:
     name: Enable RAG (Experimental)
     description: Enable RAG (Retrieval-Augmented Generation) for document search and context injection
+
+  agent_name:
+    name: Agent Name
+    description: Display name of your AI agent (shown in the chat UI and dashboard footer)
+  agent_avatar:
+    name: Agent Avatar
+    description: Emoji avatar shown in the chat welcome message
+  agent_instructions:
+    name: Agent Instructions
+    description: Extra instructions/persona appended to the system prompt (tone, style, rules)
+  html_dashboard_footer:
+    name: HTML Dashboard Footer
+    description: Footer text for generated HTML dashboards (leave empty to use default)
+  max_conversations:
+    name: Max Saved Conversations
+    description: Number of chat conversations to keep in history (1-100, default 10)

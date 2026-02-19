@@ -47,3 +47,19 @@ configuration:
   enable_rag:
     name: Abilita RAG (Sperimentale)
     description: Abilita RAG (Retrieval-Augmented Generation) per la ricerca e iniezione di documenti
+
+  agent_name:
+    name: Nome Agente
+    description: Nome visualizzato dell'agente AI (mostrato nella chat UI e nel footer delle dashboard)
+  agent_avatar:
+    name: Avatar Agente
+    description: Emoji avatar mostrato nel messaggio di benvenuto
+  agent_instructions:
+    name: Istruzioni Agente
+    description: Istruzioni/persona aggiuntive aggiunte al system prompt (tono, stile, regole)
+  html_dashboard_footer:
+    name: Footer Dashboard HTML
+    description: Testo del footer per le dashboard HTML generate (vuoto = default)
+  max_conversations:
+    name: Conversazioni Salvate
+    description: Numero di conversazioni da conservare nella cronologia (1-100, predefinito 10)
