@@ -1,4 +1,11 @@
 # Changelog
+## 3.11.7
+- **FIX**: Anthropic 400 error on second request (orphaned tool_use in history)
+  - Root cause: intermediate assistant messages with `tool_use` blocks were saved to conversation history, but without their corresponding `tool_result` blocks
+  - On the next request, `sanitize_messages_for_provider` detected orphaned `tool_use` but the damage was done — API rejected with "tool_use ids without tool_result blocks"
+  - Fix: sync logic now skips assistant messages with list content (tool_use blocks), saving only the final text response
+  - Also applies to Google provider for consistency
+
 ## 3.11.6
 - **FIX**: Anthropic tool_use
 

@@ -2636,18 +2636,26 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         elif AI_PROVIDER == "anthropic":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from providers_anthropic.stream_chat_anthropic(clean_messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages (skip the enriched user message we created)
+            # Sync ONLY new assistant messages WITHOUT tool_use (skip intermediate tool messages)
             for msg in clean_messages[conv_length_before:]:
                 if msg.get("role") == "assistant":
+                    content = msg.get("content", "")
+                    # Skip messages with tool_use blocks - they are intermediate, not for history
+                    if isinstance(content, list):
+                        continue
                     msg["model"] = get_active_model()
                     msg["provider"] = AI_PROVIDER
                     conversations[session_id].append(msg)
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
             yield from providers_google.stream_chat_google(clean_messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages (skip the enriched user message we created)
+            # Sync ONLY new assistant messages WITHOUT tool_use (skip intermediate tool messages)
             for msg in clean_messages[conv_length_before:]:
                 if msg.get("role") == "assistant":
+                    content = msg.get("content", "")
+                    # Skip messages with tool_use blocks - they are intermediate, not for history
+                    if isinstance(content, list):
+                        continue
                     msg["model"] = get_active_model()
                     msg["provider"] = AI_PROVIDER
                     conversations[session_id].append(msg)
