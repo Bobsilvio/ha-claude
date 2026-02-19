@@ -1,4 +1,10 @@
 # Changelog
+## 3.11.3
+- **FIX**: HTML dashboards with Chart.js broken by CSS `var()` used in JavaScript
+- AI models sometimes generate `color: var('--text-color')` inside `<script>` blocks — `var` is a JS keyword, causing `SyntaxError: expected expression, got keyword 'var'`
+- New `_fix_css_var_in_js()` sanitizer auto-replaces with `getComputedStyle(document.documentElement).getPropertyValue('--prop').trim()`
+- Applied to all HTML dashboards (both raw and structured mode) before saving
+
 ## 3.11.2
 - **FIX**: OOM crash (exit code 137) when uploading files with RAG enabled
 - Replaced `sentence-transformers` / PyTorch embedding backend with lightweight TF-IDF approach (zero heavy dependencies)

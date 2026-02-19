@@ -554,6 +554,32 @@ def _fill_html_placeholders(
     return out
 
 
+def _fix_css_var_in_js(html: str) -> str:
+    """Fix CSS var('--prop') mistakenly used inside <script> blocks.
+
+    AI models sometimes write Chart.js options like:
+        ticks: { color: var('--text-color') }
+    which is invalid JS (var is a keyword). This replaces such occurrences
+    inside <script> tags with getComputedStyle lookups.
+    """
+    import re
+
+    # Extract all <script>...</script> blocks
+    def _fix_script_block(match):
+        script = match.group(0)
+        # Replace var('--xxx') or var("--xxx") with getComputedStyle lookup
+        fixed = re.sub(
+            r"""\bvar\(\s*['"](--([\w-]+))['"]\s*\)""",
+            r"getComputedStyle(document.documentElement).getPropertyValue('\1').trim()",
+            script
+        )
+        if fixed != script:
+            logger.info("Sanitized CSS var() inside <script> block")
+        return fixed
+
+    return re.sub(r'<script\b[^>]*>[\s\S]*?</script>', _fix_script_block, html, flags=re.IGNORECASE)
+
+
 def _stamp_description(description: str, action: str = "create") -> str:
     """Add AI Assistant watermark to a description field.
 
@@ -2315,6 +2341,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     lang=lang,
                     footer_text=footer_text,
                 )
+
+            # Sanitize: fix CSS var() used inside <script> (common AI model mistake)
+            html_content = _fix_css_var_in_js(html_content)
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
