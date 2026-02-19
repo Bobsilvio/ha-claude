@@ -1,4 +1,10 @@
 # Changelog
+## 3.10.7
+- **FIX**: Snapshot restore now triggers `homeassistant/reload_all` for sensor/template/generic YAML files
+- Previously, restoring a snapshot for `sensors.yaml` or `template.yaml` only copied the file back but did NOT reload HA
+- The file was restored on disk but HA kept using the old (modified) version from memory
+- Now: automations → `automation/reload`, scripts → `script/reload`, lovelace → `lovelace/reload`, everything else → `homeassistant/reload_all`
+
 ## 3.10.6
 - **FIX**: `write_config_file` removed from auto-stop — model now explains changes and shows diff before/after writing
 - **NEW**: Focused prompt for `config_edit` intent with mandatory confirmation workflow:

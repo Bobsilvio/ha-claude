@@ -3084,6 +3084,11 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                         reload_result = api.call_ha_api("POST", "services/script/reload", {})
                     elif "lovelace" in lower or "dashboard" in lower or lower.endswith("ui-lovelace.yaml"):
                         reload_result = api.call_ha_api("POST", "services/lovelace/reload", {})
+                    elif "sensor" in lower or "template" in lower or "binary_sensor" in lower:
+                        reload_result = api.call_ha_api("POST", "services/homeassistant/reload_all", {})
+                    else:
+                        # Generic reload for any other YAML config file
+                        reload_result = api.call_ha_api("POST", "services/homeassistant/reload_all", {})
                 except Exception as e:
                     reload_result = {"error": str(e)}
 
