@@ -17,7 +17,8 @@ def main() -> None:
     api.logger.info(f"Log Level: {api.LOG_LEVEL.upper()} | Colored Logs: {api.COLORED_LOGS} | Debug Mode: {api.DEBUG_MODE}")
     api.logger.info(
         f"Features: Memory={api.ENABLE_MEMORY} | "
-        f"FileUpload={api.ENABLE_FILE_UPLOAD} | RAG={api.ENABLE_RAG}"
+        f"FileUpload={api.ENABLE_FILE_UPLOAD} | RAG={api.ENABLE_RAG} | "
+        f"ChatBubble={api.ENABLE_CHAT_BUBBLE}"
     )
 
     # Validate provider/model compatibility
@@ -35,6 +36,9 @@ def main() -> None:
                 "fr": f"✅ AUTO-FIX: Modèle changé automatiquement en '{api.MODEL_DISPLAY_MAPPING.get(default_model, default_model)}' (par défaut pour {api.AI_PROVIDER})",
             }
             api.logger.warning(fix_msgs.get(api.LANGUAGE, fix_msgs["en"]))
+
+    # Register floating chat bubble (if enabled)
+    api.setup_chat_bubble()
 
     from waitress import serve
 

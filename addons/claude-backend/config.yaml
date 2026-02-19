@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: AI Assistant
-version: "3.11.7"
+version: "3.12.0"
 slug: claude-backend
 description: >-
   AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -43,6 +43,7 @@ options:
   enable_memory: false
   enable_file_upload: false
   enable_rag: false
+  enable_chat_bubble: false
   max_conversations: 10
   colored_logs: true
   debug_mode: false
@@ -61,6 +62,7 @@ schema:
   enable_memory: bool?
   enable_file_upload: bool?
   enable_rag: bool?
+  enable_chat_bubble: bool?
   max_conversations: "int(1,100)?"
   colored_logs: bool?
   debug_mode: bool?

@@ -1,4 +1,16 @@
 # Changelog
+## 3.12.0 — Floating Chat Bubble
+- **NEW**: Context-aware floating chat bubble on every Home Assistant page
+  - Enable via `enable_chat_bubble: true` in add-on config
+  - Detects current page context: automation edit, script edit, device, dashboard, settings
+  - Sends context prefix to AI so it knows exactly what you're looking at
+  - Full SSE streaming with tool execution badges
+  - Session management (persists within tab), new chat button
+  - Responsive design: works on desktop and mobile
+  - Uses HA theme variables for dark/light mode compatibility
+  - Auto-registers as Lovelace resource (JS module at `/local/ha-claude-chat-bubble.js`)
+  - 4-language UI (en/it/es/fr)
+
 ## 3.11.7
 - **FIX**: Anthropic 400 error on second request (orphaned tool_use in history)
   - Root cause: intermediate assistant messages with `tool_use` blocks were saved to conversation history, but without their corresponding `tool_result` blocks

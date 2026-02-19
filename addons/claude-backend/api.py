@@ -86,6 +86,7 @@ LOG_LEVEL = os.getenv("LOG_LEVEL", "normal").lower()  # Supported: normal, verbo
 ENABLE_MEMORY = os.getenv("ENABLE_MEMORY", "False").lower() == "true"
 ENABLE_FILE_UPLOAD = os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true"
 ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
+ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
@@ -2865,6 +2866,83 @@ def api_status():
 
 
 
+
+# ---- Chat Bubble ----
+
+_chat_bubble_registered = False
+
+
+def setup_chat_bubble():
+    """Register the floating chat bubble JS as a Lovelace frontend resource.
+
+    Saves JS to /config/www/ and registers it via HA websocket so it loads
+    on every HA page. Called once at startup if enable_chat_bubble is true.
+    """
+    global _chat_bubble_registered
+    if _chat_bubble_registered:
+        return
+    if not ENABLE_CHAT_BUBBLE:
+        return
+
+    try:
+        import chat_bubble
+
+        ingress_url = get_addon_ingress_url()
+        if not ingress_url:
+            logger.warning("Chat bubble: Cannot register — ingress URL not available")
+            return
+
+        js_content = chat_bubble.get_chat_bubble_js(
+            ingress_url=ingress_url,
+            language=LANGUAGE,
+        )
+
+        # Save to /config/www/ (served by HA at /local/)
+        www_dir = os.path.join(HA_CONFIG_DIR, "www")
+        os.makedirs(www_dir, exist_ok=True)
+        js_path = os.path.join(www_dir, "ha-claude-chat-bubble.js")
+        with open(js_path, "w", encoding="utf-8") as f:
+            f.write(js_content)
+        logger.info(f"Chat bubble: JS saved to {js_path} ({len(js_content)} chars)")
+
+        # Register as Lovelace resource via websocket
+        resource_url = "/local/ha-claude-chat-bubble.js"
+        try:
+            # First check if already registered
+            existing = call_ha_websocket("lovelace/resources/list")
+            already_registered = False
+            if isinstance(existing, list):
+                for res in existing:
+                    if res.get("url", "").startswith("/local/ha-claude-chat-bubble"):
+                        already_registered = True
+                        # Update the URL with cache-busting
+                        try:
+                            call_ha_websocket(
+                                "lovelace/resources/update",
+                                resource_id=res["id"],
+                                url=resource_url + "?v=" + VERSION,
+                                res_type="module",
+                            )
+                            logger.info(f"Chat bubble: Updated existing Lovelace resource (v{VERSION})")
+                        except Exception as e:
+                            logger.warning(f"Chat bubble: Could not update resource: {e}")
+                        break
+
+            if not already_registered:
+                call_ha_websocket(
+                    "lovelace/resources/create",
+                    url=resource_url + "?v=" + VERSION,
+                    res_type="module",
+                )
+                logger.info(f"Chat bubble: Registered as Lovelace resource ({resource_url})")
+        except Exception as e:
+            logger.warning(f"Chat bubble: Could not register Lovelace resource: {e}")
+            logger.info(f"Chat bubble: Add manually in HA → Settings → Dashboards → Resources: {resource_url}")
+
+        _chat_bubble_registered = True
+
+    except Exception as e:
+        logger.error(f"Chat bubble setup failed: {e}")
 
 
 @app.route('/api/set_model', methods=['POST'])

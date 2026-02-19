@@ -26,6 +26,7 @@ MAX_RETRIES=$(bashio::config 'max_retries')
 ENABLE_MEMORY=$(bashio::config 'enable_memory')
 ENABLE_FILE_UPLOAD=$(bashio::config 'enable_file_upload')
 ENABLE_RAG=$(bashio::config 'enable_rag')
+ENABLE_CHAT_BUBBLE=$(bashio::config 'enable_chat_bubble')
 
 MAX_CONVERSATIONS=$(bashio::config 'max_conversations')
 
@@ -57,6 +58,7 @@ export MAX_RETRIES
 export ENABLE_MEMORY
 export ENABLE_FILE_UPLOAD
 export ENABLE_RAG
+export ENABLE_CHAT_BUBBLE
 export SUPERVISOR_TOKEN
 
 export MAX_CONVERSATIONS
