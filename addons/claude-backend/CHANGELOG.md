@@ -1,4 +1,11 @@
 # Changelog
+## 3.13.2
+- **FIX**: Bubble button now draggable immediately (touch and drag, 5px threshold) — replaced broken long-press mechanism
+- **NEW**: Live agent/provider selector in chat bubble — two dropdowns (Provider + Model) below the header
+  - Fetches available providers and models from `/api/get_models` on open
+  - Switching provider auto-loads its models and calls `/api/set_model`
+  - Switching model applies immediately — no addon restart needed
+
 ## 3.13.1
 - **FIX**: Chat bubble not loading — Lovelace resource registration was broken
   - Root cause: `call_ha_websocket` returns `{"type":"result","result":[...]}` but code checked `isinstance(result, list)` → always `False`, resource never found/updated

@@ -498,6 +498,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     #ha-claude-bubble .abort-btn {{
       background: var(--error-color, #db4437); color: white;
     }}
+    #ha-claude-bubble .agent-bar {{
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-bottom: 1px solid var(--divider-color, #e0e0e0);
+      background: var(--secondary-background-color, #f5f5f5); flex-shrink: 0;
+    }}
+    #ha-claude-bubble .agent-bar label {{
+      font-size: 11px; color: var(--secondary-text-color, #666); white-space: nowrap;
+    }}
+    #ha-claude-bubble .agent-bar select {{
+      flex: 1; font-size: 12px; padding: 3px 6px; border-radius: 6px;
+      border: 1px solid var(--divider-color, #ddd);
+      background: var(--card-background-color, #fff); color: var(--primary-text-color, #333);
+      outline: none; max-width: 160px; cursor: pointer;
+    }}
+    #ha-claude-bubble .agent-bar select:focus {{ border-color: var(--primary-color, #03a9f4); }}
     #ha-claude-bubble .tool-badges {{
       display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0;
     }}
@@ -527,6 +542,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
           <button id="haChatClose" title="${{T.close}}">&times;</button>
         </div>
       </div>
+      <div class="agent-bar" id="haAgentBar">
+        <label>Agent:</label>
+        <select id="haProviderSelect"></select>
+        <select id="haModelSelect"></select>
+      </div>
       <div class="context-bar" id="haChatContext" style="display:none;"></div>
       <div class="quick-actions" id="haQuickActions" style="display:none;"></div>
       <div class="chat-messages" id="haChatMessages"></div>
@@ -552,6 +572,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   const quickActionsEl = document.getElementById('haQuickActions');
   const closeBtn = document.getElementById('haChatClose');
   const newBtn = document.getElementById('haChatNew');
+  const providerSelect = document.getElementById('haProviderSelect');
+  const modelSelect = document.getElementById('haModelSelect');
 
   let isOpen = false;
   let isStreaming = false;
@@ -586,43 +608,52 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   }});
   panelResizeObserver.observe(panel);
 
-  // ---- Draggable Button (long-press) ----
-  let isDragging = false, dragStarted = false, longPressTimer = null, dragOffsetX = 0, dragOffsetY = 0;
+  // ---- Draggable Button (immediate drag, 5px threshold) ----
+  let isDragging = false, dragStarted = false, dragOffsetX = 0, dragOffsetY = 0;
+  let dragStartX = 0, dragStartY = 0, mouseIsDown = false;
+  const DRAG_THRESHOLD = 5;
 
-  function startDragCheck(cx, cy) {{
+  function onBtnDown(cx, cy) {{
+    mouseIsDown = true;
+    dragStarted = false;
+    isDragging = false;
+    dragStartX = cx;
+    dragStartY = cy;
     dragOffsetX = cx - btn.getBoundingClientRect().left;
     dragOffsetY = cy - btn.getBoundingClientRect().top;
-    longPressTimer = setTimeout(() => {{ isDragging = true; dragStarted = true; btn.classList.add('dragging'); }}, 400);
   }}
-  function handleDragMove(cx, cy) {{
-    if (!isDragging) return;
+  function onMoveGlobal(cx, cy) {{
+    if (!mouseIsDown) return;
+    if (!isDragging) {{
+      // Check threshold
+      if (Math.abs(cx - dragStartX) > DRAG_THRESHOLD || Math.abs(cy - dragStartY) > DRAG_THRESHOLD) {{
+        isDragging = true;
+        dragStarted = true;
+        btn.classList.add('dragging');
+      }} else return;
+    }}
     btn.style.left = Math.max(0, Math.min(window.innerWidth - 56, cx - dragOffsetX)) + 'px';
     btn.style.top = Math.max(0, Math.min(window.innerHeight - 56, cy - dragOffsetY)) + 'px';
     btn.style.right = 'auto'; btn.style.bottom = 'auto';
-    positionPanelNearButton();
+    if (isOpen) positionPanelNearButton();
   }}
-  function endDrag() {{
-    if (longPressTimer) {{ clearTimeout(longPressTimer); longPressTimer = null; }}
+  function onUpGlobal() {{
+    if (!mouseIsDown) return;
+    mouseIsDown = false;
     if (isDragging) {{
-      isDragging = false; btn.classList.remove('dragging');
+      isDragging = false;
+      btn.classList.remove('dragging');
       saveSetting('btn-pos', {{ x: parseInt(btn.style.left) || 0, y: parseInt(btn.style.top) || 0 }});
     }}
   }}
 
-  btn.addEventListener('mousedown', (e) => {{ e.preventDefault(); dragStarted = false; startDragCheck(e.clientX, e.clientY); }});
-  document.addEventListener('mousemove', (e) => {{
-    if (longPressTimer && !isDragging) {{
-      const dx = e.clientX - (btn.getBoundingClientRect().left + dragOffsetX);
-      const dy = e.clientY - (btn.getBoundingClientRect().top + dragOffsetY);
-      if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {{ clearTimeout(longPressTimer); longPressTimer = null; }}
-    }}
-    handleDragMove(e.clientX, e.clientY);
-  }});
-  document.addEventListener('mouseup', () => {{ const wasDrag = dragStarted; endDrag(); }});
+  btn.addEventListener('mousedown', (e) => {{ e.preventDefault(); onBtnDown(e.clientX, e.clientY); }});
+  document.addEventListener('mousemove', (e) => {{ onMoveGlobal(e.clientX, e.clientY); }});
+  document.addEventListener('mouseup', () => {{ onUpGlobal(); }});
 
-  btn.addEventListener('touchstart', (e) => {{ dragStarted = false; startDragCheck(e.touches[0].clientX, e.touches[0].clientY); }}, {{ passive: true }});
-  document.addEventListener('touchmove', (e) => {{ if (isDragging) {{ e.preventDefault(); handleDragMove(e.touches[0].clientX, e.touches[0].clientY); }} }}, {{ passive: false }});
-  document.addEventListener('touchend', () => {{ const wasDrag = dragStarted; endDrag(); if (!wasDrag) togglePanel(); }});
+  btn.addEventListener('touchstart', (e) => {{ onBtnDown(e.touches[0].clientX, e.touches[0].clientY); }}, {{ passive: true }});
+  document.addEventListener('touchmove', (e) => {{ if (mouseIsDown) {{ e.preventDefault(); onMoveGlobal(e.touches[0].clientX, e.touches[0].clientY); }} }}, {{ passive: false }});
+  document.addEventListener('touchend', () => {{ const wasDrag = dragStarted; onUpGlobal(); if (!wasDrag) togglePanel(); }});
 
   // ---- Panel positioning ----
   function positionPanelNearButton() {{
@@ -944,8 +975,76 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }};
   }}
 
+  // ---- Agent/Provider Selector ----
+  let agentData = null; // cached response from /api/get_models
+
+  async function loadAgents() {{
+    try {{
+      const resp = await fetch(API_BASE + '/api/get_models');
+      if (!resp.ok) return;
+      agentData = await resp.json();
+      if (!agentData.success) return;
+
+      // Populate provider select
+      providerSelect.innerHTML = '';
+      (agentData.available_providers || []).forEach(p => {{
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = p.name;
+        if (p.id === agentData.current_provider) opt.selected = true;
+        providerSelect.appendChild(opt);
+      }});
+
+      // Populate models for current provider
+      populateModels(agentData.current_provider);
+    }} catch(e) {{
+      console.warn('[AI Assistant] Could not load agents:', e);
+    }}
+  }}
+
+  function populateModels(provider) {{
+    if (!agentData) return;
+    modelSelect.innerHTML = '';
+    const techModels = (agentData.models_technical || {{}})[provider] || [];
+    const dispModels = (agentData.models || {{}})[provider] || [];
+    techModels.forEach((tech, i) => {{
+      const opt = document.createElement('option');
+      opt.value = tech;
+      opt.textContent = dispModels[i] || tech;
+      if (tech === agentData.current_model_technical) opt.selected = true;
+      modelSelect.appendChild(opt);
+    }});
+  }}
+
+  providerSelect.addEventListener('change', async () => {{
+    const provider = providerSelect.value;
+    populateModels(provider);
+    try {{
+      await fetch(API_BASE + '/api/set_model', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ provider }}),
+      }});
+      // Refresh to get new current_model_technical
+      await loadAgents();
+    }} catch(e) {{}}
+  }});
+
+  modelSelect.addEventListener('change', async () => {{
+    const model = modelSelect.value;
+    const provider = providerSelect.value;
+    try {{
+      await fetch(API_BASE + '/api/set_model', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ provider, model }}),
+      }});
+    }} catch(e) {{}}
+  }});
+
   // Initial setup
   updateContextBar();
-  console.log('[AI Assistant] Chat bubble loaded (v2)');
+  loadAgents();
+  console.log('[AI Assistant] Chat bubble loaded (v3)');
 }})();
 """
