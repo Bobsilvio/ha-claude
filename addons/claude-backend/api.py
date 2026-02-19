@@ -503,6 +503,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_api_key": "NVIDIA API key not configured.",
         "err_nvidia_model_invalid": "Invalid NVIDIA model.",
         "err_nvidia_model_removed": "NVIDIA model {reason}: {model_id}. Removed from model list.",
+        "err_response_blocked": "{provider}: response blocked by safety filters. Try rephrasing your request.",
 
         "status_image_processing": "Processing image...",
         "status_context_preloaded": "Context preloaded...",
@@ -579,6 +580,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_api_key": "NVIDIA API key non configurata.",
         "err_nvidia_model_invalid": "Modello NVIDIA non valido.",
         "err_nvidia_model_removed": "Modello NVIDIA {reason}: {model_id}. Rimosso dalla lista.",
+        "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
         "status_image_processing": "Elaborazione immagine...",
         "status_context_preloaded": "Contesto pre-caricato...",
@@ -655,6 +657,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_api_key": "Clave API NVIDIA no configurada.",
         "err_nvidia_model_invalid": "Modelo NVIDIA no válido.",
         "err_nvidia_model_removed": "Modelo NVIDIA {reason}: {model_id}. Eliminado de la lista.",
+        "err_response_blocked": "{provider}: respuesta bloqueada por filtros de seguridad. Intenta reformular tu solicitud.",
 
         "status_image_processing": "Procesando imagen...",
         "status_context_preloaded": "Contexto precargado...",
@@ -731,6 +734,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_api_key": "Clé API NVIDIA non configurée.",
         "err_nvidia_model_invalid": "Modèle NVIDIA non valide.",
         "err_nvidia_model_removed": "Modèle NVIDIA {reason} : {model_id}. Retiré de la liste.",
+        "err_response_blocked": "{provider} : réponse bloquée par les filtres de sécurité. Essayez de reformuler votre demande.",
 
         "status_image_processing": "Traitement de l'image...",
         "status_context_preloaded": "Contexte préchargé...",

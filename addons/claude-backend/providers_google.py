@@ -268,11 +268,41 @@ def stream_chat_google(messages, intent_info: dict | None = None):
     if round_num >= MAX_ROUNDS:
         logger.warning(f"Google: Reached max rounds ({MAX_ROUNDS})")
 
-    final_text = (getattr(response, "text", None) or "") if response is not None else ""
+    # Extract final text safely — Gemini SDK raises ValueError on .text
+    # when response is blocked by safety filters or has no text parts
+    final_text = ""
+    if response is not None:
+        try:
+            final_text = response.text or ""
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Google: Could not extract response text: {e}")
+            # Try to extract from candidates directly
+            try:
+                for candidate in (response.candidates or []):
+                    for part in (candidate.content.parts or []):
+                        if hasattr(part, "text") and part.text:
+                            final_text += part.text
+            except Exception:
+                pass
+
+    if not final_text:
+        # Check if response was blocked by safety filters
+        try:
+            block_reason = None
+            if response and hasattr(response, "prompt_feedback"):
+                block_reason = getattr(response.prompt_feedback, "block_reason", None)
+            if block_reason:
+                logger.warning(f"Google: Response blocked by safety filters: {block_reason}")
+                final_text = api.tr("err_response_blocked", provider="Google")
+            else:
+                logger.warning("Google: Empty response (no text, no tools)")
+        except Exception:
+            pass
 
     # Stream text in 4-char chunks (smooth output, aligned with other providers)
     messages.append({"role": "assistant", "content": final_text})
     yield {"type": "clear"}
-    for i in range(0, len(final_text), 4):
-        yield {"type": "token", "content": final_text[i:i+4]}
+    if final_text:
+        for i in range(0, len(final_text), 4):
+            yield {"type": "token", "content": final_text[i:i+4]}
     yield {"type": "done", "full_text": final_text}
