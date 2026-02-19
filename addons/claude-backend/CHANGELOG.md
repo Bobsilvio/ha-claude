@@ -1,4 +1,47 @@
 # Changelog
+## 3.11.2
+- **FIX**: OOM crash (exit code 137) when uploading files with RAG enabled
+- Replaced `sentence-transformers` / PyTorch embedding backend with lightweight TF-IDF approach (zero heavy dependencies)
+- Old system loaded ~500MB+ PyTorch model per chunk — new system uses stdlib only (`re`, `math`, `collections.Counter`)
+- RAG search now actually works: previously `sentence-transformers` was never installed, so all embeddings silently failed
+- Added try/except safety net around `rag.index_document()` in upload endpoint — RAG failure no longer crashes file upload
+- Migrates old `embeddings.json` automatically (removes it, starts fresh with `rag_index.json`)
+- TF-IDF supports multilingual tokenization (accented characters: àáâãäåèéêëìíîïòóôõöùúûüñç)
+
+## 3.11.1
+- **FIX**: Google Gemini provider now supports focused mode (`intent_info`), WRITE_TOOLS auto-stop, max rounds (10), and abort check
+- Previously: Google provider always used 44 tools, had no auto-stop, and could loop infinitely
+- Now: same focused mode as OpenAI/NVIDIA — fewer tools for specific intents, auto-stop after write tool success
+- **FIX**: Added missing HTML dashboard keywords: "chart", "grafic", "torta", "pie chart", "bar chart", "line chart", "donut", "gauge"
+- "la puoi modificare inserendo qualche grafico?" now correctly triggers `create_html_dashboard` instead of `generic`
+- **FIX**: Follow-up continuity — when previous intent was a dashboard/config edit and user sends a follow-up instruction ("modificala", "usa le stesse entità", "aggiungi un grafico"), the intent is carried forward
+- This works across all 4 languages (IT/EN/ES/FR follow-up signals)
+- Covers: modify, add, remove, use same entities/sensors patterns
+
+## 3.11.0 — Full i18n (Internationalization)
+- **i18n**: All 35+ hardcoded Italian user-facing strings replaced with `api.tr()` translation system
+- Added ~30 new translation keys to `LANGUAGE_TEXT` for all 4 languages (en/it/es/fr):
+  - Error messages: API key not configured, provider not supported, NVIDIA errors, image format errors
+  - Status messages: image processing, context preloaded, tool repair, rate limit, prompt too large, user cancelled
+  - Write tool responses: operation success, no changes, YAML updated/created, snapshot created
+  - Intent labels: all 17 intent types translated (modify automation, create script, etc.)
+  - Read-only mode note and instruction
+  - Smart context: script found message
+- **i18n**: Intent prompts (chat, modify_automation, modify_script, create_automation, create_script, config_edit, delete, helpers) — removed hardcoded Italian, now English base with "ALWAYS respond in the user's language"
+- **i18n**: Confirmation keywords moved to `keywords.json` with proper translations for all 4 languages
+- **i18n**: System labels DATI/CONTESTO → DATA/CONTEXT in API messages
+- **FIX**: `config_edit` prompt now mentions backup snapshots are created automatically
+- **FIX**: Confirmation continuity — user replies "si/yes/ok" → intent carried forward (not reset to generic)
+- **FIX**: Increased tool result truncation limit for read operations (20000 chars for OpenAI/Google)
+
+### Files modified
+- `api.py` — LANGUAGE_TEXT keys + all hardcoded strings → `tr()`
+- `providers_openai.py` — 7 status/error messages → `api.tr()`
+- `providers_anthropic.py` — 2 abort messages → `api.tr()`
+- `intent.py` — prompts in English, confirmation from keywords.json, DATI→DATA
+- `tools.py` — read-only instruction + delete confirmation → `api.tr()` / English
+- `keywords.json` — new `confirm` category × 4 languages
+
 ## 3.10.8
 - **REMOVED**: `agent_name`, `agent_avatar`, `agent_instructions`, `html_dashboard_footer` from add-on configuration
 - These are now hardcoded defaults ("AI Assistant", emoji, empty strings)

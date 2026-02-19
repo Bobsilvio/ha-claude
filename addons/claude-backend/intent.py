@@ -38,8 +38,8 @@ INTENT_TOOL_SETS = {
 
 # Compact focused prompts by intent
 INTENT_PROMPTS = {
-    "chat": """Sei un assistente amichevole per Home Assistant. L'utente sta semplicemente salutando o chiacchierando.
-Rispondi in modo breve e cordiale. Non chiamare nessun tool.""",
+    "chat": """You are a friendly Home Assistant assistant. The user is simply greeting or chatting.
+Reply briefly and warmly. Do NOT call any tools. ALWAYS respond in the user's language.""",
 
     "find_automation": """You are a Home Assistant automation finder.
 The user is asking whether an automation already exists.
@@ -51,34 +51,34 @@ Then answer:
 Be concise and respond in the user's language.""",
 
     "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
-The automation config MAY be provided in the DATI section of the user's message.
+The automation config MAY be provided in the DATA section of the user's message.
 
 CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
-1. If the automation is NOT clearly provided in DATI, FIRST call get_automations ONCE with a short query extracted from the user message.
+1. If the automation is NOT clearly provided in DATA, FIRST call get_automations ONCE with a short query extracted from the user message.
    - If you find multiple matches: list the best 1-5 (id + alias) and ask which one they mean.
    - If you find none: say you couldn't find it and ask for the automation name/room/device.
-2. Once you know WHICH automation, briefly confirm it: "Ho trovato l'automazione: [NAME] (id: [ID])"
-3. Describe WHAT EXACTLY will change in simple language
-4. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it
-5. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? (sì/no)"
-6. WAIT FOR USER TO CONFIRM - DO NOT call update_automation until user says "sì" (Italian yes)
-7. Only AFTER confirmation, call update_automation ONCE with the changes
+2. Once you know WHICH automation, briefly confirm which one you found (name + id).
+3. Describe WHAT EXACTLY will change in simple language.
+4. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it.
+5. ASK FOR EXPLICIT CONFIRMATION before applying. Wait for the user to confirm.
+6. DO NOT call update_automation until the user explicitly confirms.
+7. Only AFTER confirmation, call update_automation ONCE with the changes.
 8. Show a before/after diff of what changed.
 
-- Respond in the user's language. Be concise.
+- ALWAYS respond in the user's language. Be concise.
 - Never modify the wrong automation.""",
 
     "modify_script": """You are a Home Assistant script editor. The user wants to modify a script.
-The script config is provided in the DATI section.
+The script config is provided in the DATA section.
 CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
-1. FIRST, briefly confirm which script you found: "Ho trovato lo script: [NAME] (id: [ID])"
-2. Describe WHAT EXACTLY will change in simple language
-3. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it
-4. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo fare questa modifica? (sì/no)"
-5. WAIT FOR USER TO CONFIRM - DO NOT call update_script until user says "sì" or "si"
-6. Only AFTER confirmation, call update_script ONCE with the changes
+1. FIRST, briefly confirm which script you found (name + id).
+2. Describe WHAT EXACTLY will change in simple language.
+3. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it.
+4. ASK FOR EXPLICIT CONFIRMATION before applying. Wait for the user to confirm.
+5. DO NOT call update_script until the user explicitly confirms.
+6. Only AFTER confirmation, call update_script ONCE with the changes.
 7. Show a before/after diff of what changed.
-- Respond in the user's language. Be concise.
+- ALWAYS respond in the user's language. Be concise.
 - NEVER call get_scripts or read_config_file — the data is already provided.
 - If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
 
@@ -90,23 +90,24 @@ CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE WRITING:
 2. Analyze the user's request and identify EXACTLY what needs to change.
 3. EXPLAIN clearly what you will modify, add, or remove — in simple language.
 4. Show a DIFF or summary of the changes (what was before → what will be after).
-5. ASK FOR EXPLICIT CONFIRMATION: "Confermi che devo salvare queste modifiche? (sì/no)"
-6. WAIT for the user to confirm — DO NOT call write_config_file until user says "sì" or "si" or "yes".
+5. ASK FOR EXPLICIT CONFIRMATION before writing. Wait for the user to say yes/ok/confirm.
+6. DO NOT call write_config_file until the user explicitly confirms.
 7. Only AFTER confirmation, call write_config_file with the complete file content.
-8. After writing, suggest calling check_config to validate.
+8. After writing, call check_config to validate. Inform the user that a backup snapshot was automatically created.
 
 IMPORTANT:
+- A backup snapshot is created automatically every time write_config_file is called. Mention this to reassure the user.
 - When writing, include the ENTIRE file content (not just the changed part).
 - Never silently add, remove, or rename sensors/automations without telling the user.
-- Respond in the user's language. Be concise but clear about changes.""",
+- ALWAYS respond in the user's language. Be concise but clear about changes.""",
 
     "create_automation": """You are a Home Assistant automation builder. The user wants to create a NEW automation.
 CRITICAL WORKFLOW - follow these steps IN ORDER:
 1. FIRST call search_entities to find the correct entity_id for the device the user mentioned.
-   - A "luce" (light) could be a light.* OR a switch.* entity — you MUST search, never guess the domain.
+   - A light could be a light.* OR a switch.* entity — you MUST search, never guess the domain.
    - Use keywords from the user's message (room name, device type).
     - If results include match_quality/token_coverage: ONLY treat as a sure match when token_coverage is 1.0 (no missing_tokens) or match_quality is "high".
-    - If all results are low confidence (missing key query words like "piccolo"), DO NOT guess: ask the user to choose the correct entity_id from a short numbered list.
+    - If all results are low confidence, DO NOT guess: ask the user to choose the correct entity_id from a short numbered list.
 2. If unsure about the entity type, call get_entity_state to verify the domain and attributes.
 3. Build the automation with COMPLETE and CORRECT trigger/condition/action:
    - For time-based triggers use: {"platform": "time", "at": "HH:MM:SS"}
@@ -119,12 +120,12 @@ CRITICAL WORKFLOW - follow these steps IN ORDER:
    - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
 4. BEFORE creating, show the user the COMPLETE YAML of the automation in a ```yaml code block.
     Verify the entity_ids are correct.
-    - If you are NOT 100% sure which entity is the right one, ask the user to pick: "Quale dispositivo intendi? Rispondi con il numero o con l'entity_id".
-    - Only when the entity_id is clearly confirmed, ask: "Ho trovato questi sensori/dispositivi. Confermi la creazione? (sì/no)"
+    - If you are NOT 100% sure which entity is the right one, ask the user to pick from a numbered list.
+    - Only when the entity_id is clearly confirmed, ask for confirmation to create.
 5. WAIT FOR USER TO CONFIRM - DO NOT call create_automation until user confirms.
 6. Only AFTER confirmation, call create_automation ONCE with the complete config (alias, trigger, action, condition, mode).
 NEVER create an automation with empty trigger or action arrays.
-Respond in the user's language. Be concise.""",
+ALWAYS respond in the user's language. Be concise.""",
 
     "create_script": """You are a Home Assistant script builder. The user wants to create a NEW script.
 CRITICAL WORKFLOW:
@@ -135,25 +136,25 @@ CRITICAL WORKFLOW:
 3. BEFORE creating, show the user the COMPLETE YAML of the script in a ```yaml code block.
     Verify the entity_ids are correct.
     - If you are NOT 100% sure which entity is correct (low-confidence search results), ask the user to pick the entity_id first.
-    - Only when confirmed, ask: "Confermi la creazione di questo script? (sì/no)"
+    - Only when confirmed, ask for confirmation to create the script.
 4. WAIT FOR USER TO CONFIRM - DO NOT call create_script until user confirms.
 5. Only AFTER confirmation, call create_script ONCE with script_id, alias, sequence, and mode.
 NEVER create a script with empty sequence.
-Respond in the user's language. Be concise.""",
+ALWAYS respond in the user's language. Be concise.""",
 
     "control_device": """You are a Home Assistant device controller. Help the user control their devices.
 Use search_entities to find entities if needed, then call_service to control them.
-Respond in the user's language. Be concise. Maximum 2 tool calls.""",
+ALWAYS respond in the user's language. Be concise. Maximum 2 tool calls.""",
 
     "query_state": None,  # Will be generated dynamically with language instruction
 
     "delete": """You are a Home Assistant deletion assistant. User wants to delete an automation, script, or dashboard.
 CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
-1. FIRST, identify what will be deleted: "Vuoi eliminare: [NAME] (id: [ID]). Questa azione è IRREVERSIBILE."
-2. ASK FOR EXPLICIT CONFIRMATION: "Digita 'elimina' per confermare l'eliminazione di [NAME], altrimenti digita 'no'"
-3. WAIT FOR CONFIRMATION - DO NOT call delete_automation/delete_script/delete_dashboard until user types "elimina"
-4. Only AFTER explicit confirmation, call the appropriate delete tool
-- Respond in the user's language. Be concise.
+1. FIRST, identify what will be deleted: name, id, and warn that this action is IRREVERSIBLE.
+2. ASK FOR EXPLICIT CONFIRMATION: ask the user to type a confirmation word to proceed.
+3. WAIT FOR CONFIRMATION - DO NOT call delete_automation/delete_script/delete_dashboard until user explicitly confirms.
+4. Only AFTER explicit confirmation, call the appropriate delete tool.
+- ALWAYS respond in the user's language. Be concise.
 - NEVER auto-confirm deletions. Deletions are IRREVERSIBLE.""",
 
     "helpers": """You are a Home Assistant helper manager. The user wants to create, modify, delete, or list helpers.
@@ -164,11 +165,11 @@ WORKFLOW:
    a. Use search_entities if needed to check if a similar helper already exists.
    b. Build the helper config (name, icon, type-specific fields).
    c. Show the user the complete YAML/config BEFORE creating.
-   d. ASK FOR CONFIRMATION: "Confermi la creazione di questo helper? (si/no)"
+   d. ASK FOR CONFIRMATION before creating. Wait for the user to confirm.
    e. Only AFTER confirmation, call manage_helpers with action="create".
 3. If modifying: show what will change, ask confirmation, then call manage_helpers with action="update".
 4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
-- Respond in the user's language. Be concise.""",
+- ALWAYS respond in the user's language. Be concise.""",
 
     "create_dashboard": """You are a Home Assistant Lovelace dashboard builder. The user wants a NEW dashboard with cards.
 MANDATORY STEPS - follow this EXACT order:
@@ -344,7 +345,7 @@ def _format_query_state_answer(entity_id: str, state_data: dict) -> str:
 
 # ---- Intent detection ----
 
-def detect_intent(user_message: str, smart_context: str) -> dict:
+def detect_intent(user_message: str, smart_context: str, previous_intent: str | None = None) -> dict:
     """Detect user intent locally from the message and available context.
     Uses multilingual keywords from keywords.json based on LANGUAGE setting.
     Returns: {"intent": str, "tools": list[str], "prompt": str|None, "specific_target": bool}
@@ -354,6 +355,40 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
     _init_dynamic_prompts()
 
     msg = user_message.lower()
+
+    # --- CONFIRMATION CONTINUITY ---
+    # Short confirmation replies ("si", "sì", "yes", "ok") should carry forward the previous intent
+    # so the model stays in the same focused mode (e.g. config_edit with confirmation prompt)
+    # Build confirmation words from all languages in keywords.json
+    confirm_words = set()
+    for lang_data in api.KEYWORDS.values():
+        confirm_words.update(lang_data.get("confirm", []))
+    stripped = msg.strip().rstrip("!?.,;:")
+    if previous_intent and previous_intent not in ("generic", "chat") and stripped in confirm_words:
+        intent_key = previous_intent
+        if intent_key in INTENT_TOOL_SETS:
+            logger.info(f"Confirmation detected ('{stripped}') — carrying forward intent: {intent_key}")
+            return {"intent": intent_key, "tools": INTENT_TOOL_SETS[intent_key],
+                    "prompt": INTENT_PROMPTS.get(intent_key), "specific_target": False}
+
+    # --- FOLLOW-UP CONTINUITY ---
+    # If previous intent was specific and current message is a follow-up instruction
+    # (e.g. "modificala", "usa le stesse entità", "aggiungi un grafico"),
+    # carry forward the intent. This handles multi-turn conversations.
+    FOLLOW_UP_INTENTS = {"create_html_dashboard", "create_dashboard", "config_edit",
+                         "modify_automation", "modify_script", "modify_dashboard"}
+    if previous_intent and previous_intent in FOLLOW_UP_INTENTS:
+        # Check if message looks like a follow-up (modify, use same, add, etc.)
+        follow_up_signals = ["modifica", "modificala", "modificalo", "cambia", "aggiungi",
+                             "inserisci", "togli", "rimuovi", "usa le stess", "stesse entit",
+                             "stessi sensor", "gli stessi", "le stesse", "modify it", "change it",
+                             "add", "remove", "use the same", "same entities", "same sensors",
+                             "modifie", "change", "ajoute", "utilise les même",
+                             "modifica", "cambia", "añade", "usa los mismos"]
+        if any(s in msg for s in follow_up_signals):
+            logger.info(f"Follow-up detected — carrying forward intent: {previous_intent}")
+            return {"intent": previous_intent, "tools": INTENT_TOOL_SETS[previous_intent],
+                    "prompt": INTENT_PROMPTS.get(previous_intent), "specific_target": False}
 
     # Get keywords for current language, fallback to English if not available
     lang_keywords = api.KEYWORDS.get(api.LANGUAGE, api.KEYWORDS.get("en", {}))
@@ -393,7 +428,7 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
 
     if has_modify and (has_auto or has_specific_auto or looks_like_schedule_change):
         return {"intent": "modify_automation", "tools": INTENT_TOOL_SETS["modify_automation"],
-                "prompt": INTENT_PROMPTS["modify_automation"] + "\n\nIMPORTANT: Before calling update_automation, show the user the COMPLETE YAML of the proposed changes in a ```yaml code block. Then ask for explicit confirmation: 'Confermi che devo fare questa modifica? (sì/no)'", "specific_target": has_specific_auto}
+                "prompt": INTENT_PROMPTS["modify_automation"], "specific_target": has_specific_auto}
 
     # --- MODIFY SCRIPT ---
     has_script = any(k in msg for k in script_kw)
@@ -442,7 +477,8 @@ def detect_intent(user_message: str, smart_context: str) -> dict:
                      "interattiv", "realtime", "live", "responsive", "app", "custom css",
                      "custom design", "framework", "personal", "creativ",
                      "pannello web", "pagina web", "pagina live", "pannello live",
-                     "plancia", "bento"]
+                     "plancia", "bento", "chart", "grafic", "torta", "pie chart",
+                     "bar chart", "line chart", "donut", "gauge"]
     has_html_dash = any(k in msg for k in html_keywords)
 
     # Also detect references to existing HTML dashboards by name or path
@@ -729,7 +765,7 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
                                 script_yaml = yaml.dump({sid: sconfig}, default_flow_style=False, allow_unicode=True)
                                 if len(script_yaml) > 6000:
                                     script_yaml = script_yaml[:6000] + "\n... [TRUNCATED]"
-                                context_parts.append(f"## YAML SCRIPT TROVATO: \"{sconfig.get('alias', sid)}\" (id: {sid})\n```yaml\n{script_yaml}```\nPer modificarlo usa update_script con script_id='{sid}' e i campi da cambiare.")
+                                context_parts.append(api.tr("smart_context_script_found", alias=sconfig.get('alias', sid), sid=sid, yaml=script_yaml))
                                 break
                 except Exception:
                     pass

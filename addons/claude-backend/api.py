@@ -493,7 +493,56 @@ LANGUAGE_TEXT = {
         "status_executing_tool": "{provider}: running tool {tool}...",
         "status_rate_limit_wait": "{provider}: rate limit reached, waiting..."
         ,
-        "status_rate_limit_wait_seconds": "{provider}: rate limit, waiting {seconds}s..."
+        "status_rate_limit_wait_seconds": "{provider}: rate limit, waiting {seconds}s...",
+
+        "err_api_key_not_configured": "⚠️ API key for {provider_name} not configured. Set it in the add-on settings.",
+        "err_provider_not_supported": "❌ Provider '{provider}' not supported. Choose: anthropic, openai, google, nvidia, github.",
+        "err_provider_generic": "❌ Error {provider_name}: {error}",
+        "err_api_key_not_configured_short": "API key not configured",
+        "err_invalid_image_format": "Invalid image format",
+        "err_nvidia_api_key": "NVIDIA API key not configured.",
+        "err_nvidia_model_invalid": "Invalid NVIDIA model.",
+        "err_nvidia_model_removed": "NVIDIA model {reason}: {model_id}. Removed from model list.",
+
+        "status_image_processing": "Processing image...",
+        "status_context_preloaded": "Context preloaded...",
+        "status_nvidia_model_removed": "⚠️ NVIDIA model not available (404). Removed from model list.",
+        "status_tool_repair_retry": "Repaired tool state, retrying...",
+        "status_token_params_retry": "Token parameters incompatible with model, retrying.",
+        "status_github_format_retry": "GitHub model not recognized, retrying with alternative format.",
+        "status_github_model_fallback": "Model not available on GitHub, switching to GPT-4o.",
+        "status_rate_limit_waiting": "Rate limit reached, waiting...",
+        "status_prompt_too_large": "Selected model has a low limit (prompt too large). Reducing context and retrying...",
+        "status_user_cancelled": "Cancelled by user.",
+
+        "write_op_success": "✅ Operation completed successfully!",
+        "write_no_changes": "\nNo changes detected (content is identical).",
+        "write_yaml_updated": "\n**Updated YAML:**",
+        "write_yaml_created": "\n**Created YAML:**",
+        "write_snapshot_created": "\n💾 Snapshot created: `{snapshot_id}`",
+
+        "intent_modify_automation": "Modify automation",
+        "intent_modify_script": "Modify script",
+        "intent_create_automation": "Create automation",
+        "intent_create_script": "Create script",
+        "intent_create_dashboard": "Create dashboard",
+        "intent_modify_dashboard": "Modify dashboard",
+        "intent_control_device": "Device control",
+        "intent_query_state": "Device state",
+        "intent_query_history": "Data history",
+        "intent_delete": "Delete",
+        "intent_config_edit": "Edit configuration",
+        "intent_areas": "Room management",
+        "intent_notifications": "Notification",
+        "intent_helpers": "Helper management",
+        "intent_chat": "Chat",
+        "intent_generic": "Analyzing request",
+        "intent_default": "Processing",
+
+        "read_only_note": "**Read-only mode — no files were modified.**",
+
+        "smart_context_script_found": "## YAML SCRIPT FOUND: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nTo modify it use update_script with script_id='{sid}' and the fields to change.",
+        "read_only_instruction": "READ-ONLY MODE: Show the user the complete YAML code in a yaml code block. At the end add the note: "
     },
     "it": {
         "before": "Prima",
@@ -520,7 +569,56 @@ LANGUAGE_TEXT = {
         "status_executing_tool": "{provider}: eseguo tool {tool}...",
         "status_rate_limit_wait": "{provider}: rate limit raggiunto, attendo..."
         ,
-        "status_rate_limit_wait_seconds": "{provider}: rate limit, attendo {seconds}s..."
+        "status_rate_limit_wait_seconds": "{provider}: rate limit, attendo {seconds}s...",
+
+        "err_api_key_not_configured": "⚠️ Chiave API per {provider_name} non configurata. Impostala nelle impostazioni dell'add-on.",
+        "err_provider_not_supported": "❌ Provider '{provider}' non supportato. Scegli: anthropic, openai, google, nvidia, github.",
+        "err_provider_generic": "❌ Errore {provider_name}: {error}",
+        "err_api_key_not_configured_short": "API key non configurata",
+        "err_invalid_image_format": "Formato immagine non valido",
+        "err_nvidia_api_key": "NVIDIA API key non configurata.",
+        "err_nvidia_model_invalid": "Modello NVIDIA non valido.",
+        "err_nvidia_model_removed": "Modello NVIDIA {reason}: {model_id}. Rimosso dalla lista.",
+
+        "status_image_processing": "Elaborazione immagine...",
+        "status_context_preloaded": "Contesto pre-caricato...",
+        "status_nvidia_model_removed": "⚠️ Modello NVIDIA non disponibile (404). Rimosso dalla lista modelli.",
+        "status_tool_repair_retry": "Ho riparato lo stato dei tool, riprovo...",
+        "status_token_params_retry": "Parametri token non compatibili col modello, riprovo.",
+        "status_github_format_retry": "Modello GitHub non riconosciuto, riprovo con formato alternativo.",
+        "status_github_model_fallback": "Modello non disponibile su GitHub, passo a GPT-4o.",
+        "status_rate_limit_waiting": "Rate limit raggiunto, attendo...",
+        "status_prompt_too_large": "Il modello selezionato ha un limite basso (prompt troppo grande). Riduco il contesto e riprovo...",
+        "status_user_cancelled": "Interrotto dall'utente.",
+
+        "write_op_success": "✅ Operazione completata con successo!",
+        "write_no_changes": "\nNessuna modifica rilevata (il contenuto è identico).",
+        "write_yaml_updated": "\n**YAML aggiornato:**",
+        "write_yaml_created": "\n**YAML creato:**",
+        "write_snapshot_created": "\n💾 Snapshot creato: `{snapshot_id}`",
+
+        "intent_modify_automation": "Modifica automazione",
+        "intent_modify_script": "Modifica script",
+        "intent_create_automation": "Crea automazione",
+        "intent_create_script": "Crea script",
+        "intent_create_dashboard": "Crea dashboard",
+        "intent_modify_dashboard": "Modifica dashboard",
+        "intent_control_device": "Controllo dispositivo",
+        "intent_query_state": "Stato dispositivo",
+        "intent_query_history": "Storico dati",
+        "intent_delete": "Eliminazione",
+        "intent_config_edit": "Modifica configurazione",
+        "intent_areas": "Gestione stanze",
+        "intent_notifications": "Notifica",
+        "intent_helpers": "Gestione helper",
+        "intent_chat": "Chat",
+        "intent_generic": "Analisi richiesta",
+        "intent_default": "Elaboro",
+
+        "read_only_note": "**Modalità sola lettura - nessun file è stato modificato.**",
+
+        "smart_context_script_found": "## YAML SCRIPT TROVATO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPer modificarlo usa update_script con script_id='{sid}' e i campi da cambiare.",
+        "read_only_instruction": "MODALITA SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. Alla fine aggiungi la nota: "
     },
     "es": {
         "before": "Antes",
@@ -547,7 +645,56 @@ LANGUAGE_TEXT = {
         "status_executing_tool": "{provider}: ejecutando herramienta {tool}...",
         "status_rate_limit_wait": "{provider}: límite de tasa alcanzado, esperando..."
         ,
-        "status_rate_limit_wait_seconds": "{provider}: límite de tasa, esperando {seconds}s..."
+        "status_rate_limit_wait_seconds": "{provider}: límite de tasa, esperando {seconds}s...",
+
+        "err_api_key_not_configured": "⚠️ Clave API para {provider_name} no configurada. Configúrala en los ajustes del add-on.",
+        "err_provider_not_supported": "❌ Proveedor '{provider}' no soportado. Elige: anthropic, openai, google, nvidia, github.",
+        "err_provider_generic": "❌ Error {provider_name}: {error}",
+        "err_api_key_not_configured_short": "Clave API no configurada",
+        "err_invalid_image_format": "Formato de imagen no válido",
+        "err_nvidia_api_key": "Clave API NVIDIA no configurada.",
+        "err_nvidia_model_invalid": "Modelo NVIDIA no válido.",
+        "err_nvidia_model_removed": "Modelo NVIDIA {reason}: {model_id}. Eliminado de la lista.",
+
+        "status_image_processing": "Procesando imagen...",
+        "status_context_preloaded": "Contexto precargado...",
+        "status_nvidia_model_removed": "⚠️ Modelo NVIDIA no disponible (404). Eliminado de la lista de modelos.",
+        "status_tool_repair_retry": "Estado de herramientas reparado, reintentando...",
+        "status_token_params_retry": "Parámetros de token incompatibles con el modelo, reintentando.",
+        "status_github_format_retry": "Modelo GitHub no reconocido, reintentando con formato alternativo.",
+        "status_github_model_fallback": "Modelo no disponible en GitHub, cambiando a GPT-4o.",
+        "status_rate_limit_waiting": "Límite de tasa alcanzado, esperando...",
+        "status_prompt_too_large": "El modelo seleccionado tiene un límite bajo (prompt demasiado grande). Reduciendo contexto y reintentando...",
+        "status_user_cancelled": "Cancelado por el usuario.",
+
+        "write_op_success": "✅ ¡Operación completada con éxito!",
+        "write_no_changes": "\nNo se detectaron cambios (el contenido es idéntico).",
+        "write_yaml_updated": "\n**YAML actualizado:**",
+        "write_yaml_created": "\n**YAML creado:**",
+        "write_snapshot_created": "\n💾 Snapshot creado: `{snapshot_id}`",
+
+        "intent_modify_automation": "Modificar automatización",
+        "intent_modify_script": "Modificar script",
+        "intent_create_automation": "Crear automatización",
+        "intent_create_script": "Crear script",
+        "intent_create_dashboard": "Crear dashboard",
+        "intent_modify_dashboard": "Modificar dashboard",
+        "intent_control_device": "Control de dispositivo",
+        "intent_query_state": "Estado del dispositivo",
+        "intent_query_history": "Historial de datos",
+        "intent_delete": "Eliminación",
+        "intent_config_edit": "Editar configuración",
+        "intent_areas": "Gestión de habitaciones",
+        "intent_notifications": "Notificación",
+        "intent_helpers": "Gestión de helpers",
+        "intent_chat": "Chat",
+        "intent_generic": "Analizando solicitud",
+        "intent_default": "Procesando",
+
+        "read_only_note": "**Modo solo lectura — no se modificaron archivos.**",
+
+        "smart_context_script_found": "## YAML SCRIPT ENCONTRADO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPara modificarlo usa update_script con script_id='{sid}' y los campos a cambiar.",
+        "read_only_instruction": "MODO SOLO LECTURA: Muestra al usuario el código YAML completo en un code block yaml. Al final añade la nota: "
     },
     "fr": {
         "before": "Avant",
@@ -574,7 +721,56 @@ LANGUAGE_TEXT = {
         "status_executing_tool": "{provider} : exécution de l’outil {tool}...",
         "status_rate_limit_wait": "{provider} : limite de débit atteinte, attente..."
         ,
-        "status_rate_limit_wait_seconds": "{provider} : limite de débit, attente {seconds}s..."
+        "status_rate_limit_wait_seconds": "{provider} : limite de débit, attente {seconds}s...",
+
+        "err_api_key_not_configured": "⚠️ Clé API pour {provider_name} non configurée. Configurez-la dans les paramètres de l'add-on.",
+        "err_provider_not_supported": "❌ Fournisseur '{provider}' non pris en charge. Choisissez : anthropic, openai, google, nvidia, github.",
+        "err_provider_generic": "❌ Erreur {provider_name} : {error}",
+        "err_api_key_not_configured_short": "Clé API non configurée",
+        "err_invalid_image_format": "Format d'image non valide",
+        "err_nvidia_api_key": "Clé API NVIDIA non configurée.",
+        "err_nvidia_model_invalid": "Modèle NVIDIA non valide.",
+        "err_nvidia_model_removed": "Modèle NVIDIA {reason} : {model_id}. Retiré de la liste.",
+
+        "status_image_processing": "Traitement de l'image...",
+        "status_context_preloaded": "Contexte préchargé...",
+        "status_nvidia_model_removed": "⚠️ Modèle NVIDIA non disponible (404). Retiré de la liste des modèles.",
+        "status_tool_repair_retry": "État des outils réparé, nouvelle tentative...",
+        "status_token_params_retry": "Paramètres de token incompatibles avec le modèle, nouvelle tentative.",
+        "status_github_format_retry": "Modèle GitHub non reconnu, nouvelle tentative avec format alternatif.",
+        "status_github_model_fallback": "Modèle non disponible sur GitHub, passage à GPT-4o.",
+        "status_rate_limit_waiting": "Limite de débit atteinte, en attente...",
+        "status_prompt_too_large": "Le modèle sélectionné a une limite basse (prompt trop grand). Réduction du contexte et nouvelle tentative...",
+        "status_user_cancelled": "Annulé par l'utilisateur.",
+
+        "write_op_success": "✅ Opération terminée avec succès !",
+        "write_no_changes": "\nAucune modification détectée (le contenu est identique).",
+        "write_yaml_updated": "\n**YAML mis à jour :**",
+        "write_yaml_created": "\n**YAML créé :**",
+        "write_snapshot_created": "\n💾 Snapshot créé : `{snapshot_id}`",
+
+        "intent_modify_automation": "Modifier automatisation",
+        "intent_modify_script": "Modifier script",
+        "intent_create_automation": "Créer automatisation",
+        "intent_create_script": "Créer script",
+        "intent_create_dashboard": "Créer dashboard",
+        "intent_modify_dashboard": "Modifier dashboard",
+        "intent_control_device": "Contrôle appareil",
+        "intent_query_state": "État appareil",
+        "intent_query_history": "Historique données",
+        "intent_delete": "Suppression",
+        "intent_config_edit": "Modifier configuration",
+        "intent_areas": "Gestion des pièces",
+        "intent_notifications": "Notification",
+        "intent_helpers": "Gestion des helpers",
+        "intent_chat": "Chat",
+        "intent_generic": "Analyse de la demande",
+        "intent_default": "Traitement",
+
+        "read_only_note": "**Mode lecture seule — aucun fichier n'a été modifié.**",
+
+        "smart_context_script_found": "## YAML SCRIPT TROUVÉ : \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPour le modifier, utilisez update_script avec script_id='{sid}' et les champs à modifier.",
+        "read_only_instruction": "MODE LECTURE SEULE : Montrez à l'utilisateur le code YAML complet dans un code block yaml. À la fin, ajoutez la note : "
     }
 }
 
@@ -1280,6 +1476,9 @@ abort_streams: Dict[str, bool] = {}
 
 # Read-only mode per session
 read_only_sessions: Dict[str, bool] = {}
+
+# Last intent per session (for confirmation continuity)
+session_last_intent: Dict[str, str] = {}
 
 # Current session ID for thread-safe access in execute_tool (Flask sync workers)
 current_session_id: str = "default"
@@ -2060,7 +2259,7 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
     """Send a message to the configured AI provider with HA tools."""
     if not ai_client:
         provider_name = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("name", AI_PROVIDER)
-        return f"\u26a0\ufe0f Chiave API per {provider_name} non configurata. Impostala nelle impostazioni dell'add-on."
+        return tr("err_api_key_not_configured", provider_name=provider_name)
 
     if session_id not in conversations:
         conversations[session_id] = []
@@ -2080,7 +2279,7 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
         elif AI_PROVIDER == "github":
             final_text, messages = chat_openai(messages)  # Same format, different base_url
         else:
-            return f"\u274c Provider '{AI_PROVIDER}' non supportato. Scegli: anthropic, openai, google, nvidia, github."
+            return tr("err_provider_not_supported", provider=AI_PROVIDER)
 
         conversations[session_id] = messages
         conversations[session_id].append({"role": "assistant", "content": final_text})
@@ -2091,7 +2290,7 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
 
     except Exception as e:
         logger.error(f"AI error ({AI_PROVIDER}): {e}")
-        return f"\u274c Errore {PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get('name', AI_PROVIDER)}: {str(e)}"
+        return tr("err_provider_generic", provider_name=PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get('name', AI_PROVIDER), error=str(e))
 
 
 # ---- Streaming chat ----
@@ -2179,7 +2378,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     if msg:
         parts.append(f"\u2705 {msg}")
     else:
-        parts.append("\u2705 Operazione completata con successo!")
+        parts.append(tr("write_op_success"))
 
     # Show diff for update tools (only for updates, not creates)
     old_yaml = result_data.get("old_yaml", "")
@@ -2193,15 +2392,15 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
             # Wrap in marker so chat_ui.formatMarkdown passes it through as raw HTML
             parts.append(f"\n<!--DIFF-->{diff_html}<!--/DIFF-->")
         else:
-            parts.append("\nNessuna modifica rilevata (il contenuto \u00e8 identico).")
+            parts.append(tr("write_no_changes"))
 
         # Also show the updated YAML (required by show_yaml_rule)
-        parts.append("\n**YAML aggiornato:**")
+        parts.append(tr("write_yaml_updated"))
         parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
 
     elif new_yaml and tool_name not in update_tools:
         # For CREATE operations, show the new YAML
-        parts.append("\n**YAML creato:**")
+        parts.append(tr("write_yaml_created"))
         parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
 
     tip = result_data.get("tip", "")
@@ -2216,7 +2415,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
         snapshot_id = snapshot.strip()
 
     if snapshot_id and snapshot_id != "N/A (REST API)":
-        parts.append(f"\n\U0001f4be Snapshot creato: `{snapshot_id}`")
+        parts.append(tr("write_snapshot_created", snapshot_id=snapshot_id))
 
     return "\n".join(parts)
 
@@ -2227,7 +2426,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     Uses LOCAL intent detection + smart context to minimize tokens sent to AI API."""
     global current_session_id
     if not ai_client:
-        yield {"type": "error", "message": "API key non configurata"}
+        yield {"type": "error", "message": tr("err_api_key_not_configured_short")}
         return
 
     # Store read-only state for this session (accessible by execute_tool)
@@ -2237,15 +2436,18 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     if session_id not in conversations:
         conversations[session_id] = []
 
+    # Get previous intent for confirmation continuity
+    prev_intent = session_last_intent.get(session_id)
+
     # Step 1: LOCAL intent detection FIRST (need this BEFORE building smart context)
     # We do a preliminary detect to know if user is creating or modifying
-    intent_info = intent.detect_intent(user_message, "")  # Empty context for first pass
+    intent_info = intent.detect_intent(user_message, "", previous_intent=prev_intent)  # Empty context for first pass
     intent_name = intent_info["intent"]
-    
+
     # Step 2: Build smart context NOW that we know the intent
     # If user is creating new automation/script, skip fuzzy matching to avoid false automation injection
     smart_context = intent.build_smart_context(user_message, intent=intent_name)
-    
+
     # Step 2.5: Inject memory context if enabled
     memory_context = ""
     if ENABLE_MEMORY and MEMORY_AVAILABLE:
@@ -2253,38 +2455,43 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         if memory_context:
             logger.info(f"Memory context injected for session {session_id}")
             smart_context = memory_context + "\n\n" + smart_context
-    
+
     # Step 3: Re-detect intent WITH full smart context for accuracy
-    intent_info = intent.detect_intent(user_message, smart_context)
+    intent_info = intent.detect_intent(user_message, smart_context, previous_intent=prev_intent)
     intent_name = intent_info["intent"]
+
+    # Store this intent for next message's confirmation continuity
+    session_last_intent[session_id] = intent_name
     tool_count = len(intent_info.get("tools") or [])
     all_tools_count = len(tools.HA_TOOLS_DESCRIPTION)
     logger.info(f"Intent detected: {intent_name} (specific_target={intent_info['specific_target']}, tools={tool_count if tool_count else all_tools_count})")
     
-    # Show intent to user
-    INTENT_LABELS = {
-        "modify_automation": "Modifica automazione",
-        "modify_script": "Modifica script",
-        "create_automation": "Crea automazione",
-        "create_script": "Crea script",
-        "create_dashboard": "Crea dashboard",
-        "modify_dashboard": "Modifica dashboard",
-        "control_device": "Controllo dispositivo",
-        "query_state": "Stato dispositivo",
-        "query_history": "Storico dati",
-        "delete": "Eliminazione",
-        "config_edit": "Modifica configurazione",
-        "areas": "Gestione stanze",
-        "notifications": "Notifica",
-        "helpers": "Gestione helper",
-        "chat": "Chat",
-        "generic": "Analisi richiesta",
+    # Show intent to user (translated)
+    INTENT_KEYS = {
+        "modify_automation": "intent_modify_automation",
+        "modify_script": "intent_modify_script",
+        "create_automation": "intent_create_automation",
+        "create_script": "intent_create_script",
+        "create_dashboard": "intent_create_dashboard",
+        "modify_dashboard": "intent_modify_dashboard",
+        "control_device": "intent_control_device",
+        "query_state": "intent_query_state",
+        "query_history": "intent_query_history",
+        "delete": "intent_delete",
+        "config_edit": "intent_config_edit",
+        "areas": "intent_areas",
+        "notifications": "intent_notifications",
+        "helpers": "intent_helpers",
+        "chat": "intent_chat",
+        "generic": "intent_generic",
     }
-    intent_label = INTENT_LABELS.get(intent_name, "Elaboro")
+    intent_key = INTENT_KEYS.get(intent_name, "intent_default")
+    intent_label = tr(intent_key)
     yield {"type": "status", "message": f"{intent_label}... ({tool_count if tool_count else all_tools_count} tools)"}
 
     # Inject read-only instruction into intent prompt if read-only mode is active
     if read_only and intent_info.get("prompt"):
+        read_only_note = tr("read_only_note")
         read_only_instruction = (
             "\n\nIMPORTANT - READ-ONLY MODE ACTIVE:\n"
             "The user has enabled read-only mode. You MUST NOT execute any write operations.\n"
@@ -2294,7 +2501,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             "manage_entity, manage_helpers), show the user the COMPLETE YAML/code they would need "
             "to manually insert or execute.\n"
             "Format the output as a code block with language 'yaml' so they can copy it.\n"
-            "At the end, add this note: **Modalit\u00e0 sola lettura - nessun file \u00e8 stato modificato.**\n"
+            f"At the end, add this note: {read_only_note}\n"
             "You CAN still use read-only tools (get_entities, search_entities, get_entity_state, "
             "get_automations, get_scripts, get_dashboards, etc.) to gather information."
         )
@@ -2305,7 +2512,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Parse image data
         media_type, base64_data = parse_image_data(image_data)
         if not media_type or not base64_data:
-            yield {"type": "error", "message": "Formato immagine non valido"}
+            yield {"type": "error", "message": tr("err_invalid_image_format")}
             return
 
         # Save original message with image (without context text)
@@ -2323,9 +2530,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Build enriched version for API (with context)
         if smart_context:
             if intent_info["specific_target"]:
-                text_content = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+                text_content = f"{user_message}\n\n---\nDATA:\n{smart_context}"
             else:
-                text_content = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
+                text_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
         else:
             text_content = user_message
 
@@ -2339,7 +2546,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             api_content = text_content
 
         logger.info(f"Message with image: {text_content[:50]}... (media_type: {media_type})")
-        yield {"type": "status", "message": "Elaborazione immagine..."}
+        yield {"type": "status", "message": tr("status_image_processing")}
     else:
         # No image - save original message
         conversations[session_id].append({"role": "user", "content": user_message})
@@ -2347,13 +2554,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Build enriched version for API (with context)
         if smart_context:
             if intent_info["specific_target"]:
-                api_content = f"{user_message}\n\n---\nDATI:\n{smart_context}"
+                api_content = f"{user_message}\n\n---\nDATA:\n{smart_context}"
             else:
-                api_content = f"{user_message}\n\n---\nCONTESTO:\n{smart_context}\n---\nNON richiedere dati già presenti sopra. UNA sola chiamata tool, poi rispondi."
+                api_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
             # Log estimated token count
             est_tokens = len(api_content) // 4  # ~4 chars per token
             logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
-            yield {"type": "status", "message": "Contesto pre-caricato..."}
+            yield {"type": "status", "message": tr("status_context_preloaded")}
         else:
             api_content = user_message
 
@@ -2433,7 +2640,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     conversations[session_id].append(msg)
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
-            yield from providers_google.stream_chat_google(clean_messages)
+            yield from providers_google.stream_chat_google(clean_messages, intent_info=intent_info)
             # Sync ONLY new assistant messages (skip the enriched user message we created)
             for msg in clean_messages[conv_length_before:]:
                 if msg.get("role") == "assistant":
@@ -2441,7 +2648,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     msg["provider"] = AI_PROVIDER
                     conversations[session_id].append(msg)
         else:
-            yield {"type": "error", "message": f"Provider '{AI_PROVIDER}' non supportato"}
+            yield {"type": "error", "message": tr("err_provider_not_supported", provider=AI_PROVIDER)}
             return
 
         # Trim and save
@@ -2995,6 +3202,7 @@ def api_conversation_delete(session_id):
     if session_id in conversations:
         del conversations[session_id]
         save_conversations()
+    session_last_intent.pop(session_id, None)
     return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
 
 @app.route('/api/get_models', methods=['GET'])
@@ -3121,11 +3329,11 @@ def api_nvidia_test_model():
     If the model returns 404 (not available) or 400 (not chat-compatible), it is blocklisted.
     """
     if not NVIDIA_API_KEY:
-        return jsonify({"success": False, "error": "NVIDIA API key non configurata."}), 400
+        return jsonify({"success": False, "error": tr("err_nvidia_api_key")}), 400
 
     model_id = get_active_model()
     if not isinstance(model_id, str) or not model_id.strip():
-        return jsonify({"success": False, "error": "Modello NVIDIA non valido."}), 400
+        return jsonify({"success": False, "error": tr("err_nvidia_model_invalid")}), 400
 
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
     headers = {
@@ -3147,16 +3355,16 @@ def api_nvidia_test_model():
             if resp.status_code in (404, 400, 422):
                 blocklist_nvidia_model(model_id)
                 if resp.status_code == 404:
-                    reason = "non disponibile (404)"
+                    reason = "not available (404)"
                 elif resp.status_code == 400:
-                    reason = "non compatibile con chat (400)"
+                    reason = "not chat-compatible (400)"
                 else:
-                    reason = "non compatibile con chat (422)"
+                    reason = "not chat-compatible (422)"
                 return jsonify({
                     "success": False,
                     "blocklisted": True,
                     "model": model_id,
-                    "message": f"Modello NVIDIA {reason}: {model_id}. Rimosso dalla lista.",
+                    "message": tr("err_nvidia_model_removed", reason=reason, model_id=model_id),
                 }), 200
 
             return jsonify({
@@ -3192,7 +3400,7 @@ def api_nvidia_test_models():
     and rate-limit issues. Users can run it again to continue.
     """
     if not NVIDIA_API_KEY:
-        return jsonify({"success": False, "error": "NVIDIA API key non configurata."}), 400
+        return jsonify({"success": False, "error": tr("err_nvidia_api_key")}), 400
 
     body = request.get_json(silent=True) or {}
     try:
@@ -3528,25 +3736,29 @@ def upload_document():
         )
         
         # Auto-index in RAG if available AND enabled
+        rag_indexed = False
         if RAG_AVAILABLE and ENABLE_RAG:
-            doc_info = file_upload.get_document(doc_id)
-            if doc_info:
-                rag.index_document(
-                    doc_id,
-                    doc_info.get("content", ""),
-                    {
-                        "filename": doc_info.get("filename"),
-                        "uploaded_at": doc_info.get("uploaded_at"),
-                        "tags": doc_info.get("tags", []),
-                        "note": doc_info.get("note")
-                    }
-                )
+            try:
+                doc_info = file_upload.get_document(doc_id)
+                if doc_info:
+                    rag_indexed = rag.index_document(
+                        doc_id,
+                        doc_info.get("content", ""),
+                        {
+                            "filename": doc_info.get("filename"),
+                            "uploaded_at": doc_info.get("uploaded_at"),
+                            "tags": doc_info.get("tags", []),
+                            "note": doc_info.get("note")
+                        }
+                    )
+            except Exception as e:
+                logger.error(f"RAG indexing failed (non-fatal): {e}")
         
         return jsonify({
             "status": "uploaded",
             "doc_id": doc_id,
             "filename": file.filename,
-            "indexed_in_rag": RAG_AVAILABLE
+            "indexed_in_rag": rag_indexed
         }), 201
         
     except Exception as e:

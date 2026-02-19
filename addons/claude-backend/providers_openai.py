@@ -802,7 +802,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 if bad_model:
                     api.blocklist_nvidia_model(bad_model)
                 logger.warning(f"NVIDIA model not available (404): {bad_model}")
-                yield {"type": "status", "message": "⚠️ Modello NVIDIA non disponibile (404). L'ho rimosso dalla lista modelli."}
+                yield {"type": "status", "message": api.tr("status_nvidia_model_removed")}
                 error_msg_text = f"NVIDIA: modello non disponibile: {bad_model or 'unknown'}"
                 messages.append({"role": "assistant", "content": error_msg_text})
                 yield {"type": "clear"}
@@ -963,7 +963,7 @@ def stream_chat_openai(messages, intent_info=None):
             if "tool_calls" in error_msg and "must be followed by tool messages" in error_msg:
                 if _repair_tool_call_sequence(messages):
                     logger.warning("Repaired dangling tool_calls in history; retrying request once.")
-                    yield {"type": "status", "message": "Ho riparato lo stato dei tool, riprovo..."}
+                    yield {"type": "status", "message": api.tr("status_tool_repair_retry")}
                     response = api.ai_client.chat.completions.create(**kwargs)
                 else:
                     raise
@@ -973,7 +973,7 @@ def stream_chat_openai(messages, intent_info=None):
                 try:
                     retry = _retry_with_swapped_max_token_param(kwargs, max_tok, api_err)
                     if retry is not None:
-                        yield {"type": "status", "message": "Parametri token non compatibili col modello, riprovo."}
+                        yield {"type": "status", "message": api.tr("status_token_params_retry")}
                         response = retry
                     else:
                         raise
@@ -992,7 +992,7 @@ def stream_chat_openai(messages, intent_info=None):
                         continue
                     try:
                         logger.warning(f"GitHub unknown_model for {bad_model}. Retrying with model={candidate}.")
-                        yield {"type": "status", "message": "Modello GitHub non riconosciuto, riprovo con formato alternativo."}
+                        yield {"type": "status", "message": api.tr("status_github_format_retry")}
                         kwargs["model"] = candidate
                         response = api.ai_client.chat.completions.create(**kwargs)
                         break
@@ -1012,7 +1012,7 @@ def stream_chat_openai(messages, intent_info=None):
                             continue
                         try:
                             logger.warning(f"GitHub unknown_model: {bad_model}. Falling back to {fallback_model}.")
-                            yield {"type": "status", "message": "Modello non disponibile su GitHub, passo a GPT-4o."}
+                            yield {"type": "status", "message": api.tr("status_github_model_fallback")}
                             kwargs["model"] = fallback_model
                             response = api.ai_client.chat.completions.create(**kwargs)
                             break
@@ -1025,14 +1025,14 @@ def stream_chat_openai(messages, intent_info=None):
             # FIX: Handle 429 rate limit errors with backoff (without matching 'integrate')
             elif _is_rate_limit_error(api_err, error_msg):
                 logger.warning(f"Rate limit hit at round {round_num+1}: {error_msg}")
-                yield {"type": "status", "message": "Rate limit raggiunto, attendo..."}
+                yield {"type": "status", "message": api.tr("status_rate_limit_waiting")}
                 time.sleep(10)
                 continue  # Retry this round
             # Handle small-model prompt limits (e.g., GitHub o4-mini max request size)
             elif api.AI_PROVIDER == "github" and _is_request_too_large_error(api_err, error_msg) and not did_size_retry:
                 did_size_retry = True
                 logger.warning(f"Prompt too large for GitHub model={kwargs.get('model')}: {error_msg}")
-                yield {"type": "status", "message": "Il modello selezionato ha un limite basso (prompt troppo grande). Riduco il contesto e riprovo..."}
+                yield {"type": "status", "message": api.tr("status_prompt_too_large")}
                 if _shrink_messages_for_small_limit(messages):
                     oai_messages = [{"role": "system", "content": system_prompt}] + intent.trim_messages(messages)
                     kwargs["messages"] = oai_messages
@@ -1160,7 +1160,12 @@ def stream_chat_openai(messages, intent_info=None):
             logger.info(f"OpenAI: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
 
             # Truncate large results to prevent token overflow
-            max_len = 3000 if api.AI_PROVIDER == "github" else 8000
+            # Read tools get higher limit so model can see full file content
+            READ_TOOLS = {"read_config_file", "get_entity_details", "get_entity_history"}
+            if api.AI_PROVIDER == "github":
+                max_len = 6000 if fn_name in READ_TOOLS else 3000
+            else:
+                max_len = 20000 if fn_name in READ_TOOLS else 8000
             if len(result) > max_len:
                 result = result[:max_len] + '\n... [TRUNCATED - ' + str(len(result)) + ' chars total]'
             messages.append({"role": "tool", "tool_call_id": tc["id"], "content": result})

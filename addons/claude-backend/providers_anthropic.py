@@ -80,7 +80,7 @@ def stream_chat_anthropic(messages, intent_info=None):
         # Check abort flag
         if api.abort_streams.get("default"):
             logger.info("Stream aborted by user")
-            yield {"type": "error", "message": "Interrotto dall'utente."}
+            yield {"type": "error", "message": api.tr("status_user_cancelled")}
             api.abort_streams["default"] = False
             break
         # Rate-limit prevention: delay between API calls (not on first round)
@@ -91,7 +91,7 @@ def stream_chat_anthropic(messages, intent_info=None):
             time.sleep(delay)
             if api.abort_streams.get("default"):
                 logger.info("Stream aborted by user during delay")
-                yield {"type": "error", "message": "Interrotto dall'utente."}
+                yield {"type": "error", "message": api.tr("status_user_cancelled")}
                 api.abort_streams["default"] = False
                 break
 

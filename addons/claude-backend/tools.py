@@ -1227,8 +1227,8 @@ def get_openai_tools():
     ]
 
 
-def get_gemini_tools():
-    """Convert tools to Google Gemini format."""
+def get_gemini_tools(intent_info: dict | None = None):
+    """Convert tools to Google Gemini format. If intent_info provided, filter to focused tools."""
     from intent import INTENT_TOOL_SETS
     from google.genai import types
 
@@ -1264,12 +1264,17 @@ def get_gemini_tools():
             return [_sanitize_gemini_schema(v) for v in obj]
         return obj
 
-    tools = HA_TOOLS_DESCRIPTION
+    # Start with all tools or filtered by intent
+    tool_names = intent_info.get("tools") if intent_info else None
+    if tool_names:
+        all_tools = [t for t in HA_TOOLS_DESCRIPTION if t["name"] in tool_names]
+    else:
+        all_tools = HA_TOOLS_DESCRIPTION
     if not api.ENABLE_FILE_ACCESS:
         config_edit_tools = set(INTENT_TOOL_SETS.get("config_edit", []))
-        tools = [t for t in tools if t["name"] not in config_edit_tools]
+        all_tools = [t for t in all_tools if t["name"] not in config_edit_tools]
     declarations = []
-    for t in tools:
+    for t in all_tools:
         declarations.append(
             types.FunctionDeclaration(
                 name=t["name"],
@@ -1305,8 +1310,7 @@ def _read_only_response(tool_name: str, tool_input: dict) -> str:
         "message": f"Read-only mode: '{tool_name}' was NOT executed.",
         "yaml_preview": yaml_output,
         "tool_name": tool_name,
-        "IMPORTANT": "MODALITA SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. "
-                     "Alla fine aggiungi la nota: **Modalit\u00e0 sola lettura - nessun file \u00e8 stato modificato.**"
+        "IMPORTANT": api.tr("read_only_instruction") + api.tr("read_only_note")
     }, ensure_ascii=False, default=str)
 
 
@@ -3426,10 +3430,10 @@ Use get_areas when the user refers to rooms.
 **CRITICAL - Delete/Modify Confirmation (ALWAYS REQUIRED):**
 BEFORE deleting or modifying ANY automation, script, or dashboard:
 1. **List all options**: Use get_automations, get_scripts, or get_dashboards to see all available items
-2. **Identify with certainty**: Match by exact alias/name - if the user says "rimuovi questa" (remove this one), look at the conversation context to identify which one was just created/discussed
+2. **Identify with certainty**: Match by exact alias/name - if the user says "remove this one", look at the conversation context to identify which one was just created/discussed
 3. **Show what you'll delete/modify**: Display the name/alias of the item you identified
-4. **ASK for confirmation**: "Vuoi eliminare l'automazione 'Nome Automazione'? Confermi?" (Do you want to delete automation 'Name'? Confirm?)
-5. **Wait for user response**: NEVER proceed without explicit "si"/"yes"/"conferma"/"ok" from the user
+4. **ASK for confirmation**: Ask the user to confirm the deletion (e.g. "Do you want to delete automation 'Name'? Confirm?")
+5. **Wait for user response**: NEVER proceed without explicit confirmation from the user
 6. **NEVER delete the wrong item**: If there's ANY doubt, ask the user to clarify which item they mean
 
 This is a DESTRUCTIVE operation - mistakes can delete important automations. ALWAYS confirm first.

@@ -6,6 +6,9 @@ import api
 
 def get_chat_ui():
     """Generate the chat UI with image upload support."""
+    agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+    agent_avatar = getattr(api, "AGENT_AVATAR", "🤖") or "🤖"
+
     provider_name = api.PROVIDER_DEFAULTS.get(api.AI_PROVIDER, {}).get("name", api.AI_PROVIDER)
     model_name = api.get_active_model()
     configured = bool(api.get_api_key())
@@ -54,7 +57,7 @@ def get_chat_ui():
 
     ui_messages = {
         "en": {
-            "welcome": "👋 Hi! I'm your AI assistant for Home Assistant.",
+            "welcome": f"{agent_avatar} Hi! I'm {agent_name}, your AI assistant for Home Assistant.",
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Model: <strong>{model_name}</strong>",
             "capabilities": "I can control devices, create automations, and manage your smart home.",
             "vision_feature": "<strong>🖼 New in v3.0:</strong> Now you can send me images!",
@@ -62,7 +65,7 @@ def get_chat_ui():
             "analyzing": analyzing_msg
         },
         "it": {
-            "welcome": "👋 Ciao! Sono il tuo assistente AI per Home Assistant.",
+            "welcome": f"{agent_avatar} Ciao! Sono {agent_name}, il tuo assistente AI per Home Assistant.",
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong>",
             "capabilities": "Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.",
             "vision_feature": "<strong>🖼 Novità v3.0:</strong> Ora puoi inviarmi immagini!",
@@ -70,7 +73,7 @@ def get_chat_ui():
             "analyzing": analyzing_msg
         },
         "es": {
-            "welcome": "👋 ¡Hola! Soy tu asistente AI para Home Assistant.",
+            "welcome": f"{agent_avatar} ¡Hola! Soy {agent_name}, tu asistente AI para Home Assistant.",
             "provider_model": f"Proveedor: <strong>{provider_name}</strong> | Modelo: <strong>{model_name}</strong>",
             "capabilities": "Puedo controlar dispositivos, crear automatizaciones y gestionar tu hogar inteligente.",
             "vision_feature": "<strong>🖼 Nuevo en v3.0:</strong> ¡Ahora puedes enviarme imágenes!",
@@ -78,7 +81,7 @@ def get_chat_ui():
             "analyzing": analyzing_msg
         },
         "fr": {
-            "welcome": "👋 Salut ! Je suis votre assistant IA pour Home Assistant.",
+            "welcome": f"{agent_avatar} Salut ! Je suis {agent_name}, votre assistant IA pour Home Assistant.",
             "provider_model": f"Fournisseur: <strong>{provider_name}</strong> | Modèle: <strong>{model_name}</strong>",
             "capabilities": "Je peux contrôler des appareils, créer des automatisations et gérer votre maison intelligente.",
             "vision_feature": "<strong>🖼 Nouveau dans v3.0:</strong> Vous pouvez maintenant m'envoyer des images!",
@@ -427,7 +430,7 @@ def get_chat_ui():
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>AI Assistant - Home Assistant</title>
+    <title>{agent_name} - Home Assistant</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         html, body {{ height: 100%; }}
@@ -601,7 +604,7 @@ def get_chat_ui():
 <body>
     <div class="header">
         <span style="font-size: 24px;">\U0001f916</span>
-        <h1>AI Assistant</h1>
+        <h1>{agent_name}</h1>
         <span class="badge">v{api.get_version()}</span>
         <button id="sidebarToggleBtn" class="new-chat mobile-only" onclick="toggleSidebar()" title="{ui_js['conversations']}">\u2630</button>
         <select id="modelSelect" class="model-selector" title="{ui_js['change_model']}"></select>
