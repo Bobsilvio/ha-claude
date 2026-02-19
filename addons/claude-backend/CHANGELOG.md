@@ -1,4 +1,10 @@
 # Changelog
+## 3.10.5
+- **FIX**: Chat response disappearing after HTML dashboard creation — `create_html_dashboard` now triggers auto-stop
+- After successful dashboard creation, the response is formatted and sent immediately instead of making another API call
+- Draft calls (`draft=true`) correctly skip auto-stop so the model can continue sending chunks
+- Applied to both OpenAI and NVIDIA provider streams
+
 ## 3.10.4
 - **NEW**: Configurable `max_conversations` setting — number of chat conversations to keep in history (1-100, default 10)
 - Previously hardcoded to 10 in both save and list endpoints
