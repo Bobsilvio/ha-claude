@@ -95,11 +95,11 @@ RUNTIME_SELECTION_FILE = "/config/.storage/claude_runtime_selection.json"
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
 
-# Agent personalization (from add-on config)
-AGENT_NAME = (os.getenv("AGENT_NAME", "AI Assistant") or "AI Assistant").strip()
-AGENT_AVATAR = (os.getenv("AGENT_AVATAR", "🤖") or "🤖").strip()
-AGENT_INSTRUCTIONS = (os.getenv("AGENT_INSTRUCTIONS", "") or "").strip()
-HTML_DASHBOARD_FOOTER = (os.getenv("HTML_DASHBOARD_FOOTER", "") or "").strip()
+# Agent defaults (hardcoded)
+AGENT_NAME = "AI Assistant"
+AGENT_AVATAR = "🤖"
+AGENT_INSTRUCTIONS = ""
+HTML_DASHBOARD_FOOTER = ""
 MAX_CONVERSATIONS = max(1, min(100, int(os.getenv("MAX_CONVERSATIONS", "10") or "10")))
 
 # Persist system prompt override across restarts

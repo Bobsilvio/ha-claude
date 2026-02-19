@@ -1,4 +1,10 @@
 # Changelog
+## 3.10.8
+- **REMOVED**: `agent_name`, `agent_avatar`, `agent_instructions`, `html_dashboard_footer` from add-on configuration
+- These are now hardcoded defaults ("AI Assistant", emoji, empty strings)
+- Removed from config.yaml options/schema, run script, api.py env vars, and all translations
+- Internal code that references these values via `getattr()` continues to work with the hardcoded defaults
+
 ## 3.10.7
 - **FIX**: Snapshot restore now triggers `homeassistant/reload_all` for sensor/template/generic YAML files
 - Previously, restoring a snapshot for `sensors.yaml` or `template.yaml` only copied the file back but did NOT reload HA

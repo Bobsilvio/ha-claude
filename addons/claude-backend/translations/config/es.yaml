@@ -48,18 +48,6 @@ configuration:
     name: Habilitar RAG (Experimental)
     description: Habilita RAG (Retrieval-Augmented Generation) para búsqueda e inyección de documentos
 
-  agent_name:
-    name: Nombre del Agente
-    description: Nombre visible del agente AI (se muestra en la UI de chat y en el pie de las dashboards)
-  agent_avatar:
-    name: Avatar del Agente
-    description: Emoji avatar mostrado en el mensaje de bienvenida
-  agent_instructions:
-    name: Instrucciones del Agente
-    description: Instrucciones/persona extra añadidas al system prompt (tono, estilo, reglas)
-  html_dashboard_footer:
-    name: Pie de Dashboard HTML
-    description: Texto del pie para dashboards HTML generadas (vacío = predeterminado)
   max_conversations:
     name: Conversaciones Guardadas
     description: Número de conversaciones a conservar en el historial (1-100, predeterminado 10)
