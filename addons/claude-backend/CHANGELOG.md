@@ -1,4 +1,17 @@
 # Changelog
+## 3.13.0 — Chat Bubble V2: Markdown, Voice, Quick Actions, Abort
+- **Markdown rendering**: AI responses now render bold, italic, code blocks, inline code, lists, links, headers
+- **Message history persistence**: chat messages survive page reload (stored in localStorage, last 50 messages)
+- **Voice input**: microphone button using Web Speech API — tap to speak, auto-sends on recognition end; supports en/it/es/fr
+- **Quick action chips**: context-based suggestion buttons appear when relevant:
+  - Automation: "Analyze", "Optimize", "Add condition", "Fix errors"
+  - Script: "Analyze", "Optimize", "Explain"
+  - Dashboard: "Describe", "Add entities", "Optimize"
+  - Device: "Show entities and states"
+- **Abort streaming**: send button transforms into stop button during streaming; calls `/api/chat/abort` + AbortController
+- **Multi-tab sync**: messages sync across browser tabs via BroadcastChannel API
+- **Bubble-specific session**: separate `bubble_` prefixed session IDs — bubble chat doesn't interfere with main UI conversations
+
 ## 3.12.1 — Chat Bubble UX Improvements
 - **Draggable button**: long-press (400ms) to enter drag mode (like iPhone app icons), position saved in localStorage
 - **Resizable chat panel**: CSS `resize: both` with size persistence via ResizeObserver + localStorage
