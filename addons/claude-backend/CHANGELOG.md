@@ -1,4 +1,23 @@
 # Changelog
+## 3.11.4 — Provider Alignment
+- **Google Gemini provider fully aligned** with OpenAI/Anthropic:
+  - Tool result truncation (20000 chars for read tools, 8000 for others)
+  - Safe tool execution with try/except (no more crashes on tool errors)
+  - Rate limit detection and retry (429/resource_exhausted → 10s wait + retry)
+  - Progressive delay between rounds (3s→5s instead of fixed 1s)
+  - Redundancy detection: read-only tools with same args cached, no re-execution
+  - Draft dashboard auto-stop skip (both `draft_started` and `draft_appended`)
+  - Empty dashboard auto-stop skip (`create_dashboard` with 0 views continues)
+  - 4-char chunk streaming (smoother output, was word-by-word)
+  - Humanized error messages for API key/quota/billing errors (4 languages)
+  - Abort check during rate-limit delay
+  - `write_config_file` added to WRITE_TOOLS auto-stop
+- **Anthropic provider aligned**:
+  - `create_html_dashboard` added to WRITE_TOOLS auto-stop
+  - Draft dashboard auto-stop skip (draft_started/draft_appended)
+  - Tool result truncation: 20000 chars for read tools (was 8000 for all)
+  - Safe tool execution with try/except
+
 ## 3.11.3
 - **FIX**: HTML dashboards with Chart.js broken by CSS `var()` used in JavaScript
 - AI models sometimes generate `color: var('--text-color')` inside `<script>` blocks — `var` is a JS keyword, causing `SyntaxError: expected expression, got keyword 'var'`

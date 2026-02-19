@@ -211,12 +211,18 @@ def stream_chat_anthropic(messages, intent_info=None):
             logger.info(f"Anthropic: Executing tool '{tool['name']}' with input: {tool['input']}")
             yield {"type": "status", "message": api.tr("status_executing_tool", provider="Anthropic", tool=tool["name"]) }
             yield {"type": "tool", "name": tool["name"], "description": tools.get_tool_description(tool["name"])}
-            result = tools.execute_tool(tool["name"], tool["input"])
+            try:
+                result = tools.execute_tool(tool["name"], tool["input"])
+            except Exception as e:
+                logger.exception(f"Anthropic: Tool execution failed: {tool['name']}: {e}")
+                result = json.dumps({"error": f"Tool '{tool['name']}' failed: {str(e)}"}, ensure_ascii=False)
             logger.info(f"Anthropic: Tool '{tool['name']}' returned {len(result)} chars: {result[:300]}...")
             tools_called_this_session.add(tool_key)
             # Truncate large tool results to prevent token overflow
-            if len(result) > 8000:
-                result = result[:8000] + '\n... [TRUNCATED to save tokens - ' + str(len(result)) + ' chars total]'
+            _read_tools_large = {"read_config_file", "get_entity_details", "get_entity_history"}
+            max_len = 20000 if tool["name"] in _read_tools_large else 8000
+            if len(result) > max_len:
+                result = result[:max_len] + '\n... [TRUNCATED - ' + str(len(result)) + ' chars total]'
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": tool["id"],
@@ -237,7 +243,7 @@ def stream_chat_anthropic(messages, intent_info=None):
         # AUTO-STOP: If a write tool succeeded, format response directly — no more API calls needed
         WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
                    "create_automation", "create_script", "create_dashboard", "update_dashboard",
-                   "write_config_file"}
+                   "create_html_dashboard", "write_config_file"}
         auto_stop = False
         for tool in tool_uses:
             if tool["name"] in WRITE_TOOLS:
@@ -245,9 +251,12 @@ def stream_chat_anthropic(messages, intent_info=None):
                     if tr.get("tool_use_id") == tool["id"]:
                         try:
                             rdata = json.loads(tr["content"])
-                            if rdata.get("status") == "success":
+                            if rdata.get("status") == "success" or rdata.get("url"):
+                                # Skip auto-stop for draft HTML dashboards
+                                if tool["name"] == "create_html_dashboard" and rdata.get("status") in ("draft_started", "draft_appended"):
+                                    logger.info(f"Auto-stop skipped: draft dashboard {rdata.get('status')}")
                                 # Skip auto-stop for empty dashboards (0 views) - model needs to continue
-                                if tool["name"] == "create_dashboard" and rdata.get("views_count", 1) == 0:
+                                elif tool["name"] == "create_dashboard" and rdata.get("views_count", 1) == 0:
                                     logger.info("Auto-stop skipped: create_dashboard with 0 views, letting model continue")
                                 else:
                                     auto_stop = True
