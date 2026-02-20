@@ -1,4 +1,11 @@
 # Changelog
+## 3.15.5 — Automation Description Sync Fix
+- **FIX**: **Automation descriptions now update when triggers change**
+  - When modifying automation triggers without providing a new description, the old description is cleared
+  - AI is now instructed to always include a NEW description when modifying trigger times
+  - Prevents stale descriptions (e.g., "Turn on light at 21:00" staying when time changed to 22:00)
+  - Works for both YAML-based and UI-created automations
+
 ## 3.15.4 — Bug Fixes
 - **FIX**: Bubble conversations in sidebar now show proper date grouping (Today, Yesterday, etc.)
   - Correctly extracts timestamp from bubble session IDs (base36 decoding)

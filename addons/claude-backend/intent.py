@@ -62,8 +62,11 @@ CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
 4. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it.
 5. ASK FOR EXPLICIT CONFIRMATION before applying. Wait for the user to confirm.
 6. DO NOT call update_automation until the user explicitly confirms.
-7. Only AFTER confirmation, call update_automation ONCE with the changes.
-8. Show a before/after diff of what changed.
+7. If you modify the trigger/time: ALWAYS include a NEW description in the changes that reflects the new trigger times/conditions. 
+   - Example: if changing time from 21:00 to 22:00, MUST update description to "Accende automaticamente la luce alle 22:00"
+   - If you don't have a good description, set description to "" so the user can update it.
+8. Only AFTER confirmation, call update_automation ONCE with the changes.
+9. Show a before/after diff of what changed.
 
 - ALWAYS respond in the user's language. Be concise.
 - Never modify the wrong automation.""",

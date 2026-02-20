@@ -1794,6 +1794,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                             elif "actions" in changes and act_key == "action":
                                 changes["action"] = changes.pop("actions")
 
+                            # FIX: If trigger(s) are being modified but description is NOT in changes,
+                            # remove the old description so AI can regenerate it with new content
+                            triggers_modified = ("trigger" in changes or "triggers" in changes)
+                            description_provided = ("description" in changes)
+                            if triggers_modified and not description_provided:
+                                found["description"] = ""  # Reset description when triggers change without new description
+
                             for key, value in changes.items():
                                 found[key] = value
                             if add_condition:
@@ -1846,6 +1853,13 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                             changes["conditions"] = changes.pop("condition")
                         elif "conditions" in changes and cond_key == "condition":
                             changes["condition"] = changes.pop("conditions")
+
+                        # FIX: If trigger(s) are being modified but description is NOT in changes,
+                        # remove the old description so AI can regenerate it with new content
+                        triggers_modified = ("trigger" in changes or "triggers" in changes)
+                        description_provided = ("description" in changes)
+                        if triggers_modified and not description_provided:
+                            current["description"] = ""  # Reset description when triggers change without new description
 
                         # Apply changes
                         for key, value in changes.items():
