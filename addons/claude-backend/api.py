@@ -3292,7 +3292,11 @@ def api_bubble_device_update(device_id):
             return jsonify({"success": False, "error": "Device not found"}), 404
         
         if "enabled" in data:
-            devices[device_id]["enabled"] = bool(data["enabled"])
+            if data["enabled"] is None:
+                # Toggle: invert current state
+                devices[device_id]["enabled"] = not devices[device_id].get("enabled", False)
+            else:
+                devices[device_id]["enabled"] = bool(data["enabled"])
         
         if "name" in data and data["name"]:
             devices[device_id]["name"] = str(data["name"]).strip()

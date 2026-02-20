@@ -1,4 +1,9 @@
 # Changelog
+## 3.16.8 — Fix Device Toggle
+- **FIX**: Device enable/disable toggle now works correctly
+  - Frontend sent `null` to mean "toggle", but backend interpreted `bool(None)` as `False`
+  - Backend now properly inverts the current state when receiving `null`
+
 ## 3.16.7 — Fix Tablet Bubble Tap + Phone Sidebar
 - **FIX**: Bubble no longer opens when tapping HA navigation on tablet
   - Document-level `touchend` was triggering `togglePanel()` on any tap
