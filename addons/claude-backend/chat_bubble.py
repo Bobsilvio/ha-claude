@@ -730,14 +730,47 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
   }}
 
-  if (savedPos) {{
+  // ---- Apply saved button position (only if manually dragged) ----
+  // If user never dragged the button, keep it at bottom-right using relative positioning
+  // Only restore left/top if user explicitly dragged it
+  const savedPos = loadSetting('btn-pos', null);
+  const wasDragged = loadSetting('btn-dragged', false);
+
+  function clampBtnPosition() {{
+    const sz = btn.offsetWidth || 56;
+    const margin = 8;
+    // If using left/top (dragged), clamp them
+    if (btn.style.left && btn.style.left !== 'auto') {{
+      let x = parseInt(btn.style.left) || 0;
+      let y = parseInt(btn.style.top) || 0;
+      x = Math.max(margin, Math.min(window.innerWidth - sz - margin, x));
+      y = Math.max(margin, Math.min(window.innerHeight - sz - margin, y));
+      btn.style.left = x + 'px';
+      btn.style.top = y + 'px';
+    }}
+    // Always ensure bottom/right are within bounds if they're being used
+    if (btn.style.bottom && btn.style.bottom !== 'auto') {{
+      const b = Math.max(margin, parseInt(btn.style.bottom) || 24);
+      btn.style.bottom = b + 'px';
+    }}
+    if (btn.style.right && btn.style.right !== 'auto') {{
+      const r = Math.max(margin, parseInt(btn.style.right) || 24);
+      btn.style.right = r + 'px';
+    }}
+  }}
+
+  if (wasDragged && savedPos) {{
+    // User manually dragged it - restore exact position
     btn.style.left = savedPos.x + 'px';
     btn.style.top = savedPos.y + 'px';
     btn.style.right = 'auto';
     btn.style.bottom = 'auto';
   }} else {{
+    // Default: always use bottom-right (relative positioning)
     btn.style.bottom = '24px';
     btn.style.right = '24px';
+    btn.style.left = 'auto';
+    btn.style.top = 'auto';
   }}
   // Clamp on startup in case viewport changed since last save
   setTimeout(clampBtnPosition, 0);
@@ -801,6 +834,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       isDragging = false;
       btn.classList.remove('dragging');
       saveSetting('btn-pos', {{ x: parseInt(btn.style.left) || 0, y: parseInt(btn.style.top) || 0 }});
+      saveSetting('btn-dragged', true);  // Mark that button has been manually dragged
     }}
   }}
 
