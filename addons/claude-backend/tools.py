@@ -2499,16 +2499,16 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                             }]}
                         )
                         if ws_config.get("success") is True:
-                            sidebar_message = f"dashboard appears in the sidebar at /{safe_url_path}"
+                            sidebar_message = api.tr("dashboard_sidebar_ready", path=safe_url_path)
                         else:
-                            sidebar_message = "HTML file is ready but sidebar integration failed"
+                            sidebar_message = api.tr("dashboard_sidebar_failed")
                     except Exception as e:
                         logger.error(f"❌ Exception saving dashboard config: {e}")
-                        sidebar_message = "HTML file is ready but sidebar integration failed"
+                        sidebar_message = api.tr("dashboard_sidebar_failed")
 
                 result = {
                     "status": "success",
-                    "message": f"✨ Dashboard '{title}' created successfully! Your {sidebar_message}",
+                    "message": f"✨ {api.tr('dashboard_created_successfully')}'{title}'. {sidebar_message}",
                     "title": title,
                     "name": name,
                     "filename": safe_filename,

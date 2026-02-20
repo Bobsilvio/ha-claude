@@ -545,7 +545,11 @@ LANGUAGE_TEXT = {
         "read_only_note": "**Read-only mode — no files were modified.**",
 
         "smart_context_script_found": "## YAML SCRIPT FOUND: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nTo modify it use update_script with script_id='{sid}' and the fields to change.",
-        "read_only_instruction": "READ-ONLY MODE: Show the user the complete YAML code in a yaml code block. At the end add the note: "
+        "read_only_instruction": "READ-ONLY MODE: Show the user the complete YAML code in a yaml code block. At the end add the note: ",
+
+        "dashboard_created_successfully": "Dashboard created successfully! Your ",
+        "dashboard_sidebar_ready": "dashboard appears in the sidebar at /{path}",
+        "dashboard_sidebar_failed": "HTML file is ready but sidebar integration failed",
     },
     "it": {
         "before": "Prima",
@@ -622,7 +626,11 @@ LANGUAGE_TEXT = {
         "read_only_note": "**Modalità sola lettura - nessun file è stato modificato.**",
 
         "smart_context_script_found": "## YAML SCRIPT TROVATO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPer modificarlo usa update_script con script_id='{sid}' e i campi da cambiare.",
-        "read_only_instruction": "MODALITA SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. Alla fine aggiungi la nota: "
+        "read_only_instruction": "MODALITA SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. Alla fine aggiungi la nota: ",
+
+        "dashboard_created_successfully": "Dashboard creata con successo! ",
+        "dashboard_sidebar_ready": "Il dashboard appare nella sidebar a /{path}",
+        "dashboard_sidebar_failed": "File HTML pronto ma integrazione sidebar fallita",
     },
     "es": {
         "before": "Antes",
@@ -699,7 +707,11 @@ LANGUAGE_TEXT = {
         "read_only_note": "**Modo solo lectura — no se modificaron archivos.**",
 
         "smart_context_script_found": "## YAML SCRIPT ENCONTRADO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPara modificarlo usa update_script con script_id='{sid}' y los campos a cambiar.",
-        "read_only_instruction": "MODO SOLO LECTURA: Muestra al usuario el código YAML completo en un code block yaml. Al final añade la nota: "
+        "read_only_instruction": "MODO SOLO LECTURA: Muestra al usuario el código YAML completo en un code block yaml. Al final añade la nota: ",
+
+        "dashboard_created_successfully": "¡Dashboard creado con éxito! ",
+        "dashboard_sidebar_ready": "El dashboard aparece en la barra lateral a /{path}",
+        "dashboard_sidebar_failed": "Archivo HTML listo pero falló la integración de barra lateral",
     },
     "fr": {
         "before": "Avant",
@@ -776,7 +788,11 @@ LANGUAGE_TEXT = {
         "read_only_note": "**Mode lecture seule — aucun fichier n'a été modifié.**",
 
         "smart_context_script_found": "## YAML SCRIPT TROUVÉ : \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPour le modifier, utilisez update_script avec script_id='{sid}' et les champs à modifier.",
-        "read_only_instruction": "MODE LECTURE SEULE : Montrez à l'utilisateur le code YAML complet dans un code block yaml. À la fin, ajoutez la note : "
+        "read_only_instruction": "MODE LECTURE SEULE : Montrez à l'utilisateur le code YAML complet dans un code block yaml. À la fin, ajoutez la note : ",
+
+        "dashboard_created_successfully": "Tableau de bord créé avec succès ! ",
+        "dashboard_sidebar_ready": "Le tableau de bord apparaît dans la barre latérale à /{path}",
+        "dashboard_sidebar_failed": "Fichier HTML prêt mais l'intégration de la barre latérale a échoué",
     }
 }
 
@@ -2439,6 +2455,14 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     """Stream chat events for all providers with optional image support. Yields SSE event dicts.
     Uses LOCAL intent detection + smart context to minimize tokens sent to AI API."""
     global current_session_id
+    
+    # Strip context blocks from user_message for saving in conversation history
+    # This prevents [CONTEXT:...] and [CURRENT_DASHBOARD_HTML]... from cluttering the history
+    saved_user_message = user_message
+    import re
+    saved_user_message = re.sub(r'\[CONTEXT:.*?\]\[CURRENT_DASHBOARD_HTML\].*?\[/CURRENT_DASHBOARD_HTML\]\n*', '', saved_user_message, flags=re.DOTALL)
+    saved_user_message = saved_user_message.strip()
+    
     if not ai_client:
         yield {"type": "error", "message": tr("err_api_key_not_configured_short")}
         return
@@ -2529,15 +2553,15 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             yield {"type": "error", "message": tr("err_invalid_image_format")}
             return
 
-        # Save original message with image (without context text)
+        # Save original message with image (without context blocks)
         if AI_PROVIDER == "anthropic":
-            saved_content = format_message_with_image_anthropic(user_message, media_type, base64_data)
+            saved_content = format_message_with_image_anthropic(saved_user_message, media_type, base64_data)
         elif AI_PROVIDER in ("openai", "github"):
-            saved_content = format_message_with_image_openai(user_message, image_data)
+            saved_content = format_message_with_image_openai(saved_user_message, image_data)
         elif AI_PROVIDER == "google":
-            saved_content = format_message_with_image_google(user_message, media_type, base64_data)
+            saved_content = format_message_with_image_google(saved_user_message, media_type, base64_data)
         else:
-            saved_content = user_message
+            saved_content = saved_user_message
 
         conversations[session_id].append({"role": "user", "content": saved_content})
 
@@ -2562,8 +2586,8 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         logger.info(f"Message with image: {text_content[:50]}... (media_type: {media_type})")
         yield {"type": "status", "message": tr("status_image_processing")}
     else:
-        # No image - save original message
-        conversations[session_id].append({"role": "user", "content": user_message})
+        # No image - save original message (without context blocks)
+        conversations[session_id].append({"role": "user", "content": saved_user_message})
 
         # Build enriched version for API (with context)
         if smart_context:
