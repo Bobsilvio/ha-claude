@@ -710,6 +710,26 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   let currentAbortController = null;
 
   // ---- Apply saved button position ----
+  function clampBtnPosition() {{
+    const sz = btn.offsetWidth || 56;
+    const margin = 8;
+    // If using left/top (dragged), clamp them
+    if (btn.style.left && btn.style.left !== 'auto') {{
+      let x = parseInt(btn.style.left) || 0;
+      let y = parseInt(btn.style.top) || 0;
+      x = Math.max(margin, Math.min(window.innerWidth - sz - margin, x));
+      y = Math.max(margin, Math.min(window.innerHeight - sz - margin, y));
+      btn.style.left = x + 'px';
+      btn.style.top = y + 'px';
+    }} else {{
+      // Using right/bottom — ensure they don't push the button off-screen
+      const r = parseInt(btn.style.right) || 24;
+      const b = parseInt(btn.style.bottom) || 24;
+      btn.style.right = Math.max(margin, r) + 'px';
+      btn.style.bottom = Math.max(margin, b) + 'px';
+    }}
+  }}
+
   if (savedPos) {{
     btn.style.left = savedPos.x + 'px';
     btn.style.top = savedPos.y + 'px';
@@ -719,6 +739,13 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     btn.style.bottom = '24px';
     btn.style.right = '24px';
   }}
+  // Clamp on startup in case viewport changed since last save
+  setTimeout(clampBtnPosition, 0);
+
+  window.addEventListener('resize', () => {{
+    clampBtnPosition();
+    if (isOpen) positionPanelNearButton();
+  }});
 
   // ---- Apply saved panel size ----
   if (savedSize) {{

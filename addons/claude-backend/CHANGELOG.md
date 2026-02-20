@@ -1,4 +1,15 @@
 # Changelog
+## 3.15.2 — Bubble Confirmation Buttons & Resize Fix
+- **NEW**: Chat bubble now shows Sì/No confirmation buttons when AI asks for confirmation
+  - Pattern detection (IT/EN/ES/FR): "Confermi?", "vuoi eliminare?", "yes or no?", etc.
+  - Yes/No buttons styled with emojis (✅/❌), hover effects, and disable state
+  - Auto-sends user's choice as message — no typing needed
+  - Same patterns as Chat UI for consistency
+- **FIX**: Chat bubble fixed off-screen when resizing viewport
+  - Dragged button position now clamped on window resize (min 8px margin)
+  - If panel is open, repos as well
+  - Startup validates saved position against current viewport
+
 ## 3.15.1 — Bubble Working Indicator
 - **NEW**: Chat bubble now shows detailed working indicator during AI processing
   - Animated dots with elapsed time counter (e.g., "Thinking... (12s)")

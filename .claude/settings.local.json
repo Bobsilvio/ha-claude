@@ -28,7 +28,13 @@
       "Bash(git -C /Users/eleonor/italysat/ha-claude log --oneline -50)",
       "Bash(git -C /Users/eleonor/italysat/ha-claude add addons/claude-backend/CHANGELOG.md)",
       "Bash(git -C /Users/eleonor/italysat/ha-claude commit -m \"$\\(cat <<''EOF''\nAdd CHANGELOG.md for addon update notes\n\nShows version history in Home Assistant update UI.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(xxd:*)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:i.redd.it)",
+      "Bash(grep:*)",
+      "Bash(xargs cat:*)",
+      "Bash(git pull:*)"
     ]
   }
 }
