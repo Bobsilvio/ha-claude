@@ -862,7 +862,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
   btn.addEventListener('touchstart', (e) => {{ onBtnDown(e.touches[0].clientX, e.touches[0].clientY); }}, {{ passive: true }});
   document.addEventListener('touchmove', (e) => {{ if (mouseIsDown) {{ e.preventDefault(); onMoveGlobal(e.touches[0].clientX, e.touches[0].clientY); }} }}, {{ passive: false }});
-  document.addEventListener('touchend', () => {{ const wasDrag = dragStarted; onUpGlobal(); if (!wasDrag) togglePanel(); }});
+  document.addEventListener('touchend', () => {{ onUpGlobal(); }});
 
   // ---- Panel positioning ----
   function positionPanelNearButton() {{

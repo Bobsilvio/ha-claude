@@ -1012,7 +1012,17 @@ def get_chat_ui():
 
         function toggleSidebar() {{
             if (!sidebarEl) return;
+            const wasOpen = sidebarEl.classList.contains('mobile-open');
             sidebarEl.classList.toggle('mobile-open');
+            // Refresh conversation list when opening on mobile
+            if (!wasOpen) {{
+                const activeTab = document.querySelector('.sidebar-tab.active');
+                const tabName = activeTab ? activeTab.dataset.tab : 'chat';
+                if (tabName === 'chat') loadChatList();
+                else if (tabName === 'bubble') loadBubbleList();
+                else if (tabName === 'backups') loadBackupList();
+                else if (tabName === 'devices') loadDeviceList();
+            }}
         }}
 
         function closeSidebarMobile() {{

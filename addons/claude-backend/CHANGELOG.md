@@ -1,4 +1,9 @@
 # Changelog
+## 3.16.1 — Bug Fix
+- **FIXED**: ModuleNotFoundError - `pricing.py` was not included in Docker image
+  - Added missing `COPY pricing.py .` to Dockerfile
+  - Required for token usage tracking feature in 3.16.0
+
 ## 3.16.0 — Token Usage Tracking & Cost Estimation
 - **NEW**: Per-message token usage display (input/output tokens + estimated cost)
   - Shows under each AI response in both chat UI and bubble
