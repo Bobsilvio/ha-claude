@@ -29,6 +29,7 @@ COPY intent.py .
 COPY providers_openai.py .
 COPY providers_anthropic.py .
 COPY providers_google.py .
+COPY pricing.py .
 COPY chat_ui.py .
 COPY keywords.json .
 COPY config.yaml .
