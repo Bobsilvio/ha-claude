@@ -1392,7 +1392,46 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
     }} catch(e) {{}}
   }});
 
+  // ---- Register device to bubble tracking system ----
+  async function registerDevice() {{
+    try {{
+      // Check if device already has an ID stored
+      let deviceId = localStorage.getItem('ha-claude-device-id');
+      if (!deviceId) {{
+        // Generate stable device ID from various sources
+        const now = Date.now().toString(36);
+        const rand = Math.random().toString(36).substring(2, 10);
+        deviceId = 'device-' + now + '-' + rand;
+        localStorage.setItem('ha-claude-device-id', deviceId);
+      }}
+
+      // Send registration to backend
+      const resp = await fetch(API_BASE + '/api/bubble/devices', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{
+          device_id: deviceId,
+          device_name: '',  // Will be set by user later
+          device_type: deviceType,  // desktop|tablet|phone
+        }}),
+        credentials: 'same-origin',
+      }});
+      
+      if (resp.ok) {{
+        const result = await resp.json();
+        if (!result.enabled) {{
+          console.log('[AI Assistant] Device not enabled for bubble (mode: ' + BUBBLE_DEVICE_MODE + ')');
+          // Bubble is already initialized, so we don't hide it here
+          // User can manage from settings
+        }}
+      }}
+    }} catch(e) {{
+      console.error('[AI Assistant] Device registration error:', e);
+    }}
+  }}
+
   // Initial setup
+  registerDevice();
   updateContextBar();
   loadAgents();
   console.log('[AI Assistant] Chat bubble loaded (v3)');

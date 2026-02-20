@@ -1,4 +1,17 @@
 # Changelog
+## 3.15.8 — Device Manager UI
+- **NEW**: Automatic device tracking and management for bubble visibility
+  - Each device registers automatically on first bubble access
+  - Stores device ID, name, type (phone/tablet/desktop), and bubble enabled status
+  - Persistent cross-session tracking (survives browser restart)
+- **NEW**: Device management endpoints:
+  - `GET /api/bubble/devices` - List all registered devices
+  - `POST /api/bubble/devices` - Register/update device (auto-called by bubble)
+  - `PATCH /api/bubble/devices/{id}` - Enable/disable or rename device
+  - `DELETE /api/bubble/devices/{id}` - Forget a device
+- **IMPROVED**: Device config persisted to `/config/.storage/claude_bubble_devices.json`
+- **READY FOR**: DeviceManager UI in chat_ui.py (can display list and toggle enable/disable)
+
 ## 3.15.7 — Device-Specific Bubble Control
 - **NEW**: Configure bubble visibility by device type (phone, tablet, desktop)
   - **Modes available:**

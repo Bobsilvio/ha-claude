@@ -1788,6 +1788,30 @@ load_model_blocklists()
 SNAPSHOTS_DIR = "/config/.storage/claude_snapshots"
 HA_CONFIG_DIR = "/config"  # Mapped via config.yaml "map: config:rw"
 
+# ---- Device tracking for bubble visibility control ----
+DEVICES_CONFIG_FILE = "/config/.storage/claude_bubble_devices.json"
+
+def load_device_config() -> dict:
+    """Load device visibility configuration from disk."""
+    try:
+        if os.path.isfile(DEVICES_CONFIG_FILE):
+            with open(DEVICES_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f) or {}
+            return data
+        return {}
+    except Exception as e:
+        logger.warning(f"Could not load device config: {e}")
+        return {}
+
+def save_device_config(config: dict) -> None:
+    """Persist device visibility configuration to disk."""
+    try:
+        os.makedirs(os.path.dirname(DEVICES_CONFIG_FILE), exist_ok=True)
+        with open(DEVICES_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"Could not save device config: {e}")
+
 def create_snapshot(filename: str) -> dict:
     """Create a snapshot of a file before modifying it. Returns snapshot info."""
     os.makedirs(SNAPSHOTS_DIR, exist_ok=True)
@@ -3172,6 +3196,144 @@ def api_bubble_config():
         }), 200
     except Exception as e:
         logger.error(f"Error getting bubble config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/bubble/devices', methods=['GET'])
+def api_bubble_devices_list():
+    """Get list of discovered devices and their bubble visibility settings.
+    
+    Returns all devices that have accessed the bubble, with their settings.
+    Format: {"device_id": {"name": "...", "device_type": "phone|tablet|desktop", "enabled": true, "last_seen": "..."}}
+    """
+    try:
+        devices = load_device_config()
+        return jsonify({
+            "success": True,
+            "device_mode": BUBBLE_DEVICE_MODE,
+            "devices": devices
+        }), 200
+    except Exception as e:
+        logger.error(f"Error listing devices: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/bubble/devices', methods=['POST'])
+def api_bubble_devices_register():
+    """Register or update a device in the bubble tracking system.
+    
+    Browser calls this on first bubble load to register itself.
+    Body: {"device_id": "...", "device_name": "...", "device_type": "phone|tablet|desktop"}
+    """
+    try:
+        data = request.get_json() or {}
+        device_id = (data.get("device_id") or "").strip()
+        device_name = (data.get("device_name") or "").strip()
+        device_type = (data.get("device_type") or "desktop").lower()
+        
+        if not device_id or len(device_id) < 4:
+            return jsonify({"success": False, "error": "Invalid device_id"}), 400
+        
+        if device_type not in ("phone", "tablet", "desktop"):
+            device_type = "desktop"
+        
+        devices = load_device_config()
+        
+        # If device doesn't exist yet, add it with default enabled state based on mode
+        if device_id not in devices:
+            # Default: enable based on device type and mode
+            enabled = True
+            if BUBBLE_DEVICE_MODE == "disable" and device_type != "desktop":
+                enabled = False
+            elif BUBBLE_DEVICE_MODE == "tablet_only":
+                enabled = device_type == "tablet"
+            elif BUBBLE_DEVICE_MODE == "enable_all":
+                enabled = True
+            elif BUBBLE_DEVICE_MODE == "custom":
+                # In custom mode, check if device is in whitelist  
+                enabled = device_id in [d.strip() for d in BUBBLE_DEVICE_IDS.split(",") if d.strip()]
+            
+            devices[device_id] = {
+                "name": device_name or f"{device_type.capitalize()}",
+                "device_type": device_type,
+                "enabled": enabled,
+                "first_seen": datetime.now().isoformat(),
+                "last_seen": datetime.now().isoformat(),
+            }
+        else:
+            # Update last_seen and name if provided
+            devices[device_id]["last_seen"] = datetime.now().isoformat()
+            if device_name:
+                devices[device_id]["name"] = device_name
+        
+        save_device_config(devices)
+        logger.info(f"Device registered: {device_id} ({device_type})")
+        
+        # Return whether bubble should be enabled for this device
+        is_enabled = devices[device_id].get("enabled", False)
+        
+        return jsonify({
+            "success": True,
+            "device_id": device_id,
+            "enabled": is_enabled,
+            "message": f"Device registered (enabled: {is_enabled})"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error registering device: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/bubble/devices/<device_id>', methods=['PATCH'])
+def api_bubble_device_update(device_id):
+    """Enable or disable bubble for a specific device.
+    
+    Body: {"enabled": true/false, "name": "..."}
+    """
+    try:
+        device_id = device_id.strip()
+        data = request.get_json() or {}
+        
+        devices = load_device_config()
+        if device_id not in devices:
+            return jsonify({"success": False, "error": "Device not found"}), 404
+        
+        if "enabled" in data:
+            devices[device_id]["enabled"] = bool(data["enabled"])
+        
+        if "name" in data and data["name"]:
+            devices[device_id]["name"] = str(data["name"]).strip()
+        
+        save_device_config(devices)
+        logger.info(f"Device updated: {device_id} (enabled: {devices[device_id].get('enabled')})")
+        
+        return jsonify({
+            "success": True,
+            "device": devices[device_id]
+        }), 200
+    except Exception as e:
+        logger.error(f"Error updating device: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/bubble/devices/<device_id>', methods=['DELETE'])
+def api_bubble_device_delete(device_id):
+    """Remove a device from tracking.
+    
+    The device will re-register on next access.
+    """
+    try:
+        device_id = device_id.strip()
+        devices = load_device_config()
+        
+        if device_id in devices:
+            del devices[device_id]
+            save_device_config(devices)
+            logger.info(f"Device deleted: {device_id}")
+            return jsonify({"success": True, "message": f"Device '{device_id}' removed"}), 200
+        
+        return jsonify({"success": False, "error": "Device not found"}), 404
+    except Exception as e:
+        logger.error(f"Error deleting device: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 
