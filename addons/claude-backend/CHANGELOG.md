@@ -1,4 +1,12 @@
 # Changelog
+## 3.14.1
+- **FIX**: Intent detection misrouted HTML dashboard edits as `modify_script`
+  - Root cause: embedded `<script>` tags in `[CURRENT_DASHBOARD_HTML]` triggered "script" keyword match
+  - Fix: strip `[CONTEXT:...]` prefix and `[CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML]` block before keyword matching
+  - Added early detection: messages with embedded HTML dashboard context auto-route to `create_html_dashboard`
+- **FIX**: `read_html_dashboard` added to `create_html_dashboard` tool set (was missing from intent tools)
+- **FIX**: Log truncation — messages >500 chars are truncated in logs (no more full HTML dumps)
+
 ## 3.14.0 — HTML Dashboard Edit from Bubble
 - **FIX**: Bubble now correctly detects HTML dashboard pages
   - Shadow DOM iframe walk + URL path fallback (caches dashboard names from `/custom_dashboards`)

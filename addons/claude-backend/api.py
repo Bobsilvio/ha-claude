@@ -3224,7 +3224,8 @@ def api_chat_stream():
     if image_data:
         logger.info(f"Stream [{AI_PROVIDER}] with image: {message[:50]}...")
     else:
-        logger.info(f"Stream [{AI_PROVIDER}]: {message}")
+        log_msg = message if len(message) <= 500 else message[:250] + f"... [{len(message)} chars] ..." + message[-100:]
+        logger.info(f"Stream [{AI_PROVIDER}]: {log_msg}")
     if read_only:
         logger.info(f"Read-only mode active for session {session_id}")
     abort_streams[session_id] = False  # Reset abort flag

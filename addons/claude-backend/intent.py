@@ -22,7 +22,7 @@ INTENT_TOOL_SETS = {
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
     "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_frontend_resources"],
-    "create_html_dashboard": ["create_html_dashboard", "search_entities", "get_frontend_resources"],
+    "create_html_dashboard": ["read_html_dashboard", "create_html_dashboard", "search_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
     "control_device": ["call_service", "search_entities", "get_entity_state"],
     "query_state": ["get_entities", "get_entity_state", "search_entities"],
@@ -354,7 +354,17 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
     # Ensure dynamic prompts are initialized
     _init_dynamic_prompts()
 
-    msg = user_message.lower()
+    # Strip bubble context prefix and embedded HTML before keyword matching
+    clean_msg = user_message
+    # Remove [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML] block
+    if "[CURRENT_DASHBOARD_HTML]" in clean_msg:
+        clean_msg = re.sub(r'\[CURRENT_DASHBOARD_HTML\][\s\S]*?\[/CURRENT_DASHBOARD_HTML\]', '', clean_msg)
+    # Remove [CONTEXT: ...] prefix
+    if clean_msg.startswith("[CONTEXT:"):
+        bracket_end = clean_msg.find("]")
+        if bracket_end != -1:
+            clean_msg = clean_msg[bracket_end + 1:]
+    msg = clean_msg.strip().lower()
 
     # --- CONFIRMATION CONTINUITY ---
     # Short confirmation replies ("si", "sì", "yes", "ok") should carry forward the previous intent
@@ -389,6 +399,13 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
             logger.info(f"Follow-up detected — carrying forward intent: {previous_intent}")
             return {"intent": previous_intent, "tools": INTENT_TOOL_SETS[previous_intent],
                     "prompt": INTENT_PROMPTS.get(previous_intent), "specific_target": False}
+
+    # --- HTML DASHBOARD CONTEXT (from bubble) ---
+    # If the original message contains embedded HTML dashboard context, route to html dashboard intent
+    if "[CURRENT_DASHBOARD_HTML]" in user_message or "html dashboard" in user_message.lower():
+        logger.info("HTML dashboard context detected in message — routing to create_html_dashboard")
+        return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
+                "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": True}
 
     # Get keywords for current language, fallback to English if not available
     lang_keywords = api.KEYWORDS.get(api.LANGUAGE, api.KEYWORDS.get("en", {}))
