@@ -185,6 +185,8 @@ def get_chat_ui():
             "backup_date": "Date",
             "restore": "Restore",
             "confirm_restore_backup": "Restore this backup? The current file will be replaced.",
+            "delete_backup": "Delete",
+            "confirm_delete_backup": "Delete this backup permanently?",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -274,6 +276,8 @@ def get_chat_ui():
             "backup_date": "Data",
             "restore": "Ripristina",
             "confirm_restore_backup": "Ripristinare questo backup? Il file attuale verrà sostituito.",
+            "delete_backup": "Elimina",
+            "confirm_delete_backup": "Eliminare questo backup definitivamente?",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -363,6 +367,8 @@ def get_chat_ui():
             "backup_date": "Fecha",
             "restore": "Restaurar",
             "confirm_restore_backup": "¿Restaurar esta copia? El archivo actual será reemplazado.",
+            "delete_backup": "Eliminar",
+            "confirm_delete_backup": "¿Eliminar esta copia de seguridad permanentemente?",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -452,6 +458,8 @@ def get_chat_ui():
             "backup_date": "Date",
             "restore": "Restaurer",
             "confirm_restore_backup": "Restaurer cette sauvegarde ? Le fichier actuel sera remplacé.",
+            "delete_backup": "Supprimer",
+            "confirm_delete_backup": "Supprimer cette sauvegarde définitivement ?",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -501,6 +509,8 @@ def get_chat_ui():
         .backup-date {{ font-size: 11px; color: #999; }}
         .backup-restore {{ font-size: 11px; color: #667eea; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #667eea; background: none; transition: all 0.2s; }}
         .backup-restore:hover {{ background: #667eea; color: white; }}
+        .backup-delete {{ font-size: 11px; color: #e53e3e; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #e53e3e; background: none; transition: all 0.2s; margin-left: 4px; }}
+        .backup-delete:hover {{ background: #e53e3e; color: white; }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 0; overflow-x: hidden; }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
@@ -1931,8 +1941,16 @@ def get_chat_ui():
                     restoreBtn.className = 'backup-restore';
                     restoreBtn.textContent = T.restore || 'Restore';
                     restoreBtn.addEventListener('click', () => restoreBackup(snap.id));
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'backup-delete';
+                    delBtn.textContent = T.delete_backup || 'Delete';
+                    delBtn.addEventListener('click', () => deleteBackup(snap.id));
                     metaDiv.appendChild(dateSpan);
-                    metaDiv.appendChild(restoreBtn);
+                    const btns = document.createElement('div');
+                    btns.style.display = 'flex'; btns.style.gap = '4px';
+                    btns.appendChild(restoreBtn);
+                    btns.appendChild(delBtn);
+                    metaDiv.appendChild(btns);
                     item.appendChild(fileDiv);
                     item.appendChild(metaDiv);
                     listEl.appendChild(item);
@@ -1960,6 +1978,16 @@ def get_chat_ui():
                 }}
             }} catch(e) {{
                 addMessage('\u274c ' + (T.error_restore || 'Restore error: ') + e.message, 'system');
+            }}
+        }}
+
+        async function deleteBackup(snapshotId) {{
+            if (!confirm(T.confirm_delete_backup || 'Delete this backup permanently?')) return;
+            try {{
+                const resp = await fetch(apiUrl('api/snapshots/' + encodeURIComponent(snapshotId)), {{ method: 'DELETE' }});
+                if (resp.ok) loadBackupList();
+            }} catch(e) {{
+                console.error('Error deleting backup:', e);
             }}
         }}
 

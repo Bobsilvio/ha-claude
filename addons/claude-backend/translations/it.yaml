@@ -53,3 +53,12 @@ configuration:
   enable_rag:
     name: Abilita RAG
     description: "[SPERIMENTALE] Abilita RAG (Retrieval-Augmented Generation) per ricerca documenti e iniezione contesto"
+  enable_chat_bubble:
+    name: Chat Bubble
+    description: "Mostra una bolla chat AI flottante su ogni pagina di Home Assistant. Rileva il contesto (automazioni, script, dashboard). Include input vocale, rendering markdown e cambio agent live. Nascosta su dispositivi mobili."
+  max_snapshots_per_file:
+    name: Backup Massimi per File
+    description: "Numero massimo di backup da mantenere per file (es. 5 backup per automations.yaml, 5 per scripts.yaml). I backup più vecchi vengono eliminati automaticamente al raggiungimento del limite."
+  max_conversations:
+    name: Conversazioni Massime
+    description: "Numero massimo di conversazioni chat da mantenere nello storico (1-100)"

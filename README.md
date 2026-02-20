@@ -59,6 +59,7 @@ Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 - **Read/Write YAML**: Access automations, scripts, scenes, and custom configs
 - **File Explorer**: Browse your Home Assistant config directory
 - **Safe Editing**: Automatic snapshots before modifications
+- **Backup Management**: Restore or delete backups, per-file snapshot limits
 - **Config Validation**: Check configuration before applying changes
 
 ### 💬 Interactive Chat Interface
@@ -67,6 +68,14 @@ Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 - **Tool Indicators**: See what the AI is doing (badges for each tool call)
 - **Copy Button**: One-click copy for all code blocks (YAML, JSON, Python)
 - **Persistent Storage**: Conversations survive addon restarts
+
+### 🫧 Floating Chat Bubble
+- **Always Available**: AI chat bubble on every Home Assistant page
+- **Context-Aware**: Detects automations, scripts, and HTML dashboards
+- **HTML Dashboard Editing**: Modify dashboards in-place keeping same style
+- **Voice Input**: Built-in voice recognition
+- **Agent Switching**: Change AI provider/model on the fly
+- **Hidden on Mobile**: Automatically hidden on companion app
 
 ### 🌍 Multilingual Support
 - **4 Languages**: English, Italian, Spanish, French
@@ -249,7 +258,12 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 | **GitHub Token** | Personal Access Token from GitHub | - | If using GitHub |
 | **Language** | AI response language (en/it/es/fr) | `en` | ❌ |
 | **Enable File Access** | Allow AI to read/write config files | `false` | ❌ |
+| **Chat Bubble** | Floating AI bubble on every HA page (context-aware) | `false` | ❌ |
+| **Max Backups per File** | Max backup snapshots per file (oldest auto-deleted) | `5` | ❌ |
+| **Max Conversations** | Max chat conversations in history (1-100) | `10` | ❌ |
 | **Debug Mode** | Enable detailed logging | `false` | ❌ |
+| **Colored Logs** | Emoji indicators in addon logs | `true` | ❌ |
+| **Log Level** | Log verbosity (normal/verbose/debug) | `normal` | ❌ |
 | **API Port** | Internal API port | `5010` | ❌ |
 | **Timeout** | API request timeout (seconds) | `30` | ❌ |
 | **Max Retries** | Retry attempts for failed API calls | `3` | ❌ |
@@ -266,7 +280,8 @@ When **Enable File Access** is enabled, the AI can:
 - Automatic backup before any modification
 - Read-only by default (disabled)
 - Snapshots stored in `/config/.storage/claude_snapshots/`
-- Can restore previous versions from snapshots
+- Restore or delete backups from the UI
+- Per-file snapshot limits (configurable, default 5 per file)
 
 **Use cases:**
 - "Show me the YAML code for my morning routine automation"
@@ -438,6 +453,8 @@ When modifying configs, the AI shows **before/after** with diff markers:
 | `/api/chat/stream` | POST | Streaming chat (SSE) |
 | `/api/conversations` | GET | List all conversations |
 | `/api/conversations/<id>` | GET | Get specific conversation |
+| `/api/snapshots` | GET | List backup snapshots |
+| `/api/snapshots/<id>` | DELETE | Delete a backup snapshot |
 | `/api/status` | GET | Diagnostics & health check |
 | `/health` | GET | Simple health check |
 

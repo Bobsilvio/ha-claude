@@ -21,6 +21,8 @@ Open **AI Assistant** from sidebar → Select an agent from the dropdown → Sta
 - ✅ 40+ AI models across multiple providers
 - ✅ Home Assistant integration (read states, call services)
 - ✅ Multi-language UI (EN/IT/ES/FR)
+- ✅ Floating chat bubble on every HA page (context-aware)
+- ✅ Backup management with restore & delete + per-file limits
 - ✅ Optional: File upload, Persistent memory, Document search
 
 ## Configuration
@@ -34,10 +36,13 @@ Add one or more provider API keys in the add-on configuration:
 - **GitHub Token**: Fine-grained token with no special permissions (get from GitHub Settings)
 
 **Optional Features**:
+- `enable_chat_bubble` → Floating AI chat bubble on every HA page (context-aware, voice input, hidden on mobile)
 - `enable_file_upload` → Upload PDF/DOCX/TXT for AI analysis
 - `enable_memory` → AI remembers past conversations
 - `enable_rag` → Semantic search over documents
 - `enable_file_access` → Read/write `/config` files (with snapshots)
+- `max_snapshots_per_file` → Max backup snapshots per file (default 5, oldest auto-deleted)
+- `max_conversations` → Max chat conversations in history (1-100)
 - `language` → UI language (en/it/es/fr)
 - `debug_mode` → Verbose logging
 - `log_level` → Log verbosity (normal/verbose/debug)

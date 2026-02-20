@@ -102,6 +102,7 @@ AGENT_AVATAR = "🤖"
 AGENT_INSTRUCTIONS = ""
 HTML_DASHBOARD_FOOTER = ""
 MAX_CONVERSATIONS = max(1, min(100, int(os.getenv("MAX_CONVERSATIONS", "10") or "10")))
+MAX_SNAPSHOTS_PER_FILE = max(1, min(50, int(os.getenv("MAX_SNAPSHOTS_PER_FILE", "5") or "5")))
 
 # Persist system prompt override across restarts
 CUSTOM_SYSTEM_PROMPT_FILE = "/config/.storage/claude_custom_system_prompt.txt"
@@ -1788,15 +1789,23 @@ def create_snapshot(filename: str) -> dict:
     with open(meta_path, "w") as f:
         json.dump(meta, f)
 
-    # Keep max 50 snapshots, remove oldest
+    # Per-file limit: keep max MAX_SNAPSHOTS_PER_FILE snapshots per original file
     all_snapshots = sorted([f for f in os.listdir(SNAPSHOTS_DIR) if not f.endswith(".meta")])
-    while len(all_snapshots) > 50:
-        oldest = all_snapshots.pop(0)
-        try:
-            os.remove(os.path.join(SNAPSHOTS_DIR, oldest))
-            os.remove(os.path.join(SNAPSHOTS_DIR, oldest + ".meta"))
-        except:
-            pass
+    # Group by original file (suffix after timestamp_)
+    file_snapshots = {}
+    for s in all_snapshots:
+        parts = s.split("_", 2)  # YYYYMMDD_HHMMSS_filename
+        file_key = parts[2] if len(parts) > 2 else s
+        file_snapshots.setdefault(file_key, []).append(s)
+    for file_key, snaps in file_snapshots.items():
+        while len(snaps) > MAX_SNAPSHOTS_PER_FILE:
+            oldest = snaps.pop(0)
+            try:
+                os.remove(os.path.join(SNAPSHOTS_DIR, oldest))
+                os.remove(os.path.join(SNAPSHOTS_DIR, oldest + ".meta"))
+                logger.debug(f"Snapshot auto-deleted (per-file limit): {oldest}")
+            except:
+                pass
 
     logger.info(f"Snapshot created: {snapshot_id}")
     return {"snapshot_id": snapshot_id, "original_file": filename, "timestamp": timestamp}
@@ -3507,6 +3516,32 @@ def api_snapshots_restore():
         return jsonify(result if isinstance(result, dict) else {"error": str(result)}), 400
     except Exception as e:
         logger.error(f"Snapshot restore error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/snapshots/<snapshot_id>', methods=['DELETE'])
+def api_delete_snapshot(snapshot_id):
+    """Delete a specific snapshot (backup file + metadata)."""
+    try:
+        if not snapshot_id or ".." in snapshot_id or "/" in snapshot_id:
+            return jsonify({"error": "Invalid snapshot_id"}), 400
+
+        snap_path = os.path.join(SNAPSHOTS_DIR, snapshot_id)
+        meta_path = snap_path + ".meta"
+        deleted = False
+        if os.path.isfile(snap_path):
+            os.remove(snap_path)
+            deleted = True
+        if os.path.isfile(meta_path):
+            os.remove(meta_path)
+            deleted = True
+
+        if deleted:
+            logger.info(f"Snapshot deleted: {snapshot_id}")
+            return jsonify({"status": "success", "message": f"Snapshot '{snapshot_id}' deleted"}), 200
+        return jsonify({"error": f"Snapshot '{snapshot_id}' not found"}), 404
+    except Exception as e:
+        logger.error(f"Snapshot delete error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

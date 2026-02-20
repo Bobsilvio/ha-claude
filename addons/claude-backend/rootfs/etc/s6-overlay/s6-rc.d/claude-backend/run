@@ -28,6 +28,7 @@ ENABLE_FILE_UPLOAD=$(bashio::config 'enable_file_upload')
 ENABLE_RAG=$(bashio::config 'enable_rag')
 ENABLE_CHAT_BUBBLE=$(bashio::config 'enable_chat_bubble')
 
+MAX_SNAPSHOTS_PER_FILE=$(bashio::config 'max_snapshots_per_file')
 MAX_CONVERSATIONS=$(bashio::config 'max_conversations')
 
 
@@ -61,6 +62,7 @@ export ENABLE_RAG
 export ENABLE_CHAT_BUBBLE
 export SUPERVISOR_TOKEN
 
+export MAX_SNAPSHOTS_PER_FILE
 export MAX_CONVERSATIONS
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"

@@ -1,4 +1,12 @@
 # Changelog
+## 3.15.0 — Backup Management & Config Descriptions
+- **NEW**: Delete backups from the UI — each backup now has a delete button (with confirmation)
+- **NEW**: `max_snapshots_per_file` config option — set max backup snapshots per file (default 5). Oldest auto-deleted when limit is reached. Applies per-file (e.g., 5 for automations.yaml, 5 for scripts.yaml)
+- **NEW**: `max_conversations` config option — set max chat conversations in history (1-100, default 10)
+- **NEW**: Full config descriptions in all 4 languages (EN/IT/ES/FR) via `translations/*.yaml` — all options now show name and description in the addon configuration page
+- **NEW**: `DELETE /api/snapshots/<id>` API endpoint for programmatic backup deletion
+- **IMPROVED**: README updated with chat bubble, backup management, and new config options
+
 ## 3.14.2
 - **FIX**: Bubble conversations in sidebar don't show selection highlight when clicked
   - After loading a conversation, re-render the active tab (chat or bubble) to update highlight

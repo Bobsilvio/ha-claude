@@ -53,3 +53,12 @@ configuration:
   enable_rag:
     name: Activer RAG
     description: "[EXPÉRIMENTAL] Activer RAG (Génération Augmentée par Récupération) pour la recherche de documents et l'injection de contexte"
+  enable_chat_bubble:
+    name: Bulle de Chat
+    description: "Afficher une bulle de chat IA flottante sur chaque page Home Assistant. Détecte le contexte (automatisations, scripts, tableaux de bord). Inclut saisie vocale, rendu markdown et changement d'agent en direct. Masquée sur mobile."
+  max_snapshots_per_file:
+    name: Sauvegardes Max par Fichier
+    description: "Nombre maximal de copies de sauvegarde par fichier (ex. 5 pour automations.yaml, 5 pour scripts.yaml). Les copies les plus anciennes sont supprimées automatiquement."
+  max_conversations:
+    name: Conversations Maximales
+    description: "Nombre maximal de conversations de chat dans l'historique (1-100)"

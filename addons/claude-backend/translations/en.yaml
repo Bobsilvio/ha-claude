@@ -53,3 +53,12 @@ configuration:
   enable_rag:
     name: Enable RAG
     description: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search and context injection"
+  enable_chat_bubble:
+    name: Chat Bubble
+    description: "Show a floating AI chat bubble on every Home Assistant page. Context-aware: detects automations, scripts, dashboards. Includes voice input, markdown rendering, and live agent switching. Hidden on mobile devices."
+  max_snapshots_per_file:
+    name: Max Backups per File
+    description: "Maximum number of backup snapshots to keep per file (e.g., 5 backups for automations.yaml, 5 for scripts.yaml). Oldest backups are auto-deleted when the limit is reached."
+  max_conversations:
+    name: Max Conversations
+    description: "Maximum number of chat conversations to keep in history (1-100)"

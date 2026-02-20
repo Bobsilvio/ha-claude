@@ -53,3 +53,12 @@ configuration:
   enable_rag:
     name: Habilitar RAG
     description: "[EXPERIMENTAL] Habilitar RAG (Generación Aumentada por Recuperación) para búsqueda de documentos e inyección de contexto"
+  enable_chat_bubble:
+    name: Burbuja de Chat
+    description: "Mostrar una burbuja de chat AI flotante en cada página de Home Assistant. Detecta el contexto (automatizaciones, scripts, paneles). Incluye entrada de voz, renderizado markdown y cambio de agente en vivo. Oculta en dispositivos móviles."
+  max_snapshots_per_file:
+    name: Copias Máximas por Archivo
+    description: "Número máximo de copias de seguridad por archivo (ej. 5 para automations.yaml, 5 para scripts.yaml). Las copias más antiguas se eliminan automáticamente."
+  max_conversations:
+    name: Conversaciones Máximas
+    description: "Número máximo de conversaciones de chat en el historial (1-100)"
