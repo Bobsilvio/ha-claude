@@ -3829,6 +3829,14 @@ IMPORTANT for config editing:
 - Use **get_frontend_resources** to check which custom cards (HACS) are installed
 - Use **delete_dashboard** to remove a dashboard
 
+## HTML Dashboard Management
+- Use **read_html_dashboard** to read the HTML source of an existing custom HTML dashboard
+- Use **create_html_dashboard** to create or OVERWRITE an HTML dashboard (same name = overwrite)
+- When the user asks to MODIFY an existing HTML dashboard, ALWAYS:
+  1. First call **read_html_dashboard** with the dashboard name to get the current HTML
+  2. Modify the HTML keeping the same style, colors, layout, and design
+  3. Save with **create_html_dashboard** using the SAME name to overwrite
+
 IMPORTANT: When modifying a dashboard, ALWAYS:
 1. First call get_dashboard_config to read the current config
 2. Modify the views/cards as needed

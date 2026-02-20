@@ -177,6 +177,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // Prevent double injection
   if (document.getElementById('ha-claude-bubble')) return;
 
+  // ---- HTML Dashboard names cache (for URL-based detection) ----
+  let _htmlDashboardNames = null;
+  fetch(API_BASE + '/custom_dashboards', {{credentials:'same-origin'}})
+    .then(r => r.ok ? r.json() : null)
+    .then(data => {{
+      if (data && data.dashboards) {{
+        _htmlDashboardNames = data.dashboards.map(d => d.name);
+      }}
+    }}).catch(() => {{}});
+
   // ---- Persistence helpers ----
   const STORE_PREFIX = 'ha-claude-bubble-';
   function loadSetting(key, fallback) {{
@@ -290,6 +300,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (nameMatch) {{
         ctx.type = 'html_dashboard'; ctx.id = nameMatch[1];
         ctx.label = T.context_dashboard + ' (HTML): ' + nameMatch[1];
+        ctx.entities = extractDashboardEntities();
+        return ctx;
+      }}
+    }}
+
+    // Fallback: match URL path against cached HTML dashboard names
+    if (_htmlDashboardNames && _htmlDashboardNames.length > 0) {{
+      const pathSlug = path.split('/').filter(Boolean)[0] || '';
+      const match = _htmlDashboardNames.find(n => n === pathSlug);
+      if (match) {{
+        ctx.type = 'html_dashboard'; ctx.id = match;
+        ctx.label = T.context_dashboard + ' (HTML): ' + match;
         ctx.entities = extractDashboardEntities();
         return ctx;
       }}

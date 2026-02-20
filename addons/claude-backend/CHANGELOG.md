@@ -1,4 +1,12 @@
 # Changelog
+## 3.14.0 — HTML Dashboard Edit from Bubble
+- **FIX**: Bubble now correctly detects HTML dashboard pages
+  - Shadow DOM iframe walk + URL path fallback (caches dashboard names from `/custom_dashboards`)
+  - Works on custom URL paths like `/clima-fotovoltaico/` (not just `/lovelace/`)
+- **FIX**: AI now knows about `read_html_dashboard` — added to system prompt under "HTML Dashboard Management"
+  - Instructs AI to always read current HTML first, then modify keeping same style
+- **IMPROVED**: Context prefix for HTML dashboards includes instruction to use `read_html_dashboard` + `create_html_dashboard` with same name
+
 ## 3.13.9
 - **FIX**: Agent/provider selector not loading in bubble — missing `credentials:'same-origin'` on fetch calls to `/api/get_models`, `/api/set_model`, and `/api/chat/abort`
 
