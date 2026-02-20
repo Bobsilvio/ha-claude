@@ -1,4 +1,10 @@
 # Changelog
+## 3.16.4 — Flask Response Fix
+- **FIXED**: 500 error on UI route `/` due to deprecated Flask syntax
+  - Changed from tuple return `(html, 200, headers)` to `Response()` with `mimetype=` and `headers=`
+  - Flask 2.0+ no longer accepts 3-parameter tuple return for HTML responses
+  - Now properly returns HTML with cache control headers
+
 ## 3.16.3 — UI Error Debugging
 - **IMPROVED**: Detailed error logging for UI route with full traceback
   - Now logs when UI generation starts/completes

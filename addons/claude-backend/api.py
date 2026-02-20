@@ -2768,12 +2768,15 @@ def index():
         logger.info("Generating chat UI...")
         html = chat_ui.get_chat_ui()
         logger.info("Chat UI generated successfully")
-        return html, 200, {
-            'Content-Type': 'text/html; charset=utf-8',
-            'Cache-Control': 'no-store, max-age=0',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-        }
+        return Response(
+            html,
+            mimetype='text/html; charset=utf-8',
+            headers={
+                'Cache-Control': 'no-store, max-age=0',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+            }
+        )
     except Exception as e:
         logger.error(f"Error generating chat UI: {type(e).__name__}: {str(e)}", exc_info=True)
         # Return JSON error instead of HTML to see the actual message
