@@ -485,7 +485,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
     #ha-claude-bubble .chat-panel {{
       display: none; position: fixed; bottom: 90px; right: 24px;
-      width: 380px; min-width: 300px; min-height: 350px;
+      width: 380px; min-width: 300px; min-height: 300px;
       max-width: calc(100vw - 48px); height: 520px; max-height: calc(100vh - 120px);
       background: var(--card-background-color, #fff); border-radius: 16px;
       box-shadow: 0 8px 32px rgba(0,0,0,0.3); flex-direction: column;
@@ -783,8 +783,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     btn.style.top = savedPos.y + 'px';
     btn.style.right = 'auto';
     btn.style.bottom = 'auto';
+  }} else if (isTablet) {{
+    // Tablet default: top-right (avoids keyboard covering the chat)
+    btn.style.top = '16px';
+    btn.style.right = '16px';
+    btn.style.left = 'auto';
+    btn.style.bottom = 'auto';
   }} else {{
-    // Default: always use bottom-right (relative positioning)
+    // Desktop default: bottom-right
     btn.style.bottom = '24px';
     btn.style.right = '24px';
     btn.style.left = 'auto';
@@ -798,10 +804,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (isOpen) positionPanelNearButton();
   }});
 
-  // ---- Apply saved panel size ----
+  // ---- Apply saved panel size or tablet defaults ----
   if (savedSize) {{
     panel.style.width = savedSize.w + 'px';
     panel.style.height = savedSize.h + 'px';
+  }} else if (isTablet) {{
+    // Tablet: wider and shorter to leave room for keyboard
+    panel.style.width = Math.min(520, window.innerWidth - 60) + 'px';
+    panel.style.height = Math.min(400, window.innerHeight - 100) + 'px';
   }}
 
   // Save panel size on resize
@@ -868,11 +878,25 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   function positionPanelNearButton() {{
     const rect = btn.getBoundingClientRect();
     const pw = panel.offsetWidth || 380, ph = panel.offsetHeight || 520;
-    let top = rect.top - ph - 10;
-    if (top < 10) top = rect.bottom + 10;
-    let left = rect.right - pw;
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let top, left;
+
+    // Prefer opening below if button is in the top half, above if in the bottom half
+    if (rect.top < vh / 2) {{
+      // Button is in top half — open below
+      top = rect.bottom + 10;
+      if (top + ph > vh - 10) top = Math.max(10, vh - ph - 10);
+    }} else {{
+      // Button is in bottom half — open above
+      top = rect.top - ph - 10;
+      if (top < 10) top = 10;
+    }}
+
+    // Align right edge with button, but keep within viewport
+    left = rect.right - pw;
     if (left < 10) left = 10;
-    if (left + pw > window.innerWidth - 10) left = window.innerWidth - pw - 10;
+    if (left + pw > vw - 10) left = vw - pw - 10;
+
     panel.style.top = top + 'px'; panel.style.left = left + 'px';
     panel.style.right = 'auto'; panel.style.bottom = 'auto';
   }}

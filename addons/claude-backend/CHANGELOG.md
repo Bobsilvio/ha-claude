@@ -1,4 +1,10 @@
 # Changelog
+## 3.16.9 — Tablet Bubble Layout
+- **FIX**: Bubble button defaults to top-right on tablet (was bottom-right, keyboard covered chat)
+- **FIX**: Chat panel now opens below button when button is in top half of screen
+- **NEW**: Tablet-optimized panel size: wider (520px) and shorter (400px) for landscape use
+- **IMPROVED**: Panel positioning logic — smart top/bottom placement based on button position
+
 ## 3.16.8 — Fix Device Toggle
 - **FIX**: Device enable/disable toggle now works correctly
   - Frontend sent `null` to mean "toggle", but backend interpreted `bool(None)` as `False`
