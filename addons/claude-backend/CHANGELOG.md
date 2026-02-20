@@ -1,4 +1,13 @@
 # Changelog
+## 3.13.7
+- **NEW**: HTML dashboard context awareness in chat bubble
+  - Bubble detects when user is on an HTML dashboard page (walks Shadow DOM to find iframe)
+  - Fetches the full HTML source and passes it as context to the AI
+  - AI can modify the dashboard keeping the same style/design/colors
+  - Works with custom URL paths (e.g., `/clima-fotovoltaico/`) not just `/lovelace/`
+- **NEW**: `read_html_dashboard` tool — AI can read an existing HTML dashboard's source code
+- **NEW**: `/api/dashboard_html/<name>` endpoint — returns dashboard HTML as JSON
+
 ## 3.13.6
 - **FIX**: Chat bubble setup crash — `surrogates not allowed` UTF-8 encoding error
   - Surrogate pair `\uD83D\uDDD1` in confirmation buttons caused write failure

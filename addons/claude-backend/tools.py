@@ -622,6 +622,7 @@ TOOL_DESCRIPTIONS = {
     "get_dashboard_config": "Leggo config dashboard",
     "update_dashboard": "Modifico dashboard",
     "create_dashboard": "Creo dashboard",
+    "read_html_dashboard": "Leggo HTML dashboard",
     "create_html_dashboard": "Creo dashboard HTML (sezioni strutturate)",
     "delete_dashboard": "Elimino dashboard",
     "get_frontend_resources": "Verifico card installate",
@@ -1141,6 +1142,17 @@ HA_TOOLS_DESCRIPTION = [
                 "pattern": {"type": "string", "description": "Regex pattern (input_text only)."}
             },
             "required": ["action", "helper_type"]
+        }
+    },
+    {
+        "name": "read_html_dashboard",
+        "description": "Read the HTML source code of an existing custom dashboard. Use this to understand the current design, style, colors, and layout before modifying it with create_html_dashboard (same name to overwrite).",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Dashboard name/slug (e.g., 'clima-fotovoltaico')"}
+            },
+            "required": ["name"]
         }
     },
     {
@@ -2262,6 +2274,17 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "yaml": dashboard_yaml,
                 "IMPORTANT": "Show the user the dashboard YAML you created."
             }, ensure_ascii=False, default=str)
+
+        elif tool_name == "read_html_dashboard":
+            name = tool_input.get("name", "")
+            safe_name = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+            for subdir in [os.path.join("www", "dashboards"), ".html_dashboards"]:
+                fpath = os.path.join(api.HA_CONFIG_DIR, subdir, safe_name + ".html")
+                if os.path.isfile(fpath):
+                    with open(fpath, "r", encoding="utf-8") as f:
+                        html = f.read()
+                    return json.dumps({"status": "success", "name": name, "html": html, "size": len(html)}, ensure_ascii=False)
+            return json.dumps({"status": "error", "message": f"Dashboard '{name}' not found. Use list: /custom_dashboards"})
 
         elif tool_name == "create_html_dashboard":
             title = tool_input.get("title", "Custom Dashboard")

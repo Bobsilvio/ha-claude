@@ -4188,6 +4188,24 @@ def serve_html_dashboard(name):
         return jsonify({"error": f"Failed to serve dashboard: {str(e)}"}), 500
 
 
+@app.route('/api/dashboard_html/<name>')
+def api_get_dashboard_html(name):
+    """Return HTML dashboard content as JSON (for bubble context / editing)."""
+    try:
+        safe_name = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+        if not safe_name.endswith(".html"):
+            safe_name += ".html"
+        for subdir in [os.path.join("www", "dashboards"), ".html_dashboards"]:
+            path = os.path.join(HA_CONFIG_DIR, subdir, safe_name)
+            if os.path.isfile(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    html = f.read()
+                return jsonify({"name": name, "html": html, "size": len(html)}), 200
+        return jsonify({"error": f"Dashboard '{name}' not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route('/custom_dashboards')
 def list_html_dashboards():
     """List all available custom HTML dashboards."""

@@ -251,6 +251,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   }}
 
   // ---- Context Detection ----
+  function findIframesDeep(root) {{
+    const iframes = [];
+    const queue = [root];
+    while (queue.length > 0) {{
+      const el = queue.shift();
+      if (el.tagName === 'IFRAME') iframes.push(el);
+      if (el.shadowRoot) queue.push(el.shadowRoot);
+      if (el.children) for (const child of el.children) queue.push(child);
+    }}
+    return iframes;
+  }}
+
   function detectContext() {{
     const path = window.location.pathname;
     const ctx = {{ type: null, id: null, label: null, entities: null }};
@@ -268,6 +280,20 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
     m = path.match(/\\/config\\/devices\\/device\\/([^/]+)/);
     if (m) {{ ctx.type = 'device'; ctx.id = m[1]; ctx.label = 'Device: ' + m[1]; return ctx; }}
+
+    // Detect HTML dashboard: find iframe pointing to /local/dashboards/ (walks Shadow DOM)
+    const allIframes = findIframesDeep(document.body);
+    const dashIframe = allIframes.find(f => (f.getAttribute('src') || '').includes('/local/dashboards/'));
+    if (dashIframe) {{
+      const src = dashIframe.getAttribute('src') || '';
+      const nameMatch = src.match(/\\/local\\/dashboards\\/([^.?]+)/);
+      if (nameMatch) {{
+        ctx.type = 'html_dashboard'; ctx.id = nameMatch[1];
+        ctx.label = T.context_dashboard + ' (HTML): ' + nameMatch[1];
+        ctx.entities = extractDashboardEntities();
+        return ctx;
+      }}
+    }}
 
     m = path.match(/\\/(lovelace[^/]*)\\/?(.*)/);
     if (m) {{
@@ -310,6 +336,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       return '[CONTEXT: User is viewing script "' + ctx.id + '". Use get_scripts to read it. Refer to it directly.] ';
     if (ctx.type === 'device' && ctx.id)
       return '[CONTEXT: User is viewing device "' + ctx.id + '". Use search_entities to find its entities.] ';
+    if (ctx.type === 'html_dashboard' && ctx.id) {{
+      let p = '[CONTEXT: User is viewing HTML dashboard "' + ctx.id + '".';
+      if (ctx.entities && ctx.entities.length > 0) {{
+        p += ' Entities: ' + ctx.entities.join(', ') + '.';
+      }}
+      p += ' Use read_html_dashboard to read current HTML, then create_html_dashboard with same name to modify keeping same style.]';
+      return p + ' ';
+    }}
     if (ctx.type === 'dashboard' && ctx.id) {{
       let p = '[CONTEXT: User is viewing dashboard "' + ctx.id + '".';
       if (ctx.entities && ctx.entities.length > 0) {{
@@ -955,7 +989,24 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (!text || isStreaming) return;
 
     const ctx = detectContext();
-    const contextPrefix = buildContextPrefix();
+    let contextPrefix = buildContextPrefix();
+
+    // For HTML dashboards, fetch the actual HTML to pass as context
+    if (ctx.type === 'html_dashboard' && ctx.id) {{
+      try {{
+        const resp = await fetch(API_BASE + '/api/dashboard_html/' + encodeURIComponent(ctx.id), {{credentials:'same-origin'}});
+        if (resp.ok) {{
+          const data = await resp.json();
+          if (data.html) {{
+            contextPrefix = '[CONTEXT: User is viewing HTML dashboard "' + ctx.id + '". '
+              + 'Current HTML source below. To modify, use read_html_dashboard first then create_html_dashboard with same name="' + ctx.id + '" '
+              + 'keeping the same style/design/colors/layout.]\\n'
+              + '[CURRENT_DASHBOARD_HTML]\\n' + data.html + '\\n[/CURRENT_DASHBOARD_HTML]\\n';
+          }}
+        }}
+      }} catch(e) {{ console.warn('[HA-Claude] Could not fetch dashboard HTML:', e); }}
+    }}
+
     const fullMessage = contextPrefix + text;
 
     addMessage('user', text, false);
