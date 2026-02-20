@@ -88,10 +88,6 @@ ENABLE_FILE_UPLOAD = os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true"
 ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
 
-# Bubble device-specific configuration
-BUBBLE_DEVICE_MODE = os.getenv("BUBBLE_DEVICE_MODE", "disable").lower()  # disable|enable_all|tablet_only|custom
-BUBBLE_DEVICE_IDS = os.getenv("BUBBLE_DEVICE_IDS", "").strip()  # Comma-separated list for custom mode
-
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
@@ -2958,8 +2954,7 @@ def setup_chat_bubble():
         js_content = chat_bubble.get_chat_bubble_js(
             ingress_url=ingress_url,
             language=LANGUAGE,
-            bubble_device_mode=BUBBLE_DEVICE_MODE,
-            bubble_device_ids=BUBBLE_DEVICE_IDS,
+
         )
 
         # Save to /config/www/ (served by HA at /local/)
@@ -3184,15 +3179,7 @@ def api_bubble_config():
     try:
         return jsonify({
             "success": True,
-            "enabled": ENABLE_CHAT_BUBBLE,
-            "device_mode": BUBBLE_DEVICE_MODE,
-            "allowed_device_ids": [d.strip() for d in BUBBLE_DEVICE_IDS.split(",") if d.strip()],
-            "device_mode_help": {
-                "disable": "Bubble hidden on phone and tablet (desktop only)",
-                "enable_all": "Bubble visible on all devices",
-                "tablet_only": "Bubble visible only on tablets",
-                "custom": "Bubble visible on devices with IDs in the allowed list + always on desktop"
-            }
+            "enabled": ENABLE_CHAT_BUBBLE
         }), 200
     except Exception as e:
         logger.error(f"Error getting bubble config: {e}")
@@ -3210,7 +3197,6 @@ def api_bubble_devices_list():
         devices = load_device_config()
         return jsonify({
             "success": True,
-            "device_mode": BUBBLE_DEVICE_MODE,
             "devices": devices
         }), 200
     except Exception as e:
@@ -3241,22 +3227,11 @@ def api_bubble_devices_register():
         
         # If device doesn't exist yet, add it with default enabled state based on mode
         if device_id not in devices:
-            # Default: enable based on device type and mode
-            enabled = True
-            if BUBBLE_DEVICE_MODE == "disable" and device_type != "desktop":
-                enabled = False
-            elif BUBBLE_DEVICE_MODE == "tablet_only":
-                enabled = device_type == "tablet"
-            elif BUBBLE_DEVICE_MODE == "enable_all":
-                enabled = True
-            elif BUBBLE_DEVICE_MODE == "custom":
-                # In custom mode, check if device is in whitelist  
-                enabled = device_id in [d.strip() for d in BUBBLE_DEVICE_IDS.split(",") if d.strip()]
-            
+            # Device always enabled by default (management from UI)
             devices[device_id] = {
                 "name": device_name or f"{device_type.capitalize()}",
                 "device_type": device_type,
-                "enabled": enabled,
+                "enabled": True,
                 "first_seen": datetime.now().isoformat(),
                 "last_seen": datetime.now().isoformat(),
             }

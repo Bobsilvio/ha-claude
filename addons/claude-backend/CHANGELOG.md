@@ -1,4 +1,16 @@
 # Changelog
+## 3.15.10 — Simplified Device Management
+- **BREAKING**: Removed device mode configuration (`bubble_device_mode`, `bubble_device_ids`)
+  - All devices register as **enabled by default**
+  - Complete control now via UI "Bubble Devices" tab
+  - No config changes needed - simpler and more intuitive
+- **IMPROVED**: Device registration logic simplified
+  - Always register devices with `enabled: true`
+  - Management done entirely from UI (enable/disable per device)
+- **RENAMED**: "Devices" tab → **"Bubble Devices"** (clearer purpose)
+- **REMOVED**: `bubble_device_mode` and `bubble_device_ids` options from config.yaml
+  - Cleaner configuration file
+
 ## 3.15.9 — Device Manager UI
 - **NEW**: Full device management interface in settings sidebar
   - New tab "Devices" showing all registered devices

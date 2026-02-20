@@ -180,7 +180,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
             "tab_backups": "Backups",
-            "tab_devices": "Devices",
+            "tab_devices": "Bubble Devices",
             "no_backups": "No backups yet",
             "backup_file": "File",
             "backup_date": "Date",
@@ -287,7 +287,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
             "tab_backups": "Backup",
-            "tab_devices": "Dispositivi",
+            "tab_devices": "Bubble Devices",
             "no_backups": "Nessun backup",
             "backup_file": "File",
             "backup_date": "Data",
@@ -394,7 +394,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
             "tab_backups": "Copias",
-            "tab_devices": "Dispositivos",
+            "tab_devices": "Bubble Devices",
             "no_backups": "Sin copias de seguridad",
             "backup_file": "Archivo",
             "backup_date": "Fecha",
@@ -501,7 +501,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bulle",
             "tab_backups": "Sauvegardes",
-            "tab_devices": "Appareils",
+            "tab_devices": "Bubble Devices",
             "no_backups": "Aucune sauvegarde",
             "backup_file": "Fichier",
             "backup_date": "Date",
@@ -772,7 +772,7 @@ def get_chat_ui():
                 <button class="sidebar-tab active" data-tab="chat" onclick="switchSidebarTab('chat')">\U0001f4ac {ui_js['tab_chat']}</button>
                 <button class="sidebar-tab" data-tab="bubble" onclick="switchSidebarTab('bubble')">\U0001f4ad {ui_js['tab_bubble']}</button>
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
-                <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">\U0001f5f2 {ui_js['tab_devices']}</button>
+                <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">⚙️ {ui_js['tab_devices']}</button>
             </div>
             <div class="sidebar-content active" id="tabChat">
                 <div class="chat-list" id="chatList"></div>
