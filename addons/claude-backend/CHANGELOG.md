@@ -1,4 +1,11 @@
 # Changelog
+## 3.15.6 — Backup Download Feature
+- **NEW**: Download any backup directly from the Backups tab
+  - Each backup now has a Download button (next to Restore/Delete)
+  - Downloads as `.bak` file with timestamp (e.g., `automations.yaml.20260220_143022.bak`)
+  - Works for all backup types (automations, scripts, dashboards, etc.)
+  - Translations added for EN/IT/ES/FR
+
 ## 3.15.5 — Automation Description Sync Fix
 - **FIX**: **Automation descriptions now update when triggers change**
   - When modifying automation triggers without providing a new description, the old description is cleared

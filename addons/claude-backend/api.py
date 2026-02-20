@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from flask import Flask, request, jsonify, Response, stream_with_context, g
+from flask import Flask, request, jsonify, Response, stream_with_context, g, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 import requests
@@ -3586,6 +3586,51 @@ def api_delete_snapshot(snapshot_id):
         return jsonify({"error": f"Snapshot '{snapshot_id}' not found"}), 404
     except Exception as e:
         logger.error(f"Snapshot delete error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/snapshots/<snapshot_id>/download', methods=['GET'])
+def api_download_snapshot(snapshot_id):
+    """Download a backup snapshot file."""
+    try:
+        if not snapshot_id or ".." in snapshot_id or "/" in snapshot_id:
+            return jsonify({"error": "Invalid snapshot_id"}), 400
+
+        snap_path = os.path.join(SNAPSHOTS_DIR, snapshot_id)
+        meta_path = snap_path + ".meta"
+        
+        if not os.path.isfile(snap_path):
+            return jsonify({"error": f"Snapshot '{snapshot_id}' not found"}), 404
+
+        # Read metadata to get original filename
+        original_filename = snapshot_id  # default fallback
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path, "r") as f:
+                    meta = json.load(f)
+                    original_filename = meta.get("original_file", snapshot_id)
+                    timestamp = meta.get("timestamp", "")
+            except Exception:
+                pass
+
+        # Generate download filename: original_name.YYYYMMDD_HHMMSS.bak
+        # E.g.: automations.yaml.20260220_143022.bak
+        base_name = os.path.basename(original_filename)
+        if "." in base_name:
+            name_parts = base_name.rsplit(".", 1)
+            dl_filename = f"{name_parts[0]}.{timestamp}.bak"
+        else:
+            dl_filename = f"{base_name}.{timestamp}.bak"
+
+        logger.info(f"Snapshot download: {snapshot_id} as {dl_filename}")
+        return send_file(
+            snap_path,
+            as_attachment=True,
+            download_name=dl_filename,
+            mimetype="application/octet-stream"
+        )
+    except Exception as e:
+        logger.error(f"Snapshot download error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

@@ -187,6 +187,7 @@ def get_chat_ui():
             "confirm_restore_backup": "Restore this backup? The current file will be replaced.",
             "delete_backup": "Delete",
             "confirm_delete_backup": "Delete this backup permanently?",
+            "download_backup": "Download",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -278,6 +279,7 @@ def get_chat_ui():
             "confirm_restore_backup": "Ripristinare questo backup? Il file attuale verrà sostituito.",
             "delete_backup": "Elimina",
             "confirm_delete_backup": "Eliminare questo backup definitivamente?",
+            "download_backup": "Scarica",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -369,6 +371,7 @@ def get_chat_ui():
             "confirm_restore_backup": "¿Restaurar esta copia? El archivo actual será reemplazado.",
             "delete_backup": "Eliminar",
             "confirm_delete_backup": "¿Eliminar esta copia de seguridad permanentemente?",
+            "download_backup": "Descargar",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -460,6 +463,7 @@ def get_chat_ui():
             "confirm_restore_backup": "Restaurer cette sauvegarde ? Le fichier actuel sera remplacé.",
             "delete_backup": "Supprimer",
             "confirm_delete_backup": "Supprimer cette sauvegarde définitivement ?",
+            "download_backup": "Télécharger",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -509,6 +513,8 @@ def get_chat_ui():
         .backup-date {{ font-size: 11px; color: #999; }}
         .backup-restore {{ font-size: 11px; color: #667eea; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #667eea; background: none; transition: all 0.2s; }}
         .backup-restore:hover {{ background: #667eea; color: white; }}
+        .backup-download {{ font-size: 11px; color: #48bb78; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #48bb78; background: none; transition: all 0.2s; }}
+        .backup-download:hover {{ background: #48bb78; color: white; }}
         .backup-delete {{ font-size: 11px; color: #e53e3e; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #e53e3e; background: none; transition: all 0.2s; margin-left: 4px; }}
         .backup-delete:hover {{ background: #e53e3e; color: white; }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
@@ -1941,6 +1947,10 @@ def get_chat_ui():
                     restoreBtn.className = 'backup-restore';
                     restoreBtn.textContent = T.restore || 'Restore';
                     restoreBtn.addEventListener('click', () => restoreBackup(snap.id));
+                    const dlBtn = document.createElement('button');
+                    dlBtn.className = 'backup-download';
+                    dlBtn.textContent = T.download_backup || 'Download';
+                    dlBtn.addEventListener('click', () => downloadBackup(snap.id));
                     const delBtn = document.createElement('button');
                     delBtn.className = 'backup-delete';
                     delBtn.textContent = T.delete_backup || 'Delete';
@@ -1949,6 +1959,7 @@ def get_chat_ui():
                     const btns = document.createElement('div');
                     btns.style.display = 'flex'; btns.style.gap = '4px';
                     btns.appendChild(restoreBtn);
+                    btns.appendChild(dlBtn);
                     btns.appendChild(delBtn);
                     metaDiv.appendChild(btns);
                     item.appendChild(fileDiv);
@@ -1979,6 +1990,16 @@ def get_chat_ui():
             }} catch(e) {{
                 addMessage('\u274c ' + (T.error_restore || 'Restore error: ') + e.message, 'system');
             }}
+        }}
+
+        function downloadBackup(snapshotId) {{
+            const downloadUrl = apiUrl('api/snapshots/' + encodeURIComponent(snapshotId) + '/download');
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = '';  // Let the server set the filename via Content-Disposition
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }}
 
         async function deleteBackup(snapshotId) {{
