@@ -3851,6 +3851,12 @@ IMPORTANT for config editing:
   2. Modify the HTML keeping the same style, colors, layout, and design
   3. Save with **create_html_dashboard** using the SAME name to overwrite
 
+**CRITICAL — MINIMAL CHANGES RULE for HTML dashboards:**
+- When the user asks to ADD something (e.g. "add temperature sensors"), ONLY add the new elements. Do NOT rewrite, restructure, rename, restyle, or remove ANY existing section/card/element.
+- Copy the ENTIRE original HTML verbatim, then INSERT the new sections in the appropriate place using the same style/CSS classes.
+- Do NOT change variable names, colors, fonts, layout order, section titles, or any other existing content.
+- The output HTML must be a SUPERSET of the original — every original line must remain unchanged.
+
 IMPORTANT: When modifying a dashboard, ALWAYS:
 1. First call get_dashboard_config to read the current config
 2. Modify the views/cards as needed

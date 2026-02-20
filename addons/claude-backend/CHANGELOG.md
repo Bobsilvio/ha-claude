@@ -1,4 +1,16 @@
 # Changelog
+## 3.15.13 — Bubble Activity Indicator + HTML Dashboard Fix
+- **NEW**: Bubble now shows detailed working indicator during AI processing
+  - Animated dots with elapsed time counter (e.g., "Thinking... (12s)")
+  - Tool call steps shown as list (e.g., "search_entities", "create_automation")
+  - Status messages visible (e.g., "Anthropic: rate limit, waiting 6s...")
+  - Thinking stays visible until first response token arrives
+  - Steps summary shown above the response text (like main chat UI)
+- **FIX**: Status events (rate-limit waits, retries) were invisible in bubble
+- **FIX**: HTML dashboard "add" requests no longer modify existing sections
+  - Strengthened system prompt: when user asks to ADD, AI must keep entire original HTML unchanged and only INSERT new elements
+  - Updated bubble context prefix with explicit "do NOT modify existing sections" instruction
+
 ## 3.15.12 — Responsive UI Redesign
 - **IMPROVED**: Three breakpoint system for better mobile/tablet/desktop UX
   - **Mobile** (<600px): Sidebar hidden, toggle menu (hamburger ☰)

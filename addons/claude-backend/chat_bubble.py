@@ -389,7 +389,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
       if (ctx.entities && ctx.entities.length > 0) {{
         p += ' Entities: ' + ctx.entities.join(', ') + '.';
       }}
-      p += ' Use read_html_dashboard to read current HTML, then create_html_dashboard with same name to modify keeping same style.]';
+      p += ' Use read_html_dashboard to read current HTML, then create_html_dashboard with same name. ONLY add requested elements — do NOT modify existing sections.]';
       return p + ' ';
     }}
     if (ctx.type === 'dashboard' && ctx.id) {{
@@ -609,6 +609,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
     #ha-claude-bubble .thinking-steps {{
       margin-top: 4px; font-style: normal; font-size: 11px;
       color: var(--secondary-text-color, #888); line-height: 1.4;
+    }}
+    #ha-claude-bubble .progress-steps {{
+      margin-bottom: 6px; font-size: 10px; color: var(--secondary-text-color, #999);
+      line-height: 1.3; border-bottom: 1px solid var(--divider-color, #e0e0e0);
+      padding-bottom: 4px;
+    }}
+    #ha-claude-bubble .progress-steps div {{
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }}
     #ha-claude-bubble .msg.error {{
       align-self: center; background: var(--error-color, #db4437);
@@ -1116,8 +1124,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
           const data = await resp.json();
           if (data.html) {{
             contextPrefix = '[CONTEXT: User is viewing HTML dashboard "' + ctx.id + '". '
-              + 'Current HTML source below. To modify, use read_html_dashboard first then create_html_dashboard with same name="' + ctx.id + '" '
-              + 'keeping the same style/design/colors/layout.]\\n'
+              + 'Current HTML source below. To modify, use read_html_dashboard first then create_html_dashboard with same name="' + ctx.id + '". '
+              + 'CRITICAL: Keep the ENTIRE original HTML unchanged — only ADD the requested elements using the same style/CSS. Do NOT rewrite, restructure, or modify any existing section.]\\n'
               + '[CURRENT_DASHBOARD_HTML]\\n' + data.html + '\\n[/CURRENT_DASHBOARD_HTML]\\n';
           }}
         }}
@@ -1211,12 +1219,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
             const evt = JSON.parse(line.slice(6));
             if (evt.type === 'token') {{
               if (firstToken) {{
+                const savedSteps = _thinkingSteps.slice(0);
                 _removeThinking();
                 assistantEl.style.display = '';
+                if (savedSteps.length) {{
+                  const pDiv = document.createElement('div');
+                  pDiv.className = 'progress-steps';
+                  pDiv.innerHTML = savedSteps.map(s => '<div>\\u2022 ' + s.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>').join('');
+                  assistantEl.appendChild(pDiv);
+                }}
                 firstToken = false;
               }}
               assistantText += evt.content || '';
-              assistantEl.innerHTML = renderMarkdown(assistantText);
+              const stepsHtml = assistantEl.querySelector('.progress-steps');
+              const prefix = stepsHtml ? stepsHtml.outerHTML : '';
+              assistantEl.innerHTML = prefix + renderMarkdown(assistantText);
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }} else if (evt.type === 'clear') {{
               assistantText = '';
