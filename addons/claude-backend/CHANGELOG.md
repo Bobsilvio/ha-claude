@@ -1,4 +1,12 @@
 # Changelog
+## 3.16.7 — Fix Tablet Bubble Tap + Phone Sidebar
+- **FIX**: Bubble no longer opens when tapping HA navigation on tablet
+  - Document-level `touchend` was triggering `togglePanel()` on any tap
+  - Now only the bubble button click toggles the panel
+- **FIX**: Conversation history now loads correctly on phone
+  - Sidebar tabs `onclick` was blocked by CSP in HA Ingress — added CSP-safe event bindings
+  - Sidebar now refreshes conversation list when opened on mobile
+
 ## 3.16.6 — Remove Legacy Dashboard Path
 - **REMOVED**: Legacy `.html_dashboards/` path support
   - Now only scans `www/dashboards/` for custom HTML dashboards

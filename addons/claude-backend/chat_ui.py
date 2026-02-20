@@ -2675,6 +2675,14 @@ def get_chat_ui():
                     el.addEventListener('click', () => sendSuggestion(el));
                 }});
 
+                // Sidebar tabs: bind click handlers (inline onclick blocked by CSP)
+                document.querySelectorAll('.sidebar-tab').forEach((tab) => {{
+                    tab.addEventListener('click', () => {{
+                        const tabName = tab.dataset.tab;
+                        if (tabName) switchSidebarTab(tabName);
+                    }});
+                }});
+
                 // Copy buttons inside chat: use event delegation (inline onclick may be blocked)
                 if (chat && !chat._copyDelegateBound) {{
                     chat._copyDelegateBound = true;
