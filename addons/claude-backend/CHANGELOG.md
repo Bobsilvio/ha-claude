@@ -1,4 +1,9 @@
 # Changelog
+## 3.13.6
+- **FIX**: Chat bubble setup crash — `surrogates not allowed` UTF-8 encoding error
+  - Surrogate pair `\uD83D\uDDD1` in confirmation buttons caused write failure
+  - Fixed invalid Python escape sequences (`\s`, `\?`) in JS regex patterns inside f-string
+
 ## 3.13.5
 - **FIX**: Chat bubble hidden on mobile devices (companion app) — prevents accidental opens on touch
 

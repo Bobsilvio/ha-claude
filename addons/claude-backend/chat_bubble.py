@@ -893,18 +893,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   ]);
 
   const CONFIRM_PATTERNS = [
-    /confermi.*?\?/i,
-    /scrivi\s+s[iì]\s+o\s+no/i,
-    /digita\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?\s+per\s+confermare/i,
-    /vuoi\s+(eliminare|procedere|continuare).*?\?/i,
-    /s[iì]\s*\/\s*no/i,
-    /confirm.*?\?\s*(yes.*no)?/i,
-    /type\s+['"]?yes['"]?\s+or\s+['"]?no['"]?/i,
-    /do\s+you\s+want\s+to\s+(delete|proceed|continue).*?\?/i,
-    /confirma.*?\?/i,
-    /escribe\s+s[ií]\s+o\s+no/i,
-    /confirme[sz]?.*?\?/i,
-    /tape[sz]?\s+['"]?oui['"]?\s+ou\s+['"]?non['"]?/i,
+    /confermi.*\\?/i,
+    /scrivi\\s+s[i\u00ec]\\s+o\\s+no/i,
+    /digita\\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?\\s+per\\s+confermare/i,
+    /vuoi\\s+(eliminare|procedere|continuare).*\\?/i,
+    /s[i\u00ec]\\s*\\/\\s*no/i,
+    /confirm.*\\?\\s*(yes.*no)?/i,
+    /type\\s+['"]?yes['"]?\\s+or\\s+['"]?no['"]?/i,
+    /do\\s+you\\s+want\\s+to\\s+(delete|proceed|continue).*\\?/i,
+    /confirma.*\\?/i,
+    /escribe\\s+s[i\u00ed]\\s+o\\s+no/i,
+    /confirme[sz]?.*\\?/i,
+    /tape[sz]?\\s+['"]?oui['"]?\\s+ou\\s+['"]?non['"]?/i,
   ];
 
   function showConfirmationButtons(msgEl, text) {{
@@ -912,19 +912,19 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     const isConfirmation = CONFIRM_PATTERNS.some(p => p.test(text));
     if (!isConfirmation) return;
 
-    const isDeleteConfirm = /digita\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?/i.test(text) ||
-                            /type\s+['"]?delete['"]?/i.test(text);
+    const isDeleteConfirm = /digita\\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?/i.test(text) ||
+                            /type\\s+['"]?delete['"]?/i.test(text);
 
     const btnContainer = document.createElement('div');
     btnContainer.className = 'confirm-buttons';
 
     const yesBtn = document.createElement('button');
     yesBtn.className = 'confirm-btn confirm-yes';
-    yesBtn.textContent = isDeleteConfirm ? ('\uD83D\uDDD1 ' + T.confirm_delete_yes) : ('\u2705 ' + T.confirm_yes);
+    yesBtn.textContent = isDeleteConfirm ? ('\\uD83D\\uDDD1 ' + T.confirm_delete_yes) : ('\\u2705 ' + T.confirm_yes);
 
     const noBtn = document.createElement('button');
     noBtn.className = 'confirm-btn confirm-no';
-    noBtn.textContent = '\u274C ' + T.confirm_no;
+    noBtn.textContent = '\\u274C ' + T.confirm_no;
 
     yesBtn.onclick = function() {{
       yesBtn.disabled = true;
