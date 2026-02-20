@@ -1,4 +1,7 @@
 # Changelog
+## 3.13.8
+- **FIX**: Chat bubble hidden by health check — removed overly aggressive `/api/status` check that failed through ingress, cleanup on disable is handled by `cleanup_chat_bubble()` instead
+
 ## 3.13.7
 - **NEW**: HTML dashboard context awareness in chat bubble
   - Bubble detects when user is on an HTML dashboard page (walks Shadow DOM to find iframe)
