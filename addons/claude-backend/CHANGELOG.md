@@ -1,4 +1,10 @@
 # Changelog
+## 3.16.3 — UI Error Debugging
+- **IMPROVED**: Detailed error logging for UI route with full traceback
+  - Now logs when UI generation starts/completes
+  - Returns specific error type and message in response
+  - Helps diagnose UI rendering issues
+
 ## 3.16.2 — Bug Fixes
 - **FIXED**: 500 error on UI when AI provider is null/invalid
   - Added fallback to 'anthropic' when provider is null

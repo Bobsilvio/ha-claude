@@ -2765,7 +2765,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 def index():
     """Serve the chat UI."""
     try:
+        logger.info("Generating chat UI...")
         html = chat_ui.get_chat_ui()
+        logger.info("Chat UI generated successfully")
         return html, 200, {
             'Content-Type': 'text/html; charset=utf-8',
             'Cache-Control': 'no-store, max-age=0',
@@ -2773,8 +2775,9 @@ def index():
             'Expires': '0',
         }
     except Exception as e:
-        logger.error(f"Error generating chat UI: {e}", exc_info=True)
-        return jsonify({"error": f"Error generating UI: {str(e)}"}), 500
+        logger.error(f"Error generating chat UI: {type(e).__name__}: {str(e)}", exc_info=True)
+        # Return JSON error instead of HTML to see the actual message
+        return {"error": f"Error generating UI: {type(e).__name__}: {str(e)}"}, 500
 
 
 @app.route('/ui_bootstrap.js')
