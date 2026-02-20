@@ -733,7 +733,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // ---- Apply saved button position (only if manually dragged) ----
   // If user never dragged the button, keep it at bottom-right using relative positioning
   // Only restore left/top if user explicitly dragged it
-  const savedPos = loadSetting('btn-pos', null);
   const wasDragged = loadSetting('btn-dragged', false);
 
   function clampBtnPosition() {{
