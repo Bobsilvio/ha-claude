@@ -9,8 +9,10 @@ def get_chat_ui():
     agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
     agent_avatar = getattr(api, "AGENT_AVATAR", "🤖") or "🤖"
 
-    provider_name = api.PROVIDER_DEFAULTS.get(api.AI_PROVIDER, {}).get("name", api.AI_PROVIDER)
-    model_name = api.get_active_model()
+    # Fallback for null/invalid provider
+    ai_provider = getattr(api, "AI_PROVIDER", "anthropic") or "anthropic"
+    provider_name = api.PROVIDER_DEFAULTS.get(ai_provider, {}).get("name", ai_provider or "Unknown")
+    model_name = api.get_active_model() or "Not configured"
     configured = bool(api.get_api_key())
     status_color = "#4caf50" if configured else "#ff9800"
     status_text = provider_name if configured else f"{provider_name} (no key)"
@@ -906,7 +908,7 @@ def get_chat_ui():
         let currentImage = null;  // Stores base64 image data
         let pendingDocument = null;  // Stores {{file, name, size}} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
-        let currentProviderId = '{api.AI_PROVIDER}';
+        let currentProviderId = '{ai_provider}' || 'anthropic';
 
         const ANALYZING_BY_PROVIDER = {{
             'anthropic': {json.dumps(provider_analyzing['anthropic'].get(api.LANGUAGE, provider_analyzing['anthropic']['en']))},

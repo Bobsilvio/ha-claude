@@ -1,4 +1,12 @@
 # Changelog
+## 3.16.2 — Bug Fixes
+- **FIXED**: 500 error on UI when AI provider is null/invalid
+  - Added fallback to 'anthropic' when provider is null
+  - Better error logging in `/` route with full traceback
+- **FIXED**: `get_active_model()` could return None
+  - Added fallback to display "Not configured" instead
+- **IMPROVED**: Robustness when runtime selection is incomplete
+
 ## 3.16.1 — Bug Fix
 - **FIXED**: ModuleNotFoundError - `pricing.py` was not included in Docker image
   - Added missing `COPY pricing.py .` to Dockerfile

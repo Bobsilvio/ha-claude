@@ -2764,12 +2764,17 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 @app.route('/')
 def index():
     """Serve the chat UI."""
-    return chat_ui.get_chat_ui(), 200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store, max-age=0',
-        'Pragma': 'no-cache',
-        'Expires': '0',
-    }
+    try:
+        html = chat_ui.get_chat_ui()
+        return html, 200, {
+            'Content-Type': 'text/html; charset=utf-8',
+            'Cache-Control': 'no-store, max-age=0',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+        }
+    except Exception as e:
+        logger.error(f"Error generating chat UI: {e}", exc_info=True)
+        return jsonify({"error": f"Error generating UI: {str(e)}"}), 500
 
 
 @app.route('/ui_bootstrap.js')
