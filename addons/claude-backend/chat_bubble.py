@@ -22,14 +22,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mode: str = "disable", bubble_device_ids: str = "") -> str:
+def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     """Generate the floating chat bubble JavaScript module.
 
     Args:
         ingress_url: Addon ingress URL prefix (e.g. '/api/hassio_ingress/<token>')
         language: User language (en/it/es/fr)
-        bubble_device_mode: Device visibility mode (disable|enable_all|tablet_only|custom)
-        bubble_device_ids: Comma-separated list of device IDs for custom mode
 
     Returns:
         Complete JavaScript ES module as string
@@ -172,33 +170,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
   const API_BASE = INGRESS_URL;
   const T = {__import__('json').dumps(t, ensure_ascii=False)};
   const VOICE_LANG = '{voice_lang}';
-  const BUBBLE_DEVICE_MODE = '{bubble_device_mode}';  // disable|enable_all|tablet_only|custom
-  const BUBBLE_DEVICE_IDS = '{bubble_device_ids}'.split(',').map(s => s.trim()).filter(s => s);
-
   // ---- Device detection ----
-  const isMobile = /Mobi|iPhone|iPod/i.test(navigator.userAgent);
-  const isTablet = /iPad|Android/i.test(navigator.userAgent) && !/iPhone|iPod/i.test(navigator.userAgent);
-  const deviceType = isMobile ? 'phone' : isTablet ? 'tablet' : 'desktop';
-  
-  // Try to get device-specific ID from localStorage (stored by user or browser fingerprint)
-  const deviceId = localStorage.getItem('ha-claude-device-id') || '';
+  // Phone: small screen with touch (hide bubble — too small, accidental taps)
+  // Tablet: larger touch screen (show bubble — usable screen size)
+  // Desktop: mouse-based (always show bubble)
+  const ua = navigator.userAgent;
+  const isPhone = /iPhone|iPod/i.test(ua) || (/Android/i.test(ua) && /Mobile/i.test(ua));
+  const isTablet = !isPhone && (/iPad/i.test(ua) || (/Android/i.test(ua) && !/Mobile/i.test(ua)) || (navigator.maxTouchPoints > 1 && window.innerWidth >= 600));
 
-  // Determine if bubble should be shown based on device mode
-  function shouldShowBubble() {{
-    if (BUBBLE_DEVICE_MODE === 'enable_all') return true;
-    if (BUBBLE_DEVICE_MODE === 'disable') return !isMobile && !isTablet;  // Only desktop
-    if (BUBBLE_DEVICE_MODE === 'tablet_only') return isTablet;
-    if (BUBBLE_DEVICE_MODE === 'custom') {{
-      // Show if device ID is in the allowed list OR if it's a desktop (always show desktop in custom mode)
-      if (deviceType === 'desktop') return true;
-      if (deviceId && BUBBLE_DEVICE_IDS.indexOf(deviceId) !== -1) return true;
-      return false;
-    }}
-    return false;
-  }}
-
-  // Hide bubble based on device configuration
-  if (!shouldShowBubble()) return;
+  // Hide only on phones — tablets and desktops get the bubble
+  if (isPhone) return;
 
   // Prevent double injection
   if (document.getElementById('ha-claude-bubble')) return;
@@ -1422,6 +1403,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
         localStorage.setItem('ha-claude-device-id', deviceId);
       }}
 
+      // Determine device type
+      const devType = isPhone ? 'phone' : isTablet ? 'tablet' : 'desktop';
+
       // Send registration to backend
       const resp = await fetch(API_BASE + '/api/bubble/devices', {{
         method: 'POST',
@@ -1429,19 +1413,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mod
         body: JSON.stringify({{
           device_id: deviceId,
           device_name: '',  // Will be set by user later
-          device_type: deviceType,  // desktop|tablet|phone
+          device_type: devType,
         }}),
         credentials: 'same-origin',
       }});
-      
-      if (resp.ok) {{
-        const result = await resp.json();
-        if (!result.enabled) {{
-          console.log('[AI Assistant] Device not enabled for bubble (mode: ' + BUBBLE_DEVICE_MODE + ')');
-          // Bubble is already initialized, so we don't hide it here
-          // User can manage from settings
-        }}
-      }}
     }} catch(e) {{
       console.error('[AI Assistant] Device registration error:', e);
     }}

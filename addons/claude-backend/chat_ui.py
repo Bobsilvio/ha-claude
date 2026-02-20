@@ -544,9 +544,13 @@ def get_chat_ui():
         html, body {{ height: 100%; }}
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; height: 100svh; display: flex; flex-direction: column; overflow-x: hidden; }}
         .main-container {{ display: flex; flex: 1; overflow: hidden; min-width: 0; }}
-        .sidebar {{ width: 250px; min-width: 150px; max-width: 500px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; resize: horizontal; overflow-x: hidden; position: relative; }}
+        .sidebar {{ width: 250px; min-width: 140px; max-width: 500px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; position: relative; }}
         .splitter {{ width: 8px; flex: 0 0 8px; cursor: col-resize; background: transparent; }}
-        .splitter:hover {{ background: rgba(0,0,0,0.06); }}
+        .splitter:hover {{ background: rgba(0,0,0,0.08); }}
+        @media (pointer: coarse) {{
+            .splitter {{ width: 14px; flex: 0 0 14px; background: rgba(0,0,0,0.04); }}
+            .splitter:active {{ background: rgba(0,0,0,0.12); }}
+        }}
         body.resizing, body.resizing * {{ cursor: col-resize !important; user-select: none !important; }}
         .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
         .sidebar-tabs {{ display: flex; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; }}
@@ -944,12 +948,12 @@ def get_chat_ui():
         function initSidebarResize() {{
             if (!sidebarEl || !splitterEl) return;
 
-            // On mobile/touch, the sidebar becomes a stacked section and resize handle
-            // is hidden via CSS. Skip width persistence and mouse drag handlers.
-            const mobileLayout = window.matchMedia('(max-width: 768px)').matches || window.matchMedia('(pointer: coarse)').matches;
-            if (mobileLayout) return;
+            // On mobile (<600px), sidebar is stacked/hidden — skip resize.
+            // On tablet (600-1199px) and desktop (1200px+), allow resize with mouse AND touch.
+            const isMobileLayout = window.matchMedia('(max-width: 599px)').matches;
+            if (isMobileLayout) return;
 
-            const minWidth = 150;
+            const minWidth = 140;
             const maxWidth = 500;
             const storageKey = 'chatSidebarWidth';
 
@@ -963,29 +967,41 @@ def get_chat_ui():
             let startX = 0;
             let startWidth = 0;
 
-            splitterEl.addEventListener('mousedown', (e) => {{
+            function startDrag(x) {{
                 dragging = true;
-                startX = e.clientX;
+                startX = x;
                 startWidth = sidebarEl.getBoundingClientRect().width;
                 document.body.classList.add('resizing');
-                e.preventDefault();
-            }});
+            }}
 
-            window.addEventListener('mousemove', (e) => {{
+            function moveDrag(x) {{
                 if (!dragging) return;
-                const dx = e.clientX - startX;
-                let next = startWidth + dx;
-                next = Math.max(minWidth, Math.min(maxWidth, next));
+                const dx = x - startX;
+                let next = Math.max(minWidth, Math.min(maxWidth, startWidth + dx));
                 sidebarEl.style.width = next + 'px';
-            }});
+            }}
 
-            window.addEventListener('mouseup', () => {{
+            function endDrag() {{
                 if (!dragging) return;
                 dragging = false;
                 document.body.classList.remove('resizing');
                 const finalW = Math.round(sidebarEl.getBoundingClientRect().width);
                 safeLocalStorageSet(storageKey, String(finalW));
-            }});
+            }}
+
+            // Mouse events
+            splitterEl.addEventListener('mousedown', (e) => {{ startDrag(e.clientX); e.preventDefault(); }});
+            window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
+            window.addEventListener('mouseup', endDrag);
+
+            // Touch events (tablet)
+            splitterEl.addEventListener('touchstart', (e) => {{
+                if (e.touches.length === 1) {{ startDrag(e.touches[0].clientX); e.preventDefault(); }}
+            }}, {{ passive: false }});
+            window.addEventListener('touchmove', (e) => {{
+                if (dragging && e.touches.length === 1) moveDrag(e.touches[0].clientX);
+            }}, {{ passive: true }});
+            window.addEventListener('touchend', endDrag);
         }}
 
         function isMobileLayout() {{

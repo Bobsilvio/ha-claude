@@ -1,4 +1,15 @@
 # Changelog
+## 3.15.14 — Tablet Support + Touch Resize
+- **FIX**: Bubble now visible on tablets — only hidden on phones (was hidden on all mobile)
+  - iPhone/iPod/Android Mobile = phone (hidden)
+  - iPad/Android tablet/large touch screen = tablet (shown)
+  - Desktop = always shown
+- **FIX**: Sidebar resize now works with touch on tablets
+  - Added touchstart/touchmove/touchend events alongside mouse events
+  - Splitter wider on touch devices (14px) for easier grabbing
+- **FIX**: Device registration now works for tablet/phone — previously the bubble returned before registering on non-desktop devices
+- **REMOVED**: Unused `bubble_device_mode`/`bubble_device_ids` params (config was already removed)
+
 ## 3.15.13 — Bubble Activity Indicator + HTML Dashboard Fix
 - **NEW**: Bubble now shows detailed working indicator during AI processing
   - Animated dots with elapsed time counter (e.g., "Thinking... (12s)")
