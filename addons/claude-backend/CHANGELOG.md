@@ -1,4 +1,10 @@
 # Changelog
+## 3.16.6 — Remove Legacy Dashboard Path
+- **REMOVED**: Legacy `.html_dashboards/` path support
+  - Now only scans `www/dashboards/` for custom HTML dashboards
+  - Simplified dashboard listing and loading endpoints
+  - Old migration function retained for backward compatibility
+
 ## 3.16.5 — Unicode Encoding Fix
 - **FIXED**: UnicodeEncodeError with surrogate characters in HTML response
   - Added sanitization to remove invalid UTF-16 surrogates before returning

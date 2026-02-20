@@ -4522,10 +4522,8 @@ def serve_html_dashboard(name):
         if not all(c.isalnum() or c in '-.' for c in safe_name):
             return jsonify({"error": "Invalid dashboard name"}), 400
 
-        # Try new path first (www/dashboards/), then legacy (.html_dashboards/)
+        # Load from www/dashboards/ (legacy .html_dashboards/ support removed)
         dashboard_path = os.path.join(HA_CONFIG_DIR, "www", "dashboards", safe_name)
-        if not os.path.isfile(dashboard_path):
-            dashboard_path = os.path.join(HA_CONFIG_DIR, ".html_dashboards", safe_name)
 
         if not os.path.isfile(dashboard_path):
             return jsonify({"error": f"Dashboard '{name}' not found"}), 404
@@ -4565,19 +4563,13 @@ def list_html_dashboards():
     try:
         dashboards = []
 
-        # Scan both new path (www/dashboards/) and legacy (.html_dashboards/)
-        for subdir in [os.path.join("www", "dashboards"), ".html_dashboards"]:
-            dashboards_dir = os.path.join(HA_CONFIG_DIR, subdir)
-            if not os.path.isdir(dashboards_dir):
-                continue
-
+        # Scan www/dashboards/ (legacy .html_dashboards/ support removed)
+        dashboards_dir = os.path.join(HA_CONFIG_DIR, "www", "dashboards")
+        if os.path.isdir(dashboards_dir):
             for filename in os.listdir(dashboards_dir):
                 if filename.endswith(".html"):
                     file_path = os.path.join(dashboards_dir, filename)
                     dash_name = filename.replace(".html", "")
-                    # Skip if already listed (new path takes priority)
-                    if any(d["name"] == dash_name for d in dashboards):
-                        continue
                     dashboards.append({
                         "name": dash_name,
                         "filename": filename,

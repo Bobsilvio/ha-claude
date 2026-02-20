@@ -2292,12 +2292,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "read_html_dashboard":
             name = tool_input.get("name", "")
             safe_name = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
-            for subdir in [os.path.join("www", "dashboards"), ".html_dashboards"]:
-                fpath = os.path.join(api.HA_CONFIG_DIR, subdir, safe_name + ".html")
-                if os.path.isfile(fpath):
-                    with open(fpath, "r", encoding="utf-8") as f:
-                        html = f.read()
-                    return json.dumps({"status": "success", "name": name, "html": html, "size": len(html)}, ensure_ascii=False)
+            # Load from www/dashboards/ (legacy .html_dashboards/ support removed)
+            fpath = os.path.join(api.HA_CONFIG_DIR, "www", "dashboards", safe_name + ".html")
+            if os.path.isfile(fpath):
+                with open(fpath, "r", encoding="utf-8") as f:
+                    html = f.read()
+                return json.dumps({"status": "success", "name": name, "html": html, "size": len(html)}, ensure_ascii=False)
             return json.dumps({"status": "error", "message": f"Dashboard '{name}' not found. Use list: /custom_dashboards"})
 
         elif tool_name == "create_html_dashboard":
