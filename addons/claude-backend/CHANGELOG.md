@@ -1,4 +1,10 @@
 # Changelog
+## 3.15.4 — Bug Fixes
+- **FIX**: Bubble conversations in sidebar now show proper date grouping (Today, Yesterday, etc.)
+  - Correctly extracts timestamp from bubble session IDs (base36 decoding)
+  - Groups by date just like Chat UI conversations
+- **FIX**: Remove duplicate `const savedPos` declaration that caused JS SyntaxError
+
 ## 3.15.3 — History Cleanup & Polish
 - **FIX**: **History cleanup** — HTML dashboard context blocks no longer clutter conversation history
   - `[CONTEXT:...]` and `[CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML]` blocks are stripped before saving messages
