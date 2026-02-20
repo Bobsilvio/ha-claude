@@ -1,4 +1,12 @@
 # Changelog
+## 3.15.1 — Bubble Working Indicator
+- **NEW**: Chat bubble now shows detailed working indicator during AI processing
+  - Animated dots with elapsed time counter (e.g., "Thinking... (12s)")
+  - Tool call steps shown as list (e.g., "search_entities", "create_automation")
+  - Status messages visible (e.g., "Anthropic: rate limit, waiting 6s...")
+  - Thinking indicator stays visible until first response token arrives
+- **FIX**: Status events (rate-limit waits, retries) were invisible in bubble — `thinkingEl` was removed too early
+
 ## 3.15.0 — Backup Management & Config Descriptions
 - **NEW**: Delete backups from the UI — each backup now has a delete button (with confirmation)
 - **NEW**: `max_snapshots_per_file` config option — set max backup snapshots per file (default 5). Oldest auto-deleted when limit is reached. Applies per-file (e.g., 5 for automations.yaml, 5 for scripts.yaml)

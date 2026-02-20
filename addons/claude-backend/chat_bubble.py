@@ -568,6 +568,22 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       align-self: flex-start; background: var(--secondary-background-color, #f0f0f0);
       color: var(--secondary-text-color, #999); font-style: italic; white-space: pre-wrap;
     }}
+    #ha-claude-bubble .thinking-elapsed {{
+      font-size: 10px; opacity: 0.7; margin-left: 4px;
+    }}
+    #ha-claude-bubble .thinking-dots span {{
+      animation: bubble-blink 1.4s infinite both;
+    }}
+    #ha-claude-bubble .thinking-dots span:nth-child(2) {{ animation-delay: 0.2s; }}
+    #ha-claude-bubble .thinking-dots span:nth-child(3) {{ animation-delay: 0.4s; }}
+    @keyframes bubble-blink {{
+      0%, 80%, 100% {{ opacity: 0; }}
+      40% {{ opacity: 1; }}
+    }}
+    #ha-claude-bubble .thinking-steps {{
+      margin-top: 4px; font-style: normal; font-size: 11px;
+      color: var(--secondary-text-color, #888); line-height: 1.4;
+    }}
     #ha-claude-bubble .msg.error {{
       align-self: center; background: var(--error-color, #db4437);
       color: white; font-size: 12px;
@@ -1035,7 +1051,43 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     sendBtn.className = 'input-btn abort-btn';
     sendBtn.disabled = false;
 
-    const thinkingEl = addMessage('thinking', T.thinking + '...', false);
+    const thinkingEl = addMessage('thinking', '', false);
+    thinkingEl.innerHTML = T.thinking + '... <span class="thinking-elapsed"></span><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span><div class="thinking-steps"></div>';
+    const _thinkingStart = Date.now();
+    let _thinkingSteps = [];
+    const _thinkingTimer = setInterval(() => {{
+      const el = thinkingEl.querySelector('.thinking-elapsed');
+      if (!el) return;
+      const s = Math.floor((Date.now() - _thinkingStart) / 1000);
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      el.textContent = '(' + (m > 0 ? m + ':' + String(r).padStart(2, '0') : r + 's') + ')';
+    }}, 1000);
+
+    function _addThinkingStep(text) {{
+      const t = String(text || '').trim();
+      if (!t) return;
+      if (_thinkingSteps.length && _thinkingSteps[_thinkingSteps.length - 1] === t) return;
+      _thinkingSteps.push(t);
+      if (_thinkingSteps.length > 4) _thinkingSteps = _thinkingSteps.slice(-4);
+      const stepsEl = thinkingEl.querySelector('.thinking-steps');
+      if (stepsEl) stepsEl.innerHTML = _thinkingSteps.map(s => '<div>\\u2022 ' + s.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>').join('');
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }}
+
+    function _updateThinkingBase(text) {{
+      const elapsedEl = thinkingEl.querySelector('.thinking-elapsed');
+      const elapsed = elapsedEl ? elapsedEl.outerHTML : '';
+      const stepsEl = thinkingEl.querySelector('.thinking-steps');
+      const steps = stepsEl ? stepsEl.outerHTML : '';
+      thinkingEl.innerHTML = text + ' ' + elapsed + '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>' + steps;
+    }}
+
+    function _removeThinking() {{
+      clearInterval(_thinkingTimer);
+      if (thinkingEl.parentNode) thinkingEl.remove();
+    }}
+
     let toolBadgesEl = null;
     let writeToolCalled = false;
 
@@ -1054,9 +1106,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '', assistantText = '';
+      let firstToken = true;
 
-      thinkingEl.remove();
       const assistantEl = addMessage('assistant', '', false);
+      assistantEl.style.display = 'none';
 
       while (true) {{
         const {{ done, value }} = await reader.read();
@@ -1071,6 +1124,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
           try {{
             const evt = JSON.parse(line.slice(6));
             if (evt.type === 'token') {{
+              if (firstToken) {{
+                _removeThinking();
+                assistantEl.style.display = '';
+                firstToken = false;
+              }}
               assistantText += evt.content || '';
               assistantEl.innerHTML = renderMarkdown(assistantText);
               messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -1079,14 +1137,24 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
               assistantEl.innerHTML = '';
               if (toolBadgesEl) {{ toolBadgesEl.remove(); toolBadgesEl = null; }}
             }} else if (evt.type === 'done') {{
+              if (firstToken) {{
+                _removeThinking();
+                assistantEl.style.display = '';
+                firstToken = false;
+              }}
               if (evt.full_text) {{
                 assistantText = evt.full_text;
                 assistantEl.innerHTML = renderMarkdown(assistantText);
               }}
             }} else if (evt.type === 'error') {{
+              _removeThinking();
+              assistantEl.style.display = '';
               assistantEl.className = 'msg error';
               assistantEl.textContent = evt.message || 'Error';
             }} else if (evt.type === 'tool') {{
+              const desc = evt.description || evt.name || 'tool';
+              _updateThinkingBase('\\U0001f527 ' + desc);
+              _addThinkingStep(desc);
               if (!toolBadgesEl) {{
                 toolBadgesEl = document.createElement('div');
                 toolBadgesEl.className = 'tool-badges';
@@ -1099,8 +1167,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
               messagesEl.scrollTop = messagesEl.scrollHeight;
               if (RELOAD_TOOLS.has(evt.name)) writeToolCalled = true;
             }} else if (evt.type === 'status') {{
-              // Show status below tool badges or as thinking
-              if (thinkingEl.parentNode) thinkingEl.textContent = evt.message || '';
+              const msg = evt.message || '';
+              _updateThinkingBase('\\u23f3 ' + msg);
+              _addThinkingStep(msg);
             }}
           }} catch (parseErr) {{}}
         }}
@@ -1127,11 +1196,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       }}
 
     }} catch (err) {{
+      _removeThinking();
       if (err.name === 'AbortError') {{
-        // User aborted — clean up thinking element
-        if (thinkingEl.parentNode) thinkingEl.remove();
+        // User aborted
       }} else {{
-        if (thinkingEl.parentNode) thinkingEl.remove();
         addMessage('error', T.error_connection, false);
         console.error('Chat bubble error:', err);
       }}
