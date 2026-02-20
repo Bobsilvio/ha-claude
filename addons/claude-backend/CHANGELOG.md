@@ -1,4 +1,9 @@
 # Changelog
+## 3.15.11 — Bug Fixes
+- **FIXED**: NameError `BUBBLE_DEVICE_MODE` in device list endpoint
+- **FIXED**: Bubble Devices tab icon now renders properly (⚙️)
+- **IMPROVED**: Cleaner API response in `/api/bubble/devices` (device_mode removed)
+
 ## 3.15.10 — Simplified Device Management
 - **BREAKING**: Removed device mode configuration (`bubble_device_mode`, `bubble_device_ids`)
   - All devices register as **enabled by default**
