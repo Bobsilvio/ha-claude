@@ -904,6 +904,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       method: 'POST',
       headers: {{ 'Content-Type': 'application/json' }},
       body: JSON.stringify({{ session_id: getSessionId() }}),
+      credentials: 'same-origin',
     }}).catch(() => {{}});
     // Also abort the fetch
     if (currentAbortController) currentAbortController.abort();
@@ -1151,7 +1152,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
   async function loadAgents() {{
     try {{
-      const resp = await fetch(API_BASE + '/api/get_models');
+      const resp = await fetch(API_BASE + '/api/get_models', {{credentials:'same-origin'}});
       if (!resp.ok) return;
       agentData = await resp.json();
       if (!agentData.success) return;
@@ -1195,6 +1196,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ provider }}),
+        credentials: 'same-origin',
       }});
       // Refresh to get new current_model_technical
       await loadAgents();
@@ -1209,6 +1211,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ provider, model }}),
+        credentials: 'same-origin',
       }});
     }} catch(e) {{}}
   }});

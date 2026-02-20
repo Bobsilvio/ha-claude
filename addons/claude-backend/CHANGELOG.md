@@ -1,4 +1,7 @@
 # Changelog
+## 3.13.9
+- **FIX**: Agent/provider selector not loading in bubble — missing `credentials:'same-origin'` on fetch calls to `/api/get_models`, `/api/set_model`, and `/api/chat/abort`
+
 ## 3.13.8
 - **FIX**: Chat bubble hidden by health check — removed overly aggressive `/api/status` check that failed through ingress, cleanup on disable is handled by `cleanup_chat_bubble()` instead
 
