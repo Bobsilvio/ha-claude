@@ -75,6 +75,8 @@ def stream_chat_anthropic(messages, intent_info=None):
     full_text = ""
     max_rounds = (intent_info or {}).get("max_rounds") or 5
     tools_called_this_session = set()  # Track tools already called to detect redundancy
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     for round_num in range(max_rounds):
         # Check abort flag
@@ -154,6 +156,10 @@ def stream_chat_anthropic(messages, intent_info=None):
                             current_tool_input_json = ""
 
                 final_message = stream.get_final_message()
+                # Accumulate token usage across rounds
+                if hasattr(final_message, 'usage') and final_message.usage:
+                    total_input_tokens += getattr(final_message.usage, 'input_tokens', 0) or 0
+                    total_output_tokens += getattr(final_message.usage, 'output_tokens', 0) or 0
         except Exception as api_err:
             error_msg = str(api_err)
             if _is_rate_limit_error(error_msg):
@@ -284,4 +290,9 @@ def stream_chat_anthropic(messages, intent_info=None):
         # Loop back for next round
 
     messages.append({"role": "assistant", "content": full_text})
-    yield {"type": "done", "full_text": full_text}
+    yield {"type": "done", "full_text": full_text, "usage": {
+        "input_tokens": total_input_tokens,
+        "output_tokens": total_output_tokens,
+        "model": api.get_active_model(),
+        "provider": "anthropic",
+    }}

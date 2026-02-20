@@ -62,3 +62,6 @@ configuration:
   max_conversations:
     name: Max Conversations
     description: "Maximum number of chat conversations to keep in history (1-100)"
+  cost_currency:
+    name: Cost Currency
+    description: "Currency for token cost display (USD or EUR)"

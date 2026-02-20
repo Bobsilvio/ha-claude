@@ -22,6 +22,7 @@ import intent
 import providers_openai
 import providers_anthropic
 import providers_google
+import pricing
 import chat_ui
 
 # Optional feature modules
@@ -87,6 +88,7 @@ ENABLE_MEMORY = os.getenv("ENABLE_MEMORY", "False").lower() == "true"
 ENABLE_FILE_UPLOAD = os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true"
 ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
+COST_CURRENCY = os.getenv("COST_CURRENCY", "USD").upper()
 
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
@@ -1749,12 +1751,14 @@ def save_conversations():
                 if "tool_calls" in msg:
                     cleaned_msg["tool_calls"] = msg["tool_calls"]
 
-                # Preserve model/provider info for assistant messages
+                # Preserve model/provider/usage info for assistant messages
                 if msg.get("role") == "assistant":
                     if "model" in msg:
                         cleaned_msg["model"] = msg["model"]
                     if "provider" in msg:
                         cleaned_msg["provider"] = msg["provider"]
+                    if "usage" in msg:
+                        cleaned_msg["usage"] = msg["usage"]
 
                 cleaned_msgs.append(cleaned_msg)
 
@@ -2675,52 +2679,52 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     try:
         # Remember current conversation length to avoid duplicates
         conv_length_before = len(conversations[session_id])
+        last_usage = None  # Will capture usage from done event
 
         if AI_PROVIDER == "nvidia":
-            yield from providers_openai.stream_chat_nvidia_direct(messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages (skip the enriched user message we created)
-            for msg in messages[conv_length_before:]:
-                if msg.get("role") == "assistant":
-                    msg["model"] = get_active_model()
-                    msg["provider"] = AI_PROVIDER
-                    conversations[session_id].append(msg)
+            provider_gen = providers_openai.stream_chat_nvidia_direct(messages, intent_info=intent_info)
         elif AI_PROVIDER in ("openai", "github"):
-            yield from providers_openai.stream_chat_openai(messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages (skip the enriched user message we created)
-            for msg in messages[conv_length_before:]:
-                if msg.get("role") == "assistant":
-                    msg["model"] = get_active_model()
-                    msg["provider"] = AI_PROVIDER
-                    conversations[session_id].append(msg)
+            provider_gen = providers_openai.stream_chat_openai(messages, intent_info=intent_info)
         elif AI_PROVIDER == "anthropic":
             clean_messages = sanitize_messages_for_provider(messages)
-            yield from providers_anthropic.stream_chat_anthropic(clean_messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages WITHOUT tool_use (skip intermediate tool messages)
-            for msg in clean_messages[conv_length_before:]:
-                if msg.get("role") == "assistant":
-                    content = msg.get("content", "")
-                    # Skip messages with tool_use blocks - they are intermediate, not for history
-                    if isinstance(content, list):
-                        continue
-                    msg["model"] = get_active_model()
-                    msg["provider"] = AI_PROVIDER
-                    conversations[session_id].append(msg)
+            messages = clean_messages
+            provider_gen = providers_anthropic.stream_chat_anthropic(clean_messages, intent_info=intent_info)
         elif AI_PROVIDER == "google":
             clean_messages = sanitize_messages_for_provider(messages)
-            yield from providers_google.stream_chat_google(clean_messages, intent_info=intent_info)
-            # Sync ONLY new assistant messages WITHOUT tool_use (skip intermediate tool messages)
-            for msg in clean_messages[conv_length_before:]:
-                if msg.get("role") == "assistant":
-                    content = msg.get("content", "")
-                    # Skip messages with tool_use blocks - they are intermediate, not for history
-                    if isinstance(content, list):
-                        continue
-                    msg["model"] = get_active_model()
-                    msg["provider"] = AI_PROVIDER
-                    conversations[session_id].append(msg)
+            messages = clean_messages
+            provider_gen = providers_google.stream_chat_google(clean_messages, intent_info=intent_info)
         else:
             yield {"type": "error", "message": tr("err_provider_not_supported", provider=AI_PROVIDER)}
             return
+
+        # Stream events, intercepting 'done' to enrich with cost
+        for event in provider_gen:
+            if event.get("type") == "done" and event.get("usage"):
+                usage = event["usage"]
+                cost = pricing.calculate_cost(
+                    usage.get("model", ""),
+                    usage.get("provider", AI_PROVIDER),
+                    usage.get("input_tokens", 0),
+                    usage.get("output_tokens", 0),
+                    COST_CURRENCY,
+                )
+                usage["cost"] = cost
+                usage["currency"] = COST_CURRENCY
+                last_usage = usage
+            yield event
+
+        # Sync new assistant messages to conversation history
+        is_anthropic_or_google = AI_PROVIDER in ("anthropic", "google")
+        for msg in messages[conv_length_before:]:
+            if msg.get("role") == "assistant":
+                content = msg.get("content", "")
+                if is_anthropic_or_google and isinstance(content, list):
+                    continue
+                msg["model"] = get_active_model()
+                msg["provider"] = AI_PROVIDER
+                if last_usage:
+                    msg["usage"] = last_usage
+                conversations[session_id].append(msg)
 
         # Trim and save
         if len(conversations[session_id]) > 50:
@@ -3508,12 +3512,14 @@ def api_conversation_messages(session_id):
         # Skip messages with empty content or only whitespace
         if m.get("role") in ("user", "assistant") and isinstance(content, str) and content.strip():
             msg_data = {"role": m["role"], "content": content}
-            # Include model/provider info for assistant messages
+            # Include model/provider/usage info for assistant messages
             if m.get("role") == "assistant":
                 if "model" in m:
                     msg_data["model"] = m["model"]
                 if "provider" in m:
                     msg_data["provider"] = m["provider"]
+                if "usage" in m:
+                    msg_data["usage"] = m["usage"]
             display_msgs.append(msg_data)
     return jsonify({"session_id": session_id, "messages": display_msgs}), 200
 

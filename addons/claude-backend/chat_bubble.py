@@ -599,6 +599,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     #ha-claude-bubble .progress-steps div {{
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }}
+    #ha-claude-bubble .msg-usage {{
+      font-size: 10px; color: var(--secondary-text-color, #999); text-align: right;
+      margin-top: 3px; padding-top: 3px; border-top: 1px solid var(--divider-color, rgba(150,150,150,0.15));
+    }}
     #ha-claude-bubble .msg.error {{
       align-self: center; background: var(--error-color, #db4437);
       color: white; font-size: 12px;
@@ -1229,6 +1233,23 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
               if (evt.full_text) {{
                 assistantText = evt.full_text;
                 assistantEl.innerHTML = renderMarkdown(assistantText);
+              }}
+              // Append token usage
+              if (evt.usage && (evt.usage.input_tokens || evt.usage.output_tokens)) {{
+                const u = evt.usage;
+                const inp = (u.input_tokens || 0).toLocaleString();
+                const out = (u.output_tokens || 0).toLocaleString();
+                let usageTxt = inp + ' in / ' + out + ' out';
+                if (u.cost !== undefined && u.cost > 0) {{
+                  const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                  usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+                }} else if (u.cost === 0) {{
+                  usageTxt += ' \u2022 free';
+                }}
+                const uDiv = document.createElement('div');
+                uDiv.className = 'msg-usage';
+                uDiv.textContent = usageTxt;
+                assistantEl.appendChild(uDiv);
               }}
             }} else if (evt.type === 'error') {{
               _removeThinking();

@@ -491,6 +491,8 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
     full_text = ""
     max_rounds = (intent_info or {}).get("max_rounds") or 5
+    total_input_tokens = 0
+    total_output_tokens = 0
     # Cache read-only tool results to avoid redundant calls
     tool_cache: dict[str, str] = {}
     read_only_tools = {
@@ -615,6 +617,11 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
                     try:
                         chunk_data = json.loads(data)
+                        # Extract usage if present
+                        if chunk_data.get("usage"):
+                            u = chunk_data["usage"]
+                            total_input_tokens += u.get("prompt_tokens", 0) or 0
+                            total_output_tokens += u.get("completion_tokens", 0) or 0
                         if not chunk_data.get("choices"):
                             continue
 
@@ -824,6 +831,13 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             yield {"type": "token", "content": error_msg_text}
             break
 
+    yield {"type": "done", "full_text": full_text, "usage": {
+        "input_tokens": total_input_tokens,
+        "output_tokens": total_output_tokens,
+        "model": api.get_active_model(),
+        "provider": "nvidia",
+    }}
+
 
 # ---- OpenAI/GitHub Streaming ----
 
@@ -851,6 +865,8 @@ def stream_chat_openai(messages, intent_info=None):
 
     max_tok = 4000 if api.AI_PROVIDER == "github" else 4096
     full_text = ""
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     # FIX: max_rounds from intent_info, or 3 for GitHub (was 5), 5 for others
     max_rounds = (intent_info or {}).get("max_rounds") or (3 if api.AI_PROVIDER == "github" else 5)
@@ -938,8 +954,11 @@ def stream_chat_openai(messages, intent_info=None):
             "model": api.get_active_model(),
             "messages": oai_messages,
             **api.get_max_tokens_param(max_tok),
-            "stream": True
+            "stream": True,
         }
+        # Request usage data in streaming response (OpenAI supports this)
+        if api.AI_PROVIDER in ("openai",):
+            kwargs["stream_options"] = {"include_usage": True}
         # Only include tools if we have some (empty list = no tools for chat intent)
         if tool_defs:
             kwargs["tools"] = tool_defs
@@ -1049,6 +1068,10 @@ def stream_chat_openai(messages, intent_info=None):
         last_progress = time.monotonic()
 
         for chunk in response:
+            # Extract usage from final chunk (when stream_options include_usage is set)
+            if hasattr(chunk, 'usage') and chunk.usage:
+                total_input_tokens += getattr(chunk.usage, 'prompt_tokens', 0) or 0
+                total_output_tokens += getattr(chunk.usage, 'completion_tokens', 0) or 0
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
@@ -1250,4 +1273,9 @@ def stream_chat_openai(messages, intent_info=None):
                         logger.warning(f"Auto-stop query_state failed: {e}")
 
     messages.append({"role": "assistant", "content": full_text})
-    yield {"type": "done", "full_text": full_text}
+    yield {"type": "done", "full_text": full_text, "usage": {
+        "input_tokens": total_input_tokens,
+        "output_tokens": total_output_tokens,
+        "model": api.get_active_model(),
+        "provider": api.AI_PROVIDER,
+    }}

@@ -119,6 +119,8 @@ def stream_chat_google(messages, intent_info: dict | None = None):
     response = None
     round_num = 0
     tool_cache: dict[str, str] = {}  # sig -> result (for redundancy detection)
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     while round_num < MAX_ROUNDS:
         # Check abort flag
@@ -163,6 +165,12 @@ def stream_chat_google(messages, intent_info: dict | None = None):
             return
 
         yield {"type": "status", "message": api.tr("status_response_received", provider=provider_label)}
+
+        # Extract token usage from response
+        usage_meta = getattr(response, "usage_metadata", None)
+        if usage_meta:
+            total_input_tokens += getattr(usage_meta, "prompt_token_count", 0) or 0
+            total_output_tokens += getattr(usage_meta, "candidates_token_count", 0) or 0
 
         function_calls = getattr(response, "function_calls", None) or []
         if not function_calls:
@@ -262,7 +270,12 @@ def stream_chat_google(messages, intent_info: dict | None = None):
                 yield {"type": "clear"}
                 for i in range(0, len(final_text), 4):
                     yield {"type": "token", "content": final_text[i:i+4]}
-                yield {"type": "done", "full_text": final_text}
+                yield {"type": "done", "full_text": final_text, "usage": {
+                    "input_tokens": total_input_tokens,
+                    "output_tokens": total_output_tokens,
+                    "model": api.get_active_model(),
+                    "provider": "google",
+                }}
                 return
 
     if round_num >= MAX_ROUNDS:
@@ -305,4 +318,9 @@ def stream_chat_google(messages, intent_info: dict | None = None):
     if final_text:
         for i in range(0, len(final_text), 4):
             yield {"type": "token", "content": final_text[i:i+4]}
-    yield {"type": "done", "full_text": final_text}
+    yield {"type": "done", "full_text": final_text, "usage": {
+        "input_tokens": total_input_tokens,
+        "output_tokens": total_output_tokens,
+        "model": api.get_active_model(),
+        "provider": "google",
+    }}

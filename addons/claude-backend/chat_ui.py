@@ -683,6 +683,8 @@ def get_chat_ui():
         .entity-input:focus {{ border-color: #667eea; }}
         .tool-badge {{ display: inline-block; background: #e8f0fe; color: #1967d2; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
         .status-badge {{ display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
+        .message-usage {{ font-size: 11px; color: #999; text-align: right; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(150,150,150,0.15); }}
+        .conversation-usage {{ font-size: 11px; color: #aaa; text-align: center; padding: 4px 8px; background: rgba(0,0,0,0.05); border-radius: 8px; margin: 4px 12px; }}
         .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
         .undo-button:hover {{ opacity: 0.9; }}
         .undo-button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
@@ -1424,6 +1426,63 @@ def get_chat_ui():
             }}
         }}
 
+        function formatUsage(usage) {{
+            if (!usage || (!usage.input_tokens && !usage.output_tokens)) return '';
+            const inp = (usage.input_tokens || 0).toLocaleString();
+            const out = (usage.output_tokens || 0).toLocaleString();
+            let tokens = inp + ' in / ' + out + ' out';
+            if (usage.cost !== undefined && usage.cost !== null) {{
+                if (usage.cost > 0) {{
+                    const sym = usage.currency === 'EUR' ? '\u20ac' : '$';
+                    tokens += ' \u2022 ' + sym + usage.cost.toFixed(4);
+                }} else {{
+                    tokens += ' \u2022 free';
+                }}
+            }}
+            return '<div class="message-usage">' + tokens + '</div>';
+        }}
+
+        let conversationUsage = {{ input_tokens: 0, output_tokens: 0, cost: 0, currency: 'USD' }};
+
+        function updateConversationUsage(usage) {{
+            if (!usage) return;
+            conversationUsage.input_tokens += (usage.input_tokens || 0);
+            conversationUsage.output_tokens += (usage.output_tokens || 0);
+            conversationUsage.cost += (usage.cost || 0);
+            conversationUsage.currency = usage.currency || 'USD';
+            renderConversationTotal();
+        }}
+
+        function resetConversationUsage() {{
+            conversationUsage = {{ input_tokens: 0, output_tokens: 0, cost: 0, currency: 'USD' }};
+            renderConversationTotal();
+        }}
+
+        function renderConversationTotal() {{
+            let el = document.getElementById('conversation-usage-total');
+            if (!el) {{
+                el = document.createElement('div');
+                el.id = 'conversation-usage-total';
+                el.className = 'conversation-usage';
+                // Insert before input area
+                const inputArea = document.querySelector('.input-area');
+                if (inputArea) inputArea.parentNode.insertBefore(el, inputArea);
+            }}
+            if (conversationUsage.input_tokens === 0 && conversationUsage.output_tokens === 0) {{
+                el.style.display = 'none';
+                return;
+            }}
+            el.style.display = 'block';
+            const inp = conversationUsage.input_tokens.toLocaleString();
+            const out = conversationUsage.output_tokens.toLocaleString();
+            let text = '\ud83d\udcca ' + inp + ' in / ' + out + ' out';
+            if (conversationUsage.cost > 0) {{
+                const sym = conversationUsage.currency === 'EUR' ? '\u20ac' : '$';
+                text += ' \u2022 ' + sym + conversationUsage.cost.toFixed(4) + ' total';
+            }}
+            el.textContent = text;
+        }}
+
         function addMessage(text, role, imageData = null, metadata = null) {{
             const div = document.createElement('div');
             div.className = 'message ' + role;
@@ -1433,6 +1492,11 @@ def get_chat_ui():
                 if (metadata && (metadata.model || metadata.provider)) {{
                     const modelBadge = `<div style="font-size: 11px; color: #999; margin-bottom: 6px; opacity: 0.8;">🤖 ${{metadata.provider || 'AI'}} | ${{metadata.model || 'unknown'}}</div>`;
                     content = modelBadge + content;
+                }}
+                // Append usage info from history
+                if (metadata && metadata.usage) {{
+                    content += formatUsage(metadata.usage);
+                    updateConversationUsage(metadata.usage);
                 }}
                 div.innerHTML = content;
 
@@ -1895,6 +1959,14 @@ def get_chat_ui():
                                     // Inject entity picker UI if AI is asking the user to pick an entity
                                     injectEntityPicker(div, fullText);
                                 }}
+                                // Append token usage info
+                                if (div && evt.usage) {{
+                                    const usageHtml = formatUsage(evt.usage);
+                                    if (usageHtml) {{
+                                        div.insertAdjacentHTML('beforeend', usageHtml);
+                                    }}
+                                    updateConversationUsage(evt.usage);
+                                }}
                                 shouldStop = true;
                                 try {{ reader.cancel(); }} catch (e) {{}}
                             }}
@@ -2278,11 +2350,13 @@ def get_chat_ui():
                 }}
                 const data = await resp.json();
                 chat.innerHTML = '';
+                resetConversationUsage();
                 if (data.messages && data.messages.length > 0) {{
                     suggestionsEl.style.display = 'none';
                     data.messages.forEach(m => {{
                         if (m.role === 'user' || m.role === 'assistant') {{
-                            const metadata = (m.role === 'assistant' && (m.model || m.provider)) ? {{ model: m.model, provider: m.provider }} : null;
+                            const metadata = (m.role === 'assistant' && (m.model || m.provider || m.usage))
+                                ? {{ model: m.model, provider: m.provider, usage: m.usage }} : null;
                             addMessage(m.content, m.role, null, metadata);
                         }}
                     }});
@@ -2311,6 +2385,7 @@ def get_chat_ui():
         async function newChat() {{
             currentSessionId = Date.now().toString();
             safeLocalStorageSet('currentSessionId', currentSessionId);
+            resetConversationUsage();
             chat.innerHTML = `<div class="message system">
                 {msgs['welcome']}<br>
                 {msgs['provider_model']}<br>

@@ -1,4 +1,18 @@
 # Changelog
+## 3.16.0 — Token Usage Tracking & Cost Estimation
+- **NEW**: Per-message token usage display (input/output tokens + estimated cost)
+  - Shows under each AI response in both chat UI and bubble
+  - Cost calculated from hardcoded model pricing table (USD/EUR)
+  - Free providers (GitHub, NVIDIA) show "free" instead of cost
+- **NEW**: Conversation total — running token/cost counter above input area
+  - Accumulates across all messages in the conversation
+  - Resets on new chat or conversation switch
+- **NEW**: Usage data persisted in conversation history — visible when loading past chats
+- **NEW**: `cost_currency` config option (USD or EUR) with 4-language translations
+- **NEW**: `pricing.py` module — model pricing table updated each release
+- **FIX**: NVIDIA direct streaming now emits `done` event (was missing)
+- All 4 providers extract token usage: Anthropic, OpenAI, Google, NVIDIA
+
 ## 3.15.14 — Tablet Support + Touch Resize
 - **FIX**: Bubble now visible on tablets — only hidden on phones (was hidden on all mobile)
   - iPhone/iPod/Android Mobile = phone (hidden)
