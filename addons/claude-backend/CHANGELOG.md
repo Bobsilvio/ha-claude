@@ -1,4 +1,17 @@
 # Changelog
+## 3.15.9 — Device Manager UI
+- **NEW**: Full device management interface in settings sidebar
+  - New tab "Devices" showing all registered devices
+  - Display device name, type (phone/tablet/desktop), enabled status, last seen
+  - Toggle button to enable/disable each device individually
+  - Rename device with custom names (e.g., "My Phone", "Spouse's Tablet")
+  - Delete button to unregister devices
+  - Real-time updates with visual feedback
+- **IMPROVED**: Added multilingual support (EN/IT/ES/FR)
+  - Tab translations: "Devices", "Dispositivi", "Dispositivos", "Appareils"
+  - All button and status labels translated
+- **READY FOR**: Device per-user configuration and bulk actions
+
 ## 3.15.8 — Device Manager UI
 - **NEW**: Automatic device tracking and management for bubble visibility
   - Each device registers automatically on first bubble access

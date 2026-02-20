@@ -180,6 +180,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
             "tab_backups": "Backups",
+            "tab_devices": "Devices",
             "no_backups": "No backups yet",
             "backup_file": "File",
             "backup_date": "Date",
@@ -188,6 +189,20 @@ def get_chat_ui():
             "delete_backup": "Delete",
             "confirm_delete_backup": "Delete this backup permanently?",
             "download_backup": "Download",
+            # Device manager
+            "no_devices": "No devices registered yet",
+            "device_id": "Device ID",
+            "device_name": "Name",
+            "device_type": "Type",
+            "device_enabled": "Enabled",
+            "device_last_seen": "Last Seen",
+            "enable_device": "Enable",
+            "disable_device": "Disable",
+            "rename_device": "Rename",
+            "delete_device": "Delete",
+            "confirm_delete_device": "Delete this device permanently?",
+            "device_deleted": "Device deleted",
+            "device_updated": "Device updated",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -272,6 +287,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
             "tab_backups": "Backup",
+            "tab_devices": "Dispositivi",
             "no_backups": "Nessun backup",
             "backup_file": "File",
             "backup_date": "Data",
@@ -280,6 +296,20 @@ def get_chat_ui():
             "delete_backup": "Elimina",
             "confirm_delete_backup": "Eliminare questo backup definitivamente?",
             "download_backup": "Scarica",
+            # Device manager
+            "no_devices": "Nessun dispositivo registrato",
+            "device_id": "ID Dispositivo",
+            "device_name": "Nome",
+            "device_type": "Tipo",
+            "device_enabled": "Abilitato",
+            "device_last_seen": "Visto l'ultima volta",
+            "enable_device": "Abilita",
+            "disable_device": "Disabilita",
+            "rename_device": "Rinomina",
+            "delete_device": "Elimina",
+            "confirm_delete_device": "Eliminare questo dispositivo definitivamente?",
+            "device_deleted": "Dispositivo eliminato",
+            "device_updated": "Dispositivo aggiornato",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -364,6 +394,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
             "tab_backups": "Copias",
+            "tab_devices": "Dispositivos",
             "no_backups": "Sin copias de seguridad",
             "backup_file": "Archivo",
             "backup_date": "Fecha",
@@ -372,6 +403,20 @@ def get_chat_ui():
             "delete_backup": "Eliminar",
             "confirm_delete_backup": "¿Eliminar esta copia de seguridad permanentemente?",
             "download_backup": "Descargar",
+            # Device manager
+            "no_devices": "Sin dispositivos registrados",
+            "device_id": "ID del dispositivo",
+            "device_name": "Nombre",
+            "device_type": "Tipo",
+            "device_enabled": "Habilitado",
+            "device_last_seen": "Última vez visto",
+            "enable_device": "Habilitar",
+            "disable_device": "Deshabilitar",
+            "rename_device": "Renombrar",
+            "delete_device": "Eliminar",
+            "confirm_delete_device": "¿Eliminar este dispositivo permanentemente?",
+            "device_deleted": "Dispositivo eliminado",
+            "device_updated": "Dispositivo actualizado",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -456,6 +501,7 @@ def get_chat_ui():
             "tab_chat": "Chat",
             "tab_bubble": "Bulle",
             "tab_backups": "Sauvegardes",
+            "tab_devices": "Appareils",
             "no_backups": "Aucune sauvegarde",
             "backup_file": "Fichier",
             "backup_date": "Date",
@@ -464,6 +510,20 @@ def get_chat_ui():
             "delete_backup": "Supprimer",
             "confirm_delete_backup": "Supprimer cette sauvegarde définitivement ?",
             "download_backup": "Télécharger",
+            # Device manager
+            "no_devices": "Aucun appareil enregistré",
+            "device_id": "ID de l'appareil",
+            "device_name": "Nom",
+            "device_type": "Type",
+            "device_enabled": "Activé",
+            "device_last_seen": "Dernière visite",
+            "enable_device": "Activer",
+            "disable_device": "Désactiver",
+            "rename_device": "Renommer",
+            "delete_device": "Supprimer",
+            "confirm_delete_device": "Supprimer définitivement cet appareil ?",
+            "device_deleted": "Appareil supprimé",
+            "device_updated": "Appareil mis à jour",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -517,6 +577,22 @@ def get_chat_ui():
         .backup-download:hover {{ background: #48bb78; color: white; }}
         .backup-delete {{ font-size: 11px; color: #e53e3e; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #e53e3e; background: none; transition: all 0.2s; margin-left: 4px; }}
         .backup-delete:hover {{ background: #e53e3e; color: white; }}
+        /* Device Manager Styles */
+        .device-list {{ padding: 0; }}
+        .device-item {{ padding: 10px 12px; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 6px; }}
+        .device-item:hover {{ background: #f8f9fa; }}
+        .device-name {{ font-size: 12px; font-weight: 500; color: #333; }}
+        .device-meta {{ display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }}
+        .device-type {{ font-size: 11px; color: #666; background: #e8f0ff; padding: 2px 8px; border-radius: 3px; }}
+        .device-status {{ font-size: 11px; }}
+        .device-last-seen {{ font-size: 10px; color: #999; }}
+        .device-buttons {{ display: flex; gap: 4px; }}
+        .device-toggle {{ font-size: 11px; color: white; cursor: pointer; padding: 4px 10px; border-radius: 4px; border: none; background: #4caf50; transition: all 0.2s; }}
+        .device-toggle:hover {{ opacity: 0.8; }}
+        .device-rename {{ font-size: 11px; color: #667eea; cursor: pointer; padding: 4px 10px; border-radius: 4px; border: 1px solid #667eea; background: none; transition: all 0.2s; }}
+        .device-rename:hover {{ background: #667eea; color: white; }}
+        .device-delete {{ font-size: 11px; color: #e53e3e; cursor: pointer; padding: 4px 10px; border-radius: 4px; border: 1px solid #e53e3e; background: none; transition: all 0.2s; }}
+        .device-delete:hover {{ background: #e53e3e; color: white; }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 0; overflow-x: hidden; }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
@@ -696,6 +772,7 @@ def get_chat_ui():
                 <button class="sidebar-tab active" data-tab="chat" onclick="switchSidebarTab('chat')">\U0001f4ac {ui_js['tab_chat']}</button>
                 <button class="sidebar-tab" data-tab="bubble" onclick="switchSidebarTab('bubble')">\U0001f4ad {ui_js['tab_bubble']}</button>
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
+                <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">\U0001f5f2 {ui_js['tab_devices']}</button>
             </div>
             <div class="sidebar-content active" id="tabChat">
                 <div class="chat-list" id="chatList"></div>
@@ -705,6 +782,9 @@ def get_chat_ui():
             </div>
             <div class="sidebar-content" id="tabBackups">
                 <div class="backup-list" id="backupList"></div>
+            </div>
+            <div class="sidebar-content" id="tabDevices">
+                <div class="device-list" id="deviceList"></div>
             </div>
         </div>
         <div class="splitter" id="sidebarSplitter" title="{ui_js['drag_resize']}"></div>
@@ -1814,6 +1894,9 @@ def get_chat_ui():
             }} else if (tabName === 'backups') {{
                 document.getElementById('tabBackups').classList.add('active');
                 loadBackupList();
+            }} else if (tabName === 'devices') {{
+                document.getElementById('tabDevices').classList.add('active');
+                loadDeviceList();
             }}
         }}
 
@@ -2009,6 +2092,126 @@ def get_chat_ui():
                 if (resp.ok) loadBackupList();
             }} catch(e) {{
                 console.error('Error deleting backup:', e);
+            }}
+        }}
+
+        // Device Manager Functions
+        async function loadDeviceList() {{
+            const listEl = document.getElementById('deviceList');
+            try {{
+                const resp = await fetch(apiUrl('api/bubble/devices'));
+                if (!resp.ok) throw new Error('devices failed: ' + resp.status);
+                const data = await resp.json();
+                listEl.innerHTML = '';
+                if (!data.devices || Object.keys(data.devices).length === 0) {{
+                    listEl.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + (T.no_devices || 'No devices') + '</div>';
+                    return;
+                }}
+                Object.entries(data.devices).forEach(([deviceId, device]) => {{
+                    const item = document.createElement('div');
+                    item.className = 'device-item';
+                    
+                    const nameDiv = document.createElement('div');
+                    nameDiv.className = 'device-name';
+                    nameDiv.textContent = device.name || deviceId;
+                    
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'device-meta';
+                    
+                    const typeSpan = document.createElement('span');
+                    typeSpan.className = 'device-type';
+                    typeSpan.textContent = (device.device_type || 'unknown').charAt(0).toUpperCase() + (device.device_type || 'unknown').slice(1);
+                    
+                    const statusSpan = document.createElement('span');
+                    statusSpan.className = 'device-status';
+                    statusSpan.textContent = device.enabled ? '✅' : '⛔';
+                    
+                    const lastSeenSpan = document.createElement('span');
+                    lastSeenSpan.className = 'device-last-seen';
+                    lastSeenSpan.textContent = 'Last: ' + (device.last_seen ? new Date(device.last_seen).toLocaleDateString() : 'never');
+                    
+                    metaDiv.appendChild(typeSpan);
+                    metaDiv.appendChild(statusSpan);
+                    metaDiv.appendChild(lastSeenSpan);
+                    
+                    const btnDiv = document.createElement('div');
+                    btnDiv.className = 'device-buttons';
+                    
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.className = 'device-toggle';
+                    toggleBtn.textContent = device.enabled ? (T.disable_device || 'Disable') : (T.enable_device || 'Enable');
+                    toggleBtn.style.backgroundColor = device.enabled ? '#ef4444' : '#4caf50';
+                    toggleBtn.addEventListener('click', () => toggleDevice(deviceId));
+                    
+                    const renameBtn = document.createElement('button');
+                    renameBtn.className = 'device-rename';
+                    renameBtn.textContent = T.rename_device || 'Rename';
+                    renameBtn.addEventListener('click', () => renameDevice(deviceId, device.name));
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'device-delete';
+                    deleteBtn.textContent = T.delete_device || 'Delete';
+                    deleteBtn.addEventListener('click', () => deleteDevice(deviceId));
+                    
+                    btnDiv.appendChild(toggleBtn);
+                    btnDiv.appendChild(renameBtn);
+                    btnDiv.appendChild(deleteBtn);
+                    
+                    item.appendChild(nameDiv);
+                    item.appendChild(metaDiv);
+                    item.appendChild(btnDiv);
+                    listEl.appendChild(item);
+                }});
+            }} catch(e) {{
+                console.error('Error loading devices:', e);
+                listEl.innerHTML = '<div style="padding: 12px; color: #ef4444;">⚠️ Error loading devices</div>';
+            }}
+        }}
+
+        async function toggleDevice(deviceId) {{
+            try {{
+                const resp = await fetch(apiUrl('api/bubble/devices/' + encodeURIComponent(deviceId)), {{
+                    method: 'PATCH',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ enabled: null }})  // null = toggle
+                }});
+                if (resp.ok) {{
+                    addMessage('✅ ' + (T.device_updated || 'Device updated'), 'system');
+                    loadDeviceList();
+                }}
+            }} catch(e) {{
+                console.error('Error toggling device:', e);
+            }}
+        }}
+
+        async function renameDevice(deviceId, currentName) {{
+            const newName = prompt(T.rename_device + ':', currentName);
+            if (!newName || newName === currentName) return;
+            try {{
+                const resp = await fetch(apiUrl('api/bubble/devices/' + encodeURIComponent(deviceId)), {{
+                    method: 'PATCH',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ name: newName }})
+                }});
+                if (resp.ok) {{
+                    addMessage('✅ ' + (T.device_updated || 'Device updated'), 'system');
+                    loadDeviceList();
+                }}
+            }} catch(e) {{
+                console.error('Error renaming device:', e);
+            }}
+        }}
+
+        async function deleteDevice(deviceId) {{
+            if (!confirm(T.confirm_delete_device || 'Delete this device permanently?')) return;
+            try {{
+                const resp = await fetch(apiUrl('api/bubble/devices/' + encodeURIComponent(deviceId)), {{ method: 'DELETE' }});
+                if (resp.ok) {{
+                    addMessage('✅ ' + (T.device_deleted || 'Device deleted'), 'system');
+                    loadDeviceList();
+                }}
+            }} catch(e) {{
+                console.error('Error deleting device:', e);
             }}
         }}
 
