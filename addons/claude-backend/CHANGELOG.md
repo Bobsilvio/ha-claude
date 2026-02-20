@@ -1,4 +1,7 @@
 # Changelog
+## 3.13.5
+- **FIX**: Chat bubble hidden on mobile devices (companion app) — prevents accidental opens on touch
+
 ## 3.13.4
 - **FIX**: Chat bubble now properly cleans up when disabled or addon is removed
   - When `enable_chat_bubble` is set to `false`: Lovelace resource is deregistered and JS file is deleted on next startup

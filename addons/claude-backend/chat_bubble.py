@@ -171,6 +171,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   const T = {__import__('json').dumps(t, ensure_ascii=False)};
   const VOICE_LANG = '{voice_lang}';
 
+  // Hide on mobile / companion app
+  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+
   // Prevent double injection
   if (document.getElementById('ha-claude-bubble')) return;
 
