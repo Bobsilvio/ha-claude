@@ -1,4 +1,9 @@
 # Changelog
+## 3.14.2
+- **FIX**: Bubble conversations in sidebar don't show selection highlight when clicked
+  - After loading a conversation, re-render the active tab (chat or bubble) to update highlight
+  - Bubble list now always refreshes from API (was using stale cached data)
+
 ## 3.14.1
 - **FIX**: Intent detection misrouted HTML dashboard edits as `modify_script`
   - Root cause: embedded `<script>` tags in `[CURRENT_DASHBOARD_HTML]` triggered "script" keyword match

@@ -1894,12 +1894,10 @@ def get_chat_ui():
 
         async function loadBubbleList() {{
             try {{
-                if (_allConversations.length === 0) {{
-                    const resp = await fetch(apiUrl('api/conversations'));
-                    if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
-                    const data = await resp.json();
-                    _allConversations = data.conversations || [];
-                }}
+                const resp = await fetch(apiUrl('api/conversations'));
+                if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
+                const data = await resp.json();
+                _allConversations = data.conversations || [];
                 const bubbleConvs = _allConversations.filter(c => c.source === 'bubble');
                 renderConversationList(bubbleConvs, document.getElementById('bubbleList'), 'bubble');
             }} catch(e) {{
@@ -2009,7 +2007,11 @@ def get_chat_ui():
                     </div>`;
                     suggestionsEl.style.display = 'flex';
                 }}
-                loadChatList();
+                // Re-render active tab to update selection highlight
+                const activeTab = document.querySelector('.sidebar-tab.active');
+                const tabName = activeTab ? activeTab.dataset.tab : 'chat';
+                if (tabName === 'bubble') loadBubbleList();
+                else loadChatList();
                 closeSidebarMobile();
             }} catch(e) {{ console.error('Error loading conversation:', e); }}
         }}
