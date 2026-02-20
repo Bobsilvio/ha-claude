@@ -630,6 +630,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   const providerSelect = document.getElementById('haProviderSelect');
   const modelSelect = document.getElementById('haModelSelect');
 
+  // Health check: if addon is unreachable (removed/stopped), hide bubble
+  fetch(API_BASE + '/api/status', {{method:'GET',credentials:'same-origin'}})
+    .then(r => {{ if(!r.ok) throw new Error('not ok'); }})
+    .catch(() => {{
+      root.style.display = 'none';
+      console.warn('[HA-Claude] Addon unreachable, hiding chat bubble');
+    }});
+
   let isOpen = false;
   let isStreaming = false;
   let currentAbortController = null;

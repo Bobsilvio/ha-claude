@@ -1,4 +1,10 @@
 # Changelog
+## 3.13.4
+- **FIX**: Chat bubble now properly cleans up when disabled or addon is removed
+  - When `enable_chat_bubble` is set to `false`: Lovelace resource is deregistered and JS file is deleted on next startup
+  - When addon is removed/stopped: JS health check detects unreachable addon and auto-hides the bubble
+  - No more ghost bubbles persisting after disabling the feature
+
 ## 3.13.3
 - **FIX**: Entity validation in `create_automation` and `update_automation` — AI can no longer use non-existent entity_ids
   - Recursively extracts all entity_id references from triggers, conditions, and actions

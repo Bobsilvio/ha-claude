@@ -2882,6 +2882,7 @@ def setup_chat_bubble():
     if _chat_bubble_registered:
         return
     if not ENABLE_CHAT_BUBBLE:
+        cleanup_chat_bubble()
         return
 
     try:
@@ -2960,6 +2961,39 @@ def setup_chat_bubble():
 
     except Exception as e:
         logger.error(f"Chat bubble setup failed: {e}")
+
+
+def cleanup_chat_bubble():
+    """Remove chat bubble Lovelace resource and JS file.
+
+    Called at startup when ENABLE_CHAT_BUBBLE is False to clean up
+    previous registrations, so the bubble disappears after disabling.
+    """
+    try:
+        ws_result = call_ha_websocket("lovelace/resources/list")
+        resources = ws_result
+        if isinstance(ws_result, dict):
+            resources = ws_result.get("result", [])
+        removed = 0
+        if isinstance(resources, list):
+            for res in resources:
+                if isinstance(res, dict) and res.get("url", "").startswith("/local/ha-claude-chat-bubble"):
+                    try:
+                        call_ha_websocket("lovelace/resources/delete", resource_id=res["id"])
+                        removed += 1
+                        logger.info(f"Chat bubble cleanup: Removed Lovelace resource id={res.get('id')}")
+                    except Exception as e:
+                        logger.warning(f"Chat bubble cleanup: Could not remove resource: {e}")
+
+        js_path = os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.js")
+        if os.path.isfile(js_path):
+            os.remove(js_path)
+            logger.info(f"Chat bubble cleanup: Deleted {js_path}")
+
+        if removed or os.path.isfile(js_path):
+            logger.info("Chat bubble cleanup: Done")
+    except Exception as e:
+        logger.warning(f"Chat bubble cleanup failed: {e}")
 
 
 @app.route('/api/set_model', methods=['POST'])
