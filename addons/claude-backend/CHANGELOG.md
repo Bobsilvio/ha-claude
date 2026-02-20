@@ -1,4 +1,19 @@
 # Changelog
+## 3.15.7 — Device-Specific Bubble Control
+- **NEW**: Configure bubble visibility by device type (phone, tablet, desktop)
+  - **Modes available:**
+    - `disable`: Bubble hidden on phones/tablets (default, desktop only)
+    - `enable_all`: Bubble visible on all devices
+    - `tablet_only`: Bubble visible only on tablets
+    - `custom`: Per-device control with device ID whitelist
+  - Can identify different users' phones/tablets separately (e.g., your phone YES, spouse's phone NO)
+  - Device detection: Distinguishes phone/tablet/desktop via User-Agent
+  - Custom device IDs stored in browser localStorage for persistence
+  - New endpoints:
+    - `POST /api/bubble/device-id` - Register/generate device ID
+    - `GET /api/bubble/config` - View current bubble settings
+- **IMPROVED**: Better click handling on mobile (unchanged - was already fixed from earlier)
+
 ## 3.15.6 — Backup Download Feature
 - **NEW**: Download any backup directly from the Backups tab
   - Each backup now has a Download button (next to Restore/Delete)

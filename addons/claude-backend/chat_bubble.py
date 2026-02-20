@@ -22,12 +22,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
+def get_chat_bubble_js(ingress_url: str, language: str = "en", bubble_device_mode: str = "disable", bubble_device_ids: str = "") -> str:
     """Generate the floating chat bubble JavaScript module.
 
     Args:
         ingress_url: Addon ingress URL prefix (e.g. '/api/hassio_ingress/<token>')
         language: User language (en/it/es/fr)
+        bubble_device_mode: Device visibility mode (disable|enable_all|tablet_only|custom)
+        bubble_device_ids: Comma-separated list of device IDs for custom mode
 
     Returns:
         Complete JavaScript ES module as string
@@ -170,9 +172,33 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   const API_BASE = INGRESS_URL;
   const T = {__import__('json').dumps(t, ensure_ascii=False)};
   const VOICE_LANG = '{voice_lang}';
+  const BUBBLE_DEVICE_MODE = '{bubble_device_mode}';  // disable|enable_all|tablet_only|custom
+  const BUBBLE_DEVICE_IDS = '{bubble_device_ids}'.split(',').map(s => s.trim()).filter(s => s);
 
-  // Hide on mobile / companion app
-  if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return;
+  // ---- Device detection ----
+  const isMobile = /Mobi|iPhone|iPod/i.test(navigator.userAgent);
+  const isTablet = /iPad|Android/i.test(navigator.userAgent) && !/iPhone|iPod/i.test(navigator.userAgent);
+  const deviceType = isMobile ? 'phone' : isTablet ? 'tablet' : 'desktop';
+  
+  // Try to get device-specific ID from localStorage (stored by user or browser fingerprint)
+  const deviceId = localStorage.getItem('ha-claude-device-id') || '';
+
+  // Determine if bubble should be shown based on device mode
+  function shouldShowBubble() {{
+    if (BUBBLE_DEVICE_MODE === 'enable_all') return true;
+    if (BUBBLE_DEVICE_MODE === 'disable') return !isMobile && !isTablet;  // Only desktop
+    if (BUBBLE_DEVICE_MODE === 'tablet_only') return isTablet;
+    if (BUBBLE_DEVICE_MODE === 'custom') {{
+      // Show if device ID is in the allowed list OR if it's a desktop (always show desktop in custom mode)
+      if (deviceType === 'desktop') return true;
+      if (deviceId && BUBBLE_DEVICE_IDS.indexOf(deviceId) !== -1) return true;
+      return false;
+    }}
+    return false;
+  }}
+
+  // Hide bubble based on device configuration
+  if (!shouldShowBubble()) return;
 
   // Prevent double injection
   if (document.getElementById('ha-claude-bubble')) return;

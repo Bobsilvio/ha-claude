@@ -87,6 +87,11 @@ ENABLE_MEMORY = os.getenv("ENABLE_MEMORY", "False").lower() == "true"
 ENABLE_FILE_UPLOAD = os.getenv("ENABLE_FILE_UPLOAD", "False").lower() == "true"
 ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
+
+# Bubble device-specific configuration
+BUBBLE_DEVICE_MODE = os.getenv("BUBBLE_DEVICE_MODE", "disable").lower()  # disable|enable_all|tablet_only|custom
+BUBBLE_DEVICE_IDS = os.getenv("BUBBLE_DEVICE_IDS", "").strip()  # Comma-separated list for custom mode
+
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
@@ -2929,6 +2934,8 @@ def setup_chat_bubble():
         js_content = chat_bubble.get_chat_bubble_js(
             ingress_url=ingress_url,
             language=LANGUAGE,
+            bubble_device_mode=BUBBLE_DEVICE_MODE,
+            bubble_device_ids=BUBBLE_DEVICE_IDS,
         )
 
         # Save to /config/www/ (served by HA at /local/)
@@ -3103,6 +3110,69 @@ def api_set_model():
         "model": AI_MODEL
     })
 
+
+@app.route('/api/bubble/device-id', methods=['POST'])
+def api_bubble_device_id():
+    """Set or generate a unique device ID for bubble device-specific configuration.
+    
+    This endpoint allows storing a device identifier in localStorage so that
+    custom bubble visibility rules can identify specific phones/tablets/devices.
+    
+    Body (optional): {"device_id": "my-phone", "device_name": "Eleonor's iPhone"}
+    Returns: {"device_id": "...", "device_type": "phone|tablet|desktop"}
+    """
+    try:
+        data = request.get_json() or {}
+        device_id = data.get("device_id", "").strip()
+        device_name = data.get("device_name", "").strip()
+        
+        # Generate device ID if not provided
+        if not device_id:
+            import hashlib
+            import uuid
+            # Create stable device ID from browser fingerprint
+            device_id = hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()[:12]
+        
+        # Validate: only allow alphanum, dash, underscore
+        if not all(c.isalnum() or c in '-_' for c in device_id):
+            return jsonify({"success": False, "error": "Device ID can only contain alphanumeric, dash, and underscore"}), 400
+        
+        # Log device registration (for admin purposes)
+        logger.info(f"Bubble device registered: id={device_id}, name={device_name}")
+        
+        return jsonify({
+            "success": True,
+            "device_id": device_id,
+            "device_name": device_name or "Device",
+            "instruction": "Store this device_id in your browser's localStorage as 'ha-claude-device-id' to enable device-specific bubble control"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error setting device ID: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/bubble/config', methods=['GET'])
+def api_bubble_config():
+    """Get current bubble configuration and device visibility rules.
+    
+    Returns information about how the bubble is configured across devices.
+    """
+    try:
+        return jsonify({
+            "success": True,
+            "enabled": ENABLE_CHAT_BUBBLE,
+            "device_mode": BUBBLE_DEVICE_MODE,
+            "allowed_device_ids": [d.strip() for d in BUBBLE_DEVICE_IDS.split(",") if d.strip()],
+            "device_mode_help": {
+                "disable": "Bubble hidden on phone and tablet (desktop only)",
+                "enable_all": "Bubble visible on all devices",
+                "tablet_only": "Bubble visible only on tablets",
+                "custom": "Bubble visible on devices with IDs in the allowed list + always on desktop"
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error getting bubble config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/config', methods=['GET'])
