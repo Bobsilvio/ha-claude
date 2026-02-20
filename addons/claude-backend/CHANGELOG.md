@@ -1,4 +1,10 @@
 # Changelog
+## 3.16.5 — Unicode Encoding Fix
+- **FIXED**: UnicodeEncodeError with surrogate characters in HTML response
+  - Added sanitization to remove invalid UTF-16 surrogates before returning
+  - Uses `encode/decode` with `errors='replace'` to clean malformed characters
+  - Prevents 500 errors on UI generation with certain emoji/unicode combinations
+
 ## 3.16.4 — Flask Response Fix
 - **FIXED**: 500 error on UI route `/` due to deprecated Flask syntax
   - Changed from tuple return `(html, 200, headers)` to `Response()` with `mimetype=` and `headers=`

@@ -2768,6 +2768,10 @@ def index():
         logger.info("Generating chat UI...")
         html = chat_ui.get_chat_ui()
         logger.info("Chat UI generated successfully")
+        
+        # Sanitize surrogates that cause UnicodeEncodeError
+        html = html.encode('utf-8', errors='replace').decode('utf-8', errors='replace')
+        
         return Response(
             html,
             mimetype='text/html; charset=utf-8',
