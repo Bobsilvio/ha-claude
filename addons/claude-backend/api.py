@@ -3328,15 +3328,35 @@ def api_conversations_list():
                     break
         # Determine source: bubble sessions start with "bubble_"
         source = "bubble" if sid.startswith("bubble_") else "chat"
+        
+        # Extract timestamp for sorting/date grouping
+        if source == "bubble" and sid.startswith("bubble_"):
+            # Parse bubble session_id: bubble_<base36_timestamp>_<random>
+            try:
+                parts = sid.split("_")
+                if len(parts) >= 2:
+                    timestamp_b36 = parts[1]
+                    last_updated = int(timestamp_b36, 36)  # Decode base36 timestamp
+                else:
+                    last_updated = sid
+            except:
+                last_updated = sid
+        else:
+            # For chat: ID is typically a numeric timestamp
+            try:
+                last_updated = int(sid) if sid.isdigit() else sid
+            except:
+                last_updated = sid if msgs else 0
+        
         result.append({
             "id": sid,
             "title": title,
             "message_count": len(msgs),
-            "last_updated": msgs[-1].get("timestamp", sid) if msgs else sid,
+            "last_updated": last_updated,
             "source": source
         })
-    # Sort by ID (timestamp) descending
-    result.sort(key=lambda x: x["id"], reverse=True)
+    # Sort by last_updated descending
+    result.sort(key=lambda x: (x["last_updated"] if isinstance(x["last_updated"], (int, float)) else 0), reverse=True)
     return jsonify({"conversations": result[:MAX_CONVERSATIONS]}), 200
 
 
