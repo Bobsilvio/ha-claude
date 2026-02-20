@@ -1,4 +1,16 @@
 # Changelog
+## 3.15.3 — History Cleanup & Polish
+- **FIX**: **History cleanup** — HTML dashboard context blocks no longer clutter conversation history
+  - `[CONTEXT:...]` and `[CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML]` blocks are stripped before saving messages
+  - Chat conversation view now shows only user questions, not the large HTML content
+- **FIX**: **Dashboard success messages now translated** in EN/IT/ES/FR (was always responding in English)
+  - "Dashboard created successfully!" translated with proper language support
+  - Sidebar path message also localized
+- **IMPROVED**: **Bubble button positioning** — now stays at `bottom-right` even when resizing browser window
+  - Uses relative positioning (`bottom` / `right`) instead of absolute coordinates
+  - If manually dragged, saves exact position and restores it on reload
+  - If never dragged, always defaults to bottom-right (doesn't get stuck off-screen)
+
 ## 3.15.2 — Bubble Confirmation Buttons & Resize Fix
 - **NEW**: Chat bubble now shows Sì/No confirmation buttons when AI asks for confirmation
   - Pattern detection (IT/EN/ES/FR): "Confermi?", "vuoi eliminare?", "yes or no?", etc.
