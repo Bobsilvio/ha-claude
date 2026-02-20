@@ -1340,6 +1340,34 @@ def _read_only_response(tool_name: str, tool_input: dict) -> str:
     }, ensure_ascii=False, default=str)
 
 
+def _extract_entity_ids(obj):
+    """Recursively extract all entity_id references from a config dict/list."""
+    ids = set()
+    if isinstance(obj, str):
+        import re as _re
+        for m in _re.finditer(
+            r'(?:sensor|switch|light|climate|binary_sensor|input_boolean|'
+            r'automation|number|select|button|cover|fan|lock|media_player|'
+            r'vacuum|weather|water_heater|scene|script|input_number|'
+            r'input_select|input_text|person|device_tracker|calendar|'
+            r'camera|update|group|sun)\.[a-z0-9_]+', obj
+        ):
+            ids.add(m.group(0))
+    elif isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "entity_id":
+                if isinstance(v, str):
+                    ids.add(v)
+                elif isinstance(v, list):
+                    ids.update(e for e in v if isinstance(e, str))
+            else:
+                ids.update(_extract_entity_ids(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            ids.update(_extract_entity_ids(item))
+    return ids
+
+
 def execute_tool(tool_name: str, tool_input: dict) -> str:
     """Execute a tool call and return the result as string."""
     try:
@@ -1473,6 +1501,31 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "actions": tool_input.get("actions") or tool_input.get("action", []),
                 "mode": tool_input.get("mode", "single"),
             }
+
+            # ---- Entity validation: reject if entity_ids don't exist ----
+            referenced_entities = _extract_entity_ids(config.get("actions", [])) | _extract_entity_ids(config.get("triggers", [])) | _extract_entity_ids(config.get("conditions", []))
+            if referenced_entities:
+                all_states = api.get_all_states()
+                known_ids = {s.get("entity_id") for s in all_states if s.get("entity_id")}
+                invalid = [eid for eid in referenced_entities if eid not in known_ids]
+                if invalid:
+                    # Try to suggest corrections
+                    suggestions = {}
+                    for bad_id in invalid:
+                        domain = bad_id.split(".")[0] if "." in bad_id else ""
+                        name_part = bad_id.split(".", 1)[1] if "." in bad_id else bad_id
+                        # Find similar entity_ids in the same domain
+                        candidates = [kid for kid in known_ids if kid.startswith(domain + ".") and (name_part in kid or kid.split(".", 1)[1] in name_part)]
+                        if candidates:
+                            suggestions[bad_id] = candidates[:3]
+                    msg = {
+                        "status": "error",
+                        "message": f"Entity IDs not found: {', '.join(invalid)}. Use search_entities to find the correct IDs.",
+                        "invalid_entities": invalid,
+                    }
+                    if suggestions:
+                        msg["suggestions"] = suggestions
+                    return json.dumps(msg, ensure_ascii=False, default=str)
 
             # Strategy: write directly to automations.yaml (same as update_automation)
             yaml_path = api.get_config_file_path("automation", "automations.yaml")
@@ -1658,6 +1711,29 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             if not automation_id:
                 return json.dumps({"error": "automation_id is required."})
+
+            # ---- Entity validation on changes ----
+            referenced_entities = _extract_entity_ids(changes)
+            if referenced_entities:
+                all_states = api.get_all_states()
+                known_ids = {s.get("entity_id") for s in all_states if s.get("entity_id")}
+                invalid = [eid for eid in referenced_entities if eid not in known_ids]
+                if invalid:
+                    suggestions = {}
+                    for bad_id in invalid:
+                        domain = bad_id.split(".")[0] if "." in bad_id else ""
+                        name_part = bad_id.split(".", 1)[1] if "." in bad_id else bad_id
+                        candidates = [kid for kid in known_ids if kid.startswith(domain + ".") and (name_part in kid or kid.split(".", 1)[1] in name_part)]
+                        if candidates:
+                            suggestions[bad_id] = candidates[:3]
+                    msg = {
+                        "status": "error",
+                        "message": f"Entity IDs not found: {', '.join(invalid)}. Use search_entities to find the correct IDs.",
+                        "invalid_entities": invalid,
+                    }
+                    if suggestions:
+                        msg["suggestions"] = suggestions
+                    return json.dumps(msg, ensure_ascii=False, default=str)
 
             # Strategy: try YAML first, then REST API fallback (for UI-created automations)
             updated_via = None

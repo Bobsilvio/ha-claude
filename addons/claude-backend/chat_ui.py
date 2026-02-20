@@ -176,6 +176,15 @@ def get_chat_ui():
             "mic_not_found": "No microphone found. Connect a microphone and try again.",
             "mic_in_use": "Microphone in use by another app. Close other apps and try again.",
             "mic_error": "Microphone error",
+            # Sidebar tabs
+            "tab_chat": "Chat",
+            "tab_bubble": "Bubble",
+            "tab_backups": "Backups",
+            "no_backups": "No backups yet",
+            "backup_file": "File",
+            "backup_date": "Date",
+            "restore": "Restore",
+            "confirm_restore_backup": "Restore this backup? The current file will be replaced.",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -256,6 +265,15 @@ def get_chat_ui():
             "mic_not_found": "Nessun microfono trovato. Collega un microfono e riprova.",
             "mic_in_use": "Microfono in uso da un'altra app. Chiudi le altre app e riprova.",
             "mic_error": "Errore microfono",
+            # Sidebar tabs
+            "tab_chat": "Chat",
+            "tab_bubble": "Bubble",
+            "tab_backups": "Backup",
+            "no_backups": "Nessun backup",
+            "backup_file": "File",
+            "backup_date": "Data",
+            "restore": "Ripristina",
+            "confirm_restore_backup": "Ripristinare questo backup? Il file attuale verrà sostituito.",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -336,6 +354,15 @@ def get_chat_ui():
             "mic_not_found": "No se encontró micrófono. Conecta un micrófono e inténtalo de nuevo.",
             "mic_in_use": "Micrófono en uso por otra app. Cierra las otras apps e inténtalo de nuevo.",
             "mic_error": "Error de micrófono",
+            # Sidebar tabs
+            "tab_chat": "Chat",
+            "tab_bubble": "Bubble",
+            "tab_backups": "Copias",
+            "no_backups": "Sin copias de seguridad",
+            "backup_file": "Archivo",
+            "backup_date": "Fecha",
+            "restore": "Restaurar",
+            "confirm_restore_backup": "¿Restaurar esta copia? El archivo actual será reemplazado.",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -416,6 +443,15 @@ def get_chat_ui():
             "mic_not_found": "Aucun microphone trouv\u00e9. Connectez un microphone et r\u00e9essayez.",
             "mic_in_use": "Microphone utilis\u00e9 par une autre app. Fermez les autres apps et r\u00e9essayez.",
             "mic_error": "Erreur de microphone",
+            # Sidebar tabs
+            "tab_chat": "Chat",
+            "tab_bubble": "Bulle",
+            "tab_backups": "Sauvegardes",
+            "no_backups": "Aucune sauvegarde",
+            "backup_file": "Fichier",
+            "backup_date": "Date",
+            "restore": "Restaurer",
+            "confirm_restore_backup": "Restaurer cette sauvegarde ? Le fichier actuel sera remplacé.",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -441,6 +477,12 @@ def get_chat_ui():
         .splitter:hover {{ background: rgba(0,0,0,0.06); }}
         body.resizing, body.resizing * {{ cursor: col-resize !important; user-select: none !important; }}
         .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
+        .sidebar-tabs {{ display: flex; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; }}
+        .sidebar-tab {{ flex: 1; padding: 8px 4px; font-size: 12px; text-align: center; cursor: pointer; border: none; background: none; color: #666; transition: all 0.2s; border-bottom: 2px solid transparent; }}
+        .sidebar-tab:hover {{ background: #f0f0f0; }}
+        .sidebar-tab.active {{ color: #667eea; border-bottom-color: #667eea; font-weight: 600; }}
+        .sidebar-content {{ flex: 1; overflow-y: auto; display: none; }}
+        .sidebar-content.active {{ display: block; }}
         .chat-list {{ flex: 1; overflow-y: auto; }}
         .chat-item {{ padding: 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center; }}
         .chat-item:hover {{ background: #f8f9fa; }}
@@ -451,6 +493,14 @@ def get_chat_ui():
         .chat-item:hover .chat-item-delete {{ opacity: 1; }}
         .chat-item-delete:hover {{ color: #dc2626; background: rgba(239,68,68,0.1); }}
         .chat-group-title {{ padding: 10px 12px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.04em; border-top: 1px solid #f0f0f0; }}
+        .backup-list {{ padding: 0; }}
+        .backup-item {{ padding: 10px 12px; border-bottom: 1px solid #f0f0f0; display: flex; flex-direction: column; gap: 4px; }}
+        .backup-item:hover {{ background: #f8f9fa; }}
+        .backup-file {{ font-size: 12px; color: #333; font-family: monospace; word-break: break-all; }}
+        .backup-meta {{ display: flex; justify-content: space-between; align-items: center; }}
+        .backup-date {{ font-size: 11px; color: #999; }}
+        .backup-restore {{ font-size: 11px; color: #667eea; cursor: pointer; padding: 2px 8px; border-radius: 4px; border: 1px solid #667eea; background: none; transition: all 0.2s; }}
+        .backup-restore:hover {{ background: #667eea; color: white; }}
         .main-content {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
         .header {{ background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 20px; display: flex; align-items: center; gap: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); min-width: 0; overflow-x: hidden; }}
         .header h1 {{ font-size: 18px; font-weight: 600; }}
@@ -626,8 +676,20 @@ def get_chat_ui():
 
     <div class="main-container">
         <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">\U0001f4dd {ui_js['conversations']}</div>
-            <div class="chat-list" id="chatList"></div>
+            <div class="sidebar-tabs">
+                <button class="sidebar-tab active" data-tab="chat" onclick="switchSidebarTab('chat')">\U0001f4ac {ui_js['tab_chat']}</button>
+                <button class="sidebar-tab" data-tab="bubble" onclick="switchSidebarTab('bubble')">\U0001f4ad {ui_js['tab_bubble']}</button>
+                <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
+            </div>
+            <div class="sidebar-content active" id="tabChat">
+                <div class="chat-list" id="chatList"></div>
+            </div>
+            <div class="sidebar-content" id="tabBubble">
+                <div class="chat-list" id="bubbleList"></div>
+            </div>
+            <div class="sidebar-content" id="tabBackups">
+                <div class="backup-list" id="backupList"></div>
+            </div>
         </div>
         <div class="splitter" id="sidebarSplitter" title="{ui_js['drag_resize']}"></div>
         <div class="main-content">
@@ -1722,130 +1784,184 @@ def get_chat_ui():
             }}
         }}
 
+        // ---- Sidebar tab management ----
+        function switchSidebarTab(tabName) {{
+            document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.sidebar-content').forEach(c => c.classList.remove('active'));
+            document.querySelector(`.sidebar-tab[data-tab="${{tabName}}"]`)?.classList.add('active');
+            if (tabName === 'chat') {{
+                document.getElementById('tabChat').classList.add('active');
+                loadChatList();
+            }} else if (tabName === 'bubble') {{
+                document.getElementById('tabBubble').classList.add('active');
+                loadBubbleList();
+            }} else if (tabName === 'backups') {{
+                document.getElementById('tabBackups').classList.add('active');
+                loadBackupList();
+            }}
+        }}
+
+        function renderConversationList(convs, listEl, source) {{
+            listEl.innerHTML = '';
+            if (!convs || convs.length === 0) {{
+                listEl.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + T.no_conversations + '</div>';
+                return;
+            }}
+
+            function parseConvTs(conv) {{
+                try {{
+                    const raw = (conv && (conv.last_updated || conv.id)) ? (conv.last_updated || conv.id) : '';
+                    if (typeof raw === 'number') return raw;
+                    const s = String(raw || '').trim();
+                    if (!s) return 0;
+                    const n = parseInt(s, 10);
+                    if (!Number.isNaN(n) && n > 0) return n;
+                    const p = Date.parse(s);
+                    return Number.isNaN(p) ? 0 : p;
+                }} catch (e) {{ return 0; }}
+            }}
+
+            function formatGroupLabel(ts) {{
+                try {{
+                    if (!ts || ts === 0) return '';
+                    const d = new Date(ts);
+                    if (Number.isNaN(d.getTime())) return '';
+                    const now = new Date();
+                    const startToday = new Date(now);
+                    startToday.setHours(0, 0, 0, 0);
+                    const startD = new Date(d);
+                    startD.setHours(0, 0, 0, 0);
+                    const diffDays = Math.floor((startToday.getTime() - startD.getTime()) / 86400000);
+                    if (diffDays === 0) return (T.today || 'Today');
+                    if (diffDays === 1) return (T.yesterday || 'Yesterday');
+                    if (diffDays >= 2 && diffDays <= 6) return (T.days_ago || '{{n}} days ago').replace('{{n}}', String(diffDays));
+                    const sameYear = d.getFullYear() === now.getFullYear();
+                    const opts = sameYear ? {{ day: '2-digit', month: 'short' }} : {{ day: '2-digit', month: 'short', year: 'numeric' }};
+                    return d.toLocaleDateString(undefined, opts);
+                }} catch (e) {{ return ''; }}
+            }}
+
+            const sorted = convs.slice().sort((a, b) => parseConvTs(b) - parseConvTs(a));
+            let lastLabel = null;
+            sorted.forEach((conv) => {{
+                const ts = parseConvTs(conv);
+                const label = formatGroupLabel(ts);
+                if (label && label !== lastLabel) {{
+                    const header = document.createElement('div');
+                    header.className = 'chat-group-title';
+                    header.textContent = label;
+                    listEl.appendChild(header);
+                    lastLabel = label;
+                }}
+                const item = document.createElement('div');
+                item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
+                const left = document.createElement('div');
+                left.style.flex = '1';
+                left.addEventListener('click', () => loadConversation(conv.id));
+                const title = document.createElement('div');
+                title.className = 'chat-item-title';
+                title.textContent = conv.title || '';
+                const info = document.createElement('div');
+                info.className = 'chat-item-info';
+                info.textContent = String(conv.message_count || 0) + ' ' + (T.messages_count || 'messages');
+                left.appendChild(title);
+                left.appendChild(info);
+                const del = document.createElement('span');
+                del.className = 'chat-item-delete';
+                del.title = T.delete_chat || 'Delete chat';
+                del.textContent = '\U0001f5d1';
+                del.addEventListener('click', (evt) => deleteConversation(evt, conv.id));
+                item.appendChild(left);
+                item.appendChild(del);
+                listEl.appendChild(item);
+            }});
+        }}
+
+        let _allConversations = [];
+
         async function loadChatList() {{
             try {{
                 const resp = await fetch(apiUrl('api/conversations'));
                 if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
-                console.log('[loadChatList] received ', data.conversations ? data.conversations.length : 0, ' conversations');
-                chatList.innerHTML = '';
-                if (data.conversations && data.conversations.length > 0) {{
-                    function parseConvTs(conv) {{
-                        try {{
-                            const raw = (conv && (conv.last_updated || conv.id)) ? (conv.last_updated || conv.id) : '';
-                            if (typeof raw === 'number') return raw;
-                            const s = String(raw || '').trim();
-                            if (!s) return 0;
-                            // Typical session ids are Date.now() strings
-                            const n = parseInt(s, 10);
-                            if (!Number.isNaN(n) && n > 0) return n;
-                            const p = Date.parse(s);
-                            return Number.isNaN(p) ? 0 : p;
-                        }} catch (e) {{
-                            console.warn('[parseConvTs] parse error for', conv, e);
-                            return 0;
-                        }}
-                    }}
-
-                    function formatGroupLabel(ts) {{
-                        try {{
-                            if (!ts || ts === 0) return '';
-                            const d = new Date(ts);
-                            if (Number.isNaN(d.getTime())) return '';
-
-                            const now = new Date();
-                            const startToday = new Date(now);
-                            startToday.setHours(0, 0, 0, 0);
-                            const startYesterday = new Date(startToday);
-                            startYesterday.setDate(startYesterday.getDate() - 1);
-
-                            const startD = new Date(d);
-                            startD.setHours(0, 0, 0, 0);
-                            const diffDays = Math.floor((startToday.getTime() - startD.getTime()) / 86400000);
-
-                            if (diffDays === 0) return (T.today || 'Today');
-                            if (diffDays === 1) return (T.yesterday || 'Yesterday');
-                            if (diffDays >= 2 && diffDays <= 6) {{
-                                const tpl = (T.days_ago || '{{n}} days ago');
-                                return tpl.replace('{{n}}', String(diffDays));
-                            }}
-
-                            const sameYear = d.getFullYear() === now.getFullYear();
-                            const opts = sameYear
-                                ? {{ day: '2-digit', month: 'short' }}
-                                : {{ day: '2-digit', month: 'short', year: 'numeric' }};
-                            try {{
-                                return d.toLocaleDateString(undefined, opts);
-                            }} catch (e) {{
-                                return d.toDateString();
-                            }}
-                        }} catch (e) {{
-                            console.warn('[formatGroupLabel] format error for ts=', ts, e);
-                            return '';
-                        }}
-                    }}
-
-                    const convs = data.conversations.slice();
-                    convs.sort((a, b) => {{
-                        try {{
-                            return parseConvTs(b) - parseConvTs(a);
-                        }} catch (e) {{
-                            console.warn('[loadChatList sort] sort error', e);
-                            return 0;
-                        }}
-                    }});
-
-                    let lastLabel = null;
-                    convs.forEach((conv, idx) => {{
-                        try {{
-                            const ts = parseConvTs(conv);
-                            const label = formatGroupLabel(ts);
-                            if (label && label !== lastLabel) {{
-                                const header = document.createElement('div');
-                                header.className = 'chat-group-title';
-                                header.textContent = label;
-                                chatList.appendChild(header);
-                                lastLabel = label;
-                            }}
-                            const item = document.createElement('div');
-                            item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
-                            const left = document.createElement('div');
-                            left.style.flex = '1';
-                            left.addEventListener('click', () => loadConversation(conv.id));
-
-                            const title = document.createElement('div');
-                            title.className = 'chat-item-title';
-                            title.textContent = conv.title || '';
-
-                            const info = document.createElement('div');
-                            info.className = 'chat-item-info';
-                            info.textContent = String(conv.message_count || 0) + ' ' + (T.messages_count || 'messages');
-
-                            left.appendChild(title);
-                            left.appendChild(info);
-
-                            const del = document.createElement('span');
-                            del.className = 'chat-item-delete';
-                            del.title = T.delete_chat || 'Delete chat';
-                            del.textContent = '\U0001f5d1';
-                            del.addEventListener('click', (evt) => deleteConversation(evt, conv.id));
-
-                            item.appendChild(left);
-                            item.appendChild(del);
-                            chatList.appendChild(item);
-                        }} catch (e) {{
-                            console.error('[loadChatList forEach] error at index', idx, ':', e);
-                        }}
-                    }});
-                }} else {{
-                    chatList.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + T.no_conversations + '</div>';
-                }}
+                _allConversations = data.conversations || [];
+                const chatConvs = _allConversations.filter(c => c.source !== 'bubble');
+                renderConversationList(chatConvs, document.getElementById('chatList'), 'chat');
             }} catch(e) {{
                 console.error('Error loading chat list:', e);
-                if (!window._chatListErrorNotified) {{
-                    addMessage('\u26a0\ufe0f Error loading conversations: ' + (e && e.message ? e.message : String(e)), 'system');
-                    window._chatListErrorNotified = true;
+            }}
+        }}
+
+        async function loadBubbleList() {{
+            try {{
+                if (_allConversations.length === 0) {{
+                    const resp = await fetch(apiUrl('api/conversations'));
+                    if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
+                    const data = await resp.json();
+                    _allConversations = data.conversations || [];
                 }}
+                const bubbleConvs = _allConversations.filter(c => c.source === 'bubble');
+                renderConversationList(bubbleConvs, document.getElementById('bubbleList'), 'bubble');
+            }} catch(e) {{
+                console.error('Error loading bubble list:', e);
+            }}
+        }}
+
+        async function loadBackupList() {{
+            const listEl = document.getElementById('backupList');
+            try {{
+                const resp = await fetch(apiUrl('api/snapshots'));
+                if (!resp.ok) throw new Error('snapshots failed: ' + resp.status);
+                const data = await resp.json();
+                listEl.innerHTML = '';
+                if (!data.snapshots || data.snapshots.length === 0) {{
+                    listEl.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + (T.no_backups || 'No backups') + '</div>';
+                    return;
+                }}
+                data.snapshots.forEach(snap => {{
+                    const item = document.createElement('div');
+                    item.className = 'backup-item';
+                    const fileDiv = document.createElement('div');
+                    fileDiv.className = 'backup-file';
+                    fileDiv.textContent = snap.original_file || snap.id;
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'backup-meta';
+                    const dateSpan = document.createElement('span');
+                    dateSpan.className = 'backup-date';
+                    dateSpan.textContent = snap.formatted_date || snap.timestamp;
+                    const restoreBtn = document.createElement('button');
+                    restoreBtn.className = 'backup-restore';
+                    restoreBtn.textContent = T.restore || 'Restore';
+                    restoreBtn.addEventListener('click', () => restoreBackup(snap.id));
+                    metaDiv.appendChild(dateSpan);
+                    metaDiv.appendChild(restoreBtn);
+                    item.appendChild(fileDiv);
+                    item.appendChild(metaDiv);
+                    listEl.appendChild(item);
+                }});
+            }} catch(e) {{
+                console.error('Error loading backups:', e);
+                listEl.innerHTML = '<div style="padding: 12px; color: #ef4444;">\u26a0\ufe0f Error loading backups</div>';
+            }}
+        }}
+
+        async function restoreBackup(snapshotId) {{
+            if (!confirm(T.confirm_restore_backup || 'Restore this backup?')) return;
+            try {{
+                const resp = await fetch(apiUrl('api/snapshots/restore'), {{ 
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ snapshot_id: snapshotId }})
+                }});
+                const data = await resp.json();
+                if (resp.ok && data.status === 'success') {{
+                    addMessage('\u2705 ' + (T.backup_restored || 'Backup restored'), 'system');
+                    loadBackupList();
+                }} else {{
+                    addMessage('\u274c ' + (data.error || 'Restore failed'), 'system');
+                }}
+            }} catch(e) {{
+                addMessage('\u274c ' + (T.error_restore || 'Restore error: ') + e.message, 'system');
             }}
         }}
 

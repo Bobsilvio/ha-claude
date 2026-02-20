@@ -3258,15 +3258,62 @@ def api_conversations_list():
                 if isinstance(content, str):
                     title = content[:50] + ("..." if len(content) > 50 else "")
                     break
+        # Determine source: bubble sessions start with "bubble_"
+        source = "bubble" if sid.startswith("bubble_") else "chat"
         result.append({
             "id": sid,
             "title": title,
             "message_count": len(msgs),
-            "last_updated": msgs[-1].get("timestamp", sid) if msgs else sid
+            "last_updated": msgs[-1].get("timestamp", sid) if msgs else sid,
+            "source": source
         })
     # Sort by ID (timestamp) descending
     result.sort(key=lambda x: x["id"], reverse=True)
     return jsonify({"conversations": result[:MAX_CONVERSATIONS]}), 200
+
+
+@app.route('/api/snapshots', methods=['GET'])
+def api_snapshots_list():
+    """List all file snapshots (backups) created by AI Assistant."""
+    if not os.path.isdir(SNAPSHOTS_DIR):
+        return jsonify({"snapshots": []}), 200
+    
+    snapshots = []
+    for filename in os.listdir(SNAPSHOTS_DIR):
+        if filename.endswith(".meta"):
+            continue
+        meta_path = os.path.join(SNAPSHOTS_DIR, filename + ".meta")
+        if os.path.isfile(meta_path):
+            try:
+                with open(meta_path, "r") as f:
+                    meta = json.load(f)
+                # Parse timestamp from snapshot_id: YYYYMMDD_HHMMSS_filename
+                ts_str = meta.get("timestamp", "")
+                try:
+                    ts_dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+                    formatted_date = ts_dt.strftime("%d/%m/%Y %H:%M:%S")
+                    sort_key = ts_dt.timestamp()
+                except:
+                    formatted_date = ts_str
+                    sort_key = 0
+                snapshots.append({
+                    "id": meta.get("snapshot_id", filename),
+                    "original_file": meta.get("original_file", filename),
+                    "timestamp": ts_str,
+                    "formatted_date": formatted_date,
+                    "size": meta.get("size", 0),
+                    "sort_key": sort_key
+                })
+            except Exception as e:
+                logger.debug(f"Error reading snapshot meta {filename}: {e}")
+    
+    # Sort by timestamp descending (newest first)
+    snapshots.sort(key=lambda x: x.get("sort_key", 0), reverse=True)
+    # Remove sort_key from output
+    for s in snapshots:
+        s.pop("sort_key", None)
+    
+    return jsonify({"snapshots": snapshots}), 200
 
 
 @app.route('/api/conversations/<session_id>', methods=['GET'])

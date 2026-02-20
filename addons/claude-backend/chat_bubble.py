@@ -57,6 +57,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Fix errors",
             "qa_add_entities": "Add entities",
             "qa_describe": "Describe dashboard",
+            "confirm_yes": "Yes, confirm",
+            "confirm_no": "No, cancel",
+            "confirm_yes_value": "yes",
+            "confirm_no_value": "no",
+            "confirm_delete_yes": "Delete",
         },
         "it": {
             "placeholder": "Chiedi qualcosa su questa pagina...",
@@ -82,6 +87,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Correggi errori",
             "qa_add_entities": "Aggiungi entità",
             "qa_describe": "Descrivi dashboard",
+            "confirm_yes": "Sì, conferma",
+            "confirm_no": "No, annulla",
+            "confirm_yes_value": "si",
+            "confirm_no_value": "no",
+            "confirm_delete_yes": "Elimina",
         },
         "es": {
             "placeholder": "Pregunta sobre esta página...",
@@ -107,6 +117,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Corregir errores",
             "qa_add_entities": "Añadir entidades",
             "qa_describe": "Describir panel",
+            "confirm_yes": "Sí, confirma",
+            "confirm_no": "No, cancela",
+            "confirm_yes_value": "si",
+            "confirm_no_value": "no",
+            "confirm_delete_yes": "Eliminar",
         },
         "fr": {
             "placeholder": "Posez une question sur cette page...",
@@ -132,6 +147,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Corriger erreurs",
             "qa_add_entities": "Ajouter entités",
             "qa_describe": "Décrire tableau",
+            "confirm_yes": "Oui, confirme",
+            "confirm_no": "Non, annule",
+            "confirm_yes_value": "oui",
+            "confirm_no_value": "non",
+            "confirm_delete_yes": "Supprimer",
         },
     }
 
@@ -175,6 +195,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // ---- Simple Markdown renderer ----
   function renderMarkdown(text) {{
     if (!text) return '';
+    
+    // 1. Extract raw HTML diff blocks BEFORE any escaping/processing
+    var diffBlocks = [];
+    text = text.replace(/<!--DIFF-->([\\s\\S]*?)<!--\\/DIFF-->/g, function(m, html) {{
+      diffBlocks.push(html);
+      return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
+    }});
+    
     let html = text
       // Escape HTML
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -211,6 +239,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     // Clean up <br> before/after block elements
     html = html.replace(/<br>(<pre|<div|<strong style)/g, '$1');
     html = html.replace(/(<\\/pre>|<\\/div>)<br>/g, '$1');
+    
+    // 2. Restore diff HTML blocks (untouched by markdown transforms)
+    for (var i = 0; i < diffBlocks.length; i++) {{
+      html = html.replace('%%DIFF_' + i + '%%', diffBlocks[i]);
+    }}
     return html;
   }}
 
@@ -450,6 +483,28 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
     #ha-claude-bubble .msg.assistant .md-li {{ padding: 1px 0; }}
     #ha-claude-bubble .msg.assistant a {{ color: var(--primary-color, #03a9f4); text-decoration: underline; }}
+    /* Diff styles for colored code changes */
+    #ha-claude-bubble .diff-side {{ overflow-x: auto; margin: 8px 0; border-radius: 6px; border: 1px solid var(--divider-color, #e1e4e8); }}
+    #ha-claude-bubble .diff-table {{ width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; table-layout: fixed; }}
+    #ha-claude-bubble .diff-table th {{ padding: 4px 8px; background: var(--secondary-background-color, #f6f8fa); border-bottom: 1px solid var(--divider-color, #e1e4e8); text-align: left; font-size: 10px; font-weight: 600; width: 50%; }}
+    #ha-claude-bubble .diff-th-old {{ color: #cb2431; }}
+    #ha-claude-bubble .diff-th-new {{ color: #22863a; border-left: 1px solid var(--divider-color, #e1e4e8); }}
+    #ha-claude-bubble .diff-table td {{ padding: 1px 6px; white-space: pre-wrap; word-break: break-all; vertical-align: top; font-size: 10px; line-height: 1.4; }}
+    #ha-claude-bubble .diff-eq {{ color: var(--secondary-text-color, #586069); }}
+    #ha-claude-bubble .diff-del {{ background: #ffeef0; color: #cb2431; }}
+    #ha-claude-bubble .diff-add {{ background: #e6ffec; color: #22863a; }}
+    #ha-claude-bubble .diff-empty {{ background: var(--secondary-background-color, #fafbfc); }}
+    #ha-claude-bubble .diff-table td + td {{ border-left: 1px solid var(--divider-color, #e1e4e8); }}
+    /* Confirmation buttons */
+    #ha-claude-bubble .confirm-buttons {{ display: flex; gap: 10px; margin-top: 12px; justify-content: center; }}
+    #ha-claude-bubble .confirm-btn {{ padding: 8px 20px; border-radius: 20px; border: 2px solid; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }}
+    #ha-claude-bubble .confirm-yes {{ background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }}
+    #ha-claude-bubble .confirm-yes:hover {{ background: #4caf50; color: white; }}
+    #ha-claude-bubble .confirm-no {{ background: #ffebee; border-color: #f44336; color: #c62828; }}
+    #ha-claude-bubble .confirm-no:hover {{ background: #f44336; color: white; }}
+    #ha-claude-bubble .confirm-btn:disabled {{ opacity: 0.5; cursor: not-allowed; }}
+    #ha-claude-bubble .confirm-btn.selected {{ opacity: 1; transform: scale(1.05); }}
+    #ha-claude-bubble .confirm-buttons.answered .confirm-btn:not(.selected) {{ opacity: 0.3; }}
     #ha-claude-bubble .msg.thinking {{
       align-self: flex-start; background: var(--secondary-background-color, #f0f0f0);
       color: var(--secondary-text-color, #999); font-style: italic; white-space: pre-wrap;
@@ -826,6 +881,64 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     'update_dashboard', 'create_automation', 'create_script',
   ]);
 
+  const CONFIRM_PATTERNS = [
+    /confermi.*?\?/i,
+    /scrivi\s+s[iì]\s+o\s+no/i,
+    /digita\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?\s+per\s+confermare/i,
+    /vuoi\s+(eliminare|procedere|continuare).*?\?/i,
+    /s[iì]\s*\/\s*no/i,
+    /confirm.*?\?\s*(yes.*no)?/i,
+    /type\s+['"]?yes['"]?\s+or\s+['"]?no['"]?/i,
+    /do\s+you\s+want\s+to\s+(delete|proceed|continue).*?\?/i,
+    /confirma.*?\?/i,
+    /escribe\s+s[ií]\s+o\s+no/i,
+    /confirme[sz]?.*?\?/i,
+    /tape[sz]?\s+['"]?oui['"]?\s+ou\s+['"]?non['"]?/i,
+  ];
+
+  function showConfirmationButtons(msgEl, text) {{
+    if (!text || typeof text !== 'string') return;
+    const isConfirmation = CONFIRM_PATTERNS.some(p => p.test(text));
+    if (!isConfirmation) return;
+
+    const isDeleteConfirm = /digita\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?/i.test(text) ||
+                            /type\s+['"]?delete['"]?/i.test(text);
+
+    const btnContainer = document.createElement('div');
+    btnContainer.className = 'confirm-buttons';
+
+    const yesBtn = document.createElement('button');
+    yesBtn.className = 'confirm-btn confirm-yes';
+    yesBtn.textContent = isDeleteConfirm ? ('\uD83D\uDDD1 ' + T.confirm_delete_yes) : ('\u2705 ' + T.confirm_yes);
+
+    const noBtn = document.createElement('button');
+    noBtn.className = 'confirm-btn confirm-no';
+    noBtn.textContent = '\u274C ' + T.confirm_no;
+
+    yesBtn.onclick = function() {{
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      btnContainer.classList.add('answered');
+      yesBtn.classList.add('selected');
+      const answer = isDeleteConfirm ? 'elimina' : T.confirm_yes_value;
+      input.value = answer;
+      sendMessage();
+    }};
+
+    noBtn.onclick = function() {{
+      yesBtn.disabled = true;
+      noBtn.disabled = true;
+      btnContainer.classList.add('answered');
+      noBtn.classList.add('selected');
+      input.value = T.confirm_no_value;
+      sendMessage();
+    }};
+
+    btnContainer.appendChild(yesBtn);
+    btnContainer.appendChild(noBtn);
+    msgEl.appendChild(btnContainer);
+  }}
+
   async function sendMessage() {{
     const text = input.value.trim();
     if (!text || isStreaming) return;
@@ -921,7 +1034,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       }}
 
       // Save to history
-      if (assistantText) addToHistory('assistant', assistantText);
+      if (assistantText) {{
+        addToHistory('assistant', assistantText);
+        // Show confirmation buttons if needed
+        showConfirmationButtons(assistantEl, assistantText);
+      }}
 
       // Auto-reload if write tool modified current page
       if (writeToolCalled && ctx.type) {{

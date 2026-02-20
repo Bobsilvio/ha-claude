@@ -1,4 +1,11 @@
 # Changelog
+## 3.13.3
+- **FIX**: Entity validation in `create_automation` and `update_automation` — AI can no longer use non-existent entity_ids
+  - Recursively extracts all entity_id references from triggers, conditions, and actions
+  - Validates against Home Assistant's actual entity registry before creating/updating
+  - Returns error with suggestions if invalid entities are found (e.g., `switch.luce_bagno` → `switch.switch_luce_bagno_piccolo`)
+  - Fix: moved `_extract_entity_ids` to module level (was scoped inside `create_automation`, causing NameError in `update_automation`)
+
 ## 3.13.2
 - **FIX**: Bubble button now draggable immediately (touch and drag, 5px threshold) — replaced broken long-press mechanism
 - **NEW**: Live agent/provider selector in chat bubble — two dropdowns (Provider + Model) below the header
