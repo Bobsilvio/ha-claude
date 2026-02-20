@@ -1,4 +1,13 @@
 # Changelog
+## 3.15.12 — Responsive UI Redesign
+- **IMPROVED**: Three breakpoint system for better mobile/tablet/desktop UX
+  - **Mobile** (<600px): Sidebar hidden, toggle menu (hamburger ☰)
+  - **Tablet** (600px-1199px): Sidebar visible but narrow (160px) alongside chat
+  - **Desktop** (1200px+): Full layout with 250px sidebar
+- **FIXED**: Chat list and buttons now visible on all devices
+- **IMPROVED**: Better proportions for tablet screens (which can fit sidebar + chat)
+- **IMPROVED**: Smaller header and font sizes optimized per screen size
+
 ## 3.15.11 — Bug Fixes
 - **FIXED**: NameError `BUBBLE_DEVICE_MODE` in device list endpoint
 - **FIXED**: Bubble Devices tab icon now renders properly (⚙️)

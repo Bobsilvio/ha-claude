@@ -706,7 +706,8 @@ def get_chat_ui():
         .mobile-only {{ display: none; }}
 
         /* Mobile layout */
-        @media (max-width: 768px), (pointer: coarse) {{
+        /* Mobile: <600px - sidebar hidden, toggle */
+        @media (max-width: 599px) {{
             .mobile-only {{ display: inline-flex; }}
 
             .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
@@ -736,6 +737,25 @@ def get_chat_ui():
             .input-row {{ gap: 6px; }}
             .input-area button {{ width: 38px; height: 38px; }}
             .input-area textarea {{ padding: 10px 14px; }}
+        }}
+
+        /* Tablet: 600px - 1199px - sidebar visible but narrow */
+        @media (min-width: 600px) and (max-width: 1199px) {{
+            .mobile-only {{ display: none; }}
+            .sidebar {{ width: 160px; min-width: 140px; max-width: 180px; }}
+            .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
+            .header h1 {{ font-size: 16px; }}
+            .model-selector {{ flex: 1 1 auto; max-width: 180px; font-size: 11px; }}
+            .chat-list {{ max-height: 35svh; }}
+            .message {{ max-width: 90%; padding: 10px 12px; }}
+            .input-area {{ padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }}
+            .input-row {{ gap: 6px; }}
+        }}
+
+        /* Desktop: 1200px+ - full layout */
+        @media (min-width: 1200px) {{
+            .mobile-only {{ display: none; }}
+            .sidebar {{ width: 250px; }}
         }}
 
         @media (max-width: 360px) {{
