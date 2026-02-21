@@ -225,7 +225,20 @@ def stream_chat_anthropic(messages, intent_info=None):
 
             logger.info(f"Anthropic: Executing tool '{tool['name']}' with input: {tool['input']}")
             yield {"type": "status", "message": api.tr("status_executing_tool", provider="Anthropic", tool=tool["name"]) }
-            yield {"type": "tool", "name": tool["name"], "description": tools.get_tool_description(tool["name"])}
+            
+            # Build a more detailed tool description with parameters
+            tool_desc = tools.get_tool_description(tool["name"])
+            tool_input = tool.get("input", {})
+            if tool_input:
+                if isinstance(tool_input, dict):
+                    if "filename" in tool_input:
+                        tool_desc += f": {tool_input['filename']}"
+                    elif "entity_id" in tool_input:
+                        tool_desc += f": {tool_input['entity_id']}"
+                    elif "automation_id" in tool_input:
+                        tool_desc += f": {tool_input['automation_id']}"
+            
+            yield {"type": "tool", "name": tool["name"], "description": tool_desc}
             try:
                 result = tools.execute_tool(tool["name"], tool["input"])
             except Exception as e:
