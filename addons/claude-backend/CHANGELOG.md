@@ -1,4 +1,12 @@
 # Changelog
+## 3.17.2 — Config edit: diff view instead of full file
+- **NEW**: `config_edit` now shows a side-by-side diff (❌ PRIMA / ✅ DOPO) instead of the full corrected file
+  - Only for edits to existing files; new files still show the full code
+  - Diff is injected at proposal phase (before confirmation) — all providers: Anthropic, OpenAI, NVIDIA, GitHub, Google
+  - After write confirmation, diff is also shown in the ✅ success message
+- **FIX**: `write_config_file` tool now reads the existing content before overwriting, returns `old_yaml`/`new_yaml` for diff display
+- **FIX**: `write_config_file` added to WRITE_TOOLS auto-stop in OpenAI/NVIDIA providers (was missing; model was doing an extra unnecessary API round)
+
 ## 3.17.1 — Fix Anthropic model list
 - **FIX**: Removed Claude 3.5 Sonnet/Haiku and Opus 3 from Anthropic model list
   - `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` return 404 — no longer available via API

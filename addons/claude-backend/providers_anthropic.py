@@ -77,6 +77,7 @@ def stream_chat_anthropic(messages, intent_info=None):
     tools_called_this_session = set()  # Track tools already called to detect redundancy
     total_input_tokens = 0
     total_output_tokens = 0
+    last_read_content: dict = {}  # filename -> content (for proposal-phase diff injection)
 
     for round_num in range(max_rounds):
         # Check abort flag
@@ -181,10 +182,16 @@ def stream_chat_anthropic(messages, intent_info=None):
             full_text = accumulated_text
             logger.warning(f"Anthropic: AI responded WITHOUT calling any tools. Response: '{full_text[:200]}...'")
             logger.info(f"Anthropic: This means the AI decided not to use any of the {len(focused_tools)} available tools")
+            # For config_edit: inject diff view for display; keep full_text (with yaml) for message context
+            display_text = full_text
+            if last_read_content and (intent_info or {}).get("intent") == "config_edit":
+                display_text = api._inject_proposal_diff(full_text, last_read_content)
+                if display_text != full_text:
+                    logger.info("Anthropic: injected proposal diff into display text")
             # Yield a clear signal to reset any previous tool badges
             yield {"type": "clear"}
-            for i in range(0, len(full_text), 4):
-                chunk = full_text[i:i+4]
+            for i in range(0, len(display_text), 4):
+                chunk = display_text[i:i+4]
                 yield {"type": "token", "content": chunk}
             break
 
@@ -226,6 +233,14 @@ def stream_chat_anthropic(messages, intent_info=None):
                 result = json.dumps({"error": f"Tool '{tool['name']}' failed: {str(e)}"}, ensure_ascii=False)
             logger.info(f"Anthropic: Tool '{tool['name']}' returned {len(result)} chars: {result[:300]}...")
             tools_called_this_session.add(tool_key)
+            # Cache read_config_file content for proposal-phase diff
+            if tool["name"] == "read_config_file":
+                try:
+                    rdata = json.loads(result)
+                    if rdata.get("content"):
+                        last_read_content[rdata.get("filename", "__last__")] = rdata["content"]
+                except Exception:
+                    pass
             # Truncate large tool results to prevent token overflow
             _read_tools_large = {"read_config_file", "get_entity_details", "get_entity_history"}
             max_len = 20000 if tool["name"] in _read_tools_large else 8000

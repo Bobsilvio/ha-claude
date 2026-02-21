@@ -2447,6 +2447,30 @@ def _build_side_by_side_diff_html(old_yaml: str, new_yaml: str) -> str:
     return "".join(h)
 
 
+def _inject_proposal_diff(text: str, cached_originals: dict) -> str:
+    """For config_edit proposal phase: replace ```yaml blocks with side-by-side diff views.
+    Returns the display text (for streaming to user). The caller should keep the original
+    text intact in message history so the model can reference the proposed YAML later.
+    Only replaces when a non-empty original exists (i.e. editing, not creating a new file)."""
+    import re as _re
+    if not cached_originals:
+        return text
+    original = list(cached_originals.values())[-1]
+    if not original.strip():
+        return text  # New file — show full code, no diff
+    yaml_block_re = _re.compile(r'```yaml\n([\s\S]*?)\n?```')
+    matches = list(yaml_block_re.finditer(text))
+    if not matches:
+        return text
+    result = text
+    for match in reversed(matches):
+        proposed_yaml = match.group(1).strip()
+        diff_html = _build_side_by_side_diff_html(original, proposed_yaml)
+        if diff_html:
+            result = result[:match.start()] + f"<!--DIFF-->{diff_html}<!--/DIFF-->" + result[match.end():]
+    return result
+
+
 def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     """Format a human-readable response from a successful write tool result.
     This avoids needing another API round just to format the response.
@@ -2463,7 +2487,7 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     old_yaml = result_data.get("old_yaml", "")
     new_yaml = result_data.get("new_yaml", "") or result_data.get("yaml", "")
 
-    update_tools = ("update_automation", "update_script", "update_dashboard")
+    update_tools = ("update_automation", "update_script", "update_dashboard", "write_config_file")
 
     if old_yaml and new_yaml and tool_name in update_tools:
         diff_html = _build_side_by_side_diff_html(old_yaml, new_yaml)

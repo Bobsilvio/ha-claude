@@ -501,6 +501,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
         "list_config_files", "get_frontend_resources",
         "search_entities", "get_entity_state", "get_entities",
     }
+    last_read_content: dict = {}  # filename -> content (for proposal-phase diff injection)
 
     def _is_confirmation_text(text: str) -> bool:
         low = (text or "").lower()
@@ -684,10 +685,16 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 clean_text = _clean_response_for_logging(full_text)
                 log_fn(f"NVIDIA: AI responded WITHOUT calling any tools. Response: '{clean_text[:200]}...'"
                 )
+                # For config_edit: inject diff view for display; keep full_text for message context
+                display_text = full_text
+                if last_read_content and (intent_info or {}).get("intent") == "config_edit":
+                    display_text = api._inject_proposal_diff(full_text, last_read_content)
+                    if display_text != full_text:
+                        logger.info("NVIDIA: injected proposal diff into display text")
                 messages.append({"role": "assistant", "content": full_text})
                 yield {"type": "clear"}
-                for i in range(0, len(full_text), 4):
-                    chunk = full_text[i:i+4]
+                for i in range(0, len(display_text), 4):
+                    chunk = display_text[i:i+4]
                     yield {"type": "token", "content": chunk}
                 break
 
@@ -755,6 +762,14 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
                 if fn_name in read_only_tools:
                     tool_cache[sig] = result
+                # Cache read_config_file content for proposal-phase diff
+                if fn_name == "read_config_file":
+                    try:
+                        rdata = json.loads(result)
+                        if rdata.get("content"):
+                            last_read_content[rdata.get("filename", "__last__")] = rdata["content"]
+                    except Exception:
+                        pass
 
                 tool_call_results[tc_id] = (fn_name, result)
                 yield {"type": "tool_result", "name": fn_name, "result": result}
@@ -772,6 +787,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                 "create_dashboard",
                 "update_dashboard",
                 "create_html_dashboard",
+                "write_config_file",
             }
             auto_stop = False
             for _tc_id, (fn_name, result) in tool_call_results.items():
@@ -887,6 +903,7 @@ def stream_chat_openai(messages, intent_info=None):
     full_text = ""
     total_input_tokens = 0
     total_output_tokens = 0
+    last_read_content: dict = {}  # filename -> content (for proposal-phase diff injection)
 
     # FIX: max_rounds from intent_info, or 3 for GitHub (was 5), 5 for others
     max_rounds = (intent_info or {}).get("max_rounds") or (3 if api.AI_PROVIDER == "github" else 5)
@@ -1143,9 +1160,15 @@ def stream_chat_openai(messages, intent_info=None):
             clean_text = _clean_response_for_logging(full_text)
             logger.warning(f"OpenAI: AI responded WITHOUT calling any tools. Response: '{clean_text[:200]}...'")
             logger.info(f"OpenAI: This means the AI decided not to use any of the {len(tool_defs)} available tools")
+            # For config_edit: inject diff view for display; keep full_text for message context
+            display_text = full_text
+            if last_read_content and (intent_info or {}).get("intent") == "config_edit":
+                display_text = api._inject_proposal_diff(full_text, last_read_content)
+                if display_text != full_text:
+                    logger.info("OpenAI: injected proposal diff into display text")
             yield {"type": "clear"}
-            for i in range(0, len(full_text), 4):
-                chunk = full_text[i:i+4]
+            for i in range(0, len(display_text), 4):
+                chunk = display_text[i:i+4]
                 yield {"type": "token", "content": chunk}
             break
 
@@ -1230,11 +1253,19 @@ def stream_chat_openai(messages, intent_info=None):
 
             if fn_name in read_only_tools:
                 tool_cache[sig] = result
+            # Cache read_config_file content for proposal-phase diff
+            if fn_name == "read_config_file":
+                try:
+                    rdata = json.loads(result)
+                    if rdata.get("content"):
+                        last_read_content[rdata.get("filename", "__last__")] = rdata["content"]
+                except Exception:
+                    pass
 
         # AUTO-STOP: If a write tool succeeded, format response directly
         WRITE_TOOLS = {"update_automation", "update_script", "update_dashboard_card",
                    "create_automation", "create_script", "create_dashboard", "update_dashboard",
-                   "create_html_dashboard"}
+                   "create_html_dashboard", "write_config_file"}
         auto_stop = False
         for tc_id, (fn_name, result) in tool_call_results.items():
             if fn_name in WRITE_TOOLS:

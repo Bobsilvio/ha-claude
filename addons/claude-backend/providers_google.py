@@ -121,6 +121,7 @@ def stream_chat_google(messages, intent_info: dict | None = None):
     rate_limit_retries = 0  # Separate counter to cap rate-limit retries regardless of round_num
     MAX_RATE_LIMIT_RETRIES = 3
     tool_cache: dict[str, str] = {}  # sig -> result (for redundancy detection)
+    last_read_content: dict = {}  # filename -> content (for proposal-phase diff injection)
     total_input_tokens = 0
     total_output_tokens = 0
 
@@ -235,6 +236,14 @@ def stream_chat_google(messages, intent_info: dict | None = None):
                 # Cache read-only tool results
                 if name in READ_ONLY_TOOLS:
                     tool_cache[sig] = result
+                # Cache read_config_file content for proposal-phase diff
+                if name == "read_config_file":
+                    try:
+                        rdata = json.loads(result)
+                        if rdata.get("content"):
+                            last_read_content[rdata.get("filename", "__last__")] = rdata["content"]
+                    except Exception:
+                        pass
 
             # Tool result truncation (aligned with OpenAI provider)
             max_len = 20000 if name in READ_TOOLS_LARGE else 8000
@@ -330,12 +339,19 @@ def stream_chat_google(messages, intent_info: dict | None = None):
         except Exception:
             final_text = api.tr("err_loop_exhausted")
 
+    # For config_edit: inject diff view for display; keep final_text for message context
+    display_text = final_text
+    if final_text and last_read_content and (intent_info or {}).get("intent") == "config_edit":
+        display_text = api._inject_proposal_diff(final_text, last_read_content)
+        if display_text != final_text:
+            logger.info("Google: injected proposal diff into display text")
+
     # Stream text in 4-char chunks (smooth output, aligned with other providers)
     messages.append({"role": "assistant", "content": final_text})
     yield {"type": "clear"}
-    if final_text:
-        for i in range(0, len(final_text), 4):
-            yield {"type": "token", "content": final_text[i:i+4]}
+    if display_text:
+        for i in range(0, len(display_text), 4):
+            yield {"type": "token", "content": display_text[i:i+4]}
     yield {"type": "done", "full_text": final_text, "usage": {
         "input_tokens": total_input_tokens,
         "output_tokens": total_output_tokens,

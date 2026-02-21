@@ -3045,6 +3045,14 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             if not filename:
                 return json.dumps({"error": "filename is required."})
             filepath = os.path.join(api.HA_CONFIG_DIR, filename)
+            # Read existing content before overwriting (used for diff display)
+            old_content = ""
+            if os.path.isfile(filepath):
+                try:
+                    with open(filepath, "r", encoding="utf-8") as f:
+                        old_content = f.read()
+                except Exception:
+                    pass
             # Auto-create snapshot before writing
             snapshot = api.create_snapshot(filename)
             try:
@@ -3056,6 +3064,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 if snapshot.get("snapshot_id"):
                     msg += f" Backup snapshot created: {snapshot['snapshot_id']}"
                 return json.dumps({"status": "success", "message": msg, "snapshot": snapshot,
+                                   "old_yaml": old_content, "new_yaml": content,
                                    "tip": "Call check_config to validate the configuration."}, ensure_ascii=False, default=str)
             except Exception as e:
                 return json.dumps({"error": f"Failed to write '{filename}': {str(e)}", "snapshot": snapshot})
