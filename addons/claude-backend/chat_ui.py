@@ -207,6 +207,9 @@ def get_chat_ui():
             "confirm_delete_device": "Delete this device permanently?",
             "device_deleted": "Device deleted",
             "device_updated": "Device updated",
+            # Dark mode
+            "dark_mode": "Dark mode",
+            "light_mode": "Light mode",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -316,6 +319,9 @@ def get_chat_ui():
             "confirm_delete_device": "Eliminare questo dispositivo definitivamente?",
             "device_deleted": "Dispositivo eliminato",
             "device_updated": "Dispositivo aggiornato",
+            # Dark mode
+            "dark_mode": "Tema scuro",
+            "light_mode": "Tema chiaro",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -425,6 +431,9 @@ def get_chat_ui():
             "confirm_delete_device": "¿Eliminar este dispositivo permanentemente?",
             "device_deleted": "Dispositivo eliminado",
             "device_updated": "Dispositivo actualizado",
+            # Dark mode
+            "dark_mode": "Tema oscuro",
+            "light_mode": "Tema claro",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -777,6 +786,293 @@ def get_chat_ui():
         @media (max-width: 360px) {{
             .header .badge {{ display: none; }}
         }}
+
+        /* Dark Mode Styles */
+        body.dark-mode {{
+            background: #1a1a1a;
+        }}
+
+        body.dark-mode .sidebar {{
+            background: #242424;
+            border-right-color: #3a3a3a;
+        }}
+
+        body.dark-mode .sidebar-header {{
+            border-bottom-color: #3a3a3a;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .sidebar-tabs {{
+            background: #1f1f1f;
+            border-bottom-color: #3a3a3a;
+        }}
+
+        body.dark-mode .sidebar-tab {{
+            color: #a0a0a0;
+        }}
+
+        body.dark-mode .sidebar-tab:hover {{
+            background: #2f2f2f;
+        }}
+
+        body.dark-mode .sidebar-tab.active {{
+            color: #8ab4f8;
+            border-bottom-color: #8ab4f8;
+        }}
+
+        body.dark-mode .chat-item {{
+            border-bottom-color: #2a2a2a;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .chat-item:hover {{
+            background: #2f2f2f;
+        }}
+
+        body.dark-mode .chat-item.active {{
+            background: #1e3a8a;
+            border-left-color: #8ab4f8;
+        }}
+
+        body.dark-mode .chat-item-title {{
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .chat-item-info {{
+            color: #808080;
+        }}
+
+        body.dark-mode .chat-group-title {{
+            background: #1a1a1a;
+            border-top-color: #2a2a2a;
+            color: #707070;
+        }}
+
+        body.dark-mode .backup-item,
+        body.dark-mode .device-item {{
+            border-bottom-color: #2a2a2a;
+        }}
+
+        body.dark-mode .backup-item:hover,
+        body.dark-mode .device-item:hover {{
+            background: #2a2a2a;
+        }}
+
+        body.dark-mode .backup-file,
+        body.dark-mode .device-name {{
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .backup-date,
+        body.dark-mode .device-last-seen {{
+            color: #808080;
+        }}
+
+        body.dark-mode .device-type {{
+            background: #1e3a8a;
+            color: #8ab4f8;
+        }}
+
+        body.dark-mode .splitter:hover {{
+            background: rgba(255,255,255,0.08);
+        }}
+
+        body.dark-mode .message.assistant {{
+            background: #2a2a2a;
+            color: #e0e0e0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }}
+
+        body.dark-mode .message.user {{
+            background: #6366f1;
+        }}
+
+        body.dark-mode .message.thinking {{
+            background: #1f1f1f;
+            color: #909090;
+        }}
+
+        body.dark-mode .message.system {{
+            background: #5d4037;
+            color: #ffb74d;
+        }}
+
+        body.dark-mode .message.assistant pre {{
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .message.assistant code {{
+            background: #2a2a2a;
+            color: #8ab4f8;
+        }}
+
+        body.dark-mode .message.assistant pre code {{
+            background: none;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .chat-container {{
+            background: #1a1a1a;
+        }}
+
+        body.dark-mode .input-area {{
+            background: #242424;
+            border-top-color: #3a3a3a;
+        }}
+
+        body.dark-mode .input-area textarea {{
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border-color: #3a3a3a;
+        }}
+
+        body.dark-mode .input-area textarea:focus {{
+            border-color: #8ab4f8;
+        }}
+
+        body.dark-mode .input-area textarea::placeholder {{
+            color: #707070;
+        }}
+
+        body.dark-mode .suggestion {{
+            background: #2a2a2a;
+            border-color: #3a3a3a;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .suggestion:hover {{
+            background: #3d5a80;
+            border-color: #8ab4f8;
+            color: white;
+        }}
+
+        body.dark-mode .model-selector {{
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.2);
+        }}
+
+        body.dark-mode .model-selector option {{
+            background: #2a2a2a;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .tool-badge {{
+            background: #1e3a8a;
+            color: #8ab4f8;
+        }}
+
+        body.dark-mode .status-badge {{
+            background: #5d4037;
+            color: #ffb74d;
+        }}
+
+        body.dark-mode .message-usage {{
+            color: #808080;
+            border-top-color: rgba(128,128,128,0.2);
+        }}
+
+        body.dark-mode .conversation-usage {{
+            background: rgba(0,0,0,0.3);
+            color: #a0a0a0;
+        }}
+
+        body.dark-mode .entity-input {{
+            background: #2a2a2a;
+            color: #e0e0e0;
+            border-color: #3a3a3a;
+        }}
+
+        body.dark-mode .entity-input:focus {{
+            border-color: #8ab4f8;
+        }}
+
+        body.dark-mode .entity-input::placeholder {{
+            color: #707070;
+        }}
+
+        body.dark-mode .diff-side {{
+            background: #1a1a1a;
+            border-color: #3a3a3a;
+        }}
+
+        body.dark-mode .diff-table {{
+            background: #1a1a1a;
+        }}
+
+        body.dark-mode .diff-table th {{
+            background: #2a2a2a;
+            border-bottom-color: #3a3a3a;
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .diff-eq {{
+            color: #a0a0a0;
+        }}
+
+        body.dark-mode .diff-del {{
+            background: #4a1616;
+            color: #ff9b9b;
+        }}
+
+        body.dark-mode .diff-add {{
+            background: #164a1a;
+            color: #9bff9b;
+        }}
+
+        body.dark-mode .diff-empty {{
+            background: #0f0f0f;
+        }}
+
+        body.dark-mode .diff-table td {{
+            border-left-color: #2a2a2a;
+        }}
+
+        body.dark-mode .diff-collapse {{
+            background: #1e3a8a;
+            color: #8ab4f8;
+        }}
+
+        body.dark-mode .image-preview-container {{
+            background: #2a2a2a;
+        }}
+
+        body.dark-mode .image-preview {{
+            border-color: #3d5a80;
+        }}
+
+        body.dark-mode .doc-preview-container {{
+            background: #1e3a8a;
+        }}
+
+        body.dark-mode .doc-preview-name {{
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .doc-preview-size {{
+            color: #a0a0a0;
+        }}
+
+        body.dark-mode .undo-button {{
+            background: #5d4037;
+            color: #ffb74d;
+        }}
+
+        body.dark-mode .undo-button:hover {{
+            opacity: 0.8;
+        }}
+
+        body.dark-mode .dark-mode-toggle {{
+            color: #e0e0e0;
+        }}
+
+        body.dark-mode .dark-mode-toggle:hover {{
+            background: rgba(255,255,255,0.15);
+        }}
+
+        body.dark-mode .dark-mode-toggle.active {{
+            background: #ffb340;
+        }}
     </style>
 </head>
 <body>
@@ -795,6 +1091,12 @@ def get_chat_ui():
             <input type="checkbox" id="readOnlyToggle" onchange="toggleReadOnly(this.checked)">
             <span class="readonly-slider"></span>
             <span class="readonly-label" id="readOnlyLabel">{ui_js['readonly_off']}</span>
+        </label>
+        <label class="readonly-toggle dark-mode-toggle" title="{ui_js.get('dark_mode', 'Dark mode')}">
+            <span class="readonly-icon" id="themeIcon">\U0001f319</span>
+            <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode(this.checked)">
+            <span class="readonly-slider"></span>
+            <span class="readonly-label" id="darkModeLabel">OFF</span>
         </label>
         <div class="status">
             <div class="status-dot" id="statusDot"></div>
@@ -916,6 +1218,7 @@ def get_chat_ui():
         let currentImage = null;  // Stores base64 image data
         let pendingDocument = null;  // Stores {{file, name, size}} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
+        let darkMode = safeLocalStorageGet('darkMode') === 'true';
         let currentProviderId = '{ai_provider}' || 'anthropic';
         let currentModelDisplay = '{model_name}';  // Updated by loadModels() and changeModel()
 
@@ -1120,6 +1423,42 @@ def get_chat_ui():
             const wrapper = document.querySelector('.readonly-toggle');
             if (wrapper) wrapper.classList.toggle('active', checked);
         }}
+
+        function toggleDarkMode(checked) {{
+            darkMode = checked;
+            safeLocalStorageSet('darkMode', checked ? 'true' : 'false');
+            if (checked) {{
+                document.body.classList.add('dark-mode');
+                document.getElementById('themeIcon').textContent = '\u2600';  // sun emoji
+                document.getElementById('darkModeLabel').textContent = 'ON';
+            }} else {{
+                document.body.classList.remove('dark-mode');
+                document.getElementById('themeIcon').textContent = '\U0001f319';  // moon emoji
+                document.getElementById('darkModeLabel').textContent = 'OFF';
+            }}
+            const wrapper = document.querySelector('.dark-mode-toggle');
+            if (wrapper) wrapper.classList.toggle('active', checked);
+        }}
+
+        // Initialize dark mode on page load
+        (function() {{
+            const darkModeStored = safeLocalStorageGet('darkMode', 'false') === 'true';
+            darkMode = darkModeStored;
+            const toggle = document.getElementById('darkModeToggle');
+            if (toggle) {{
+                toggle.checked = darkMode;
+                if (darkMode) {{
+                    document.body.classList.add('dark-mode');
+                    document.getElementById('themeIcon').textContent = '\u2600';
+                    document.getElementById('darkModeLabel').textContent = 'ON';
+                }} else {{
+                    document.getElementById('themeIcon').textContent = '\U0001f319';
+                    document.getElementById('darkModeLabel').textContent = 'OFF';
+                }}
+                const wrapper = document.querySelector('.dark-mode-toggle');
+                if (wrapper) wrapper.classList.toggle('active', darkMode);
+            }}
+        }})();
 
         // Initialize read-only toggle on page load
         (function() {{
@@ -2724,6 +3063,11 @@ def get_chat_ui():
 
         (function bootUI() {{
             try {{
+                // Initialize dark mode before anything else
+                if (darkMode) {{
+                    document.body.classList.add('dark-mode');
+                }}
+
                 // Reinforce click handler assignment (helps when inline onclick gets lost/cached)
                 if (sendBtn) {{
                     sendBtn.onclick = () => handleButtonClick();

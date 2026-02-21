@@ -1,4 +1,11 @@
 # Changelog
+## 3.17.4 — Dark Mode UI Theme
+- **NEW**: Dark mode toggle (🌙 icon) in the header for reduced eye strain
+  - Available in all 4 languages: Italian, English, Spanish, French
+  - Preference saved to localStorage — persists across page reloads
+  - Complete dark theme covering chat, sidebar, input area, messages, code blocks, and all UI elements
+  - Optimized colors for contrast and readability (blues #8ab4f8, backgrounds #1a1a1a)
+
 ## 3.17.3 — Config edit: confirmation buttons
 - **NEW**: "Sì/No" confirmation buttons now appear for `config_edit` proposals (chat UI + bubble)
   - Added missing patterns to `CONFIRM_PATTERNS`: "Vuoi che applichi?", "Should I apply?", "¿Quieres que aplique?", "Veux-tu que j'applique?"

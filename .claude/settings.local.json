@@ -34,7 +34,11 @@
       "WebFetch(domain:i.redd.it)",
       "Bash(grep:*)",
       "Bash(xargs cat:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:polyformproject.org)",
+      "Bash(curl:*)",
+      "WebFetch(domain:ai.google.dev)"
     ]
   }
 }
