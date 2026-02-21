@@ -1492,6 +1492,7 @@ def get_chat_ui():
                 /digita\\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?\\s+per\\s+confermare/i,
                 /vuoi\\s+(eliminare|procedere|continuare|applic).*?\\?/i,
                 /vuoi\\s+che\\s+(applic|esegu|salv|scriva|modifich).*?\\?/i,
+                /applichi.*?\\?/i,
                 /s[i\u00ec]\\s*\\/\\s*no/i,
                 /confirm.*?\\?\\s*(yes.*no)?/i,
                 /type\\s+['"]?yes['"]?\\s+or\\s+['"]?no['"]?/i,
