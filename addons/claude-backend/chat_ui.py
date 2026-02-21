@@ -1798,7 +1798,12 @@ def get_chat_ui():
             let tokens = inp + ' in / ' + out + ' out';
             if (usage.cost !== undefined && usage.cost !== null) {{
                 if (usage.cost > 0) {{
-                    const sym = usage.currency === 'EUR' ? '\u20ac' : '$';
+                    let sym = '$';  // Default
+                    const curr = (usage.currency || 'USD').toUpperCase().trim();
+                    if (curr === 'EUR') sym = '\u20ac';
+                    else if (curr === 'GBP') sym = '\u00a3';
+                    else if (curr === 'JPY') sym = '\u00a5';
+                    else sym = '$';  // Fallback for any other currency
                     tokens += ' \u2022 ' + sym + usage.cost.toFixed(4);
                 }} else {{
                     tokens += ' \u2022 free';

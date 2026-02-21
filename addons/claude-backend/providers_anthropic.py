@@ -27,6 +27,15 @@ def _humanize_anthropic_error(error_msg: str) -> str:
     msg = error_msg or ""
     low = msg.lower()
 
+    # API usage limits reached
+    if "usage limits" in low or "specified api usage limits" in low:
+        return {
+            "en": "Anthropic: monthly API limit reached (next reset: March 1st). Switch to another provider or wait for the reset.",
+            "it": "Anthropic: limite API mensile raggiunto (prossimo reset: 1 marzo). Cambia provider o aspetta il reset.",
+            "es": "Anthropic: límite de API mensual alcanzado (próximo reset: 1 de marzo). Cambia de proveedor o espera el reset.",
+            "fr": "Anthropic: limite d'API mensuelle atteinte (prochain reset: 1er mars). Changez de fournisseur ou attendez le reset.",
+        }.get(api.LANGUAGE, "Anthropic: monthly API limit reached. Switch to another provider or wait for the reset on March 1st.")
+
     # Low credit / billing
     if "credit balance is too low" in low or "plans & billing" in low or "purchase credits" in low:
         return {
