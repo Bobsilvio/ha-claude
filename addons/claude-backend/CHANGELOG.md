@@ -1,4 +1,8 @@
 # Changelog
+## 3.17.1 — Fix Anthropic model list
+- **FIX**: Removed Claude 3.5 Sonnet/Haiku and Opus 3 from Anthropic model list
+  - `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`, `claude-3-opus-20240229` return 404 — no longer available via API
+
 ## 3.17.0 — Provider Fixes & Model Updates
 - **FIX**: OpenAI/NVIDIA `insufficient_quota` (429) no longer silently swallowed
   - Detected "insufficient_quota"/"exceeded your current quota" → immediate error message, no retry

@@ -1055,8 +1055,6 @@ PROVIDER_MODELS = {
         # Legacy (ancora disponibili)
         "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-opus-4-1-20250805",
         "claude-sonnet-4-20250514", "claude-opus-4-20250514",
-        # Claude 3.5 / 3
-        "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229",
     ],
     "openai": ["gpt-5.2", "gpt-5.2-mini", "gpt-5", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3", "o3-mini", "o1"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
@@ -1113,9 +1111,6 @@ MODEL_NAME_MAPPING = {
     "Claude: Opus 4.1": "claude-opus-4-1-20250805",
     "Claude: Sonnet 4": "claude-sonnet-4-20250514",
     "Claude: Opus 4": "claude-opus-4-20250514",
-    "Claude: Sonnet 3.5": "claude-3-5-sonnet-20241022",
-    "Claude: Haiku 3.5": "claude-3-5-haiku-20241022",
-    "Claude: Opus 3": "claude-3-opus-20240229",
     "OpenAI: GPT-5.2": "gpt-5.2",
     "OpenAI: GPT-5.2-mini": "gpt-5.2-mini",
     "OpenAI: GPT-5": "gpt-5",
