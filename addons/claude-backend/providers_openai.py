@@ -640,6 +640,12 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
                         if delta.get("content"):
                             content_parts.append(delta["content"])
 
+                        # Handle reasoning_content from extended thinking models (Deepseek, o1, o3)
+                        if delta.get("reasoning_content"):
+                            reasoning_chunk = delta["reasoning_content"]
+                            if reasoning_chunk:
+                                yield {"type": "status", "message": api.tr("status_still_working", provider="NVIDIA")}
+
                         if delta.get("tool_calls"):
                             for tc_delta in delta["tool_calls"]:
                                 idx = tc_delta.get("index", 0)
@@ -1154,6 +1160,16 @@ def stream_chat_openai(messages, intent_info=None):
 
             if delta.content:
                 content_parts.append(delta.content)
+
+            # Handle reasoning from extended thinking models (OpenAI o1, o3, Deepseek, etc.)
+            if hasattr(delta, 'reasoning_content') and delta.reasoning_content:
+                reasoning_chunk = delta.reasoning_content
+                if reasoning_chunk:
+                    yield {"type": "status", "message": api.tr("status_still_working", provider=provider_label)}
+            elif hasattr(delta, 'reasoning') and delta.reasoning:
+                reasoning_chunk = delta.reasoning
+                if reasoning_chunk:
+                    yield {"type": "status", "message": api.tr("status_still_working", provider=provider_label)}
 
             if delta.tool_calls:
                 for tc_delta in delta.tool_calls:
