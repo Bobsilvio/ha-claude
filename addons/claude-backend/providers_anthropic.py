@@ -123,6 +123,15 @@ def stream_chat_anthropic(messages, intent_info=None):
             }
             if focused_tools:
                 call_kwargs["tools"] = focused_tools
+            
+            # Add extended thinking for Claude Opus 4.6 if enabled
+            model = api.get_active_model()
+            if api.ANTHROPIC_EXTENDED_THINKING and model and "opus-4-6" in model.lower():
+                call_kwargs["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": 10000  # Reasonable budget for reasoning
+                }
+                logger.info(f"Anthropic: Extended thinking enabled for {model} (budget: 10000 tokens)")
 
             yield {"type": "status", "message": api.tr("status_request_sent", provider="Anthropic")}
 

@@ -1,4 +1,15 @@
 # Changelog
+## 3.17.5 — Extended Thinking + Enhanced Tool Tracking
+- **NEW**: Extended thinking support for Claude Opus 4.6 (Anthropic)
+  - Add `ANTHROPIC_EXTENDED_THINKING=true` environment variable to enable reasoning budget (10k tokens)
+  - Improves accuracy for complex config analysis tasks
+- **NEW**: Extended thinking support for OpenAI o1, o1-mini, o3, o3-mini models
+  - Add `OPENAI_EXTENDED_THINKING=true` environment variable (some models have it built-in)
+- **IMPROVED**: Tool execution tracking for NVIDIA and OpenAI providers
+  - Now shows detailed progress like "Reading: packages/config.yaml" instead of generic status
+  - Matches Anthropic's tool tracking UI — each round shows filename/entity being processed
+  - Better UX during long multi-file config_edit operations
+
 ## 3.17.4 — Dark Mode UI Theme
 - **NEW**: Dark mode toggle (🌙 icon) in the header for reduced eye strain
   - Available in all 4 languages: Italian, English, Spanish, French

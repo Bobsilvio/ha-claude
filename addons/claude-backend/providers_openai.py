@@ -581,7 +581,7 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             "max_tokens": 8192,
             "temperature": 0.7,
             "stream": True,
-            "chat_template_kwargs": {"thinking": api.NVIDIA_THINKING_MODE}
+            "chat_template_kwargs": {"thinking": api.NVIDIA_THINKING_MODE},
         }
         # Only include tools if we have some
         if tool_defs:
@@ -757,6 +757,22 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
                 # Execute tool using the standard execute_tool function
                 logger.info(f"NVIDIA: Executing tool '{fn_name}' with args: {args}")
+                
+                # Emit progress events for UI feedback
+                yield {"type": "status", "message": f"Executing {fn_name}..."}
+                
+                # Build detailed tool description with parameters
+                tool_desc = fn_name
+                if isinstance(args, dict):
+                    if "filename" in args:
+                        tool_desc += f": {args['filename']}"
+                    elif "entity_id" in args:
+                        tool_desc += f": {args['entity_id']}"
+                    elif "automation_id" in args:
+                        tool_desc += f": {args['automation_id']}"
+                
+                yield {"type": "tool", "name": fn_name, "description": tool_desc}
+                
                 result = _safe_execute_tool(fn_name, args)
                 logger.info(f"NVIDIA: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
 
@@ -1234,8 +1250,23 @@ def stream_chat_openai(messages, intent_info=None):
                 continue
 
             # Execute tool
-            yield {"type": "tool", "name": fn_name, "description": tools.get_tool_description(fn_name)}
             logger.info(f"OpenAI: Executing tool '{fn_name}' with args: {args}")
+            
+            # Emit progress events for UI feedback
+            yield {"type": "status", "message": f"Executing {fn_name}..."}
+            
+            # Build detailed tool description with parameters
+            tool_desc = tools.get_tool_description(fn_name)
+            if isinstance(args, dict):
+                if "filename" in args:
+                    tool_desc += f": {args['filename']}"
+                elif "entity_id" in args:
+                    tool_desc += f": {args['entity_id']}"
+                elif "automation_id" in args:
+                    tool_desc += f": {args['automation_id']}"
+            
+            yield {"type": "tool", "name": fn_name, "description": tool_desc}
+            
             result = _safe_execute_tool(fn_name, args)
             logger.info(f"OpenAI: Tool '{fn_name}' returned {len(result)} chars: {result[:300]}...")
 

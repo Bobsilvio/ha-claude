@@ -75,6 +75,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 NVIDIA_THINKING_MODE = os.getenv("NVIDIA_THINKING_MODE", "False").lower() == "true"
+ANTHROPIC_EXTENDED_THINKING = os.getenv("ANTHROPIC_EXTENDED_THINKING", "False").lower() == "true"
+OPENAI_EXTENDED_THINKING = os.getenv("OPENAI_EXTENDED_THINKING", "False").lower() == "true"
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
     AI_MODEL = ""
