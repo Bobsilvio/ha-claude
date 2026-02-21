@@ -23,7 +23,7 @@ Don't forget to follow me on social media:
 Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM (free Kimi K2.5), and GitHub Models (GPT, Llama, Mistral, DeepSeek, Grok, Phi, Cohere and more).
 
 [![GitHub Release](https://img.shields.io/github/v/release/Bobsilvio/ha-claude)](https://github.com/Bobsilvio/ha-claude/releases)
-[![License](https://img.shields.io/github/license/Bobsilvio/ha-claude)](LICENSE)
+[![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm%20NC%201.0-blue)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.1%2B-blue)](https://www.home-assistant.io/)
 
 ---
@@ -511,7 +511,13 @@ https://github.com/Bobsilvio/ha-claude/issues
 
 ## 📝 License
 
-MIT License - see [LICENSE](LICENSE) for details
+**PolyForm Noncommercial License 1.0.0** — see [LICENSE](LICENSE) for full terms.
+
+- ✅ Personal use, hobby projects, home automation enthusiasts: **free**
+- ✅ Non-profit organizations, educational and government institutions: **free**
+- ❌ Commercial use (paid services, businesses, installers charging clients): **not permitted without explicit written permission from the author**
+
+To request a commercial license: open an issue on [GitHub](https://github.com/Bobsilvio/ha-claude/issues).
 
 ---
 
