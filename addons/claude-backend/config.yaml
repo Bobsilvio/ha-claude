@@ -36,6 +36,8 @@ options:
   github_token: ""
   nvidia_api_key: ""
   nvidia_thinking_mode: false
+  anthropic_extended_thinking: false
+  openai_extended_thinking: false
   enable_file_access: false
   language: en
   timeout: "30"
@@ -57,6 +59,8 @@ schema:
   github_token: password?
   nvidia_api_key: password?
   nvidia_thinking_mode: bool?
+  anthropic_extended_thinking: bool?
+  openai_extended_thinking: bool?
   enable_file_access: bool?
   language: list(en|it|es|fr)?
   timeout: str?
