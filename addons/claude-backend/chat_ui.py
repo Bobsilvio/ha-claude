@@ -141,6 +141,8 @@ def get_chat_ui():
             "nvidia_remaining": "remaining: {n} (press again to continue)",
             "nvidia_test_failed": "NVIDIA test failed",
             "switched_to": "Switched to {provider} \u2192 {model}",
+            "provider_label": "Provider",
+            "model_label": "Model",
             # Suggestions
             "sug_lights": "Show all lights",
             "sug_sensors": "Sensor status",
@@ -248,6 +250,8 @@ def get_chat_ui():
             "nvidia_remaining": "restanti: {n} (ripremi per continuare)",
             "nvidia_test_failed": "Test NVIDIA fallito",
             "switched_to": "Passato a {provider} \u2192 {model}",
+            "provider_label": "Provider",
+            "model_label": "Modello",
             # Suggestions
             "sug_lights": "Mostra tutte le luci",
             "sug_sensors": "Stato sensori",
@@ -355,6 +359,8 @@ def get_chat_ui():
             "nvidia_remaining": "restantes: {n} (pulsa de nuevo para continuar)",
             "nvidia_test_failed": "Test NVIDIA fallido",
             "switched_to": "Cambiado a {provider} \u2192 {model}",
+            "provider_label": "Proveedor",
+            "model_label": "Modelo",
             # Suggestions
             "sug_lights": "Mostrar todas las luces",
             "sug_sensors": "Estado de sensores",
@@ -462,6 +468,8 @@ def get_chat_ui():
             "nvidia_remaining": "restants : {n} (appuie à nouveau pour continuer)",
             "nvidia_test_failed": "Test NVIDIA échoué",
             "switched_to": "Passé à {provider} \u2192 {model}",
+            "provider_label": "Fournisseur",
+            "model_label": "Modèle",
             # Suggestions
             "sug_lights": "Afficher toutes les lumières",
             "sug_sensors": "État des capteurs",
@@ -909,6 +917,7 @@ def get_chat_ui():
         let pendingDocument = null;  // Stores {{file, name, size}} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
         let currentProviderId = '{ai_provider}' || 'anthropic';
+        let currentModelDisplay = '{model_name}';  // Updated by loadModels() and changeModel()
 
         const ANALYZING_BY_PROVIDER = {{
             'anthropic': {json.dumps(provider_analyzing['anthropic'].get(api.LANGUAGE, provider_analyzing['anthropic']['en']))},
@@ -2375,7 +2384,7 @@ def get_chat_ui():
                 }} else {{
                     chat.innerHTML = `<div class="message system">
                         {msgs['welcome']}<br>
-                        {msgs['provider_model']}<br>
+                        ${{getProviderModelLine()}}<br>
                         {msgs['capabilities']}<br>
                         {msgs['vision_feature']}
                     </div>`;
@@ -2400,7 +2409,7 @@ def get_chat_ui():
             resetConversationUsage();
             chat.innerHTML = `<div class="message system">
                 {msgs['welcome']}<br>
-                {msgs['provider_model']}<br>
+                ${{getProviderModelLine()}}<br>
                 {msgs['capabilities']}<br>
                 {msgs['vision_feature']}
             </div>`;
@@ -2418,6 +2427,12 @@ def get_chat_ui():
             'nvidia': '🎯 NVIDIA NIM',
             'github': '🚀 GitHub Models'
         }};
+
+        // Build the welcome provider/model line dynamically (always reflects current selection)
+        function getProviderModelLine() {{
+            const provName = PROVIDER_LABELS[currentProviderId] || currentProviderId || '';
+            return `${{T.provider_label}}: <strong>${{provName}}</strong> | ${{T.model_label}}: <strong>${{currentModelDisplay}}</strong>`;
+        }}
 
         function updateHeaderProviderStatus(providerId, availableProviders) {{
             const statusTextEl = document.getElementById('statusText');
@@ -2456,6 +2471,9 @@ def get_chat_ui():
 
                 if (currentProvider) {{
                     currentProviderId = currentProvider;
+                }}
+                if (currentModel) {{
+                    currentModelDisplay = currentModel;
                 }}
 
                 updateHeaderProviderStatus(currentProviderId, data.available_providers);
@@ -2609,6 +2627,7 @@ def get_chat_ui():
                     const O4MINI_TOKENS_HINT = {o4mini_tokens_hint_js};
                     // Keep UI state in sync so the thinking message matches the selected provider
                     currentProviderId = parsed.provider;
+                    currentModelDisplay = parsed.model;
                     const testBtn = document.getElementById('testNvidiaBtn');
                     if (testBtn) {{
                         testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';

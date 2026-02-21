@@ -118,6 +118,8 @@ def stream_chat_google(messages, intent_info: dict | None = None):
 
     response = None
     round_num = 0
+    rate_limit_retries = 0  # Separate counter to cap rate-limit retries regardless of round_num
+    MAX_RATE_LIMIT_RETRIES = 3
     tool_cache: dict[str, str] = {}  # sig -> result (for redundancy detection)
     total_input_tokens = 0
     total_output_tokens = 0
@@ -154,7 +156,22 @@ def stream_chat_google(messages, intent_info: dict | None = None):
         except Exception as api_err:
             error_msg = str(api_err)
             if _is_rate_limit_error(error_msg):
-                logger.warning(f"Google: Rate limit hit at round {round_num+1}: {error_msg}")
+                low = error_msg.lower()
+                # Detect exhausted daily/project quota (limit: 0 or per-day quota type)
+                is_quota_exhausted = (
+                    "limit: 0" in low
+                    or "free_tier_requests" in low
+                    or "per_day" in low
+                    or "insufficient_quota" in low
+                )
+                rate_limit_retries += 1
+                logger.warning(f"Google: Rate limit hit at round {round_num+1} (retry {rate_limit_retries}): {error_msg[:200]}")
+                if is_quota_exhausted or rate_limit_retries > MAX_RATE_LIMIT_RETRIES:
+                    # Quota is daily-exhausted or we've retried too many times — stop now
+                    err_text = api.tr("err_google_quota") if is_quota_exhausted else api.tr("err_loop_exhausted")
+                    logger.error(f"Google: Stopping retries (quota_exhausted={is_quota_exhausted}, retries={rate_limit_retries})")
+                    yield {"type": "error", "message": err_text}
+                    return
                 yield {"type": "status", "message": api.tr("status_rate_limit_waiting")}
                 time.sleep(10)
                 continue  # Retry this round
@@ -308,9 +325,10 @@ def stream_chat_google(messages, intent_info: dict | None = None):
                 logger.warning(f"Google: Response blocked by safety filters: {block_reason}")
                 final_text = api.tr("err_response_blocked", provider="Google")
             else:
-                logger.warning("Google: Empty response (no text, no tools)")
+                logger.warning("Google: Empty response (no text, no tools) — showing fallback error")
+                final_text = api.tr("err_loop_exhausted")
         except Exception:
-            pass
+            final_text = api.tr("err_loop_exhausted")
 
     # Stream text in 4-char chunks (smooth output, aligned with other providers)
     messages.append({"role": "assistant", "content": final_text})

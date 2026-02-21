@@ -799,6 +799,19 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
 
             if status == 429 or _is_rate_limit_error(e, error_msg):
                 logger.warning(f"NVIDIA rate limit hit at round {round_num+1}: {error_msg}")
+                if "insufficient_quota" in error_msg or "exceeded your current quota" in error_msg:
+                    full_text = api.tr("err_openai_quota")
+                    logger.error("NVIDIA quota exceeded (insufficient_quota): aborting without retry")
+                    messages.append({"role": "assistant", "content": full_text})
+                    yield {"type": "clear"}
+                    yield {"type": "token", "content": full_text}
+                    yield {"type": "done", "full_text": full_text, "usage": {
+                        "input_tokens": total_input_tokens,
+                        "output_tokens": total_output_tokens,
+                        "model": api.get_active_model(),
+                        "provider": "nvidia",
+                    }}
+                    return
                 yield {"type": "status", "message": api.tr("status_rate_limit_wait", provider="NVIDIA")}
                 time.sleep(10)
                 continue
@@ -830,6 +843,13 @@ def stream_chat_nvidia_direct(messages, intent_info=None):
             yield {"type": "clear"}
             yield {"type": "token", "content": error_msg_text}
             break
+
+    # Safety net: loop exhausted without generating any response
+    if not full_text:
+        full_text = api.tr("err_loop_exhausted")
+        logger.warning("NVIDIA: loop exhausted with no response generated, showing fallback error")
+        yield {"type": "clear"}
+        yield {"type": "token", "content": full_text}
 
     yield {"type": "done", "full_text": full_text, "usage": {
         "input_tokens": total_input_tokens,
@@ -863,7 +883,7 @@ def stream_chat_openai(messages, intent_info=None):
     logger.info(f"OpenAI tools available ({len(tool_defs)})")
     logger.debug(f"OpenAI tools: {', '.join(tool_names)}")
 
-    max_tok = 4000 if api.AI_PROVIDER == "github" else 4096
+    max_tok = 8192 if api.AI_PROVIDER == "github" else 4096
     full_text = ""
     total_input_tokens = 0
     total_output_tokens = 0
@@ -1044,6 +1064,20 @@ def stream_chat_openai(messages, intent_info=None):
             # FIX: Handle 429 rate limit errors with backoff (without matching 'integrate')
             elif _is_rate_limit_error(api_err, error_msg):
                 logger.warning(f"Rate limit hit at round {round_num+1}: {error_msg}")
+                if "insufficient_quota" in error_msg or "exceeded your current quota" in error_msg:
+                    # Quota exhausted - retrying won't help, show a clear error immediately
+                    full_text = api.tr("err_openai_quota")
+                    logger.error("OpenAI quota exceeded (insufficient_quota): aborting without retry")
+                    messages.append({"role": "assistant", "content": full_text})
+                    yield {"type": "clear"}
+                    yield {"type": "token", "content": full_text}
+                    yield {"type": "done", "full_text": full_text, "usage": {
+                        "input_tokens": total_input_tokens,
+                        "output_tokens": total_output_tokens,
+                        "model": api.get_active_model(),
+                        "provider": api.AI_PROVIDER,
+                    }}
+                    return
                 yield {"type": "status", "message": api.tr("status_rate_limit_waiting")}
                 time.sleep(10)
                 continue  # Retry this round
@@ -1217,6 +1251,21 @@ def stream_chat_openai(messages, intent_info=None):
                 except (json.JSONDecodeError, KeyError):
                     pass
 
+        # AUTO-STOP: check_config returned valid - format response locally, skip extra API round
+        if not auto_stop:
+            for _tc_id, (fn_name, result) in tool_call_results.items():
+                if fn_name == "check_config":
+                    try:
+                        rdata = json.loads(result)
+                        if isinstance(rdata, dict) and rdata.get("status") == "valid":
+                            msg = rdata.get("message", "")
+                            full_text = f"✅ {msg}" if msg else api.tr("write_op_success")
+                            auto_stop = True
+                            logger.info("Auto-stop: check_config valid, generating response locally")
+                    except Exception:
+                        pass
+                    break  # Only check the first check_config result
+
         if auto_stop:
             logger.info(f"Auto-stop: write tool succeeded, skipping further API calls")
             yield {"type": "clear"}
@@ -1271,6 +1320,13 @@ def stream_chat_openai(messages, intent_info=None):
                         break
                     except Exception as e:
                         logger.warning(f"Auto-stop query_state failed: {e}")
+
+    # Safety net: loop exhausted (e.g. repeated rate limits) without generating any response
+    if not full_text:
+        full_text = api.tr("err_loop_exhausted")
+        logger.warning("OpenAI: loop exhausted with no response generated, showing fallback error")
+        yield {"type": "clear"}
+        yield {"type": "token", "content": full_text}
 
     messages.append({"role": "assistant", "content": full_text})
     yield {"type": "done", "full_text": full_text, "usage": {

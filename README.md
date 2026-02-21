@@ -135,9 +135,11 @@ Click **"AI Assistant"** in the Home Assistant sidebar!
 
 ## 🔑 Provider Setup
 
-### 🟠 GitHub Models (Recommended - Free!)
+### 🟠 GitHub Models (Recommended - Free tier)
 
-> **40+ models** with one token. Includes GPT-4o, Llama, Mistral, DeepSeek, Grok, Phi, Cohere. **Free tier** available.
+> **40+ models** with one token. Includes GPT-4o, Llama, Mistral, DeepSeek, Grok, Phi, Cohere. **Free tier** available with rate limits.
+>
+> ⚠️ **Note:** GitHub Models is free but has usage limits (requests per minute/hour/day). If you see a *"budget limit"* or *"403 Forbidden"* error, your account's spending limit has been reached — check [github.com/settings/billing](https://github.com/settings/billing) → *Spending limits*. Models marked as "preview" may be unavailable or return 404 — use **GPT-4o** or **Llama** as reliable alternatives.
 
 **Get Token:**
 1. Go to https://github.com/settings/tokens

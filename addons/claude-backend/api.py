@@ -489,6 +489,8 @@ LANGUAGE_TEXT = {
         "err_http_413": "Request too large (413). Reduce message/context length or switch model.",
         "err_http_429": "Rate limit (429). Wait a few seconds and retry, or switch model/provider.",
         "err_google_quota": "Google Gemini: quota exhausted (429). Wait a minute and retry, or switch to another model/provider.",
+        "err_openai_quota": "❌ OpenAI quota exceeded. Your account has run out of credits. Check your plan and billing at platform.openai.com.",
+        "err_loop_exhausted": "❌ The AI did not respond (request limit reached or repeated errors). Try again or switch model/provider.",
 
         "status_request_sent": "{provider}: sending request to the model...",
         "status_response_received": "{provider}: response received, processing...",
@@ -570,6 +572,8 @@ LANGUAGE_TEXT = {
         "err_http_413": "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello.",
         "err_http_429": "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider.",
         "err_google_quota": "Google Gemini: quota esaurita (429). Attendi un minuto e riprova, oppure cambia modello/provider.",
+        "err_openai_quota": "❌ Quota OpenAI esaurita. Il tuo account ha esaurito i crediti. Controlla il piano e la fatturazione su platform.openai.com.",
+        "err_loop_exhausted": "❌ L'AI non ha risposto (limite di round raggiunto o errori ripetuti). Riprova o cambia modello/provider.",
 
         "status_request_sent": "{provider}: invio richiesta al modello...",
         "status_response_received": "{provider}: risposta ricevuta, elaboro...",
@@ -651,6 +655,8 @@ LANGUAGE_TEXT = {
         "err_http_413": "Solicitud demasiado grande (413). Reduce el mensaje/contexto o cambia de modelo.",
         "err_http_429": "Límite de tasa (429). Espera unos segundos y reintenta, o cambia de modelo/proveedor.",
         "err_google_quota": "Google Gemini: cuota agotada (429). Espera un minuto y reintenta, o cambia de modelo/proveedor.",
+        "err_openai_quota": "❌ Cuota de OpenAI agotada. Tu cuenta se ha quedado sin créditos. Revisa tu plan y facturación en platform.openai.com.",
+        "err_loop_exhausted": "❌ La IA no respondió (límite de rondas alcanzado o errores repetidos). Inténtalo de nuevo o cambia de modelo/proveedor.",
 
         "status_request_sent": "{provider}: enviando solicitud al modelo...",
         "status_response_received": "{provider}: respuesta recibida, procesando...",
@@ -732,6 +738,8 @@ LANGUAGE_TEXT = {
         "err_http_413": "Requête trop volumineuse (413). Réduis le message/le contexte ou change de modèle.",
         "err_http_429": "Limite de débit (429). Attends quelques secondes et réessaie, ou change de modèle/fournisseur.",
         "err_google_quota": "Google Gemini : quota épuisé (429). Attends une minute et réessaie, ou change de modèle/fournisseur.",
+        "err_openai_quota": "❌ Quota OpenAI épuisé. Ton compte n'a plus de crédits. Vérifie ton plan et ta facturation sur platform.openai.com.",
+        "err_loop_exhausted": "❌ L'IA n'a pas répondu (limite de rounds atteinte ou erreurs répétées). Réessaie ou change de modèle/fournisseur.",
 
         "status_request_sent": "{provider} : envoi de la requête au modèle...",
         "status_response_received": "{provider} : réponse reçue, traitement...",
@@ -885,10 +893,10 @@ def format_message_with_image_google(text: str, media_type: str, base64_data: st
 # ---- Provider defaults ----
 
 PROVIDER_DEFAULTS = {
-    "anthropic": {"model": "claude-sonnet-4-20250514", "name": "Claude (Anthropic)"},
+    "anthropic": {"model": "claude-sonnet-4-6", "name": "Claude (Anthropic)"},
     "openai": {"model": "gpt-5.2", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
-    "github": {"model": "openai/gpt-5.2", "name": "GitHub Models"},
+    "github": {"model": "openai/gpt-4o", "name": "GitHub Models"},
     "nvidia": {"model": "moonshotai/kimi-k2.5", "name": "NVIDIA NIM"},
 }
 
@@ -1041,7 +1049,15 @@ def get_nvidia_models_cached() -> Optional[list[str]]:
     return None
 
 PROVIDER_MODELS = {
-    "anthropic": ["claude-sonnet-4-20250514", "claude-opus-4-20250514", "claude-haiku-4-20250514"],
+    "anthropic": [
+        # Ultimi (correnti)
+        "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
+        # Legacy (ancora disponibili)
+        "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-opus-4-1-20250805",
+        "claude-sonnet-4-20250514", "claude-opus-4-20250514",
+        # Claude 3.5 / 3
+        "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229",
+    ],
     "openai": ["gpt-5.2", "gpt-5.2-mini", "gpt-5", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3", "o3-mini", "o1"],
     "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
     "nvidia": [
@@ -1053,13 +1069,14 @@ PROVIDER_MODELS = {
         "nvidia/llama-3.1-nemotron-70b-instruct",
     ],
     "github": [
-        # OpenAI (via Azure)
-        "openai/gpt-5.2", "openai/gpt-5.2-mini",
+        # OpenAI (via Azure) - gpt-4o and gpt-4o-mini are the stable defaults
         "openai/gpt-4o", "openai/gpt-4o-mini",
-        "openai/gpt-5", "openai/gpt-5-chat", "openai/gpt-5-mini", "openai/gpt-5-nano",
         "openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano",
         "openai/o1", "openai/o1-mini", "openai/o1-preview",
         "openai/o3", "openai/o3-mini", "openai/o4-mini",
+        # Preview / may not be available on all accounts
+        "openai/gpt-5.2", "openai/gpt-5.2-mini",
+        "openai/gpt-5", "openai/gpt-5-chat", "openai/gpt-5-mini", "openai/gpt-5-nano",
         # Meta Llama
         "meta/meta-llama-3.1-405b-instruct", "meta/meta-llama-3.1-8b-instruct",
         "meta/llama-3.3-70b-instruct",
@@ -1088,9 +1105,17 @@ PROVIDER_MODELS = {
 
 # Mapping user-friendly names (with prefixes) to technical model names
 MODEL_NAME_MAPPING = {
+    "Claude: Opus 4.6": "claude-opus-4-6",
+    "Claude: Sonnet 4.6": "claude-sonnet-4-6",
+    "Claude: Haiku 4.5": "claude-haiku-4-5-20251001",
+    "Claude: Sonnet 4.5": "claude-sonnet-4-5-20250929",
+    "Claude: Opus 4.5": "claude-opus-4-5-20251101",
+    "Claude: Opus 4.1": "claude-opus-4-1-20250805",
     "Claude: Sonnet 4": "claude-sonnet-4-20250514",
     "Claude: Opus 4": "claude-opus-4-20250514",
-    "Claude: Haiku 4": "claude-haiku-4-20250514",
+    "Claude: Sonnet 3.5": "claude-3-5-sonnet-20241022",
+    "Claude: Haiku 3.5": "claude-3-5-haiku-20241022",
+    "Claude: Opus 3": "claude-3-opus-20240229",
     "OpenAI: GPT-5.2": "gpt-5.2",
     "OpenAI: GPT-5.2-mini": "gpt-5.2-mini",
     "OpenAI: GPT-5": "gpt-5",

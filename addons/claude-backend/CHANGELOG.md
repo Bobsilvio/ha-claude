@@ -1,4 +1,28 @@
 # Changelog
+## 3.17.0 — Provider Fixes & Model Updates
+- **FIX**: OpenAI/NVIDIA `insufficient_quota` (429) no longer silently swallowed
+  - Detected "insufficient_quota"/"exceeded your current quota" → immediate error message, no retry
+  - Safety net: empty response after loop exhaustion now shows `err_loop_exhausted` instead of blank
+- **FIX**: Google Gemini infinite loop on 429 rate limit
+  - `round_num` was only incremented after tool calls; rate-limit `continue` looped forever at round 0
+  - Added separate `rate_limit_retries` counter (max 3)
+  - Google daily quota (`limit: 0`, `free_tier_requests`) detected → stops immediately with clear error
+- **FIX**: `config_edit` prompt — models (llama-3.1-70b, Gemini 2.5 Flash) described errors instead of showing corrected YAML
+  - Added explicit rule: first action must be a tool call, never announce "I will read the file"
+  - Added: NEVER respond with only a description — always show complete corrected YAML block
+- **FIX**: New Chat welcome message showed stale model/provider after switching models
+  - `{msgs['provider_model']}` was a static Python f-string embedded at page load
+  - Replaced with dynamic JS `currentModelDisplay` variable updated by `loadModels()` and `changeModel()`
+- **FIX**: Default GitHub model changed from `openai/gpt-5.2` (unavailable) to `openai/gpt-4o`
+- **NEW**: `check_config` auto-stop — formats success response locally after validation, skips extra API round
+- **NEW**: GitHub max output tokens raised 4000 → 8192 (prevents truncated YAML in long responses)
+- **NEW**: Full Anthropic model list updated to match official docs
+  - Latest: Opus 4.6, Sonnet 4.6 (new default), Haiku 4.5
+  - Legacy: Sonnet 4.5, Opus 4.5, Opus 4.1, Sonnet 4, Opus 4
+  - Classic: Sonnet 3.5, Haiku 3.5, Opus 3
+- **NEW**: Translation keys added (all 4 languages): `err_openai_quota`, `err_loop_exhausted`, `err_google_quota`, `provider_label`, `model_label`
+- **UPDATED**: README — GitHub Models section labeled "Free tier" with rate limit / budget limit warning
+
 ## 3.16.9 — Tablet Bubble Layout
 - **FIX**: Bubble button defaults to top-right on tablet (was bottom-right, keyboard covered chat)
 - **FIX**: Chat panel now opens below button when button is in top half of screen
