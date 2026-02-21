@@ -1064,15 +1064,19 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     /confermi.*\\?/i,
     /scrivi\\s+s[i\u00ec]\\s+o\\s+no/i,
     /digita\\s+['"\u2018\u2019]?elimina['"\u2018\u2019]?\\s+per\\s+confermare/i,
-    /vuoi\\s+(eliminare|procedere|continuare).*\\?/i,
+    /vuoi\\s+(eliminare|procedere|continuare|applic).*\\?/i,
+    /vuoi\\s+che\\s+(applic|esegu|salv|scriva|modifich).*\\?/i,
     /s[i\u00ec]\\s*\\/\\s*no/i,
     /confirm.*\\?\\s*(yes.*no)?/i,
     /type\\s+['"]?yes['"]?\\s+or\\s+['"]?no['"]?/i,
-    /do\\s+you\\s+want\\s+to\\s+(delete|proceed|continue).*\\?/i,
+    /do\\s+you\\s+want\\s+(me\\s+to\\s+)?(apply|proceed|continue|delete|save|write).*\\?/i,
+    /should\\s+i\\s+(apply|proceed|write|save).*\\?/i,
     /confirma.*\\?/i,
     /escribe\\s+s[i\u00ed]\\s+o\\s+no/i,
+    /\\u00bfquieres\\s+que\\s+(apliqu|proceda|guard).*\\?/i,
     /confirme[sz]?.*\\?/i,
     /tape[sz]?\\s+['"]?oui['"]?\\s+ou\\s+['"]?non['"]?/i,
+    /veux-tu\\s+que\\s+(j['\u2019]appliqu|je\\s+proc[eè]d|je\\s+sauvegard).*\\?/i,
   ];
 
   function showConfirmationButtons(msgEl, text) {{

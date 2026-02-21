@@ -1,4 +1,9 @@
 # Changelog
+## 3.17.3 — Config edit: confirmation buttons
+- **NEW**: "Sì/No" confirmation buttons now appear for `config_edit` proposals (chat UI + bubble)
+  - Added missing patterns to `CONFIRM_PATTERNS`: "Vuoi che applichi?", "Should I apply?", "¿Quieres que aplique?", "Veux-tu que j'applique?"
+  - Previously only automations/scripts showed clickable confirm buttons; now config file edits do too
+
 ## 3.17.2 — Config edit: diff view instead of full file
 - **NEW**: `config_edit` now shows a side-by-side diff (❌ PRIMA / ✅ DOPO) instead of the full corrected file
   - Only for edits to existing files; new files still show the full code
