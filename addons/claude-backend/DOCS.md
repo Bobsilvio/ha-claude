@@ -200,7 +200,7 @@ Create `/config/amira/mcp_config.json` to add external tools:
 }
 ```
 
-→ Full guide: [MCP.md](../../../MCP.md)
+→ Full guide: [MCP.md](../../../docs/MCP.md)
 
 ### Logging
 Set `log_level`:

@@ -48,7 +48,8 @@
     <img src="https://img.shields.io/badge/Subscribe-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white">
   </a>
 </p>
-# 🏠🤖 Amira Ai Assistant
+
+# 🏠🤖 Amira AI Assistant
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
@@ -80,14 +81,13 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **AI Suggestions**: AI analyzes issues and suggests concrete fixes
 - **Dismiss Issues**: Acknowledge and dismiss resolved repairs
 
-### 👁️ Vision Support *(New in v3.0!)*
-- **📸 Image Upload**: Send screenshots, photos, or dashboard images
+### 👁️ Vision Support
+- **Image Upload**: Send screenshots, photos, or dashboard images
 - **Visual Analysis**: AI can see and understand images
-- **Card Recreation**: "Create cards like this image" - AI analyzes and recreates layouts
-- **Smart Suggestions**: Show a dashboard, get improvement suggestions
+- **Card Recreation**: "Create cards like this image" — AI analyzes and recreates layouts
 - **Multi-Provider**: Works with Claude, GPT-4o, Gemini vision models
 
-### 📝 Configuration File Access *(New in v2.9)*
+### 📝 Configuration File Access
 - **Read/Write YAML**: Access automations, scripts, scenes, and custom configs
 - **File Explorer**: Browse your Home Assistant config directory
 - **Safe Editing**: Automatic snapshots before modifications
@@ -95,7 +95,7 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Config Validation**: Check configuration before applying changes
 
 ### 💬 Interactive Chat Interface
-- **Chat History**: Keep last 10 conversations, switch between them
+- **Chat History**: Keep last N conversations, switch between them
 - **Streaming Responses**: Real-time token-by-token output
 - **Tool Indicators**: See what the AI is doing (badges for each tool call)
 - **Copy Button**: One-click copy for all code blocks (YAML, JSON, Python)
@@ -111,8 +111,8 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 
 ### 🌍 Multilingual Support
 - **4 Languages**: English, Italian, Spanish, French
-- **AI Responses**: AI always responds in your chosen language (v2.9.27)
-- **Config UI Translations**: Settings labels and descriptions in all 4 languages (v3.0.2)
+- **AI Responses**: AI always responds in your chosen language
+- **Config UI Translations**: Settings labels and descriptions in all 4 languages
 - **Fully Localized**: Complete multilingual experience
 
 ### 🔌 MCP (Model Context Protocol)
@@ -127,6 +127,12 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **WhatsApp**: Twilio integration with webhook support
 - **Context Aware**: Full conversation history per user per channel
 - **Multi-channel**: Use both simultaneously
+
+### ⏰ Scheduled Tasks
+- **Cron-based**: Schedule automations using cron expressions
+- **Background Execution**: Tasks run independently without user interaction
+- **History Tracking**: Log of past executions with error reporting
+- **Enable/Disable**: Toggle tasks without deleting them
 
 ### 🛠️ Dashboard Creation
 - **Lovelace Dashboards**: Create custom dashboards with cards
@@ -146,6 +152,7 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 ---
 
 ## 🚀 Quick Start
+
 Simply click the button below to add it automatically:
 
 [![Add Repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FBobsilvio%2Fha-claude)
@@ -189,13 +196,13 @@ Click **"Amira"** in the Home Assistant sidebar!
 | 🟩 NVIDIA NIM | [build.nvidia.com](https://build.nvidia.com) | ✅ Unlimited |
 | ⚡ Groq | [console.groq.com](https://console.groq.com) | ✅ Unlimited |
 | 🌐 OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) | ❌ Pay per use |
-| + 12 more | See [SETUP_HA.md](SETUP_HA.md) | — |
+| + 12 more | See [SETUP_HA.md](docs/SETUP_HA.md) | — |
 
-→ Step-by-step key creation guide: [SETUP_HA.md](SETUP_HA.md)
+→ Step-by-step key creation guide: [SETUP_HA.md](docs/SETUP_HA.md)
 
 ---
 
-## 🔑 GitHub Copilot & OpenAI Codex (OAuth)
+## 🔐 OAuth Providers (GitHub Copilot & OpenAI Codex)
 
 These providers use **OAuth authentication** — no API key to paste, just a one-time login.
 
@@ -294,14 +301,9 @@ When **Enable File Access** is enabled, the AI can:
 - Restore or delete backups from the UI
 - Per-file snapshot limits (configurable, default 5 per file)
 
-**Use cases:**
-- "Show me the YAML code for my morning routine automation"
-- "List all files in the lovelace folder"
-- "Add a condition to automation X checking if Y is on"
-
 ---
 
-## � Data Storage
+## 📁 Data Storage
 
 All persistent data is stored in **`/config/amira/`** — one folder, easy to backup or inspect.
 
@@ -311,6 +313,7 @@ All persistent data is stored in **`/config/amira/`** — one folder, easy to ba
 ├── runtime_selection.json    # Last selected model/provider
 ├── snapshots/                # Config file backups (before edits)
 ├── mcp_config.json           # MCP servers (create manually)
+├── scheduled_tasks.json      # Scheduled task definitions
 └── memory/
     ├── MEMORY.md             # Long-term facts (always in context)
     └── HISTORY.md            # Session log (append-only)
@@ -354,7 +357,7 @@ Extend Amira with external tools via the **Model Context Protocol**. Place your 
 
 Supported server types: **Filesystem, Brave Search, Git, SQLite, Slack, GitHub**, and any custom MCP-compatible server.
 
-→ Full setup guide with examples: [MCP.md](MCP.md)
+→ Full setup guide with examples: [MCP.md](docs/MCP.md)
 
 ---
 
@@ -368,17 +371,6 @@ Just talk naturally — Amira understands intent in English, Italian, Spanish an
 - *"Add a condition to the morning routine automation"*
 - *"Create an HTML dashboard for my solar panels"*
 - 📸 *Upload an image* → *"Recreate these cards for my sensors"*
-
-→ Full multilingual example list: [DOCS.md](DOCS.md)
-
----
-
-## 💬 Chat History
-
-- **Persistent**: Conversations survive addon restarts
-- **Configurable depth**: Keep last N chats (default 10)
-- **Switchable**: Click any conversation to reload it
-- **Storage**: `/config/amira/conversations.json`
 
 ---
 
@@ -439,8 +431,7 @@ Just talk naturally — Amira understands intent in English, Italian, Spanish an
 
 ## 🤝 Contributing
 
-Issues and pull requests welcome! Visit:
-https://github.com/Bobsilvio/ha-claude/issues
+Issues and pull requests welcome! Visit [github.com/Bobsilvio/ha-claude/issues](https://github.com/Bobsilvio/ha-claude/issues).
 
 ---
 
@@ -465,16 +456,6 @@ Created with ❤️ for the Home Assistant community
 - OpenAI for GPT models
 - Google for Gemini
 - GitHub for GitHub Models access
-
----
-
-## ⭐ Show Your Support
-
-If you find this project useful, consider:
-- ⭐ **Starring** the repository
-- 🐛 Reporting bugs or suggesting features
-- 📢 Sharing with other Home Assistant users
-- ☕ [Buy me a coffee](https://ko-fi.com/bobsilvio) *(optional)*
 
 ---
 

@@ -168,7 +168,7 @@ For stdio servers (if node/python available on the host):
 
 3. Restart addon → check logs for "MCP: Initialized N server(s)"
 
-→ Full guide: [MCP.md](../../../MCP.md)
+→ Full guide: [MCP.md](../../../docs/MCP.md)
 
 ---
 
@@ -181,7 +181,7 @@ For stdio servers (if node/python available on the host):
 | `twilio_auth_token` | Twilio auth token |
 | `twilio_whatsapp_from` | Your Twilio WhatsApp number |
 
-→ Setup guide: [MESSAGING.md](../../../MESSAGING.md)
+→ Setup guide: [MESSAGING.md](../../../docs/MESSAGING.md)
 
 ---
 
@@ -206,9 +206,9 @@ Check logs: **Settings → Add-ons → Amira → Logs**
 | | |
 |---|---|
 | [DOCS.md](../../../DOCS.md) | Full technical reference |
-| [SETUP_HA.md](../../../SETUP_HA.md) | Step-by-step installation |
-| [MCP.md](../../../MCP.md) | MCP tools setup |
-| [MESSAGING.md](../../../MESSAGING.md) | Telegram / WhatsApp |
+| [SETUP_HA.md](../../../docs/SETUP_HA.md) | Step-by-step installation |
+| [MCP.md](../../../docs/MCP.md) | MCP tools setup |
+| [MESSAGING.md](../../../docs/MESSAGING.md) | Telegram / WhatsApp |
 
 ---
 
