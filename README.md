@@ -31,8 +31,6 @@
   </a>
 </p>
 
----
-
 ### 🌍 Follow Me
 
 <p align="center">
@@ -49,7 +47,9 @@
   </a>
 </p>
 
-# 🏠🤖 Amira AI Assistant
+---
+
+### 🏠🤖 Amira Ai Assistant
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
