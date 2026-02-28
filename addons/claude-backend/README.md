@@ -205,7 +205,7 @@ Check logs: **Settings → Add-ons → Amira → Logs**
 
 | | |
 |---|---|
-| [DOCS.md](../../../DOCS.md) | Full technical reference |
+| [DOCS.md](DOCS.md) | Full technical reference |
 | [SETUP_HA.md](../../../docs/SETUP_HA.md) | Step-by-step installation |
 | [MCP.md](../../../docs/MCP.md) | MCP tools setup |
 | [MESSAGING.md](../../../docs/MESSAGING.md) | Telegram / WhatsApp |

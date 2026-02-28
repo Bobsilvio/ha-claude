@@ -138,27 +138,16 @@ Claude: I'll create a reminder for tomorrow at 9 AM.
 ### Telegram
 - **Long Polling**: Your addon polls Telegram servers for messages
 - **HTTPS**: Communication with Telegram is encrypted
-- **Bot Token**: Keep it private (it's unique to your bot)
+- **Bot Token**: Keep it private — it's unique to your bot
 
 ### WhatsApp (Twilio)
-- **Webhook Signature**: Twilio signs all webhooks with HMAC-SHA1
-- **Verification**: Your addon automatically verifies every webhook
-- **HTTPS**: All communication is encrypted
-- **Auth Token**: Keep it private (it's equivalent to a password)
+- **Webhook Signature**: Twilio signs all webhooks with HMAC-SHA1 — Amira verifies every request automatically
+- **Auth Token**: Keep it private — equivalent to a password
 
-### Recommendations
-
-1. **Whitelist Users** (future feature):
-   - Only allow specific contacts
-   - Prevent unauthorized access
-
-2. **Use Strong Credentials**:
-   - Generate new tokens regularly
-   - Don't share credentials
-
-3. **Monitor Logs**:
-   - Check logs for unauthorized access attempts
-   - Disable bots if suspicious activity detected
+### Best Practices
+- Don't share tokens or credentials
+- Monitor addon logs for unexpected access
+- Regenerate tokens if compromised
 
 ---
 
@@ -275,31 +264,16 @@ Claude: Helps you set up automations via natural language
 
 ---
 
-## 📝 Environment Variables
-
-Add these to Home Assistant addon environment if needed:
-
-```yaml
-TELEGRAM_BOT_TOKEN: "your-token-here"
-TELEGRAM_POLL_TIMEOUT: "30"  # Seconds between polls
-TWILIO_ACCOUNT_SID: "your-sid"
-TWILIO_AUTH_TOKEN: "your-token"
-TWILIO_WHATSAPP_FROM: "+1234567890"
-TWILIO_WEBHOOK_URL: "https://your-instance/api/whatsapp/webhook"
-```
-
----
-
 ## 🛠️ Advanced Features via Messaging
 
 Enable these in Home Assistant Configuration for extended messaging capabilities:
 
 | Feature | What It Does | Learn More |
 |---------|-------------|-----------|
-| **Device Control** | "Turn on kitchen light" → executed via HA | [DOCS.md](DOCS.md#device-control) |
-| **Persistent Memory** | AI remembers past conversations | [DOCS.md](DOCS.md#memory) |
+| **Device Control** | "Turn on kitchen light" → executed via HA | [DOCS.md](../addons/claude-backend/DOCS.md) |
+| **Persistent Memory** | AI remembers past conversations | [DOCS.md](../addons/claude-backend/DOCS.md) |
 | **Custom Tools** | Add API integrations via MCP | [MCP.md](MCP.md) |
-| **Image Analysis** | Send images for AI analysis | [DOCS.md](DOCS.md#vision-support) |
+| **Image Analysis** | Send images for AI analysis | [DOCS.md](../addons/claude-backend/DOCS.md) |
 
 ---
 
@@ -312,10 +286,3 @@ Having issues? Check:
 3. **Credentials**: Verify tokens are correct and active
 4. **Network**: Ensure connectivity to external APIs
 
----
-
-## 📜 License
-
-This integration follows the same license as the Amira addon.
-
-Enjoy chatting with your Amira! 🎉

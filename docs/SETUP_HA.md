@@ -171,10 +171,10 @@ See [MCP.md](MCP.md) for examples of:
 
 ## 📚 More Info
 
-- **Chat Features**: See [DOCS.md](DOCS.md)
+- **Chat Features**: See [DOCS.md](../addons/claude-backend/DOCS.md)
 - **Messaging Setup**: See [MESSAGING.md](MESSAGING.md)
 - **MCP Tools**: See [MCP.md](MCP.md)
-- **File Upload/RAG**: See [DOCS.md - File Processing](DOCS.md#-file-processing)
+- **File Upload/RAG**: See [DOCS.md](../addons/claude-backend/DOCS.md)
 
 ---
 
@@ -190,5 +190,5 @@ See [MCP.md](MCP.md) for examples of:
 ## 🆘 Help
 
 - Check logs in add-on
-- See [Troubleshooting](DOCS.md#-troubleshooting) section in DOCS.md
+- See [Troubleshooting](../addons/claude-backend/DOCS.md) section in DOCS.md
 - Open GitHub issue with logs attached

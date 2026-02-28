@@ -245,6 +245,7 @@ All persistent data lives in **`/config/amira/`**:
 ├── conversations.json        # Chat history
 ├── runtime_selection.json    # Last selected model/provider
 ├── mcp_config.json           # MCP servers (create manually)
+├── scheduled_tasks.json      # Scheduled task definitions
 ├── snapshots/                # Config file backups (before edits)
 ├── documents/                # Uploaded files
 ├── rag/                      # RAG document index
@@ -263,9 +264,9 @@ All persistent data lives in **`/config/amira/`**:
 
 ## Support
 
-- **Issues**: https://github.com/Bobsilvio/ha-claude/issues
-- **Discussions**: https://github.com/Bobsilvio/ha-claude/discussions
-- **Repository**: https://github.com/Bobsilvio/ha-claude
+- **Issues**: [github.com/Bobsilvio/ha-claude/issues](https://github.com/Bobsilvio/ha-claude/issues)
+- **Discussions**: [github.com/Bobsilvio/ha-claude/discussions](https://github.com/Bobsilvio/ha-claude/discussions)
+- **Repository**: [github.com/Bobsilvio/ha-claude](https://github.com/Bobsilvio/ha-claude)
 
 ## Changelog
 

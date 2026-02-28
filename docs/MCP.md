@@ -49,8 +49,8 @@ EOF
 
 Check that file exists:
 ```bash
-ls -la /config/mcp_config.json
-cat /config/mcp_config.json
+ls -la /config/amira/mcp_config.json
+cat /config/amira/mcp_config.json
 ```
 
 **Step 3: Restart Addon**
@@ -270,37 +270,6 @@ Ask your AI:
 | **"Permission denied"** | MCP path must be readable from `/config/` |
 | **AI doesn't use tools** | Check MCP section appears in addon logs on restart |
 | **Tool doesn't work** | Verify server `command` is installed (python, uv, npm) |
-
----
-
-## 📝 Example: Full Featured Setup
-
-```json
-{
-  "filesystem": {
-    "command": "uv",
-    "args": ["run", "python", "-m", "mcp.server.stdio.filesystem"],
-    "env": {
-      "MCP_FILESYSTEM_ROOTS": "/config",
-      "MCP_ALLOWED_DIRS": "/config:/config/automations:/config/scripts:/config/packages:/config/www"
-    }
-  },
-  "web_search": {
-    "command": "python",
-    "args": ["-m", "mcp.server.brave_search"],
-    "env": {
-      "BRAVE_API_KEY": "YOUR_BRAVE_API_KEY"
-    }
-  },
-  "git": {
-    "command": "python",
-    "args": ["-m", "mcp.server.git"],
-    "env": {
-      "GIT_REPOSITORY_PATH": "/config"
-    }
-  }
-}
-```
 
 ---
 
