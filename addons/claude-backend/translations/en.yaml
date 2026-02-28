@@ -1,10 +1,9 @@
 configuration:
-  ai_provider:
-    name: AI Provider
-    description: "Select your AI provider. 🆓 FREE: NVIDIA, GitHub Models | 💳 PAID: Anthropic, OpenAI, Google"
-  ai_model:
-    name: AI Model
-    description: "Choose based on provider: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-5.2/5/o3, Google=Gemini, NVIDIA=6 models🧪🆓 (Kimi/Llama/Mistral/Phi/Nemotron), GitHub=40+ models🆓"
+
+  language:
+    name: Language
+    description: AI response language (English, Italian, Spanish, or French)
+
   anthropic_api_key:
     name: Anthropic API Key
     description: API key from console.anthropic.com (save here even if not using, for quick switching)
@@ -14,54 +13,138 @@ configuration:
   google_api_key:
     name: Google API Key
     description: API key from aistudio.google.com (save here even if not using, for quick switching)
-  nvidia_api_key:
-    name: NVIDIA API Key
-    description: API key from build.nvidia.com (free - save here even if not using, for quick switching)
-  nvidia_thinking_mode:
-    name: NVIDIA Thinking Mode
-    description: "Enable thinking mode to see AI's reasoning process (slower but more transparent)"
   github_token:
     name: GitHub Token
     description: Personal Access Token from github.com/settings/tokens (save here even if not using, for quick switching)
-  debug_mode:
-    name: Debug Mode
-    description: Enable detailed logging for troubleshooting (creates larger logs)
+  nvidia_api_key:
+    name: NVIDIA API Key
+    description: API key from build.nvidia.com (free - save here even if not using, for quick switching)
+  groq_api_key:
+    name: Groq API Key
+    description: "Free & fast LLM provider with free Whisper voice transcription - get from console.groq.com"
+  mistral_api_key:
+    name: Mistral API Key
+    description: "Mistral's fast open-source models - get from console.mistral.ai"
+  openrouter_api_key:
+    name: OpenRouter API Key
+    description: "Global gateway with access to 100+ models from all providers (Claude, GPT, Llama, Mistral, etc.) - get from openrouter.ai"
+  deepseek_api_key:
+    name: DeepSeek API Key
+    description: "Fast and affordable models with advanced reasoning (R1, V3) - get from platform.deepseek.com"
+  minimax_api_key:
+    name: MiniMax API Key
+    description: "Advanced Chinese LLM provider with multimodal support - get from platform.minimax.io"
+  aihubmix_api_key:
+    name: AiHubMix API Key
+    description: "Universal API gateway with access to all major models (ChatGPT, Claude, Gemini, etc.) - get from aihubmix.com"
+  siliconflow_api_key:
+    name: SiliconFlow API Key
+    description: "Chinese gateway with access to open-source models (Qwen, Llama, Mistral) at high speed - get from siliconflow.cn"
+  volcengine_api_key:
+    name: VolcEngine API Key
+    description: "Aliyun enterprise gateway for LLMs - get from volcengine.com"
+  dashscope_api_key:
+    name: DashScope API Key
+    description: "Aliyun Qwen models with vision/multimodal support - get from dashscope.console.aliyun.com"
+  moonshot_api_key:
+    name: Moonshot API Key
+    description: "Moonshot Kimi model (fast reasoning, best for Chinese) - get from platform.moonshot.cn"
+  zhipu_api_key:
+    name: Zhipu API Key
+    description: "Zhipu GLM models with vision support - get from open.bigmodel.cn"
+  perplexity_api_key:
+    name: Perplexity API Key
+    description: "Sonar models with real-time web search (sonar-pro, sonar-reasoning-pro, r1-1776) - get from perplexity.ai/api"
+
+  custom_api_key:
+    name: Custom Endpoint API Key
+    description: "API key for your custom OpenAI-compatible endpoint (e.g. LM Studio, vLLM, LocalAI) - leave empty if not using a custom endpoint"
+  custom_api_base:
+    name: Custom Endpoint Base URL
+    description: "Base URL of your custom OpenAI-compatible API (e.g. http://localhost:1234/v1) - leave empty if not using a custom endpoint"
+  custom_model_name:
+    name: Custom Model Name
+    description: "Model identifier to send to your custom endpoint (e.g. mistral-7b-instruct, llama3) - leave empty if not using a custom endpoint"
+
+  ollama_base_url:
+    name: Ollama Server URL
+    description: "URL of local Ollama server (default: http://localhost:11434) - no API key needed, runs locally"
+
+  nvidia_thinking_mode:
+    name: NVIDIA Thinking Mode
+    description: "Enable thinking mode to see AI's reasoning process (slower but more transparent)"
+  anthropic_extended_thinking:
+    name: Anthropic Extended Thinking
+    description: "Enable Claude Opus extended thinking for complex reasoning tasks (slower, uses more tokens)"
+  anthropic_prompt_caching:
+    name: Anthropic Prompt Caching
+    description: "Cache long repetitive instructions to save costs and improve response speed"
+  openai_extended_thinking:
+    name: OpenAI Extended Thinking
+    description: "Enable o1/o3 reasoning mode for complex problem-solving (slower, uses more tokens)"
+
   enable_file_access:
     name: Enable File Access
     description: Allow AI to read/write Home Assistant config files (automations, scripts, YAML)
-  language:
-    name: Language
-    description: AI response language (English, Italian, Spanish, or French)
-  timeout:
-    name: Request Timeout
-    description: API request timeout in seconds (default 30, increase if responses are slow)
-  max_retries:
-    name: Max Retries
-    description: Maximum retry attempts for failed API calls (default 3)
-  colored_logs:
-    name: Colored Logs
-    description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
-  log_level:
-    name: Log Level
-    description: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
   enable_memory:
     name: Enable Memory
     description: "[EXPERIMENTAL] Enable persistent memory - AI remembers past conversations across sessions"
   enable_file_upload:
     name: Enable File Upload
     description: "[EXPERIMENTAL] Allow uploading documents (PDF, DOCX, TXT, MD, YAML) for AI analysis"
+  enable_voice_input:
+    name: Enable Voice Input
+    description: "Enable microphone button for voice messages (Groq Whisper, with OpenAI/Google fallback) - requires HTTPS"
   enable_rag:
     name: Enable RAG
     description: "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search and context injection"
   enable_chat_bubble:
     name: Chat Bubble
     description: "Show a floating AI chat bubble on every Home Assistant page. Context-aware: detects automations, scripts, dashboards. Includes voice input, markdown rendering, and live agent switching. Hidden on mobile devices."
+
+  timeout:
+    name: Request Timeout
+    description: API request timeout in seconds (default 30, increase if responses are slow)
+  max_retries:
+    name: Max Retries
+    description: Maximum retry attempts for failed API calls (default 3)
   max_snapshots_per_file:
     name: Max Backups per File
     description: "Maximum number of backup snapshots to keep per file (e.g., 5 backups for automations.yaml, 5 for scripts.yaml). Oldest backups are auto-deleted when the limit is reached."
   max_conversations:
     name: Max Conversations
     description: "Maximum number of chat conversations to keep in history (1-100)"
+
   cost_currency:
     name: Cost Currency
-    description: "Currency for token cost display (USD or EUR)"
+    description: "Currency for token cost display (USD, EUR, GBP, or JPY)"
+  mcp_config_file:
+    name: MCP Config File
+    description: "Path to MCP configuration JSON file (default: /config/amira/mcp_config.json) - create this file with your custom MCP servers"
+
+  telegram_bot_token:
+    name: Telegram Bot Token
+    description: "Telegram bot token from @BotFather - leave empty to disable Telegram messaging"
+  twilio_account_sid:
+    name: Twilio Account SID
+    description: "Your Twilio Account SID for WhatsApp integration - get from console.twilio.com"
+  twilio_auth_token:
+    name: Twilio Auth Token
+    description: "Your Twilio Auth Token for WhatsApp integration - get from console.twilio.com"
+  twilio_whatsapp_from:
+    name: Twilio WhatsApp Number
+    description: "Your Twilio WhatsApp number (e.g., +1234567890) - leave empty to disable WhatsApp"
+
+  colored_logs:
+    name: Colored Logs
+    description: Enable colored emoji indicators in addon logs (🟢 success, 🔴 error, etc.)
+  debug_mode:
+    name: Debug Mode
+    description: Enable detailed logging for troubleshooting (creates larger logs)
+  log_level:
+    name: Log Level
+    description: "Log verbosity: normal (filter noise), verbose (all logs), debug (includes payload data)"
+
+  api_port:
+    name: API Port
+    description: "Port the add-on uses to expose its internal API (default: 5010) - only change if conflicting with another add-on"

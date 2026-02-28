@@ -1,6 +1,6 @@
 """Floating chat bubble module for Home Assistant integration.
 
-Generates a JavaScript ES module that injects a floating AI assistant
+Generates a JavaScript ES module that injects a floating Amira
 chat bubble into every Home Assistant page. The module is registered
 as a Lovelace resource and loaded via extra_module_url or /local/.
 
@@ -160,7 +160,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     voice_lang = {"en": "en-US", "it": "it-IT", "es": "es-ES", "fr": "fr-FR"}.get(language, "en-US")
 
     return f"""/**
- * AI Assistant - Floating Chat Bubble for Home Assistant
+ * Amira - Floating Chat Bubble for Home Assistant
  * Context-aware, draggable, resizable, with voice input and markdown rendering.
  */
 (function() {{
@@ -360,9 +360,13 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     const ctx = detectContext();
     if (!ctx.type) return '';
     if (ctx.type === 'automation' && ctx.id)
-      return '[CONTEXT: User is viewing automation "' + ctx.id + '". Use get_automations to read it. Refer to it directly.] ';
+      return '[CONTEXT: User is viewing automation id="' + ctx.id + '". '
+           + 'The automation_id for modify operations is: ' + ctx.id + '. '
+           + 'Use get_automations or the DATA section to read it. Refer to it directly.] ';
     if (ctx.type === 'script' && ctx.id)
-      return '[CONTEXT: User is viewing script "' + ctx.id + '". Use get_scripts to read it. Refer to it directly.] ';
+      return '[CONTEXT: User is viewing script id="' + ctx.id + '". '
+           + 'The script_id for modify operations is: ' + ctx.id + '. '
+           + 'Use get_scripts or the DATA section to read it. Refer to it directly.] ';
     if (ctx.type === 'device' && ctx.id)
       return '[CONTEXT: User is viewing device "' + ctx.id + '". Use search_entities to find its entities.] ';
     if (ctx.type === 'html_dashboard' && ctx.id) {{
@@ -370,7 +374,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (ctx.entities && ctx.entities.length > 0) {{
         p += ' Entities: ' + ctx.entities.join(', ') + '.';
       }}
-      p += ' Use read_html_dashboard to read current HTML, then create_html_dashboard with same name. ONLY add requested elements — do NOT modify existing sections.]';
+      p += ' The current HTML will be provided. Call create_html_dashboard(name="' + ctx.id + '", html="<complete modified html>") immediately. NEVER output HTML as text in the chat.]';
       return p + ' ';
     }}
     if (ctx.type === 'dashboard' && ctx.id) {{
@@ -418,21 +422,53 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     return sid;
   }}
   function resetSession() {{
-    const sid = 'bubble_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
-    sessionStorage.setItem(SESSION_KEY, sid);
-    return sid;
+    // Remove current session so getSessionId() generates a fresh one on next call
+    sessionStorage.removeItem(SESSION_KEY);
+  }}
+  
+  // ---- Fallback in-memory storage (for private browsing or disabled localStorage) ----
+  let memoryHistoryFallback = [];
+  let localStorageAvailable = true;
+  try {{ localStorage.setItem('__test', '1'); localStorage.removeItem('__test'); }}
+  catch(e) {{ 
+    console.warn('[Bubble] localStorage not available (private mode?), using in-memory fallback');
+    localStorageAvailable = false;
   }}
 
   // ---- Message History Persistence ----
   const HISTORY_KEY = STORE_PREFIX + 'history';
   const MAX_HISTORY = 50;
   function loadHistory() {{
-    try {{ return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }}
-    catch(e) {{ return []; }}
+    try {{ 
+      if (!localStorageAvailable) {{
+        console.log('[Bubble] Using in-memory fallback, stored:', memoryHistoryFallback.length, 'messages');
+        return memoryHistoryFallback;
+      }}
+      const raw = localStorage.getItem(HISTORY_KEY);
+      console.log('[Bubble] localStorage.getItem returned:', raw ? raw.substring(0, 50) + '...' : 'null');
+      return JSON.parse(raw || '[]'); 
+    }}
+    catch(e) {{ 
+      console.warn('[Bubble] loadHistory error:', e);
+      return memoryHistoryFallback || []; 
+    }}
   }}
   function saveHistory(messages) {{
-    try {{ localStorage.setItem(HISTORY_KEY, JSON.stringify(messages.slice(-MAX_HISTORY))); }}
-    catch(e) {{}}
+    try {{ 
+      if (!localStorageAvailable) {{
+        memoryHistoryFallback = messages.slice(-MAX_HISTORY);
+        console.log('[Bubble] saved to in-memory:', memoryHistoryFallback.length, 'messages');
+        return;
+      }}
+      const json = JSON.stringify(messages.slice(-MAX_HISTORY));
+      localStorage.setItem(HISTORY_KEY, json);
+      console.log('[Bubble] saved to localStorage:', messages.length, 'messages');
+    }}
+    catch(e) {{
+      // Fallback to in-memory if localStorage quota exceeded
+      memoryHistoryFallback = messages.slice(-MAX_HISTORY);
+      console.warn('[Bubble] localStorage error, using in-memory fallback:', e);
+    }}
   }}
   function addToHistory(role, text) {{
     const h = loadHistory();
@@ -651,15 +687,17 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       display: flex; align-items: center; gap: 6px;
       padding: 6px 12px; border-bottom: 1px solid var(--divider-color, #e0e0e0);
       background: var(--secondary-background-color, #f5f5f5); flex-shrink: 0;
+      flex-wrap: nowrap; overflow: hidden;
     }}
     #ha-claude-bubble .agent-bar label {{
       font-size: 11px; color: var(--secondary-text-color, #666); white-space: nowrap;
+      flex-shrink: 0;
     }}
     #ha-claude-bubble .agent-bar select {{
-      flex: 1; font-size: 12px; padding: 3px 6px; border-radius: 6px;
+      flex: 1; min-width: 80px; font-size: 12px; padding: 3px 6px; border-radius: 6px;
       border: 1px solid var(--divider-color, #ddd);
       background: var(--card-background-color, #fff); color: var(--primary-text-color, #333);
-      outline: none; max-width: 160px; cursor: pointer;
+      outline: none; cursor: pointer;
     }}
     #ha-claude-bubble .agent-bar select:focus {{ border-color: var(--primary-color, #03a9f4); }}
     #ha-claude-bubble .tool-badges {{
@@ -669,12 +707,29 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       display: inline-block; background: var(--primary-color, #03a9f4);
       color: white; font-size: 10px; padding: 2px 8px; border-radius: 10px; opacity: 0.8;
     }}
+    @media (max-width: 768px) {{
+      #ha-claude-bubble .agent-bar {{
+        gap: 4px; padding: 4px 8px;
+      }}
+      #ha-claude-bubble .agent-bar label {{
+        display: none;
+      }}
+      #ha-claude-bubble .agent-bar select {{
+        min-width: 70px; font-size: 11px; padding: 2px 4px;
+      }}
+    }}
     @media (max-width: 480px) {{
       #ha-claude-bubble .chat-panel {{
         width: calc(100vw - 16px) !important; height: calc(100vh - 100px) !important;
         right: 8px !important; bottom: 80px !important; border-radius: 12px;
       }}
       #ha-claude-bubble .bubble-btn {{ width: 48px; height: 48px; font-size: 20px; }}
+      #ha-claude-bubble .agent-bar {{
+        gap: 3px; padding: 3px 6px;
+      }}
+      #ha-claude-bubble .agent-bar select {{
+        min-width: 60px; font-size: 10px; padding: 2px 3px;
+      }}
     }}
   `;
   document.head.appendChild(style);
@@ -685,7 +740,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   root.innerHTML = `
     <div class="chat-panel" id="haChatPanel">
       <div class="chat-header" id="haChatHeader">
-        <span>AI Assistant</span>
+        <span>Amira</span>
         <div class="chat-header-actions">
           <button id="haChatNew" title="${{T.new_chat}}">&#10227;</button>
           <button id="haChatClose" title="${{T.close}}">&times;</button>
@@ -705,7 +760,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         <button class="input-btn send-btn" id="haChatSend" title="${{T.send}}">&#9654;</button>
       </div>
     </div>
-    <button class="bubble-btn" id="haChatBubbleBtn" title="AI Assistant">&#129302;</button>
+    <button class="bubble-btn" id="haChatBubbleBtn" title="Amira">&#129302;</button>
   `;
   document.body.appendChild(root);
 
@@ -826,53 +881,57 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   }});
   panelResizeObserver.observe(panel);
 
-  // ---- Draggable Button (immediate drag, 5px threshold) ----
+  // ---- Draggable Button — uses Pointer Events + setPointerCapture ----
+  // setPointerCapture ensures pointermove/pointerup are delivered to the button
+  // even when the cursor moves outside the document (e.g. over an iframe or
+  // another window region), which was causing the drag to "freeze".
   let isDragging = false, dragStarted = false, dragOffsetX = 0, dragOffsetY = 0;
-  let dragStartX = 0, dragStartY = 0, mouseIsDown = false;
+  let dragStartX = 0, dragStartY = 0;
   const DRAG_THRESHOLD = 5;
 
-  function onBtnDown(cx, cy) {{
-    mouseIsDown = true;
-    dragStarted = false;
+  btn.addEventListener('pointerdown', (e) => {{
+    if (e.button !== 0 && e.pointerType === 'mouse') return; // left button only for mouse
+    e.preventDefault();
+    btn.setPointerCapture(e.pointerId); // lock all pointer events to this element
     isDragging = false;
-    dragStartX = cx;
-    dragStartY = cy;
-    dragOffsetX = cx - btn.getBoundingClientRect().left;
-    dragOffsetY = cy - btn.getBoundingClientRect().top;
-  }}
-  function onMoveGlobal(cx, cy) {{
-    if (!mouseIsDown) return;
+    dragStarted = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    dragOffsetX = e.clientX - btn.getBoundingClientRect().left;
+    dragOffsetY = e.clientY - btn.getBoundingClientRect().top;
+  }});
+
+  btn.addEventListener('pointermove', (e) => {{
+    if (!btn.hasPointerCapture(e.pointerId)) return;
     if (!isDragging) {{
-      // Check threshold
-      if (Math.abs(cx - dragStartX) > DRAG_THRESHOLD || Math.abs(cy - dragStartY) > DRAG_THRESHOLD) {{
+      if (Math.abs(e.clientX - dragStartX) > DRAG_THRESHOLD || Math.abs(e.clientY - dragStartY) > DRAG_THRESHOLD) {{
         isDragging = true;
         dragStarted = true;
         btn.classList.add('dragging');
       }} else return;
     }}
-    btn.style.left = Math.max(0, Math.min(window.innerWidth - 56, cx - dragOffsetX)) + 'px';
-    btn.style.top = Math.max(0, Math.min(window.innerHeight - 56, cy - dragOffsetY)) + 'px';
+    btn.style.left = Math.max(0, Math.min(window.innerWidth - 56, e.clientX - dragOffsetX)) + 'px';
+    btn.style.top = Math.max(0, Math.min(window.innerHeight - 56, e.clientY - dragOffsetY)) + 'px';
     btn.style.right = 'auto'; btn.style.bottom = 'auto';
     if (isOpen) positionPanelNearButton();
-  }}
-  function onUpGlobal() {{
-    if (!mouseIsDown) return;
-    mouseIsDown = false;
+  }});
+
+  btn.addEventListener('pointerup', (e) => {{
+    if (!btn.hasPointerCapture(e.pointerId)) return;
+    btn.releasePointerCapture(e.pointerId);
     if (isDragging) {{
       isDragging = false;
       btn.classList.remove('dragging');
       saveSetting('btn-pos', {{ x: parseInt(btn.style.left) || 0, y: parseInt(btn.style.top) || 0 }});
-      saveSetting('btn-dragged', true);  // Mark that button has been manually dragged
+      saveSetting('btn-dragged', true);
     }}
-  }}
+  }});
 
-  btn.addEventListener('mousedown', (e) => {{ e.preventDefault(); onBtnDown(e.clientX, e.clientY); }});
-  document.addEventListener('mousemove', (e) => {{ onMoveGlobal(e.clientX, e.clientY); }});
-  document.addEventListener('mouseup', () => {{ onUpGlobal(); }});
-
-  btn.addEventListener('touchstart', (e) => {{ onBtnDown(e.touches[0].clientX, e.touches[0].clientY); }}, {{ passive: true }});
-  document.addEventListener('touchmove', (e) => {{ if (mouseIsDown) {{ e.preventDefault(); onMoveGlobal(e.touches[0].clientX, e.touches[0].clientY); }} }}, {{ passive: false }});
-  document.addEventListener('touchend', () => {{ onUpGlobal(); }});
+  btn.addEventListener('pointercancel', (e) => {{
+    if (btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId);
+    isDragging = false;
+    btn.classList.remove('dragging');
+  }});
 
   // ---- Panel positioning ----
   function positionPanelNearButton() {{
@@ -1137,8 +1196,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
           const data = await resp.json();
           if (data.html) {{
             contextPrefix = '[CONTEXT: User is viewing HTML dashboard "' + ctx.id + '". '
-              + 'Current HTML source below. To modify, use read_html_dashboard first then create_html_dashboard with same name="' + ctx.id + '". '
-              + 'CRITICAL: Keep the ENTIRE original HTML unchanged — only ADD the requested elements using the same style/CSS. Do NOT rewrite, restructure, or modify any existing section.]\\n'
+              + 'The COMPLETE current HTML is below. Modify it as requested, then call create_html_dashboard(name="' + ctx.id + '", html="<complete modified html>") immediately — do NOT call read_html_dashboard first. '
+              + 'CRITICAL: Keep ALL existing sections, style, and CSS unchanged — only ADD or MODIFY what the user requests. NEVER output HTML as text in the chat.]\\n'
               + '[CURRENT_DASHBOARD_HTML]\\n' + data.html + '\\n[/CURRENT_DASHBOARD_HTML]\\n';
           }}
         }}
@@ -1299,6 +1358,34 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
               toolBadgesEl.appendChild(badge);
               messagesEl.scrollTop = messagesEl.scrollHeight;
               if (RELOAD_TOOLS.has(evt.name)) writeToolCalled = true;
+            }} else if (evt.type === 'diff') {{
+              if (assistantEl && evt.content) {{
+                const wrapper = document.createElement('details');
+                wrapper.style.cssText = 'margin:6px 0;font-size:11px;border:1px solid #334155;border-radius:5px;overflow:hidden;';
+                const summary = document.createElement('summary');
+                summary.style.cssText = 'padding:5px 8px;cursor:pointer;background:#1e293b;color:#94a3b8;user-select:none;';
+                summary.textContent = '\\U0001f4dd Diff modifiche';
+                wrapper.appendChild(summary);
+                const pre = document.createElement('pre');
+                pre.style.cssText = 'margin:0;padding:6px;overflow-x:auto;background:#0f172a;font-size:10px;line-height:1.5;';
+                evt.content.split('\\n').forEach(function(line) {{
+                  const span = document.createElement('span');
+                  span.style.cssText = 'display:block;white-space:pre;';
+                  if (line.startsWith('+') && !line.startsWith('+++')) {{
+                    span.style.background = 'rgba(34,197,94,0.15)'; span.style.color = '#86efac';
+                  }} else if (line.startsWith('-') && !line.startsWith('---')) {{
+                    span.style.background = 'rgba(239,68,68,0.15)'; span.style.color = '#fca5a5';
+                  }} else if (line.startsWith('@@')) {{
+                    span.style.color = '#7dd3fc';
+                  }} else {{
+                    span.style.color = '#64748b';
+                  }}
+                  span.textContent = line;
+                  pre.appendChild(span);
+                }});
+                wrapper.appendChild(pre);
+                assistantEl.appendChild(wrapper);
+              }}
             }} else if (evt.type === 'status') {{
               const msg = evt.message || '';
               _updateThinkingBase('\\u23f3 ' + msg);
@@ -1348,14 +1435,58 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // ---- Restore message history on load ----
   function restoreHistory() {{
     const history = loadHistory();
+    console.log('[Bubble] Restored history:', history.length, 'messages');
     if (history.length === 0) return;
     // Only show last 20 messages
     const recent = history.slice(-20);
     recent.forEach(m => {{
       addMessage(m.role, m.text, m.role === 'assistant');
     }});
+    console.log('[Bubble] Loaded', recent.length, 'recent messages to UI');
   }}
   restoreHistory();
+
+  // ---- Addon Health Check: Remove bubble if addon is down ----
+  let addonHealthCheckFails = 0;
+  const MAX_FAILS = 2;
+  async function checkAddonHealth() {{
+    try {{
+      const resp = await fetch(API_BASE + '/api/status', {{
+        method: 'GET',
+        credentials: 'same-origin',
+        timeout: 3000
+      }});
+      if (resp.ok) {{
+        addonHealthCheckFails = 0;  // Reset counter on success
+        console.log('[Bubble] Addon health: OK');
+      }} else {{
+        addonHealthCheckFails++;
+        console.warn('[Bubble] Addon health check failed:', resp.status);
+        if (addonHealthCheckFails >= MAX_FAILS) {{
+          removeBubbleFromDOM();
+        }}
+      }}
+    }} catch (error) {{
+      addonHealthCheckFails++;
+      console.warn('[Bubble] Addon health check error:', error);
+      if (addonHealthCheckFails >= MAX_FAILS) {{
+        removeBubbleFromDOM();
+      }}
+    }}
+  }}
+
+  function removeBubbleFromDOM() {{
+    console.log('[Bubble] Addon unreachable, removing bubble from DOM');
+    const root = document.getElementById('ha-claude-bubble');
+    if (root) {{
+      root.remove();
+      clearInterval(healthCheckInterval);
+    }}
+  }}
+
+  // Start health check every 30 seconds
+  const healthCheckInterval = setInterval(checkAddonHealth, 30000);
+  checkAddonHealth(); // Do first check immediately
 
   // ---- Multi-tab sync: listen for messages from other tabs ----
   if (bc) {{
@@ -1372,6 +1503,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
   // ---- Agent/Provider Selector ----
   let agentData = null; // cached response from /api/get_models
+  let _syncProvider = '';  // last known provider (for cross-UI polling)
+  let _syncModel = '';     // last known model   (for cross-UI polling)
 
   async function loadAgents() {{
     try {{
@@ -1392,8 +1525,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
       // Populate models for current provider
       populateModels(agentData.current_provider);
+      // Track for cross-UI sync polling
+      _syncProvider = agentData.current_provider || '';
+      _syncModel    = agentData.current_model_technical || '';
     }} catch(e) {{
-      console.warn('[AI Assistant] Could not load agents:', e);
+      console.warn('[Amira] Could not load agents:', e);
     }}
   }}
 
@@ -1467,7 +1603,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         credentials: 'same-origin',
       }});
     }} catch(e) {{
-      console.error('[AI Assistant] Device registration error:', e);
+      console.error('[Amira] Device registration error:', e);
     }}
   }}
 
@@ -1475,6 +1611,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   registerDevice();
   updateContextBar();
   loadAgents();
-  console.log('[AI Assistant] Chat bubble loaded (v3)');
+
+  // Poll every 10s for model/provider changes made from chat_ui or other tabs
+  setInterval(async () => {{
+    try {{
+      const r = await fetch(API_BASE + '/api/status', {{credentials:'same-origin'}});
+      if (!r.ok) return;
+      const d = await r.json();
+      const sp = d.provider || '';
+      const sm = d.model || '';
+      if (sp && sm && (sp !== _syncProvider || sm !== _syncModel)) {{
+        await loadAgents();
+      }}
+    }} catch(e) {{}}
+  }}, 10000);
+
+  console.log('[Amira] Chat bubble loaded (v3)');
 }})();
 """

@@ -32,6 +32,45 @@ MAX_SNAPSHOTS_PER_FILE=$(bashio::config 'max_snapshots_per_file')
 MAX_CONVERSATIONS=$(bashio::config 'max_conversations')
 COST_CURRENCY=$(bashio::config 'cost_currency')
 
+# Additional AI providers
+GROQ_API_KEY=$(bashio::config 'groq_api_key')
+MISTRAL_API_KEY=$(bashio::config 'mistral_api_key')
+OPENROUTER_API_KEY=$(bashio::config 'openrouter_api_key')
+DEEPSEEK_API_KEY=$(bashio::config 'deepseek_api_key')
+MINIMAX_API_KEY=$(bashio::config 'minimax_api_key')
+AIHUBMIX_API_KEY=$(bashio::config 'aihubmix_api_key')
+SILICONFLOW_API_KEY=$(bashio::config 'siliconflow_api_key')
+VOLCENGINE_API_KEY=$(bashio::config 'volcengine_api_key')
+DASHSCOPE_API_KEY=$(bashio::config 'dashscope_api_key')
+MOONSHOT_API_KEY=$(bashio::config 'moonshot_api_key')
+ZHIPU_API_KEY=$(bashio::config 'zhipu_api_key')
+PERPLEXITY_API_KEY=$(bashio::config 'perplexity_api_key')
+CUSTOM_API_KEY=$(bashio::config 'custom_api_key')
+CUSTOM_API_BASE=$(bashio::config 'custom_api_base')
+CUSTOM_MODEL_NAME=$(bashio::config 'custom_model_name')
+# OAuth-only providers — no config token; read from secure /data/ files at runtime
+GITHUB_COPILOT_TOKEN=""
+OPENAI_CODEX_TOKEN=""
+OLLAMA_BASE_URL=$(bashio::config 'ollama_base_url')
+
+# Messaging configuration
+TELEGRAM_BOT_TOKEN=$(bashio::config 'telegram_bot_token')
+TWILIO_ACCOUNT_SID=$(bashio::config 'twilio_account_sid')
+TWILIO_AUTH_TOKEN=$(bashio::config 'twilio_auth_token')
+TWILIO_WHATSAPP_FROM=$(bashio::config 'twilio_whatsapp_from')
+
+# MCP (Model Context Protocol) configuration
+MCP_CONFIG_FILE=$(bashio::config 'mcp_config_file' 2>/dev/null || echo "/config/amira/mcp_config.json")
+if [ "${MCP_CONFIG_FILE}" = "null" ] || [ -z "${MCP_CONFIG_FILE}" ]; then
+  MCP_CONFIG_FILE="/config/amira/mcp_config.json"
+fi
+if [ -f "${MCP_CONFIG_FILE}" ]; then
+  MCP_SERVERS=$(cat "${MCP_CONFIG_FILE}")
+  bashio::log.info "MCP config loaded from: ${MCP_CONFIG_FILE}"
+else
+  MCP_SERVERS="{}"
+  bashio::log.info "MCP config file not found. Create ${MCP_CONFIG_FILE} to enable MCP servers"
+fi
 
 # SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
 if [[ -z "${SUPERVISOR_TOKEN:-}" ]]; then
@@ -66,11 +105,52 @@ export SUPERVISOR_TOKEN
 export MAX_SNAPSHOTS_PER_FILE
 export MAX_CONVERSATIONS
 export COST_CURRENCY
+export TELEGRAM_BOT_TOKEN
+export TWILIO_ACCOUNT_SID
+export TWILIO_AUTH_TOKEN
+export TWILIO_WHATSAPP_FROM
+export MCP_SERVERS
+
+export GROQ_API_KEY
+export MISTRAL_API_KEY
+export OPENROUTER_API_KEY
+export DEEPSEEK_API_KEY
+export MINIMAX_API_KEY
+export AIHUBMIX_API_KEY
+export SILICONFLOW_API_KEY
+export VOLCENGINE_API_KEY
+export DASHSCOPE_API_KEY
+export MOONSHOT_API_KEY
+export ZHIPU_API_KEY
+export PERPLEXITY_API_KEY
+export CUSTOM_API_KEY
+export CUSTOM_API_BASE
+export CUSTOM_MODEL_NAME
+export GITHUB_COPILOT_TOKEN
+export OPENAI_CODEX_TOKEN
+export OLLAMA_BASE_URL
 
 bashio::log.info "AI Provider: ${AI_PROVIDER}"
 bashio::log.info "ENABLE_FILE_ACCESS: ${ENABLE_FILE_ACCESS}"
 bashio::log.info "DEBUG_MODE: ${DEBUG_MODE}"
 bashio::log.info "COLORED_LOGS: ${COLORED_LOGS}"
+if [ -n "${TELEGRAM_BOT_TOKEN}" ] && [ "${TELEGRAM_BOT_TOKEN}" != "null" ]; then
+    TELEGRAM_STATUS="enabled"
+else
+    TELEGRAM_STATUS="disabled"
+fi
+if [ -n "${TWILIO_ACCOUNT_SID}" ] && [ "${TWILIO_ACCOUNT_SID}" != "null" ]; then
+    WHATSAPP_STATUS="enabled"
+else
+    WHATSAPP_STATUS="disabled"
+fi
+bashio::log.info "Messaging - Telegram: ${TELEGRAM_STATUS}"
+bashio::log.info "Messaging - WhatsApp: ${WHATSAPP_STATUS}"
+if [ -n "${MCP_SERVERS}" ] && [ "${MCP_SERVERS}" != "{}" ]; then
+    bashio::log.info "MCP Config: configured"
+else
+    bashio::log.info "MCP Config: not configured"
+fi
 bashio::log.info "SUPERVISOR_TOKEN present: $([ -n \"${SUPERVISOR_TOKEN}\" ] && echo 'yes' || echo 'NO - HA API will fail!')"
 bashio::log.info "SUPERVISOR_TOKEN length: ${#SUPERVISOR_TOKEN}"
 

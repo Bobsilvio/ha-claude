@@ -1,64 +1,228 @@
-# AI Assistant for Home Assistant (Add-on)
+# Amira - Smart Home AI Assistant
 
-**Multi-provider AI chat interface** for Home Assistant. Chat with Claude, GPT-4, Gemini, NVIDIA, GitHub Models, and more.
+Multi-provider AI assistant for Home Assistant. Control your smart home, create automations, and manage configurations with natural language.
 
-## Quick Start
+Supports **19 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
 
-### 1. Add Repository
-Settings → Add-ons & Backups → Add-on Store → ⋮ → Repositories → `https://github.com/Bobsilvio/ha-claude`
+---
 
-### 2. Install & Configure
-- Install **AI Assistant for Home Assistant**
-- Configuration tab → Add **at least one AI provider API key** (Anthropic/OpenAI/Google/NVIDIA/GitHub)
-- Save & Start
+## 🚀 Quick Start
 
-### 3. First Run
-Open **AI Assistant** from sidebar → Select an agent from the dropdown → Start chatting
+1. **Install** → Settings → Add-ons → Add-on Store → Search "Amira"
+2. **Add at least one API key** (see providers table below)
+3. **Start** → Open Web UI → Pick a model → Chat!
 
-## What You Get
+> 💡 **Free options**: GitHub Models (40+ models), NVIDIA NIM, Groq, Google Gemini (1500 req/day).
+>
+> 💳 **Already paying for ChatGPT Plus/Pro?** Use **OpenAI Codex** — included in your subscription, no API key needed. See below.
 
-- ✅ Streaming chat with real-time responses
-- ✅ 40+ AI models across multiple providers
-- ✅ Home Assistant integration (read states, call services)
-- ✅ Multi-language UI (EN/IT/ES/FR)
-- ✅ Floating chat bubble on every HA page (context-aware)
-- ✅ Backup management with restore & delete + per-file limits
-- ✅ Optional: File upload, Persistent memory, Document search
+---
 
-## Configuration
+## ⚙️ Configuration
 
-Add one or more provider API keys in the add-on configuration:
+### Providers
 
-- **Anthropic API Key**: Claude 3.5 Sonnet/Haiku (get from [console.anthropic.com](https://console.anthropic.com))
-- **OpenAI API Key**: GPT-4, o3-mini (get from [platform.openai.com](https://platform.openai.com))
-- **Google API Key**: Gemini (get from [ai.google.dev](https://ai.google.dev))
-- **NVIDIA API Key**: Open-source models (get from [build.nvidia.com](https://build.nvidia.com))
-- **GitHub Token**: Fine-grained token with no special permissions (get from GitHub Settings)
+| Provider | Key Setting | Free? | Get Key |
+|----------|-------------|-------|---------|
+| Anthropic Claude | `anthropic_api_key` | ❌ | [console.anthropic.com](https://console.anthropic.com) |
+| OpenAI | `openai_api_key` | ❌ | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
+| Google Gemini | `google_api_key` | ✅ 1500 req/day | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) |
+| NVIDIA NIM | `nvidia_api_key` | ✅ Unlimited | [build.nvidia.com](https://build.nvidia.com) |
+| GitHub Models | `github_token` | ✅ Rate limited | [github.com/settings/tokens](https://github.com/settings/tokens) |
+| Groq | `groq_api_key` | ✅ Unlimited | [console.groq.com](https://console.groq.com) |
+| Mistral | `mistral_api_key` | ❌ | [console.mistral.ai](https://console.mistral.ai) |
+| Ollama (local) | `ollama_base_url` | ✅ Local | [ollama.com](https://ollama.com) |
+| DeepSeek | `deepseek_api_key` | ❌ | [platform.deepseek.com](https://platform.deepseek.com) |
+| OpenRouter | `openrouter_api_key` | ❌ | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| Perplexity | `perplexity_api_key` | ❌ | [perplexity.ai/api](https://www.perplexity.ai/api) |
+| MiniMax | `minimax_api_key` | ❌ | [minimaxi.com](https://www.minimaxi.com) |
+| AiHubMix | `aihubmix_api_key` | ❌ | [aihubmix.com](https://aihubmix.com) |
+| SiliconFlow | `siliconflow_api_key` | ❌ | [siliconflow.cn](https://siliconflow.cn) |
+| VolcEngine | `volcengine_api_key` | ❌ | [volcengine.com](https://www.volcengine.com) |
+| DashScope | `dashscope_api_key` | ❌ | [dashscope.aliyun.com](https://dashscope.aliyun.com) |
+| Moonshot | `moonshot_api_key` | ❌ | [platform.moonshot.cn](https://platform.moonshot.cn) |
+| Zhipu AI | `zhipu_api_key` | ❌ | [open.bigmodel.cn](https://open.bigmodel.cn) |
+| GitHub Copilot | OAuth (no key) | ✅ (sub req.) | [github.com/login/device](https://github.com/login/device) |
+| OpenAI Codex | OAuth (no key) | ✅ (sub req.) | ChatGPT Plus/Pro — see below |
+| Custom | `custom_api_key` + `custom_api_base` | varies | Any OpenAI-compatible API |
 
-**Optional Features**:
-- `enable_chat_bubble` → Floating AI chat bubble on every HA page (context-aware, voice input, hidden on mobile)
-- `enable_file_upload` → Upload PDF/DOCX/TXT for AI analysis
-- `enable_memory` → AI remembers past conversations
-- `enable_rag` → Semantic search over documents
-- `enable_file_access` → Read/write `/config` files (with snapshots)
-- `max_snapshots_per_file` → Max backup snapshots per file (default 5, oldest auto-deleted)
-- `max_conversations` → Max chat conversations in history (1-100)
-- `language` → UI language (en/it/es/fr)
-- `debug_mode` → Verbose logging
-- `log_level` → Log verbosity (normal/verbose/debug)
+### 💳 OpenAI Codex — for ChatGPT Plus/Pro subscribers
 
-For all options and details, see **DOCS.md** tab in the add-on.
+If you already pay for **ChatGPT Plus** ($20/mo) or **Pro** ($200/mo), you can use OpenAI's Codex models inside Amira **at no extra cost** — no API key required.
 
-## Troubleshooting
+**How it works:** Amira authenticates with your ChatGPT account via OAuth (same login you use on chatgpt.com). The token is stored locally and auto-refreshed.
 
-- **Sidebar not visible?** → Restart Home Assistant and ensure add-on is running
-- **API errors?** → Verify API key is valid and has correct permissions
-- **Chat doesn't load?** → Hard-refresh browser (Ctrl+F5) or check add-on logs
-- **More help?** → See **DOCS.md** tab or [GitHub issues](https://github.com/Bobsilvio/ha-claude/issues)
+**Available models:** `gpt-5.3-codex`, `gpt-5.2-codex`, `gpt-5.1-codex`, `gpt-5-codex`, `gpt-5-codex-mini` — specialized for agentic coding tasks, ideal for HA automations, scripts and dashboard generation.
 
-## Links
+**vs. standard OpenAI API:**
+| | OpenAI API (`openai_api_key`) | OpenAI Codex (OAuth) |
+|---|---|---|
+| Cost | Pay per token | Included in ChatGPT Plus/Pro |
+| Auth | API key | Login with ChatGPT account |
+| Models | GPT-4o, o3, o4-mini, … | gpt-5.x-codex family |
+| Best for | General use, all OpenAI models | ChatGPT subscribers, coding tasks |
 
-- 📖 **Full Documentation**: See **DOCS.md** tab
-- 🐛 **Issues**: https://github.com/Bobsilvio/ha-claude/issues
-- 💬 **Discussions**: https://github.com/Bobsilvio/ha-claude/discussions
+**Setup:**
+1. Select **OpenAI Codex** as provider in Amira
+2. Click **🔑 Connect OpenAI Codex** in the banner that appears
+3. Log in with your ChatGPT account in the new tab
+4. Copy the redirect URL (`localhost:1455/...`) and paste it in the Amira modal
+5. Done — a green banner confirms the connection with expiry info
+
+### Key Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `language` | `en` | UI language: en / it / es / fr |
+| `enable_file_access` | `false` | Read/write HA config files |
+| `enable_chat_bubble` | `false` | Floating AI button on every HA page |
+| `enable_memory` | `false` | Persistent MEMORY.md (see below) |
+| `enable_file_upload` | `false` | Upload PDF / DOCX / TXT |
+| `enable_rag` | `false` | Semantic search in uploaded documents |
+| `max_conversations` | `10` | Chat history depth (1–100) |
+| `cost_currency` | `USD` | Cost display currency |
+| `timeout` | `30` | Request timeout (seconds) |
+| `mcp_config_file` | `/config/amira/mcp_config.json` | Custom MCP tools |
+
+---
+
+## 📁 Data Storage
+
+All persistent data lives in **`/config/amira/`** — one folder, easy to backup.
+
+```
+/config/amira/
+├── conversations.json        # Chat history
+├── runtime_selection.json    # Last selected model/provider
+├── model_blocklist.json      # Blocked/failed models
+├── bubble_devices.json       # Chat bubble per-device config
+├── custom_system_prompt.txt  # Custom system prompt override
+├── mcp_config.json           # MCP servers (create this manually)
+├── snapshots/                # Config file backups (before edits)
+├── rag/                      # RAG document index
+├── documents/                # Uploaded files
+└── memory/
+    ├── MEMORY.md             # Long-term facts (always in context)
+    ├── HISTORY.md            # Session log (append-only)
+    └── conversations.json    # Full conversation archive
+```
+
+> Files from older versions (`/config/.storage/claude_*`) are migrated automatically on first start.
+
+---
+
+## 🧠 Memory
+
+When `enable_memory: true`, Amira uses a two-file system:
+
+- **`MEMORY.md`** — Injected once in every system prompt. Write here what the AI should always know.
+- **`HISTORY.md`** — Append-only log of past sessions. Never auto-injected, available for manual reference.
+
+**Add persistent context (SSH into HA):**
+
+```bash
+mkdir -p /config/amira/memory
+nano /config/amira/memory/MEMORY.md
+```
+
+Example:
+```markdown
+## User
+Name: Eleonora. Home Assistant OS, single user.
+## Preferences
+Reply in Italian. Keep answers concise.
+## Home
+3 zones: Living room, Bedroom, Garden. Solar panels on roof.
+```
+
+No per-message keyword search, no cross-session contamination. Simple and token-efficient.
+
+---
+
+## 🔌 MCP Tools (Custom AI Actions)
+
+Extend the AI with external tools via [Model Context Protocol](https://modelcontextprotocol.io/):
+
+1. Create `/config/amira/mcp_config.json`
+2. Add your servers:
+
+```json
+{
+  "filesystem": {
+    "transport": "http",
+    "url": "http://YOUR-SERVER-IP:PORT"
+  }
+}
+```
+
+For stdio servers (if node/python available on the host):
+```json
+{
+  "my_tool": {
+    "transport": "stdio",
+    "command": "uvx",
+    "args": ["mcp-server-name"]
+  }
+}
+```
+
+3. Restart addon → check logs for "MCP: Initialized N server(s)"
+
+→ Full guide: [MCP.md](../../../MCP.md)
+
+---
+
+## 📱 Messaging (Optional)
+
+| Setting | Description |
+|---------|-------------|
+| `telegram_bot_token` | Bot token from Telegram @BotFather |
+| `twilio_account_sid` | Twilio SID for WhatsApp |
+| `twilio_auth_token` | Twilio auth token |
+| `twilio_whatsapp_from` | Your Twilio WhatsApp number |
+
+→ Setup guide: [MESSAGING.md](../../../MESSAGING.md)
+
+---
+
+## 🐛 Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| "Invalid API key" | Check key format matches selected provider |
+| No models in dropdown | Add at least one API key, restart |
+| File access not working | Enable `enable_file_access: true`, restart |
+| Bubble not visible | Enable `enable_chat_bubble: true`, refresh |
+| Chat history lost | Check write permissions on `/config/amira/` |
+| Memory not working | Enable `enable_memory: true`; check `/config/amira/memory/MEMORY.md` |
+| MCP not loading | Validate JSON at `/config/amira/mcp_config.json`; check logs |
+
+Check logs: **Settings → Add-ons → Amira → Logs**
+
+---
+
+## 📖 Docs
+
+| | |
+|---|---|
+| [DOCS.md](../../../DOCS.md) | Full technical reference |
+| [SETUP_HA.md](../../../SETUP_HA.md) | Step-by-step installation |
+| [MCP.md](../../../MCP.md) | MCP tools setup |
+| [MESSAGING.md](../../../MESSAGING.md) | Telegram / WhatsApp |
+
+---
+
+## 📜 License
+
+PolyForm Non-Commercial License 1.0.0 — free for personal use.
+Commercial use requires explicit written permission from the author.
+
+---
+
+## 🆘 Support
+
+- 🐛 [Report Issues](https://github.com/Bobsilvio/ha-claude/issues)
+- 💬 [Discussions](https://github.com/Bobsilvio/ha-claude/discussions)
+- ⭐ Star on GitHub if you find it useful!
+
 

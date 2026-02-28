@@ -1,4 +1,4 @@
-"""AI Assistant API with multi-provider support for Home Assistant."""
+"""Amira AI Assistant API with multi-provider support for Home Assistant."""
 
 import os
 import json
@@ -19,9 +19,7 @@ from werkzeug.exceptions import HTTPException
 
 import tools
 import intent
-import providers_openai
-import providers_anthropic
-import providers_google
+from providers import stream_chat as provider_stream_chat
 import pricing
 import chat_ui
 
@@ -43,6 +41,68 @@ try:
     RAG_AVAILABLE = True
 except ImportError:
     RAG_AVAILABLE = False
+
+try:
+    import mcp
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+
+try:
+    import fallback
+    FALLBACK_AVAILABLE = True
+except ImportError:
+    FALLBACK_AVAILABLE = False
+
+try:
+    import semantic_cache
+    SEMANTIC_CACHE_AVAILABLE = True
+except ImportError:
+    SEMANTIC_CACHE_AVAILABLE = False
+
+try:
+    import tool_optimizer
+    TOOL_OPTIMIZER_AVAILABLE = True
+except ImportError:
+    TOOL_OPTIMIZER_AVAILABLE = False
+
+try:
+    import quality_metrics
+    QUALITY_METRICS_AVAILABLE = True
+except ImportError:
+    QUALITY_METRICS_AVAILABLE = False
+
+try:
+    import messaging
+    import telegram_bot
+    import whatsapp_bot
+    MESSAGING_AVAILABLE = True
+except ImportError:
+    MESSAGING_AVAILABLE = False
+
+try:
+    import image_support
+    IMAGE_SUPPORT_AVAILABLE = True
+except ImportError:
+    IMAGE_SUPPORT_AVAILABLE = False
+
+try:
+    import scheduled_tasks
+    SCHEDULED_TASKS_AVAILABLE = True
+except ImportError:
+    SCHEDULED_TASKS_AVAILABLE = False
+
+try:
+    import voice_transcription
+    VOICE_TRANSCRIPTION_AVAILABLE = True
+except ImportError:
+    VOICE_TRANSCRIPTION_AVAILABLE = False
+
+try:
+    import scheduler_agent
+    SCHEDULER_AGENT_AVAILABLE = True
+except ImportError:
+    SCHEDULER_AGENT_AVAILABLE = False
 
 load_dotenv()
 
@@ -74,8 +134,27 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
+AIHUBMIX_API_KEY = os.getenv("AIHUBMIX_API_KEY", "")
+SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
+VOLCENGINE_API_KEY = os.getenv("VOLCENGINE_API_KEY", "")
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
+MOONSHOT_API_KEY = os.getenv("MOONSHOT_API_KEY", "")
+ZHIPU_API_KEY = os.getenv("ZHIPU_API_KEY", "")
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "")
+GITHUB_COPILOT_TOKEN = os.getenv("GITHUB_COPILOT_TOKEN", "")
+OPENAI_CODEX_TOKEN = os.getenv("OPENAI_CODEX_TOKEN", "")
+CUSTOM_API_KEY = os.getenv("CUSTOM_API_KEY", "")
+CUSTOM_API_BASE = os.getenv("CUSTOM_API_BASE", "")
+CUSTOM_MODEL_NAME = os.getenv("CUSTOM_MODEL_NAME", "")
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 NVIDIA_THINKING_MODE = os.getenv("NVIDIA_THINKING_MODE", "False").lower() == "true"
 ANTHROPIC_EXTENDED_THINKING = os.getenv("ANTHROPIC_EXTENDED_THINKING", "False").lower() == "true"
+ANTHROPIC_PROMPT_CACHING = os.getenv("ANTHROPIC_PROMPT_CACHING", "False").lower() == "true"
 OPENAI_EXTENDED_THINKING = os.getenv("OPENAI_EXTENDED_THINKING", "False").lower() == "true"
 # Filter out bashio 'null' values
 if AI_MODEL in ("null", "None", ""):
@@ -96,13 +175,13 @@ SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN"
 
 # Persisted runtime selection (preferred over add-on configuration).
 # This enables choosing the agent/model from the chat dropdown only.
-RUNTIME_SELECTION_FILE = "/config/.storage/claude_runtime_selection.json"
+RUNTIME_SELECTION_FILE = "/config/amira/runtime_selection.json"
 
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
 
 # Agent defaults (hardcoded)
-AGENT_NAME = "AI Assistant"
+AGENT_NAME = "Amira"
 AGENT_AVATAR = "🤖"
 AGENT_INSTRUCTIONS = ""
 HTML_DASHBOARD_FOOTER = ""
@@ -110,7 +189,7 @@ MAX_CONVERSATIONS = max(1, min(100, int(os.getenv("MAX_CONVERSATIONS", "10") or 
 MAX_SNAPSHOTS_PER_FILE = max(1, min(50, int(os.getenv("MAX_SNAPSHOTS_PER_FILE", "5") or "5")))
 
 # Persist system prompt override across restarts
-CUSTOM_SYSTEM_PROMPT_FILE = "/config/.storage/claude_custom_system_prompt.txt"
+CUSTOM_SYSTEM_PROMPT_FILE = "/config/amira/custom_system_prompt.txt"
 
 _LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
 
@@ -396,10 +475,37 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
                 return tpl
         return "GitHub Models: request too long for selected model." + limit_part
 
+    _CREDITS_URLS = {
+        "openrouter": "https://openrouter.ai/settings/credits",
+        "openai": "https://platform.openai.com/settings/billing",
+        "anthropic": "https://console.anthropic.com/settings/plans",
+        "deepseek": "https://platform.deepseek.com",
+        "groq": "https://console.groq.com",
+        "mistral": "https://console.mistral.ai",
+        "minimax": "https://platform.minimaxi.com",
+        "aihubmix": "https://aihubmix.com",
+        "siliconflow": "https://cloud.siliconflow.cn",
+        "nvidia": "https://developer.nvidia.com/nim",
+    }
+    if code == 400 and ("usage limits" in low or "regain access on" in low or "api usage limits" in low):
+        date_m = re.search(r"regain access on\s+(\S+)", raw, re.IGNORECASE)
+        date_str = date_m.group(1) if date_m else ""
+        tpl = get_lang_text("err_api_usage_limits")
+        if tpl:
+            return tpl.format(date=date_str) if date_str else tpl
+        return f"❌ API usage limits reached. Access will be restored on {date_str or '?'}. Switch to another provider in the meantime."
+    if code == 402 or "insufficient credits" in low or "insufficient balance" in low or "out of credits" in low:
+        base = get_lang_text("err_http_402") or "❌ Insufficient balance. Top up your account credits for this provider."
+        url = _CREDITS_URLS.get(provider)
+        return f"{base}\n⚠️ {url}" if url else base
     if code == 401:
         return get_lang_text("err_http_401") or "Authentication failed (401)."
     if code == 403:
         return get_lang_text("err_http_403") or "Access denied (403)."
+    if code == 429 and ("insufficient_quota" in low or "insufficient quota" in low or "exceeded your current quota" in low or "run out of credits" in low):
+        base = get_lang_text("err_openai_quota") or "❌ Quota exceeded. Your account has run out of credits. Check your billing details."
+        url = _CREDITS_URLS.get(provider)
+        return f"{base}\n⚠️ {url}" if url else base
     if code == 429 and provider == "google" and "resource_exhausted" in low:
         return get_lang_text("err_google_quota") or "Google Gemini: quota exhausted (429). Wait a minute and retry, or switch to another model/provider."
     if code == 429:
@@ -429,7 +535,14 @@ def load_runtime_selection() -> bool:
             return False
 
         # Accept only known providers; model is expected to be a technical id.
-        if provider not in ("anthropic", "openai", "google", "nvidia", "github"):
+        _known = {
+            "anthropic", "openai", "google", "nvidia", "github",
+            "groq", "mistral", "openrouter", "deepseek", "minimax",
+            "aihubmix", "siliconflow", "volcengine", "dashscope",
+            "moonshot", "zhipu", "ollama", "github_copilot", "openai_codex",
+            "claude_web", "chatgpt_web",
+        }
+        if provider not in _known:
             return False
 
         AI_PROVIDER = provider
@@ -486,6 +599,8 @@ LANGUAGE_TEXT = {
 
         "err_github_budget_limit": "GitHub Models: budget limit reached for this account. Increase your GitHub budget/credit or pick another provider/model from the dropdown.",
         "err_github_request_too_large": "GitHub Models: the request is too long for the selected model{limit_part}. Try a shorter question or pick a larger model from the dropdown.",
+        "err_api_usage_limits": "❌ API usage limits reached. Your access will be restored on {date}. Switch to another provider in the meantime.",
+        "err_http_402": "❌ Insufficient balance. Top up your account credits at the provider's website, or switch to another provider.",
         "err_http_401": "Authentication failed (401). Check the provider API key/token.",
         "err_http_403": "Access denied (403). The model may not be available for this account/token.",
         "err_http_413": "Request too large (413). Reduce message/context length or switch model.",
@@ -562,51 +677,52 @@ LANGUAGE_TEXT = {
         "before": "Prima",
         "after": "Dopo",
         "respond_instruction": "Rispondi sempre in Italiano.",
-        "show_yaml_rule": "CRITICO: Dopo aver CREATO o MODIFICATO automazioni/script/dashboard, DEVI sempre mostrare il codice YAML all'utente nella tua risposta. Non saltare mai questo passaggio.",
-        "confirm_entity_rule": "CRITICO: Prima di creare automazioni, USA SEMPRE search_entities per trovare il corretto entity_id, poi conferma con l'utente se ci sono più risultati.",
-        "confirm_delete_rule": "CRITICO DISTRUTTIVO: Prima di ELIMINARE o MODIFICARE un'automazione/script/dashboard, DEVI:\n1. Usare get_automations/get_scripts/get_dashboards per elencare tutte le opzioni\n2. Identificare con CERTEZZA quale l'utente vuole eliminare/modificare (per nome/alias)\n3. Mostrare all'utente QUALE eliminerai/modificherai\n4. CHIEDERE CONFERMA ESPLICITA prima di procedere\n5. NON eliminare/modificare MAI senza conferma - è un'operazione IRREVERSIBILE",
-        "example_vs_create_rule": "CRITICO INTENTO: Distingui tra 'mostra esempio' e 'crea effettivamente':\n- Se l'utente chiede un \"esempio\", \"mostrami\", \"fammi vedere\", \"come si fa\" → rispondi con il codice YAML SOLAMENTE, NON chiamare create_automation/create_script\n- Se l'utente chiede esplicitamente di \"creare\", \"salvare\", \"aggiungere\", \"rendilo reale\" → chiama create_automation/create_script\n- In caso di dubbio, mostra prima il codice YAML e chiedi se vuole crearlo effettivamente",
+        "show_yaml_rule": "CRITICO: Dopo aver CREATO o MODIFICATO automazioni/script/dashboard, DEVI sempre mostrare il codice YAML al usuario in tua risposta. Nunca omitas este paso.",
+        "confirm_entity_rule": "CRITICO: Antes de crear automazioni, USA SIEMPRE search_entities per trovare il corretto entity_id, poi confirma con l'utente se ci sono più risultati.",
+        "confirm_delete_rule": "CRITICO DISTRUTTIVO: Antes de ELIMINARE o MODIFICARE un'automazione/script/dashboard, DEVI:\n1. Usar get_automations/get_scripts/get_dashboards per elencare tutte le opzioni\n2. Identificare con CERTEZZA quale l'utente vuole eliminare/modificare (per nome/alias)\n3. Mostrare al usuario CUÁL eliminarás/modificarás\n4. PEDIR CONFIRMACIÓN EXPLÍCITA antes de procedere\n5. NUNCA eliminar/modificare MAI senza conferma - è un'operazione IRREVERSIBILE",
+        "example_vs_create_rule": "CRITICO INTENTO: Distingue tra 'mostra esempio' e 'crea effettivamente':\n- Se l'utente chiede un \"esempio\", \"mostrami\", \"come si fa\", \"demo\" → rispondi con il codice YAML SOLAMENTE, NON chiamare create_automation/create_script\n- Se l'utente chiede esplicitamente di \"creare\", \"salvare\", \"aggiungere\", \"rendilo reale\" → chiamare create_automation/create_script\n- En caso di dubbio, mostra prima il codice YAML e chiedi se vuole crearlo effettivamente",
 
-        "err_github_budget_limit": "GitHub Models: limite budget raggiunto per questo account. Aumenta il budget/credito su GitHub oppure seleziona un altro provider/modello dal menu in alto.",
+        "err_github_budget_limit": "GitHub Models: limite budget raggiunto per questo account. Aumenta il budget/crédito su GitHub oppure seleziona un altro provider/modello dal menu in alto.",
         "err_github_request_too_large": "GitHub Models: richiesta troppo lunga per il modello selezionato{limit_part}. Prova a fare una domanda più corta, oppure scegli un modello più grande dal menu in alto.",
+        "err_api_usage_limits": "❌ Limiti di utilizzo API raggiunti. Il tuo accesso verrà ripristinato il {date}. Nel frattempo passa a un altro provider.",
+        "err_http_402": "❌ Credito insufficiente. Ricarica il saldo sul sito del provider, oppure passa a un altro provider.",
         "err_http_401": "Autenticazione fallita (401). Verifica la chiave/token del provider selezionato.",
         "err_http_403": "Accesso negato (403). Il modello potrebbe non essere disponibile per questo account/token.",
         "err_http_413": "Richiesta troppo grande (413). Riduci la lunghezza del messaggio/contesto o cambia modello.",
-        "err_http_429": "Rate limit (429). Attendi qualche secondo e riprova, oppure cambia modello/provider.",
+        "err_http_429": "Limite di velocità (429). Attendi qualche secondo e riprova, oppure cambia modello/provider.",
         "err_google_quota": "Google Gemini: quota esaurita (429). Attendi un minuto e riprova, oppure cambia modello/provider.",
-        "err_openai_quota": "❌ Quota OpenAI esaurita. Il tuo account ha esaurito i crediti. Controlla il piano e la fatturazione su platform.openai.com.",
-        "err_loop_exhausted": "❌ L'AI non ha risposto (limite di round raggiunto o errori ripetuti). Riprova o cambia modello/provider.",
+        "err_openai_quota": "❌ Quota OpenAI esaurita. Il tuo account ha esaurito i crediti. Controlla il tuo piano e la fatturazione su platform.openai.com.",
+        "err_loop_exhausted": "❌ L'IA non ha risposto (limite di round raggiunto o errori ripetuti). Riprova o cambia modello/provider.",
 
         "status_request_sent": "{provider}: invio richiesta al modello...",
         "status_response_received": "{provider}: risposta ricevuta, elaboro...",
-        "status_generating": "{provider}: sto generando la risposta...",
+        "status_generating": "{provider}: generando la risposta...",
         "status_still_working": "{provider}: ancora in elaborazione...",
         "status_actions_received": "Ho ricevuto una richiesta di azioni, eseguo...",
         "status_executing_tool": "{provider}: eseguo tool {tool}...",
-        "status_rate_limit_wait": "{provider}: rate limit raggiunto, attendo..."
-        ,
-        "status_rate_limit_wait_seconds": "{provider}: rate limit, attendo {seconds}s...",
+        "status_rate_limit_wait": "{provider}: limite di velocità raggiunto, attendo...",
+        "status_rate_limit_wait_seconds": "{provider}: limite di velocità, attendo {seconds}s...",
 
-        "err_api_key_not_configured": "⚠️ Chiave API per {provider_name} non configurata. Impostala nelle impostazioni dell'add-on.",
-        "err_provider_not_supported": "❌ Provider '{provider}' non supportato. Scegli: anthropic, openai, google, nvidia, github.",
+        "err_api_key_not_configured": "⚠️ Chiave API per {provider_name} non configurata. Impostala nelle impostazioni del componente aggiuntivo.",
+        "err_provider_not_supported": "❌ Provider '{provider}' non supportato. Scegli tra: anthropic, openai, google, nvidia, github e altri.",
         "err_provider_generic": "❌ Errore {provider_name}: {error}",
-        "err_api_key_not_configured_short": "API key non configurata",
+        "err_api_key_not_configured_short": "Chiave API non configurata",
         "err_invalid_image_format": "Formato immagine non valido",
-        "err_nvidia_api_key": "NVIDIA API key non configurata.",
+        "err_nvidia_api_key": "Chiave API NVIDIA non configurata.",
         "err_nvidia_model_invalid": "Modello NVIDIA non valido.",
         "err_nvidia_model_removed": "Modello NVIDIA {reason}: {model_id}. Rimosso dalla lista.",
         "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
-        "status_image_processing": "Elaborazione immagine...",
-        "status_context_preloaded": "Contesto pre-caricato...",
+        "status_image_processing": "Elaboro immagine...",
+        "status_context_preloaded": "Contesto precaricato...",
         "status_nvidia_model_removed": "⚠️ Modello NVIDIA non disponibile (404). Rimosso dalla lista modelli.",
-        "status_tool_repair_retry": "Ho riparato lo stato dei tool, riprovo...",
-        "status_token_params_retry": "Parametri token non compatibili col modello, riprovo.",
-        "status_github_format_retry": "Modello GitHub non riconosciuto, riprovo con formato alternativo.",
-        "status_github_model_fallback": "Modello non disponibile su GitHub, passo a GPT-4o.",
-        "status_rate_limit_waiting": "Rate limit raggiunto, attendo...",
+        "status_tool_repair_retry": "Stato strumenti ripristinato, nuovo tentativo...",
+        "status_token_params_retry": "Parametri token incompatibili con il modello, nuovo tentativo.",
+        "status_github_format_retry": "Modello GitHub non riconosciuto, nuovo tentativo con formato alternativo.",
+        "status_github_model_fallback": "Modello non disponibile su GitHub, passaggio a GPT-4o.",
+        "status_rate_limit_waiting": "Limite di velocità raggiunto, attendo...",
         "status_prompt_too_large": "Il modello selezionato ha un limite basso (prompt troppo grande). Riduco il contesto e riprovo...",
-        "status_user_cancelled": "Interrotto dall'utente.",
+        "status_user_cancelled": "Annullato dall'utente.",
 
         "write_op_success": "✅ Operazione completata con successo!",
         "write_no_changes": "\nNessuna modifica rilevata (il contenuto è identico).",
@@ -630,13 +746,12 @@ LANGUAGE_TEXT = {
         "intent_helpers": "Gestione helper",
         "intent_chat": "Chat",
         "intent_generic": "Analisi richiesta",
-        "intent_default": "Elaboro",
+        "intent_default": "Elaborazione",
 
-        "read_only_note": "**Modalità sola lettura - nessun file è stato modificato.**",
+        "read_only_note": "**Modalità sola lettura — nessun file è stato modificato.**",
 
         "smart_context_script_found": "## YAML SCRIPT TROVATO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPer modificarlo usa update_script con script_id='{sid}' e i campi da cambiare.",
-        "read_only_instruction": "MODALITA SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. Alla fine aggiungi la nota: ",
-
+        "read_only_instruction": "MODALITÀ SOLA LETTURA: Mostra all'utente il codice YAML completo in un code block yaml. Alla fine aggiungi la nota: ",
         "dashboard_created_successfully": "Dashboard creata con successo! ",
         "dashboard_sidebar_ready": "Il dashboard appare nella sidebar a /{path}",
         "dashboard_sidebar_failed": "File HTML pronto ma integrazione sidebar fallita",
@@ -647,82 +762,83 @@ LANGUAGE_TEXT = {
         "respond_instruction": "Responde siempre en Español.",
         "show_yaml_rule": "CRÍTICO: Después de CREAR o MODIFICAR automatizaciones/scripts/dashboards, DEBES mostrar el código YAML al usuario en tu respuesta. Nunca omitas este paso.",
         "confirm_entity_rule": "CRÍTICO: Antes de crear automatizaciones, USA SIEMPRE search_entities para encontrar el entity_id correcto, luego confirma con el usuario si hay múltiples resultados.",
-        "confirm_delete_rule": "CRÍTICO DESTRUCTIVO: Antes de ELIMINAR o MODIFICAR una automatización/script/dashboard, DEBES:\n1. Usar get_automations/get_scripts/get_dashboards para listar todas las opciones\n2. Identificar con CERTEZA cuál quiere eliminar/modificar el usuario (por nombre/alias)\n3. Mostrar al usuario CUÁL eliminarás/modificarás\n4. PEDIR CONFIRMACIÓN EXPLÍCITA antes de proceder\n5. NUNCA eliminar/modificar sin confirmación - es una operación IRREVERSIBLE",
-        "example_vs_create_rule": "CRÍTICO INTENCIÓN: Distingue entre 'mostrar ejemplo' y 'crear realmente':\n- Si el usuario pide un \"ejemplo\", \"muéstrame\", \"cómo se hace\", \"demo\" → responde con código YAML SOLAMENTE, NO llames create_automation/create_script\n- Si el usuario pide explícitamente \"crear\", \"guardar\", \"añadir\", \"hazlo real\" → llama create_automation/create_script\n- En caso de duda, muestra primero el código YAML y pregunta si quiere crearlo realmente",
+        "confirm_delete_rule": "CRÍTICO DESTRUCTIVO: Antes de ELIMINAR o MODIFICAR una automatización/script/dashboard, DEBES:\n1. Usar get_automations/get_scripts/get_dashboards para listar todas las opciones\n2. Identificar con CERTEZZA cuál quiere eliminar/modificar el usuario (por nombre/alias)\n3. Mostrar al usuario CUÁL eliminarás/modificarás\n4. PEDIR CONFIRMACIÓN EXPLÍCITA antes de proceder\n5. NUNCA eliminar/modificar sin confirmación - es una operación IRREVERSIBLE",
+        "example_vs_create_rule": "CRÍTICO INTENCIÓN: Distingue entre 'mostrar ejemplo' y 'crear realmente':\n- Si el usuario pide un \"esempio\", \"mostrami\", \"cómo se hace\", \"demo\" → responde con el código YAML SOLAMENTE, NO llames create_automation/create_script\n- Si el usuario pide esplicitamente di \"crear\", \"guardar\", \"añadir\", \"hazlo real\" → llama create_automation/create_script\n- En caso de duda, muestra primero el código YAML y pregunta si quiere crearlo realmente",
 
         "err_github_budget_limit": "GitHub Models: se ha alcanzado el límite de presupuesto de esta cuenta. Aumenta el presupuesto/crédito en GitHub o elige otro proveedor/modelo en el desplegable.",
         "err_github_request_too_large": "GitHub Models: la solicitud es demasiado larga para el modelo seleccionado{limit_part}. Prueba con una pregunta más corta o elige un modelo más grande en el desplegable.",
         "err_http_401": "Autenticación fallida (401). Verifica la clave/token del proveedor.",
-        "err_http_403": "Acceso denegado (403). El modelo puede no estar disponible para esta cuenta/token.",
+        "err_http_403": "Acceso negado (403). El modelo puede no estar disponible para este cuenta/token.",
+        "err_api_usage_limits": "❌ Límites de uso de API alcanzados. Tu acceso se restablecerá el {date}. Cambia a otro proveedor mientras tanto.",
         "err_http_413": "Solicitud demasiado grande (413). Reduce el mensaje/contexto o cambia de modelo.",
         "err_http_429": "Límite de tasa (429). Espera unos segundos y reintenta, o cambia de modelo/proveedor.",
         "err_google_quota": "Google Gemini: cuota agotada (429). Espera un minuto y reintenta, o cambia de modelo/proveedor.",
-        "err_openai_quota": "❌ Cuota de OpenAI agotada. Tu cuenta se ha quedado sin créditos. Revisa tu plan y facturación en platform.openai.com.",
-        "err_loop_exhausted": "❌ La IA no respondió (límite de rondas alcanzado o errores repetidos). Inténtalo de nuevo o cambia de modelo/proveedor.",
+        "err_openai_quota": "❌ Quota de OpenAI agotada. Tu cuenta se ha quedado sin créditos. Revisa tu plan y facturación en platform.openai.com.",
+        "err_loop_exhausted": "❌ La IA no respondió (limite de rondas alcanzado o errores repetidos). Inténtalo de nuevo o cambia de modelo/proveedor.",
 
-        "status_request_sent": "{provider}: enviando solicitud al modelo...",
-        "status_response_received": "{provider}: respuesta recibida, procesando...",
-        "status_generating": "{provider}: generando la respuesta...",
-        "status_still_working": "{provider}: todavía procesando...",
+        "status_request_sent": "{provider} : envoi de la requête au modèle...",
+        "status_response_received": "{provider} : réponse reçue, traitement...",
+        "status_generating": "{provider} : génération de la réponse...",
+        "status_still_working": "{provider} : toujours en cours...",
         "status_actions_received": "Acciones solicitadas, ejecutando...",
-        "status_executing_tool": "{provider}: ejecutando herramienta {tool}...",
-        "status_rate_limit_wait": "{provider}: límite de tasa alcanzado, esperando..."
+        "status_executing_tool": "{provider} : exécution de l’outil {tool}...",
+        "status_rate_limit_wait": "{provider} : limite de débit alcanzado, attente..."
         ,
-        "status_rate_limit_wait_seconds": "{provider}: límite de tasa, esperando {seconds}s...",
+        "status_rate_limit_wait_seconds": "{provider} : limite de débit, attente {seconds}s...",
 
-        "err_api_key_not_configured": "⚠️ Clave API para {provider_name} no configurada. Configúrala en los ajustes del add-on.",
-        "err_provider_not_supported": "❌ Proveedor '{provider}' no soportado. Elige: anthropic, openai, google, nvidia, github.",
-        "err_provider_generic": "❌ Error {provider_name}: {error}",
-        "err_api_key_not_configured_short": "Clave API no configurada",
+        "err_api_key_not_configured": "⚠️ Clé API pour {provider_name} non configurée. Configurez-la dans les paramètres de l'add-on.",
+        "err_provider_not_supported": "❌ Proveedor '{provider}' non soportado. Elige: anthropic, openai, google, nvidia, github.",
+        "err_provider_generic": "❌ Errore {provider_name}: {error}",
+        "err_api_key_not_configured_short": "Clé API non configurée",
         "err_invalid_image_format": "Formato de imagen no válido",
-        "err_nvidia_api_key": "Clave API NVIDIA no configurada.",
-        "err_nvidia_model_invalid": "Modelo NVIDIA no válido.",
-        "err_nvidia_model_removed": "Modelo NVIDIA {reason}: {model_id}. Eliminado de la lista.",
-        "err_response_blocked": "{provider}: respuesta bloqueada por filtros de seguridad. Intenta reformular tu solicitud.",
+        "err_nvidia_api_key": "Clé API NVIDIA non configurée.",
+        "err_nvidia_model_invalid": "Modèle NVIDIA non valide.",
+        "err_nvidia_model_removed": "Modèle NVIDIA {reason}: {model_id}. Eliminado de la lista.",
+        "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
         "status_image_processing": "Procesando imagen...",
-        "status_context_preloaded": "Contexto precargado...",
-        "status_nvidia_model_removed": "⚠️ Modelo NVIDIA no disponible (404). Eliminado de la lista de modelos.",
-        "status_tool_repair_retry": "Estado de herramientas reparado, reintentando...",
-        "status_token_params_retry": "Parámetros de token incompatibles con el modelo, reintentando.",
-        "status_github_format_retry": "Modelo GitHub no reconocido, reintentando con formato alternativo.",
-        "status_github_model_fallback": "Modelo no disponible en GitHub, cambiando a GPT-4o.",
-        "status_rate_limit_waiting": "Límite de tasa alcanzado, esperando...",
-        "status_prompt_too_large": "El modelo seleccionado tiene un límite bajo (prompt demasiado grande). Reduciendo contexto y reintentando...",
-        "status_user_cancelled": "Cancelado por el usuario.",
+        "status_context_preloaded": "Contesto precargado...",
+        "status_nvidia_model_removed": "⚠️ Modèle NVIDIA non disponible (404). Eliminado de la liste des modèles.",
+        "status_tool_repair_retry": "État des outils réparé, nouvelle tentative...",
+        "status_token_params_retry": "Paramètres de token incompatibles avec le modèle, nouvelle tentative.",
+        "status_github_format_retry": "Modèle GitHub non riconosciuto, nouvelle tentative avec format alternatif.",
+        "status_github_model_fallback": "Modèle non disponible su GitHub, passage à GPT-4o.",
+        "status_rate_limit_waiting": "Límite de débit alcanzado, en attente...",
+        "status_prompt_too_large": "Il modello selezionato ha un limite basso (prompt troppo grande). Riduco il contesto e riprovo...",
+        "status_user_cancelled": "Annulé par l'utilisateur.",
 
-        "write_op_success": "✅ ¡Operación completada con éxito!",
-        "write_no_changes": "\nNo se detectaron cambios (el contenido es idéntico).",
-        "write_yaml_updated": "\n**YAML actualizado:**",
-        "write_yaml_created": "\n**YAML creado:**",
-        "write_snapshot_created": "\n💾 Snapshot creado: `{snapshot_id}`",
+        "write_op_success": "✅ Operazione completata con successo!",
+        "write_no_changes": "\nNessuna modifica rilevata (il contenuto è identico).",
+        "write_yaml_updated": "\n**YAML aggiornato:**",
+        "write_yaml_created": "\n**YAML creato:**",
+        "write_snapshot_created": "\n💾 Snapshot creato: `{snapshot_id}`",
 
-        "intent_modify_automation": "Modificar automatización",
+        "intent_modify_automation": "Modificar automazione",
         "intent_modify_script": "Modificar script",
-        "intent_create_automation": "Crear automatización",
+        "intent_create_automation": "Crear automazione",
         "intent_create_script": "Crear script",
         "intent_create_dashboard": "Crear dashboard",
         "intent_modify_dashboard": "Modificar dashboard",
-        "intent_control_device": "Control de dispositivo",
-        "intent_query_state": "Estado del dispositivo",
-        "intent_query_history": "Historial de datos",
-        "intent_delete": "Eliminación",
-        "intent_config_edit": "Editar configuración",
-        "intent_areas": "Gestión de habitaciones",
-        "intent_notifications": "Notificación",
-        "intent_helpers": "Gestión de helpers",
+        "intent_control_device": "Controllo dispositivo",
+        "intent_query_state": "Stato dispositivo",
+        "intent_query_history": "Storico dati",
+        "intent_delete": "Eliminazione",
+        "intent_config_edit": "Modifica configurazione",
+        "intent_areas": "Gestione stanze",
+        "intent_notifications": "Notifica",
+        "intent_helpers": "Gestione helper",
         "intent_chat": "Chat",
-        "intent_generic": "Analizando solicitud",
+        "intent_generic": "Analisi richiesta",
         "intent_default": "Procesando",
 
-        "read_only_note": "**Modo solo lectura — no se modificaron archivos.**",
+        "read_only_note": "**Modalità sola lettura — nessun file è stato modificato.**",
 
-        "smart_context_script_found": "## YAML SCRIPT ENCONTRADO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPara modificarlo usa update_script con script_id='{sid}' y los campos a cambiar.",
-        "read_only_instruction": "MODO SOLO LECTURA: Muestra al usuario el código YAML completo en un code block yaml. Al final añade la nota: ",
+        "smart_context_script_found": "## YAML SCRIPT TROVATO: \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPer modificarlo usa update_script con script_id='{sid}' e i campi a cambiar.",
+        "read_only_instruction": "MODE LECTURE SEULE: Muestra al usuario el código YAML completo en un code block yaml. Al final añade la nota: ",
 
-        "dashboard_created_successfully": "¡Dashboard creado con éxito! ",
-        "dashboard_sidebar_ready": "El dashboard aparece en la barra lateral a /{path}",
-        "dashboard_sidebar_failed": "Archivo HTML listo pero falló la integración de barra lateral",
+        "dashboard_created_successfully": "Dashboard creata con successo! ",
+        "dashboard_sidebar_ready": "Il dashboard appare nella sidebar a /{path}",
+        "dashboard_sidebar_failed": "File HTML pronto ma integrazione sidebar fallita",
     },
     "fr": {
         "before": "Avant",
@@ -730,26 +846,27 @@ LANGUAGE_TEXT = {
         "respond_instruction": "Réponds toujours en Français.",
         "show_yaml_rule": "CRITIQUE: Après avoir CRÉÉ ou MODIFIÉ des automatisations/scripts/dashboards, tu DOIS toujours montrer le code YAML à l'utilisateur dans ta réponse. Ne saute jamais cette étape.",
         "confirm_entity_rule": "CRITIQUE: Avant de créer des automatisations, UTILISE TOUJOURS search_entities pour trouver le bon entity_id, puis confirme avec l'utilisateur s'il y a plusieurs résultats.",
-        "confirm_delete_rule": "CRITIQUE DESTRUCTIF: Avant de SUPPRIMER ou MODIFIER une automatisation/script/dashboard, tu DOIS:\n1. Utiliser get_automations/get_scripts/get_dashboards pour lister toutes les options\n2. Identifier avec CERTITUDE laquelle l'utilisateur veut supprimer/modifier (par nom/alias)\n3. Montrer à l'utilisateur LAQUELLE tu vas supprimer/modifier\n4. DEMANDER une CONFIRMATION EXPLICITE avant de procéder\n5. NE JAMAIS supprimer/modifier sans confirmation - c'est une opération IRRÉVERSIBLE",
-        "example_vs_create_rule": "CRITIQUE INTENTION: Distingue entre 'montrer exemple' et 'créer réellement':\n- Si l'utilisateur demande un \"exemple\", \"montre-moi\", \"comment faire\", \"démo\" → réponds avec le code YAML SEULEMENT, NE PAS appeler create_automation/create_script\n- Si l'utilisateur demande explicitement de \"créer\", \"sauvegarder\", \"ajouter\", \"rends-le réel\" → appelle create_automation/create_script\n- En cas de doute, montre d'abord le code YAML et demande s'il veut le créer réellement",
+        "confirm_delete_rule": "CRITIQUE DESTRUCTIF: Avant de SUPPRIMER ou MODIFIER une automatisation/script/dashboard, tu DOIS:\n1. Utiliser get_automations/get_scripts/get_dashboards pour lister toutes les options\n2. Identifier avec CERTITUDE laquelle l'utilisateur veut supprimer/modifier (par nom/alias)\n3. Montrer à l'utilisateur LAQUELLE tu vas supprimer/modifier\n4. DEMANDER une CONFIRMACIÓN EXPLÍCITA avant de proceder\n5. NUNCA supprimer/modifier sans confirmation - c'est une opération IRRÉVERSIBLE",
+        "example_vs_create_rule": "CRITIQUE INTENTION: Distingue entre 'mostrar ejemplo' et 'créer réellement':\n- Si l'utilisateur demande un \"exemple\", \"mostrami\", \"comment faire\", \"demo\" → réponds avec le code YAML SOLAMENTE, NON chiamare create_automation/create_script\n- Si l'utilisateur demande esplicitement de \"créer\", \"sauvegarder\", \"ajouter\", \"rends-le réel\" → chiamare create_automation/create_script\n- En cas de doute, montre d'abord le code YAML et demande s'il veut le créer réellement",
 
-        "err_github_budget_limit": "GitHub Models : limite de budget atteinte pour ce compte. Augmente le budget/crédit GitHub ou choisis un autre fournisseur/modèle dans la liste déroulante.",
+        "err_github_budget_limit": "GitHub Models : limite de budget atteinte pour ce compte. Augmente le budget/crédit GitHub ou choisis un autre fournisseur/modello dans la liste déroulante.",
         "err_github_request_too_large": "GitHub Models : la requête est trop longue pour le modèle sélectionné{limit_part}. Essaie une question plus courte ou choisis un modèle plus grand dans la liste déroulante.",
         "err_http_401": "Échec d'authentification (401). Vérifie la clé/le jeton du fournisseur.",
         "err_http_403": "Accès refusé (403). Le modèle peut ne pas être disponible pour ce compte/jeton.",
+        "err_api_usage_limits": "❌ Limites d'utilisation API atteintes. Votre accès sera rétabli le {date}. Changez de fournisseur en attendant.",
         "err_http_413": "Requête trop volumineuse (413). Réduis le message/le contexte ou change de modèle.",
         "err_http_429": "Limite de débit (429). Attends quelques secondes et réessaie, ou change de modèle/fournisseur.",
         "err_google_quota": "Google Gemini : quota épuisé (429). Attends une minute et réessaie, ou change de modèle/fournisseur.",
-        "err_openai_quota": "❌ Quota OpenAI épuisé. Ton compte n'a plus de crédits. Vérifie ton plan et ta facturation sur platform.openai.com.",
+        "err_openai_quota": "❌ Quota OpenAI épuisée. Ton compte n'a plus de crédits. Vérifie ton plan et ta facturation sur platform.openai.com.",
         "err_loop_exhausted": "❌ L'IA n'a pas répondu (limite de rounds atteinte ou erreurs répétées). Réessaie ou change de modèle/fournisseur.",
 
         "status_request_sent": "{provider} : envoi de la requête au modèle...",
         "status_response_received": "{provider} : réponse reçue, traitement...",
         "status_generating": "{provider} : génération de la réponse...",
         "status_still_working": "{provider} : toujours en cours...",
-        "status_actions_received": "Actions demandées, exécution...",
+        "status_actions_received": "Acciones solicitadas, ejecutando...",
         "status_executing_tool": "{provider} : exécution de l’outil {tool}...",
-        "status_rate_limit_wait": "{provider} : limite de débit atteinte, attente..."
+        "status_rate_limit_wait": "{provider} : limite de débit alcanzado, attente..."
         ,
         "status_rate_limit_wait_seconds": "{provider} : limite de débit, attente {seconds}s...",
 
@@ -761,36 +878,36 @@ LANGUAGE_TEXT = {
         "err_nvidia_api_key": "Clé API NVIDIA non configurée.",
         "err_nvidia_model_invalid": "Modèle NVIDIA non valide.",
         "err_nvidia_model_removed": "Modèle NVIDIA {reason} : {model_id}. Retiré de la liste.",
-        "err_response_blocked": "{provider} : réponse bloquée par les filtres de sécurité. Essayez de reformuler votre demande.",
+        "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
-        "status_image_processing": "Traitement de l'image...",
-        "status_context_preloaded": "Contexte préchargé...",
+        "status_image_processing": "Procesando imagen...",
+        "status_context_preloaded": "Contesto precargado...",
         "status_nvidia_model_removed": "⚠️ Modèle NVIDIA non disponible (404). Retiré de la liste des modèles.",
         "status_tool_repair_retry": "État des outils réparé, nouvelle tentative...",
         "status_token_params_retry": "Paramètres de token incompatibles avec le modèle, nouvelle tentative.",
-        "status_github_format_retry": "Modèle GitHub non reconnu, nouvelle tentative avec format alternatif.",
-        "status_github_model_fallback": "Modèle non disponible sur GitHub, passage à GPT-4o.",
-        "status_rate_limit_waiting": "Limite de débit atteinte, en attente...",
-        "status_prompt_too_large": "Le modèle sélectionné a une limite basse (prompt trop grand). Réduction du contexte et nouvelle tentative...",
+        "status_github_format_retry": "Modèle GitHub non riconosciuto, nouvelle tentative avec format alternatif.",
+        "status_github_model_fallback": "Modèle non disponible su GitHub, passage à GPT-4o.",
+        "status_rate_limit_waiting": "Límite de débit alcanzado, en attente...",
+        "status_prompt_too_large": "Il modello selezionato ha un limite basso (prompt troppo grande). Riduco il contesto e riprovo...",
         "status_user_cancelled": "Annulé par l'utilisateur.",
 
-        "write_op_success": "✅ Opération terminée avec succès !",
-        "write_no_changes": "\nAucune modification détectée (le contenu est identique).",
+        "write_op_success": "✅ Opération réalisée avec succès !",
+        "write_no_changes": "\nAucun changement détecté (le contenu est identique).",
         "write_yaml_updated": "\n**YAML mis à jour :**",
         "write_yaml_created": "\n**YAML créé :**",
         "write_snapshot_created": "\n💾 Snapshot créé : `{snapshot_id}`",
 
-        "intent_modify_automation": "Modifier automatisation",
-        "intent_modify_script": "Modifier script",
-        "intent_create_automation": "Créer automatisation",
-        "intent_create_script": "Créer script",
-        "intent_create_dashboard": "Créer dashboard",
-        "intent_modify_dashboard": "Modifier dashboard",
-        "intent_control_device": "Contrôle appareil",
-        "intent_query_state": "État appareil",
-        "intent_query_history": "Historique données",
+        "intent_modify_automation": "Modifier une automatisation",
+        "intent_modify_script": "Modifier un script",
+        "intent_create_automation": "Créer une automatisation",
+        "intent_create_script": "Créer un script",
+        "intent_create_dashboard": "Créer un dashboard",
+        "intent_modify_dashboard": "Modifier un dashboard",
+        "intent_control_device": "Contrôle d'appareil",
+        "intent_query_state": "État de l'appareil",
+        "intent_query_history": "Historique des données",
         "intent_delete": "Suppression",
-        "intent_config_edit": "Modifier configuration",
+        "intent_config_edit": "Modifier la configuration",
         "intent_areas": "Gestion des pièces",
         "intent_notifications": "Notification",
         "intent_helpers": "Gestion des helpers",
@@ -800,12 +917,11 @@ LANGUAGE_TEXT = {
 
         "read_only_note": "**Mode lecture seule — aucun fichier n'a été modifié.**",
 
-        "smart_context_script_found": "## YAML SCRIPT TROUVÉ : \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPour le modifier, utilisez update_script avec script_id='{sid}' et les champs à modifier.",
-        "read_only_instruction": "MODE LECTURE SEULE : Montrez à l'utilisateur le code YAML complet dans un code block yaml. À la fin, ajoutez la note : ",
-
-        "dashboard_created_successfully": "Tableau de bord créé avec succès ! ",
-        "dashboard_sidebar_ready": "Le tableau de bord apparaît dans la barre latérale à /{path}",
-        "dashboard_sidebar_failed": "Fichier HTML prêt mais l'intégration de la barre latérale a échoué",
+        "smart_context_script_found": "## YAML SCRIPT TROUVÉ : \"{alias}\" (id: {sid})\n```yaml\n{yaml}```\nPour le modifier, utilise update_script avec script_id='{sid}' et les champs à changer.",
+        "read_only_instruction": "MODE LECTURE SEULE : Montre à l'utilisateur le code YAML complet dans un code block yaml. À la fin ajoute la note : ",
+        "dashboard_created_successfully": "Dashboard créé avec succès ! Ton ",
+        "dashboard_sidebar_ready": "dashboard apparaît dans la barre latérale à /{path}",
+        "dashboard_sidebar_failed": "Le fichier HTML est prêt mais l'intégration dans la barre latérale a échoué",
     }
 }
 
@@ -895,11 +1011,29 @@ def format_message_with_image_google(text: str, media_type: str, base64_data: st
 # ---- Provider defaults ----
 
 PROVIDER_DEFAULTS = {
-    "anthropic": {"model": "claude-sonnet-4-6", "name": "Claude (Anthropic)"},
+    "anthropic": {"model": "claude-opus-4-6", "name": "Claude (Anthropic)"},
     "openai": {"model": "gpt-5.2", "name": "ChatGPT (OpenAI)"},
     "google": {"model": "gemini-2.0-flash", "name": "Gemini (Google)"},
     "github": {"model": "openai/gpt-4o", "name": "GitHub Models"},
     "nvidia": {"model": "moonshotai/kimi-k2.5", "name": "NVIDIA NIM"},
+    "groq": {"model": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B (Groq)"},
+    "mistral": {"model": "mistral-large-latest", "name": "Mistral Large"},
+    "ollama": {"model": "mistral", "name": "Ollama (Local)"},
+    "openrouter": {"model": "anthropic/claude-opus-4.6", "name": "OpenRouter (Gateway)"},
+    "deepseek": {"model": "deepseek-chat", "name": "DeepSeek (API)"},
+    "minimax": {"model": "MiniMax-M2.1", "name": "MiniMax (API)"},
+    "aihubmix": {"model": "gpt-4o", "name": "AiHubMix (Gateway)"},
+    "siliconflow": {"model": "Qwen/Qwen2.5-7B-Instruct", "name": "SiliconFlow (Gateway)"},
+    "volcengine": {"model": "Qwen/Qwen2.5-7B-Instruct", "name": "VolcEngine (Gateway)"},
+    "dashscope": {"model": "qwen-max", "name": "DashScope (Qwen/Aliyun)"},
+    "moonshot": {"model": "kimi-k2.5", "name": "Moonshot (Kimi)"},
+    "zhipu": {"model": "glm-4-flash", "name": "Zhipu (GLM)"},
+    "perplexity": {"model": "sonar-pro", "name": "Perplexity (Sonar)"},
+    "custom": {"model": "", "name": "Custom Endpoint"},
+    "github_copilot": {"model": "gpt-4o", "name": "GitHub Copilot (OAuth)"},
+    "openai_codex": {"model": "gpt-5.3-codex", "name": "OpenAI Codex (OAuth)"},
+    "claude_web": {"model": "claude-opus-4-6", "name": "Claude.ai Web ⚠️ [UNSTABLE]"},
+    "chatgpt_web": {"model": "gpt-4o", "name": "ChatGPT Web ⚠️ [UNSTABLE]"},
 }
 
 # GitHub models that returned unknown_model at runtime (per current token)
@@ -912,7 +1046,7 @@ GITHUB_MODEL_BLOCKLIST: set[str] = set()  # may be used by providers
 # NVIDIA models that have been successfully chat-tested (per current key)
 NVIDIA_MODEL_TESTED_OK: set[str] = set()
 
-MODEL_BLOCKLIST_FILE = "/config/.storage/claude_model_blocklist.json"
+MODEL_BLOCKLIST_FILE = "/config/amira/model_blocklist.json"
 
 
 def load_model_blocklists() -> None:
@@ -1050,7 +1184,14 @@ def get_nvidia_models_cached() -> Optional[list[str]]:
         return list(cached_models)
     return None
 
-PROVIDER_MODELS = {
+# ---------------------------------------------------------------------------
+# PROVIDER_MODELS — single source of truth is each provider's get_available_models().
+# The static dict below is the authoritative fallback; at startup it is patched
+# with the live list from each provider so edits to provider files take effect
+# immediately without touching api.py.
+# To update models for a provider → edit ONLY that provider's get_available_models().
+# ---------------------------------------------------------------------------
+_PROVIDER_MODELS_STATIC = {
     "anthropic": [
         # Ultimi (correnti)
         "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
@@ -1099,8 +1240,141 @@ PROVIDER_MODELS = {
         # xAI
         "xai/grok-3", "xai/grok-3-mini",
     ],
+    "groq": [
+        # Production models
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "openai/gpt-oss-120b",
+        "openai/gpt-oss-20b",
+        # Production systems (agentic)
+        "groq/compound",
+        "groq/compound-mini",
+        # Preview models
+        "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "meta-llama/llama-4-scout-17b-16e-instruct",
+        "qwen/qwen3-32b",
+        "moonshotai/kimi-k2-instruct-0905",
+    ],
+    "mistral": [
+        "mistral-large-latest",
+        "mistral-medium",
+        "mistral-small-latest",
+        "open-mixtral-8x7b",
+        "open-mixtral-8x22b",
+    ],
+    "ollama": [
+        "mistral",
+        "llama2",
+        "neural-chat",
+        "orca-mini",
+        "dolphin-mixtral",
+        "openchat",
+    ],
+    "openrouter": [
+        "anthropic/claude-opus-4.6", "anthropic/claude-sonnet-4.6",
+        "openai/gpt-4o", "openai/gpt-4o-mini",
+        "meta-llama/llama-3.1-405b-instruct",
+        "mistralai/mistral-large-2512",
+        "google/gemini-2.0-flash-001",
+        "openrouter/auto",
+    ],
+    "deepseek": [
+        "deepseek-chat",
+        "deepseek-r1",
+        "deepseek-v3",
+    ],
+    "minimax": [
+        "MiniMax-M2.1",
+        "MiniMax-M2",
+        "MiniMax-M3",
+    ],
+    "aihubmix": [
+        "gpt-4o", "gpt-4-turbo",
+        "claude-opus-4-6", "claude-sonnet-4-6",
+        "gemini-2.0-flash",
+        "llama-3.1-405b",
+    ],
+    "siliconflow": [
+        "Qwen/Qwen2.5-7B-Instruct",
+        "Qwen/Qwen2.5-32B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "meta-llama/Llama-3.1-70B-Instruct",
+        "mistral/Mistral-7B-Instruct-v0.3",
+    ],
+    "volcengine": [
+        "Qwen/Qwen2.5-7B-Instruct",
+        "Qwen/Qwen2.5-32B-Instruct",
+        "meta-llama/Llama-3.1-8B-Instruct",
+        "meta-llama/Llama-3.1-70B-Instruct",
+    ],
+    "dashscope": [
+        "qwen-max",
+        "qwen-plus",
+        "qwen-turbo",
+        "qwen-long",
+        "qwen-vl-plus",
+    ],
+    "moonshot": [
+        "kimi-k2.5",
+        "kimi-k2",
+        "kimi-k1.5",
+        "kimi-k1",
+    ],
+    "zhipu": [
+        "glm-4-flash",
+        "glm-4-flash-250414",
+        "glm-4-air",
+        "glm-4-airx",
+        "glm-4-plus",
+        "glm-4-long",
+        "glm-z1-flash",
+        "glm-z1-air",
+        "glm-z1-airx",
+        "glm-4",
+        "glm-4v",
+    ],
+    "perplexity": [
+        "sonar-pro",
+        "sonar",
+        "sonar-reasoning-pro",
+        "sonar-reasoning",
+        "r1-1776",
+    ],
+    "custom": [],  # model name comes from CUSTOM_MODEL_NAME env var
 }
 
+# Build PROVIDER_MODELS: start from static fallback, then patch each provider
+# with its own get_available_models() so the provider file is the single source
+# of truth. Providers that fail to import (missing deps at import time) keep
+# the static fallback silently.
+PROVIDER_MODELS = dict(_PROVIDER_MODELS_STATIC)
+
+try:
+    from providers import _PROVIDER_CLASSES, get_provider_class as _get_provider_class
+    for _pid in list(_PROVIDER_CLASSES):
+        try:
+            _cls = _get_provider_class(_pid)
+            _live = _cls().get_available_models()
+            if _live:  # only replace if the provider returned something
+                PROVIDER_MODELS[_pid] = _live
+        except Exception:
+            pass  # keep static fallback for this provider
+except Exception:
+    pass
+
+# Load persisted model cache from disk (populated by /api/refresh_models).
+# Overlay on PROVIDER_MODELS so the UI shows dynamically-fetched models.
+try:
+    from providers.model_fetcher import load_cache as _load_model_cache
+    _model_cache = _load_model_cache()
+    for _p, _ml in _model_cache.items():
+        if _ml:
+            PROVIDER_MODELS[_p] = _ml
+    if _model_cache:
+        import logging as _log
+        _log.getLogger(__name__).info(f"Loaded model cache for {len(_model_cache)} providers")
+except Exception as _mc_err:
+    pass  # cache optional — dynamic lists remain
 
 
 # Mapping user-friendly names (with prefixes) to technical model names
@@ -1176,6 +1450,119 @@ MODEL_NAME_MAPPING = {
     "GitHub: Jamba 1.5 Large": "ai21-labs/ai21-jamba-1.5-large",
     "GitHub: Grok-3": "xai/grok-3",
     "GitHub: Grok-3 Mini": "xai/grok-3-mini",
+    
+    "Groq: Llama 3.3 70B": "llama-3.3-70b-versatile",
+    "Groq: Llama 3.1 8B": "llama-3.1-8b-instant",
+    "Groq: GPT OSS 120B": "openai/gpt-oss-120b",
+    "Groq: GPT OSS 20B": "openai/gpt-oss-20b",
+    "Groq: Compound": "groq/compound",
+    "Groq: Compound Mini": "groq/compound-mini",
+    "Groq: Llama 4 Maverick": "meta-llama/llama-4-maverick-17b-128e-instruct",
+    "Groq: Llama 4 Scout": "meta-llama/llama-4-scout-17b-16e-instruct",
+    "Groq: Qwen3 32B": "qwen/qwen3-32b",
+    "Groq: Kimi K2": "moonshotai/kimi-k2-instruct-0905",
+    
+    "Mistral: Large": "mistral-large-latest",
+    "Mistral: Medium": "mistral-medium",
+    "Mistral: Small": "mistral-small-latest",
+    "Mistral: Mixtral 8x7B": "open-mixtral-8x7b",
+    "Mistral: Mixtral 8x22B": "open-mixtral-8x22b",
+    
+    "Ollama: Mistral": "mistral",
+    "Ollama: Llama2": "llama2",
+    "Ollama: Neural Chat": "neural-chat",
+    "Ollama: Orca Mini": "orca-mini",
+    "Ollama: Dolphin Mixtral": "dolphin-mixtral",
+    "Ollama: OpenChat": "openchat",
+    
+    "OpenRouter: Claude Opus 4.6": "anthropic/claude-opus-4.6",
+    "OpenRouter: Claude Sonnet 4.6": "anthropic/claude-sonnet-4.6",
+    "OpenRouter: GPT-4o": "openai/gpt-4o",
+    "OpenRouter: GPT-4o-mini": "openai/gpt-4o-mini",
+    "OpenRouter: Llama 3.1 405B": "meta-llama/llama-3.1-405b-instruct",
+    "OpenRouter: Mistral Large": "mistralai/mistral-large-2512",
+    "OpenRouter: Gemini 2.0 Flash": "google/gemini-2.0-flash-001",
+    "OpenRouter: Auto": "openrouter/auto",
+    
+    "DeepSeek: Chat": "deepseek-chat",
+    "DeepSeek: R1": "deepseek-r1",
+    "DeepSeek: V3": "deepseek-v3",
+    
+    "MiniMax: M2.1": "MiniMax-M2.1",
+    "MiniMax: M2": "MiniMax-M2",
+    "MiniMax: M3": "MiniMax-M3",
+    
+    "AiHubMix: GPT-4o": "gpt-4o",
+    "AiHubMix: GPT-4-turbo": "gpt-4-turbo",
+    "AiHubMix: Claude Opus": "claude-opus-4-6",
+    "AiHubMix: Claude Sonnet": "claude-sonnet-4-6",
+    "AiHubMix: Gemini": "gemini-2.0-flash",
+    "AiHubMix: Llama": "llama-3.1-405b",
+    
+    "SiliconFlow: Qwen 2.5 7B": "Qwen/Qwen2.5-7B-Instruct",
+    "SiliconFlow: Qwen 2.5 32B": "Qwen/Qwen2.5-32B-Instruct",
+    "SiliconFlow: Llama 3.1 8B": "meta-llama/Llama-3.1-8B-Instruct",
+    "SiliconFlow: Llama 3.1 70B": "meta-llama/Llama-3.1-70B-Instruct",
+    "SiliconFlow: Mistral 7B": "mistral/Mistral-7B-Instruct-v0.3",
+    
+    "VolcEngine: Qwen 2.5 7B": "Qwen/Qwen2.5-7B-Instruct",
+    "VolcEngine: Qwen 2.5 32B": "Qwen/Qwen2.5-32B-Instruct",
+    "VolcEngine: Llama 3.1 8B": "meta-llama/Llama-3.1-8B-Instruct",
+    "VolcEngine: Llama 3.1 70B": "meta-llama/Llama-3.1-70B-Instruct",
+    
+    "DashScope: Qwen Max": "qwen-max",
+    "DashScope: Qwen Plus": "qwen-plus",
+    "DashScope: Qwen Turbo": "qwen-turbo",
+    "DashScope: Qwen Long": "qwen-long",
+    "DashScope: Qwen VL+": "qwen-vl-plus",
+    
+    "Moonshot: Kimi K2.5": "kimi-k2.5",
+    "Moonshot: Kimi K2": "kimi-k2",
+    "Moonshot: Kimi K1.5": "kimi-k1.5",
+    "Moonshot: Kimi K1": "kimi-k1",
+    
+    "Zhipu: GLM-4-Flash (free)": "glm-4-flash",
+    "Zhipu: GLM-4-Flash 250414 (free)": "glm-4-flash-250414",
+    "Zhipu: GLM-4-Air": "glm-4-air",
+    "Zhipu: GLM-4-AirX": "glm-4-airx",
+    "Zhipu: GLM-4-Plus": "glm-4-plus",
+    "Zhipu: GLM-4-Long": "glm-4-long",
+    "Zhipu: GLM-Z1-Flash (free reasoning)": "glm-z1-flash",
+    "Zhipu: GLM-Z1-Air": "glm-z1-air",
+    "Zhipu: GLM-Z1-AirX": "glm-z1-airx",
+    "Zhipu: GLM-4 (legacy)": "glm-4",
+    "Zhipu: GLM-4v (legacy)": "glm-4v",
+    
+    "GitHub Copilot: GPT-4o": "gpt-4o",
+    "GitHub Copilot: GPT-4o-mini": "gpt-4o-mini",
+    "GitHub Copilot: o3-mini": "o3-mini",
+    "GitHub Copilot: o1": "o1",
+    "GitHub Copilot: o1-mini": "o1-mini",
+    "GitHub Copilot: Claude 3.7 Sonnet": "claude-3.7-sonnet",
+    "GitHub Copilot: Claude 3.5 Sonnet": "claude-3.5-sonnet",
+    "GitHub Copilot: Gemini 2.0 Flash": "gemini-2.0-flash",
+    "GitHub Copilot: Gemini 1.5 Pro": "gemini-1.5-pro",
+
+    "OpenAI Codex: gpt-5.3-codex": "gpt-5.3-codex",
+    "OpenAI Codex: gpt-5.3-codex-spark": "gpt-5.3-codex-spark",
+    "OpenAI Codex: gpt-5.2-codex": "gpt-5.2-codex",
+    "OpenAI Codex: gpt-5.1-codex-max": "gpt-5.1-codex-max",
+    "OpenAI Codex: gpt-5.1-codex": "gpt-5.1-codex",
+    "OpenAI Codex: gpt-5-codex": "gpt-5-codex",
+    "OpenAI Codex: gpt-5-codex-mini": "gpt-5-codex-mini",
+    "Claude Web: claude-opus-4-5-20251101": "claude-opus-4-5-20251101",
+    "Claude Web: claude-sonnet-4-5-20250929": "claude-sonnet-4-5-20250929",
+    "Claude Web: claude-haiku-4-5-20251001": "claude-haiku-4-5-20251001",
+    "ChatGPT Web: gpt-4o": "gpt-4o",
+    "ChatGPT Web: gpt-4o-mini": "gpt-4o-mini",
+    "ChatGPT Web: gpt-4.5": "gpt-4.5",
+    "ChatGPT Web: gpt-5": "gpt-5",
+    "ChatGPT Web: gpt-5.2": "gpt-5.2",
+    "ChatGPT Web: chatgpt-4o-latest": "chatgpt-4o-latest",
+    "ChatGPT Web: o1": "o1",
+    "ChatGPT Web: o3": "o3",
+    "ChatGPT Web: o3-mini": "o3-mini",
+    "ChatGPT Web: o4-mini": "o4-mini",
 }
 
 # Per-provider reverse mapping: {provider: {technical_name: display_name}}
@@ -1187,6 +1574,22 @@ _PREFIX_TO_PROVIDER = {
     "Google:": "google",
     "NVIDIA:": "nvidia",
     "GitHub:": "github",
+    "Groq:": "groq",
+    "Mistral:": "mistral",
+    "Ollama:": "ollama",
+    "OpenRouter:": "openrouter",
+    "DeepSeek:": "deepseek",
+    "MiniMax:": "minimax",
+    "AiHubMix:": "aihubmix",
+    "SiliconFlow:": "siliconflow",
+    "VolcEngine:": "volcengine",
+    "DashScope:": "dashscope",
+    "Moonshot:": "moonshot",
+    "Zhipu:": "zhipu",
+    "GitHub Copilot:": "github_copilot",
+    "OpenAI Codex:": "openai_codex",
+    "Claude Web:": "claude_web",
+    "ChatGPT Web:": "chatgpt_web",
 }
 for _display_name, _tech_name in MODEL_NAME_MAPPING.items():
     for _prefix, _prov in _PREFIX_TO_PROVIDER.items():
@@ -1237,9 +1640,13 @@ def get_model_provider(model_name: str) -> str:
         return "github"
     # Try to infer from technical name
     tech_name = normalize_model_name(model_name)
-    # GitHub Models uses fully-qualified IDs like 'openai/gpt-4o'
-    # Treat those as GitHub provider models (not OpenAI direct).
-    if tech_name.startswith("openai/"):
+    # GitHub Models uses fully-qualified IDs with a 'vendor/' prefix (openai/, meta/, mistral-ai/, etc.)
+    # All of these belong to GitHub — not to the individual vendor's direct API.
+    _GITHUB_VENDOR_PREFIXES = (
+        "openai/", "meta/", "mistral-ai/", "mistralai/", "microsoft/",
+        "deepseek/", "cohere/", "ai21-labs/", "xai/",
+    )
+    if any(tech_name.startswith(p) for p in _GITHUB_VENDOR_PREFIXES):
         return "github"
     if tech_name.startswith("claude-"):
         return "anthropic"
@@ -1247,7 +1654,7 @@ def get_model_provider(model_name: str) -> str:
         return "openai"
     elif tech_name.startswith("gemini-"):
         return "google"
-    elif tech_name.startswith(("moonshotai/", "meta/", "mistralai/", "microsoft/", "nvidia/")):
+    elif tech_name.startswith(("moonshotai/", "nvidia/")):
         return "nvidia"
     return "unknown"
 
@@ -1256,6 +1663,11 @@ def validate_model_provider_compatibility() -> tuple[bool, str]:
     """Validate that the selected model is compatible with the selected provider."""
     if not AI_MODEL:
         return True, ""  # No model selected, use default
+
+    # Solo provider "stretti" hanno modelli esclusivi — skip check per tutti gli altri
+    _STRICT_PROVIDERS = {"anthropic", "openai", "google"}
+    if AI_PROVIDER not in _STRICT_PROVIDERS:
+        return True, ""
 
     model_provider = get_model_provider(AI_MODEL)
     if model_provider == "unknown":
@@ -1278,28 +1690,37 @@ def validate_model_provider_compatibility() -> tuple[bool, str]:
 def get_active_model() -> str:
     """Get the active model name (technical format).
     Prefers the user's selected model/provider if set, else falls back to global AI_MODEL."""
+    # Solo Anthropic, OpenAI e Google hanno modelli esclusivi — per tutti gli altri provider
+    # (gateway multi-vendor: NVIDIA, GitHub, OpenRouter, Groq, ecc.) accettiamo qualsiasi modello.
+    _STRICT_PROVIDERS = {"anthropic", "openai", "google"}
+
+    def _model_ok(model: str) -> bool:
+        """Return True if model is compatible with current provider (or check is N/A)."""
+        if AI_PROVIDER not in _STRICT_PROVIDERS:
+            return True  # gateway provider: never reject
+        mp = get_model_provider(model)
+        return mp in (AI_PROVIDER, "unknown")
+
     # Use SELECTED_MODEL if the user has made a selection AND provider matches
     if SELECTED_MODEL and SELECTED_PROVIDER == AI_PROVIDER:
         model = normalize_model_name(SELECTED_MODEL)
-        # Extra check: ensure model is compatible with current provider
-        model_provider = get_model_provider(model)
-        if model_provider == AI_PROVIDER or model_provider == "unknown":
-            # Canonicalize a few common cross-provider formats
+        if _model_ok(model):
             if AI_PROVIDER == "openai" and model.startswith("openai/"):
                 return model.split("/", 1)[1]
             return model
-    
+
     # Fall back to AI_MODEL (from config/env)
     if AI_MODEL:
         model = normalize_model_name(AI_MODEL)
-        # Extra check: ensure model is compatible with current provider
-        model_provider = get_model_provider(model)
-        if model_provider == AI_PROVIDER or model_provider == "unknown":
-            # Canonicalize a few common cross-provider formats
+        if _model_ok(model):
             if AI_PROVIDER == "openai" and model.startswith("openai/"):
                 return model.split("/", 1)[1]
             return model
-    
+
+    # Custom provider: fall back to configured model name
+    if AI_PROVIDER == "custom" and CUSTOM_MODEL_NAME:
+        return CUSTOM_MODEL_NAME
+
     # Last resort: use provider default
     return PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("model", "unknown")
 
@@ -1316,6 +1737,38 @@ def get_api_key() -> str:
         return NVIDIA_API_KEY
     elif AI_PROVIDER == "github":
         return GITHUB_TOKEN
+    elif AI_PROVIDER == "groq":
+        return GROQ_API_KEY
+    elif AI_PROVIDER == "mistral":
+        return MISTRAL_API_KEY
+    elif AI_PROVIDER == "openrouter":
+        return OPENROUTER_API_KEY
+    elif AI_PROVIDER == "deepseek":
+        return DEEPSEEK_API_KEY
+    elif AI_PROVIDER == "minimax":
+        return MINIMAX_API_KEY
+    elif AI_PROVIDER == "aihubmix":
+        return AIHUBMIX_API_KEY
+    elif AI_PROVIDER == "siliconflow":
+        return SILICONFLOW_API_KEY
+    elif AI_PROVIDER == "volcengine":
+        return VOLCENGINE_API_KEY
+    elif AI_PROVIDER == "dashscope":
+        return DASHSCOPE_API_KEY
+    elif AI_PROVIDER == "moonshot":
+        return MOONSHOT_API_KEY
+    elif AI_PROVIDER == "zhipu":
+        return ZHIPU_API_KEY
+    elif AI_PROVIDER == "custom":
+        return CUSTOM_API_KEY
+    elif AI_PROVIDER == "github_copilot":
+        return GITHUB_COPILOT_TOKEN
+    elif AI_PROVIDER == "openai_codex":
+        return OPENAI_CODEX_TOKEN
+    elif AI_PROVIDER == "claude_web":
+        return ""
+    elif AI_PROVIDER == "chatgpt_web":
+        return ""
     return ""
 
 
@@ -1501,6 +1954,48 @@ def initialize_ai_client():
             },
         )
         logger.info(f"GitHub Models client initialized (model: {get_active_model()})")
+    elif AI_PROVIDER == "ollama":
+        # Ollama è locale, non ha API key — il provider viene gestito da providers/manager.py
+        logger.info(f"Ollama provider selected (local, no API key required). Model: {get_active_model()}")
+        ai_client = None
+    elif AI_PROVIDER in (
+        "groq", "mistral", "openrouter", "deepseek", "minimax",
+        "aihubmix", "siliconflow", "volcengine", "dashscope",
+        "moonshot", "zhipu", "github_copilot", "openai_codex",
+        "claude_web", "chatgpt_web",
+    ):
+        # Questi provider usano providers/manager.py — non serve un ai_client dedicato
+        if api_key:
+            logger.info(f"{AI_PROVIDER} provider ready (model: {get_active_model()})")
+        elif AI_PROVIDER == "github_copilot":
+            # GitHub Copilot usa OAuth device flow — nessuna API key necessaria nella config
+            _oauth_file = "/data/oauth_copilot.json"
+            if os.path.isfile(_oauth_file):
+                logger.info(f"github_copilot provider ready via OAuth (model: {get_active_model()})")
+            else:
+                logger.info(f"github_copilot selected — authenticate via the 🔑 button in the UI")
+        elif AI_PROVIDER == "openai_codex":
+            # OpenAI Codex usa OAuth — nessuna API key necessaria nella config
+            _oauth_file = "/data/oauth_codex.json"
+            if os.path.isfile(_oauth_file):
+                logger.info(f"openai_codex provider ready via OAuth (model: {get_active_model()})")
+            else:
+                logger.info(f"openai_codex selected — authenticate via the 🔑 button in the UI")
+        elif AI_PROVIDER == "claude_web":
+            _session_file = "/data/session_claude_web.json"
+            if os.path.isfile(_session_file):
+                logger.info(f"claude_web provider ready via session token (model: {get_active_model()})")
+            else:
+                logger.info("claude_web selected — authenticate via the 🔑 button in the UI")
+        elif AI_PROVIDER == "chatgpt_web":
+            _session_file = "/data/session_chatgpt_web.json"
+            if os.path.isfile(_session_file):
+                logger.info(f"chatgpt_web provider ready via session token (model: {get_active_model()})")
+            else:
+                logger.info("chatgpt_web selected — authenticate via the 🔑 button in the UI")
+        else:
+            logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
+        ai_client = None
     else:
         logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
         ai_client = None
@@ -1644,11 +2139,12 @@ def get_config_includes_text():
     return "\n".join(lines) + "\n"
 
 
-# Conversation persistence - use /config for persistence across addon rebuilds
-CONVERSATIONS_FILE = "/config/.storage/claude_conversations.json"
+# Conversation persistence - stored in /config/amira/ for all amira data
+CONVERSATIONS_FILE = "/config/amira/conversations.json"
 
 # Backward compatibility: older versions may have used different paths.
 LEGACY_CONVERSATIONS_FILES = [
+    "/config/.storage/claude_conversations.json",
     "/config/claude_conversations.json",
     "/config/.storage/conversations.json",
     "/data/claude_conversations.json",
@@ -1807,11 +2303,11 @@ load_model_blocklists()
 
 # ---- Snapshot system for safe config editing ----
 
-SNAPSHOTS_DIR = "/config/.storage/claude_snapshots"
+SNAPSHOTS_DIR = "/config/amira/snapshots"
 HA_CONFIG_DIR = "/config"  # Mapped via config.yaml "map: config:rw"
 
 # ---- Device tracking for bubble visibility control ----
-DEVICES_CONFIG_FILE = "/config/.storage/claude_bubble_devices.json"
+DEVICES_CONFIG_FILE = "/config/amira/bubble_devices.json"
 
 def load_device_config() -> dict:
     """Load device visibility configuration from disk."""
@@ -1948,9 +2444,6 @@ def get_all_states() -> List[Dict]:
     return result if isinstance(result, list) else []
 
 
-
-
-
 # ---- Provider-specific chat implementations ----
 
 
@@ -1995,8 +2488,8 @@ def chat_openai(messages: List[Dict]) -> tuple:
     global AI_MODEL
     trimmed = intent.trim_messages(messages)
     system_prompt = tools.get_system_prompt()
-    tools = tools.get_openai_tools_for_provider()
-    max_tok = 4000 if AI_PROVIDER in ["github", "nvidia"] else 4096
+    ha_tools = tools.get_openai_tools_for_provider()
+    max_tok = 4000 if AI_PROVIDER in ("github", "nvidia") else 4096
 
     oai_messages = [{"role": "system", "content": system_prompt}] + trimmed
 
@@ -2004,7 +2497,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
     kwargs = {
         "model": get_active_model(),
         "messages": oai_messages,
-        "tools": tools,
+        "tools": ha_tools,
         **get_max_tokens_param(max_tok)
     }
     if AI_PROVIDER == "nvidia":
@@ -2096,7 +2589,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
                 if fn_name in read_only_tools:
                     tool_cache[sig] = result
             # Truncate tool results for GitHub/NVIDIA to stay within token limits
-            if AI_PROVIDER in ["github", "nvidia"] and len(result) > 3000:
+            if AI_PROVIDER in ("github", "nvidia") and len(result) > 3000:
                 result = result[:3000] + '... (truncated)'
             messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
 
@@ -2107,7 +2600,7 @@ def chat_openai(messages: List[Dict]) -> tuple:
         kwargs = {
             "model": get_active_model(),
             "messages": oai_messages,
-            "tools": tools,
+            "tools": ha_tools,
             **get_max_tokens_param(max_tok)
         }
         if AI_PROVIDER == "nvidia":
@@ -2336,11 +2829,37 @@ def _clean_unnecessary_comments(text: str) -> str:
     return text
 
 
+def _collect_from_stream(user_message: str, session_id: str) -> str:
+    """Blocking wrapper: collects all text from stream_chat_with_ai.
+    Used by Telegram/WhatsApp for manager.py providers (groq, mistral, claude_web, etc.)."""
+    parts: list[str] = []
+    for event in stream_chat_with_ai(user_message, session_id):
+        event_type = event.get("type")
+        if event_type == "token":
+            # stream_chat_with_ai normalizes "text" → "token" with field "content"
+            parts.append(event.get("content", ""))
+        elif event_type == "text":
+            # fallback: some paths might still yield "text" directly
+            parts.append(event.get("text", ""))
+        elif event_type == "error":
+            return "❌ " + event.get("message", "Errore sconosciuto")
+    result = "".join(parts).strip()
+    result = _clean_unnecessary_comments(result)
+    return result
+
+
 def chat_with_ai(user_message: str, session_id: str = "default") -> str:
     """Send a message to the configured AI provider with HA tools."""
-    if not ai_client:
+    # Legacy providers use ai_client directly; manager.py providers have ai_client=None (normal).
+    _LEGACY_PROVIDERS = {"anthropic", "openai", "google", "nvidia", "github"}
+
+    if not ai_client and AI_PROVIDER in _LEGACY_PROVIDERS:
         provider_name = PROVIDER_DEFAULTS.get(AI_PROVIDER, {}).get("name", AI_PROVIDER)
         return tr("err_api_key_not_configured", provider_name=provider_name)
+
+    # Provider managed by providers/manager.py (groq, mistral, claude_web, chatgpt_web, etc.)
+    if AI_PROVIDER not in _LEGACY_PROVIDERS:
+        return _collect_from_stream(user_message, session_id)
 
     if session_id not in conversations:
         conversations[session_id] = []
@@ -2539,8 +3058,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     saved_user_message = saved_user_message.strip()
     
     if not ai_client:
-        yield {"type": "error", "message": tr("err_api_key_not_configured_short")}
-        return
+        # Per i provider gestiti da providers/manager.py, ai_client è sempre None (è normale).
+        # Il controllo effettivo sulla chiave lo fa il manager stesso.
+        # Blocca solo se si tratta di un provider legacy che richiede davvero ai_client.
+        _LEGACY_PROVIDERS = {"anthropic", "openai", "google", "nvidia", "github"}
+        if AI_PROVIDER in _LEGACY_PROVIDERS:
+            yield {"type": "error", "message": tr("err_api_key_not_configured_short")}
+            return
 
     # Store read-only state for this session (accessible by execute_tool)
     read_only_sessions[session_id] = read_only
@@ -2559,14 +3083,40 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
     # Step 2: Build smart context NOW that we know the intent
     # If user is creating new automation/script, skip fuzzy matching to avoid false automation injection
-    smart_context = intent.build_smart_context(user_message, intent=intent_name)
+    # When the message contains [CURRENT_DASHBOARD_HTML] the HTML is extracted and will be injected
+    # as a SEPARATE earlier turn in the conversation (user: HTML, assistant: "ok, letto"), so the
+    # actual user message sent to the model is only the clean request text + normal smart context.
+    # This avoids token overflow without losing entity awareness.
+    _dashboard_in_msg = "[CURRENT_DASHBOARD_HTML]" in user_message
 
-    # Step 2.5: Inject memory context if enabled
+    # Extract dashboard HTML block if present (will be injected as a separate history turn below)
+    _dashboard_html_block = ""
+    _dashboard_html_inner = ""
+    _dashboard_name_hint = ""
+    if _dashboard_in_msg:
+        import re as _re2
+        _m = _re2.search(r'\[CURRENT_DASHBOARD_HTML\]([\s\S]*?)\[/CURRENT_DASHBOARD_HTML\]', user_message)
+        if _m:
+            _dashboard_html_block = _m.group(0)  # includes tags
+            _dashboard_html_inner = _m.group(1).strip()
+        # Also grab dashboard name from the CONTEXT prefix if present
+        _nm = _re2.search(r'\[CONTEXT:[^\]]*?"([^"]+)"', user_message)
+        if _nm:
+            _dashboard_name_hint = _nm.group(1)
+        logger.info(f"Dashboard HTML split: extracted {len(_dashboard_html_block)} chars, name='{_dashboard_name_hint}'")
+
+    smart_context = intent.build_smart_context(
+        user_message,
+        intent=intent_name,
+        # Use normal cap — the HTML will be a separate turn, not part of this message
+    )
+
+    # Step 2.5: Inject memory context if enabled (nanobot style: reads MEMORY.md once, no cross-session search)
     memory_context = ""
     if ENABLE_MEMORY and MEMORY_AVAILABLE:
-        memory_context = memory.get_memory_context(query=user_message, limit=3)
+        memory_context = memory.get_memory_context()
         if memory_context:
-            logger.info(f"Memory context injected for session {session_id}")
+            logger.info(f"Memory context (MEMORY.md) injected for session {session_id}")
             smart_context = memory_context + "\n\n" + smart_context
 
     # Step 3: Re-detect intent WITH full smart context for accuracy
@@ -2643,42 +3193,93 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Build enriched version for API (with context)
         if smart_context:
             if intent_info["specific_target"]:
-                text_content = f"{user_message}\n\n---\nDATA:\n{smart_context}"
+                api_content = f"{user_message}\n\n---\nDATA:\n{smart_context}"
             else:
-                text_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
+                api_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
         else:
-            text_content = user_message
+            api_content = user_message
 
         if AI_PROVIDER == "anthropic":
-            api_content = format_message_with_image_anthropic(text_content, media_type, base64_data)
+            api_content = format_message_with_image_anthropic(api_content, media_type, base64_data)
         elif AI_PROVIDER in ("openai", "github"):
-            api_content = format_message_with_image_openai(text_content, image_data)
+            api_content = format_message_with_image_openai(api_content, image_data)
         elif AI_PROVIDER == "google":
-            api_content = format_message_with_image_google(text_content, media_type, base64_data)
+            api_content = format_message_with_image_google(api_content, media_type, base64_data)
         else:
-            api_content = text_content
+            api_content = api_content
 
-        logger.info(f"Message with image: {text_content[:50]}... (media_type: {media_type})")
+        logger.info(f"Message with image: {api_content[:50]}... (media_type: {media_type})")
         yield {"type": "status", "message": tr("status_image_processing")}
     else:
         # No image - save original message (without context blocks)
         conversations[session_id].append({"role": "user", "content": saved_user_message})
 
+        # When the bubble sends [CURRENT_DASHBOARD_HTML], strip it from the actual user message
+        # so api_content only contains the clean request text. The HTML will be injected as a
+        # separate earlier conversation turn so the model sees it as prior context, not as part
+        # of the current user turn. This keeps each individual message small.
+        clean_user_message = user_message
+        if _dashboard_in_msg and _dashboard_html_block:
+            import re as _re3
+            # Remove the [CONTEXT:...] prefix (everything up to and including the HTML closing tag)
+            clean_user_message = _re3.sub(
+                r'\[CONTEXT:[^\]]*\]\s*\[CURRENT_DASHBOARD_HTML\][\s\S]*?\[/CURRENT_DASHBOARD_HTML\]\s*',
+                '',
+                clean_user_message,
+            ).strip()
+
         # Build enriched version for API (with context)
         if smart_context:
             if intent_info["specific_target"]:
-                api_content = f"{user_message}\n\n---\nDATA:\n{smart_context}"
+                api_content = f"{clean_user_message}\n\n---\nDATA:\n{smart_context}"
+            elif intent_name in ("create_html_dashboard", "modify_dashboard"):
+                # For HTML dashboards: use all entity_ids directly — no tool-call instruction
+                # (web providers like claude_web/chatgpt_web have no tools and "ONE tool call"
+                #  confuses them into producing YAML instead of HTML)
+                api_content = (
+                    f"{clean_user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\n"
+                    "Use the entity_ids listed above directly in your HTML. "
+                    "Output ONLY the complete <!DOCTYPE html>…</html> page, nothing else."
+                )
             else:
-                api_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
+                api_content = f"{clean_user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
             # Log estimated token count
             est_tokens = len(api_content) // 4  # ~4 chars per token
             logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
             yield {"type": "status", "message": tr("status_context_preloaded")}
         else:
-            api_content = user_message
+            api_content = clean_user_message
 
-    # Create a copy of messages for API with enriched last user message
-    messages = conversations[session_id][:-1] + [{"role": "user", "content": api_content}]
+    # Create a copy of messages for API with enriched last user message.
+    # If [CURRENT_DASHBOARD_HTML] was present, inject the HTML as a synthetic earlier turn:
+    #   user:      [CURRENT_DASHBOARD_HTML]...(HTML)...[/CURRENT_DASHBOARD_HTML]
+    #   assistant: "Ho letto la dashboard corrente."
+    # This way the model sees the HTML as prior context while the actual request stays lean.
+    if _dashboard_html_block and not image_data:
+        _name_label = f' "{_dashboard_name_hint}"' if _dashboard_name_hint else ""
+        _html_turn_user = (
+            f"[CURRENT_DASHBOARD_HTML]{_dashboard_html_inner}\n[/CURRENT_DASHBOARD_HTML]\n"
+            f"(This is the current HTML of dashboard{_name_label}. "
+            f"Keep all existing sections intact unless explicitly asked to remove them.)"
+        )
+        _html_turn_assistant = (
+            f"Ho letto la dashboard corrente{_name_label}. "
+            "Dimmi cosa vuoi modificare o aggiungere."
+        )
+        messages = (
+            conversations[session_id][:-1]
+            + [
+                {"role": "user",      "content": _html_turn_user},
+                {"role": "assistant", "content": _html_turn_assistant},
+                {"role": "user",      "content": api_content},
+            ]
+        )
+        logger.info(
+            f"Dashboard HTML split into separate turn: "
+            f"HTML turn={len(_html_turn_user)} chars, request turn={len(api_content)} chars"
+        )
+    else:
+        messages = conversations[session_id][:-1] + [{"role": "user", "content": api_content}]
 
     # Inject file upload and RAG context if available AND enabled
     if (FILE_UPLOAD_AVAILABLE and ENABLE_FILE_UPLOAD) or (RAG_AVAILABLE and ENABLE_RAG):
@@ -2726,51 +3327,372 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         # Remember current conversation length to avoid duplicates
         conv_length_before = len(conversations[session_id])
         last_usage = None  # Will capture usage from done event
+        _streamed_text_parts: list = []  # accumulate streamed tokens for saving
 
-        if AI_PROVIDER == "nvidia":
-            provider_gen = providers_openai.stream_chat_nvidia_direct(messages, intent_info=intent_info)
-        elif AI_PROVIDER in ("openai", "github"):
-            provider_gen = providers_openai.stream_chat_openai(messages, intent_info=intent_info)
-        elif AI_PROVIDER == "anthropic":
+        # Clean messages for specific providers that need it
+        if AI_PROVIDER in ("anthropic", "google"):
             clean_messages = sanitize_messages_for_provider(messages)
             messages = clean_messages
-            provider_gen = providers_anthropic.stream_chat_anthropic(clean_messages, intent_info=intent_info)
-        elif AI_PROVIDER == "google":
-            clean_messages = sanitize_messages_for_provider(messages)
-            messages = clean_messages
-            provider_gen = providers_google.stream_chat_google(clean_messages, intent_info=intent_info)
-        else:
-            yield {"type": "error", "message": tr("err_provider_not_supported", provider=AI_PROVIDER)}
-            return
 
-        # Stream events, intercepting 'done' to enrich with cost
-        for event in provider_gen:
-            if event.get("type") == "done" and event.get("usage"):
-                usage = event["usage"]
-                cost = pricing.calculate_cost(
-                    usage.get("model", ""),
-                    usage.get("provider", AI_PROVIDER),
-                    usage.get("input_tokens", 0),
-                    usage.get("output_tokens", 0),
-                    COST_CURRENCY,
-                )
-                usage["cost"] = cost
-                usage["currency"] = COST_CURRENCY
-                last_usage = usage
-            yield event
+        # Inject tool schemas into intent_info so providers can pass them to the API.
+        # This enables tool calling for all OpenAI-compatible providers (Mistral, Groq, etc.)
+        # and for the Anthropic SDK provider.
+        if intent_info is not None:
+            intent_info["tool_schemas"] = tools.get_openai_tools()
 
-        # Sync new assistant messages to conversation history
+        # Tool execution loop: providers surface tool_calls in the done event;
+        # we execute them here and loop until the model produces a final answer.
+        _MAX_TOOL_ROUNDS = 8
+        _tool_round = 0
+        _tool_cache: dict = {}
+        _read_only_tools = {
+            "get_automations", "get_scripts", "get_dashboards",
+            "get_dashboard_config", "read_config_file",
+            "list_config_files", "get_frontend_resources",
+            "search_entities", "get_entity_state", "get_entities",
+        }
+
+        while _tool_round < _MAX_TOOL_ROUNDS:
+            _tool_round += 1
+
+            # Use unified provider interface (replaces old provider_*.py functions)
+            # Passa il modello attivo esplicitamente così il provider non usa default errati
+            provider_gen = provider_stream_chat(
+                AI_PROVIDER, messages,
+                intent_info=intent_info,
+                model=get_active_model(),
+            )
+
+            _pending_tool_calls: list = []
+
+            # For create_html_dashboard: buffer text instead of streaming it.
+            # The model writes the full HTML as plain text — suppress it so the user
+            # sees only the tool status + confirmation, not raw HTML in the chat.
+            # If no tool call happens (clarifying question), flush the buffer as-is.
+            _is_html_dash = (intent_info or {}).get("intent") == "create_html_dashboard"
+
+            # For no-tool providers (claude_web, chatgpt_web, github_copilot, openai_codex):
+            # buffer the full response so we can run the tool simulator on it after done.
+            _NO_TOOL_PROVIDERS = {"claude_web", "chatgpt_web", "github_copilot", "openai_codex"}
+            _is_no_tool_provider = AI_PROVIDER in _NO_TOOL_PROVIDERS
+            _text_buffer: list = []
+
+            # Stream events, intercepting 'done' to enrich with cost or detect tool calls
+            for event in provider_gen:
+                if event.get("type") == "done":
+                    _pending_tool_calls = event.get("tool_calls") or []
+                    if not _pending_tool_calls:
+                        full_buf = "".join(_text_buffer)
+
+                        # ── Tool Simulator: extract <tool_call> blocks from buffered text ──
+                        if _is_no_tool_provider and full_buf and not _is_html_dash:
+                            from providers.tool_simulator import extract_tool_calls, clean_response_text
+                            _sim_calls = extract_tool_calls(full_buf)
+                            if _sim_calls:
+                                # Inject as pending tool calls — the normal loop below handles them
+                                _pending_tool_calls = _sim_calls
+                                # For read-only tool calls, suppress the introductory text:
+                                # the model will respond properly once it sees the tool results.
+                                # For write tool calls, show the confirmation text to the user.
+                                _all_read_only = all(
+                                    tc.get("name", "") in _read_only_tools
+                                    for tc in _sim_calls
+                                )
+                                if not _all_read_only:
+                                    cleaned = clean_response_text(full_buf)
+                                    if cleaned:
+                                        yield {"type": "token", "content": cleaned}
+                                _text_buffer = []
+                                # Do NOT yield done yet — let the tool loop continue
+                                break
+                            # No tool_calls found → plain text response, flush as-is
+                            if full_buf:
+                                yield {"type": "token", "content": full_buf}
+                            _text_buffer = []
+
+                        # Flush buffer for html dashboard (no tool call → clarifying question)
+                        elif _is_html_dash and _text_buffer:
+                            full_html_buf = "".join(_text_buffer)
+                            # For no-tool providers the HTML is streamed as plain text and will
+                            # be auto-saved from _streamed_text_parts after this loop. Suppress
+                            # the raw HTML from the chat and show a brief confirmation instead.
+                            import re as _re_html
+                            _has_html = bool(_re_html.search(
+                                r'(?:<!DOCTYPE\s+html|<html[\s>])',
+                                full_html_buf, _re_html.IGNORECASE
+                            ))
+                            if _is_no_tool_provider and _has_html:
+                                # Emit a short confirmation — the full HTML will be auto-saved
+                                yield {"type": "token", "content": "✨ Dashboard salvata!"}
+                            else:
+                                # No HTML found → clarifying question or tool-capable provider;
+                                # flush the buffer normally so the user sees the response.
+                                for buffered_chunk in _text_buffer:
+                                    yield {"type": "token", "content": buffered_chunk}
+                            _text_buffer = []
+
+                        # Normal completion — enrich with cost and forward to client
+                        if event.get("usage"):
+                            raw_usage = event["usage"]
+                            input_tokens = raw_usage.get("input_tokens") or raw_usage.get("prompt_tokens", 0)
+                            output_tokens = raw_usage.get("output_tokens") or raw_usage.get("completion_tokens", 0)
+                            model_name = raw_usage.get("model") or get_active_model()
+                            provider_name = raw_usage.get("provider") or AI_PROVIDER
+                            cost = pricing.calculate_cost(
+                                model_name, provider_name, input_tokens, output_tokens, COST_CURRENCY,
+                            )
+                            usage = {
+                                **raw_usage,
+                                "input_tokens": input_tokens,
+                                "output_tokens": output_tokens,
+                                "cost": cost,
+                                "currency": COST_CURRENCY,
+                            }
+                            event = {**event, "usage": usage}
+                            last_usage = usage
+                        if not _pending_tool_calls:
+                            yield event
+                    # If tool_calls present: do NOT yield done — execute tools and loop
+                    break  # exit inner for-loop regardless
+                elif event.get("type") == "error":
+                    # Umanizza il messaggio di errore grezzo prima di inviarlo all'utente
+                    raw_msg = event.get("message", "")
+                    friendly = humanize_provider_error(Exception(raw_msg), AI_PROVIDER)
+                    if friendly and friendly != raw_msg:
+                        event = dict(event)
+                        event["message"] = friendly
+                    yield event
+                    break  # stop on error
+                elif event.get("type") == "text":
+                    # Normalize "text" → "token" so the UI receives the expected event format.
+                    # All new-path providers (Groq, Mistral, Anthropic SDK, etc.) yield
+                    # {"type": "text", "text": "..."} but the chat_ui.js expects
+                    # {"type": "token", "content": "..."}.
+                    chunk = event.get("text", "")
+                    _streamed_text_parts.append(chunk)
+                    if _is_html_dash or _is_no_tool_provider:
+                        _text_buffer.append(chunk)  # buffer: process after done
+                    else:
+                        yield {"type": "token", "content": chunk}
+                elif event.get("type") == "token":
+                    # Some providers yield token events directly — accumulate those too
+                    content = event.get("content", "")
+                    _streamed_text_parts.append(content)
+                    if _is_html_dash or _is_no_tool_provider:
+                        _text_buffer.append(content)  # buffer: process after done
+                    else:
+                        yield event
+                else:
+                    yield event
+
+            if not _pending_tool_calls:
+                break  # No tool calls → conversation complete
+
+            # --- Execute tool calls and prepare next round ---
+            text_so_far = "".join(_streamed_text_parts)
+            _streamed_text_parts = []
+
+            # Append assistant message with tool_calls (OpenAI format)
+            messages.append({
+                "role": "assistant",
+                "content": text_so_far or None,
+                "tool_calls": [
+                    {
+                        "id": tc.get("id", f"call_{i}"),
+                        "type": "function",
+                        "function": {
+                            "name": tc.get("name", ""),
+                            "arguments": tc.get("arguments", "{}"),
+                        },
+                    }
+                    for i, tc in enumerate(_pending_tool_calls)
+                ],
+            })
+
+            # Execute each tool and append its result
+            for tc in _pending_tool_calls:
+                fn_name = tc.get("name", "")
+                try:
+                    tc_args = json.loads(tc.get("arguments", "{}") or "{}")
+                except Exception:
+                    tc_args = {}
+
+                # Show status to user
+                _status_label = tools.TOOL_DESCRIPTIONS.get(fn_name, fn_name)
+                yield {"type": "status", "message": f"🔧 {_status_label}..."}
+                logger.info(f"Tool (round {_tool_round}): {fn_name} {list(tc_args.keys())}")
+
+                _sig = f"{fn_name}:{json.dumps(tc_args, sort_keys=True)}"
+                if fn_name in _read_only_tools and _sig in _tool_cache:
+                    logger.debug(f"Tool cache hit: {fn_name}")
+                    result = _tool_cache[_sig]
+                else:
+                    result = tools.execute_tool(fn_name, tc_args)
+                    if fn_name in _read_only_tools:
+                        _tool_cache[_sig] = result
+
+                # Extract diff for UI rendering (strip before feeding to model)
+                try:
+                    _result_obj = json.loads(result)
+                    if isinstance(_result_obj, dict) and "diff" in _result_obj:
+                        _diff_content = _result_obj.pop("diff")
+                        result = json.dumps(_result_obj, ensure_ascii=False)
+                        yield {"type": "diff", "content": _diff_content}
+                except Exception:
+                    pass
+
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": tc.get("id", f"call_{fn_name}"),
+                    "content": result,
+                })
+
+        # Sync new assistant messages to conversation history.
+        # New-path providers (Mistral, Groq, openai_compatible, etc.) stream text as
+        # events but do NOT append to `messages`, so we use _streamed_text_parts.
+        # Old-path providers (legacy Anthropic/OpenAI agentic loop) append directly
+        # to `messages` — handle both cases without duplicating.
         is_anthropic_or_google = AI_PROVIDER in ("anthropic", "google")
-        for msg in messages[conv_length_before:]:
-            if msg.get("role") == "assistant":
-                content = msg.get("content", "")
-                if is_anthropic_or_google and isinstance(content, list):
-                    continue
+        new_msgs_from_provider = [
+            msg for msg in messages[conv_length_before:]
+            if msg.get("role") == "assistant"
+            and not (is_anthropic_or_google and isinstance(msg.get("content", ""), list))
+        ]
+        if new_msgs_from_provider:
+            # Old-path: provider appended messages directly, use those
+            for msg in new_msgs_from_provider:
                 msg["model"] = get_active_model()
                 msg["provider"] = AI_PROVIDER
                 if last_usage:
                     msg["usage"] = last_usage
                 conversations[session_id].append(msg)
+        elif _streamed_text_parts:
+            # New-path: assemble streamed tokens and save as assistant message
+            assembled = "".join(_streamed_text_parts).strip()
+            if assembled:
+                assistant_msg: dict = {
+                    "role": "assistant",
+                    "content": assembled,
+                    "model": get_active_model(),
+                    "provider": AI_PROVIDER,
+                }
+                if last_usage:
+                    assistant_msg["usage"] = last_usage
+                conversations[session_id].append(assistant_msg)
+
+                # ── Auto-save HTML dashboard ───────────────────────────────
+                # Providers without tool support (claude_web, groq, mistral, …)
+                # stream the HTML as plain text. If the intent was
+                # create_html_dashboard, extract the HTML block and save it.
+                if intent_name == "create_html_dashboard":
+                    import re as _re
+                    html_block: Optional[str] = None
+                    # 1. ```html ... ``` closed block (with or without DOCTYPE)
+                    m = _re.search(
+                        r'```(?:html)?\s*\n((?:<!DOCTYPE\s+html|<html)[\s\S]*?)```',
+                        assembled, _re.IGNORECASE
+                    )
+                    if m:
+                        html_block = m.group(1).strip()
+                    if not html_block:
+                        # 2. Unclosed/truncated code block (hit token limit)
+                        m = _re.search(
+                            r'```(?:html)?\s*\n((?:<!DOCTYPE\s+html|<html)[\s\S]*)',
+                            assembled, _re.IGNORECASE
+                        )
+                        if m:
+                            html_block = m.group(1).strip()
+                    if not html_block:
+                        # 3. Bare <!DOCTYPE html> … </html> (no fence)
+                        m = _re.search(
+                            r'(<!DOCTYPE\s+html[\s\S]*?</html>)',
+                            assembled, _re.IGNORECASE
+                        )
+                        if m:
+                            html_block = m.group(1).strip()
+                    if not html_block:
+                        # 4. Bare <html> … </html> (no DOCTYPE, no fence)
+                        m = _re.search(
+                            r'(<html[\s>][\s\S]*?</html>)',
+                            assembled, _re.IGNORECASE
+                        )
+                        if m:
+                            html_block = m.group(1).strip()
+
+                    if html_block:
+                        # ── Derive slug/title ──────────────────────────────────────
+                        # Priority 1: use the dashboard name from the bubble context prefix
+                        # e.g. [CONTEXT: User is viewing HTML dashboard "ciao-epcube-tigo".]
+                        _ctx_dash_m = _re.search(
+                            r'\[CONTEXT:[^\]]*HTML\s+dashboard\s+["\x27]([^"\x27\]]+)["\x27]',
+                            saved_user_message,
+                            _re.IGNORECASE,
+                        )
+                        if _ctx_dash_m:
+                            _slug = _ctx_dash_m.group(1).strip()
+                            _title = " ".join(w.capitalize() for w in _slug.replace("-", " ").replace("_", " ").split())
+                            logger.info(f"HTML dashboard auto-save: using context name '{_slug}'")
+                        else:
+                            # Priority 2: derive from user's actual message (strip context blocks)
+                            _clean_msg = _re.sub(r'\[CONTEXT:[^\]]*\]', '', saved_user_message)
+                            _clean_msg = _re.sub(r'\[CURRENT_DASHBOARD_HTML\][\s\S]*?\[/CURRENT_DASHBOARD_HTML\]', '', _clean_msg)
+                            _stop = {"mi", "crei", "crea", "una", "un", "la", "il",
+                                     "con", "i", "de", "dei", "degli", "delle", "del", "le",
+                                     "sensori", "sensore", "di", "e", "pagina", "html",
+                                     "web", "per", "make", "create", "page",
+                                     "dashboard", "pannello"}
+                            _words = _re.sub(r'[^\w\s]', ' ', _clean_msg.lower()).split()
+                            _slug_words = [w for w in _words if w not in _stop and len(w) > 2][:3]
+                            _slug = "-".join(_slug_words) or "dashboard"
+                            _title = " ".join(w.capitalize() for w in _slug_words) or "Dashboard"
+
+                        # Extract entity ids mentioned in the HTML
+                        # Match any domain.entity pattern (covers custom integrations like epcube)
+                        _entities = list(dict.fromkeys(_re.findall(
+                            r'\b([a-z_][a-z0-9_]*\.[a-z0-9][a-z0-9_]+)\b',
+                            html_block
+                        )))
+                        # Filter out obvious non-entity patterns (CSS, JS, HTML attrs)
+                        _skip = {"text.bold", "div.card", "font.size", "margin.top",
+                                  "border.radius", "background.color", "flex.wrap",
+                                  "font.weight", "padding.top"}
+                        # Domains that are never valid HA entity domains
+                        _skip_domains = {"icon", "font", "text", "div", "span", "style",
+                                         "margin", "border", "background", "padding",
+                                         "flex", "color", "width", "height", "display",
+                                         "position", "align", "justify", "overflow",
+                                         "cursor", "opacity", "transform", "transition"}
+                        _entities = [e for e in _entities if
+                                     '.' in e and e not in _skip
+                                     and e.split('.')[0] not in _skip_domains
+                                     and not e.startswith(("http.", "https.", "www.",
+                                                           "Math.", "JSON.", "Object.",
+                                                           "console.", "window.", "document.",
+                                                           "Promise.", "Array.", "String.",
+                                                           "Number.", "Boolean.", "Date."))]
+                        # Deduplicate preserving order
+                        _entities = list(dict.fromkeys(_entities))
+
+                        try:
+                            yield {"type": "status", "message": "💾 Salvo la dashboard HTML…"}
+                            _save_result = tools.execute_tool("create_html_dashboard", {
+                                "title": _title,
+                                "name": _slug,
+                                "entities": _entities,
+                                "html": html_block,
+                            })
+                            logger.info(
+                                f"Auto-saved HTML dashboard '{_slug}' "
+                                f"(entities={len(_entities)}): {str(_save_result)[:200]}"
+                            )
+                            yield {"type": "status", "message": f"✅ Dashboard HTML '{_slug}.html' salvata!"}
+                        except Exception as _e:
+                            logger.warning(f"Auto-save HTML dashboard failed: {_e}")
+                            yield {"type": "status", "message": f"⚠️ Salvataggio HTML fallito: {_e}"}
+                # ──────────────────────────────────────────────────────────
+                # NOTE: sentinel-based auto-execute blocks (CONFIRM_CREATE_AUTOMATION etc.)
+                # have been removed. No-tool providers now use the universal Tool Simulator
+                # (<tool_call> XML blocks) which are handled by the streaming loop above.
 
         # Trim and save
         if len(conversations[session_id]) > 50:
@@ -3141,9 +4063,14 @@ def api_set_model():
     if "model" in data:
         normalized = normalize_model_name(data["model"])
 
-        # If provider is explicitly set, enforce compatibility.
-        # This prevents states like provider=nvidia with model=openai/gpt-4o.
-        if "provider" in data:
+        # Solo Anthropic, OpenAI e Google hanno modelli esclusivi propri.
+        # Tutti gli altri provider (NVIDIA, GitHub, Groq, Mistral, OpenRouter, SiliconFlow, ecc.)
+        # ospitano modelli di vendor diversi → accettare qualsiasi modello selezionato dall'utente
+        # per quel provider senza checks di compatibilità.
+        _STRICT_PROVIDERS = {"anthropic", "openai", "google"}
+
+        # Enforce compatibility only for strict single-vendor providers.
+        if "provider" in data and AI_PROVIDER in _STRICT_PROVIDERS:
             model_provider = get_model_provider(normalized)
             if model_provider not in ("unknown", AI_PROVIDER):
                 SELECTED_MODEL = ""
@@ -3159,11 +4086,6 @@ def api_set_model():
                 SELECTED_MODEL = normalized
                 SELECTED_PROVIDER = AI_PROVIDER
         else:
-            # If provider isn't provided, accept the model and infer provider when possible.
-            # (Keeps UI resilient if it only sends a model.)
-            inferred = get_model_provider(normalized)
-            if inferred != "unknown":
-                AI_PROVIDER = inferred
             AI_MODEL = normalized
             SELECTED_MODEL = normalized
             SELECTED_PROVIDER = AI_PROVIDER
@@ -3540,14 +4462,44 @@ def api_chat_stream():
     abort_streams[session_id] = False  # Reset abort flag
 
     def generate():
-        try:
-            for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-        except Exception as e:
-            logger.error(f"❌ Stream error in stream_chat_with_ai: {type(e).__name__}: {str(e)}", extra={"context": "REQUEST"})
-            import traceback
-            logger.error(f"Traceback: {traceback.format_exc()}", extra={"context": "REQUEST"})
-            yield f"data: {json.dumps({'error': f'Stream error: {str(e)}'}, ensure_ascii=False)}\n\n"
+        import threading as _threading
+        import queue as _queue
+        q: _queue.Queue = _queue.Queue()
+        _SENTINEL = object()
+
+        def _producer():
+            try:
+                for event in stream_chat_with_ai(message, session_id, image_data, read_only=read_only):
+                    q.put(("event", event))
+            except Exception as exc:
+                logger.error(
+                    f"❌ Stream error in stream_chat_with_ai: {type(exc).__name__}: {exc}",
+                    extra={"context": "REQUEST"},
+                )
+                import traceback
+                logger.error(f"Traceback: {traceback.format_exc()}", extra={"context": "REQUEST"})
+                q.put(("error", exc))
+            finally:
+                q.put(("done", _SENTINEL))
+
+        t = _threading.Thread(target=_producer, daemon=True)
+        t.start()
+
+        while True:
+            try:
+                kind, val = q.get(timeout=10)
+            except _queue.Empty:
+                # Keep connection alive while waiting for slow providers (e.g. NVIDIA)
+                yield ": keep-alive\n\n"
+                continue
+
+            if kind == "event":
+                yield f"data: {json.dumps(val, ensure_ascii=False)}\n\n"
+            elif kind == "error":
+                yield f"data: {json.dumps({'type': 'error', 'message': str(val)}, ensure_ascii=False)}\n\n"
+                break
+            else:  # "done"
+                break
 
     return Response(
         stream_with_context(generate()),
@@ -3566,7 +4518,972 @@ def api_chat_abort():
     return jsonify({"status": "abort_requested"}), 200
 
 
-@app.route('/api/conversations/<session_id>/messages', methods=['GET'])
+@app.route('/api/memory/clear', methods=['POST'])
+def api_memory_clear():
+    """Clear file memory cache (Layer 2)."""
+    try:
+        file_cache = memory.get_config_file_cache()
+        old_stats = file_cache.stats()
+        file_cache.clear()
+        logger.info(f"Memory cache cleared: was {old_stats['cached_files']} files, {old_stats['total_bytes']} bytes")
+        return jsonify({
+            "status": "success",
+            "message": f"Cleared {old_stats['cached_files']} files",
+            "freed_bytes": old_stats['total_bytes'],
+        }), 200
+    except Exception as e:
+        logger.error(f"Memory clear error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ MCP (Model Context Protocol) Endpoints ============
+
+@app.route('/api/mcp/servers', methods=['GET'])
+def api_mcp_servers_list():
+    """List all configured MCP servers and their connection status."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        manager = mcp.get_mcp_manager()
+        servers = []
+        for name, server in manager.servers.items():
+            tools_count = len(server.tools) if server.is_connected() else 0
+            servers.append({
+                "name": name,
+                "connected": server.is_connected(),
+                "transport": server.transport_type,
+                "tools_count": tools_count,
+                "tools": list(server.tools.keys()) if server.is_connected() else [],
+            })
+        
+        return jsonify({
+            "status": "success",
+            "servers": servers,
+            "total_servers": len(servers),
+        }), 200
+    except Exception as e:
+        logger.error(f"MCP list servers error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/server/<server_name>/status', methods=['GET'])
+def api_mcp_server_status(server_name):
+    """Get status of a specific MCP server."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        manager = mcp.get_mcp_manager()
+        if server_name not in manager.servers:
+            return jsonify({
+                "status": "error",
+                "message": f"Server '{server_name}' not found"
+            }), 404
+        
+        server = manager.servers[server_name]
+        return jsonify({
+            "status": "success",
+            "server_name": server_name,
+            "connected": server.is_connected(),
+            "transport": server.transport_type,
+            "tools": {name: {"description": tool.get("description", "")} 
+                     for name, tool in server.tools.items()},
+            "tools_count": len(server.tools),
+        }), 200
+    except Exception as e:
+        logger.error(f"MCP server status error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/server/<server_name>/reconnect', methods=['POST'])
+def api_mcp_server_reconnect(server_name):
+    """Reconnect to a specific MCP server."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        manager = mcp.get_mcp_manager()
+        if server_name not in manager.servers:
+            return jsonify({
+                "status": "error",
+                "message": f"Server '{server_name}' not found"
+            }), 404
+        
+        server = manager.servers[server_name]
+        server.disconnect()
+        server.connect()
+        
+        return jsonify({
+            "status": "success",
+            "message": f"Reconnected to '{server_name}'",
+            "connected": server.is_connected(),
+            "tools_count": len(server.tools),
+        }), 200
+    except Exception as e:
+        logger.error(f"MCP server reconnect error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/tools', methods=['GET'])
+def api_mcp_all_tools():
+    """List all available tools from all connected MCP servers."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        manager = mcp.get_mcp_manager()
+        all_tools = manager.get_all_tools()
+        
+        tools_by_server = {}
+        for tool_name, tool_info in all_tools.items():
+            server_name = tool_info.get("server", "unknown")
+            if server_name not in tools_by_server:
+                tools_by_server[server_name] = []
+            tools_by_server[server_name].append({
+                "name": tool_name,
+                "tool_name": tool_info.get("tool_name", ""),
+                "description": tool_info.get("description", ""),
+            })
+        
+        return jsonify({
+            "status": "success",
+            "tools": all_tools,
+            "tools_by_server": tools_by_server,
+            "total_tools": len(all_tools),
+        }), 200
+    except Exception as e:
+        logger.error(f"MCP all tools error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/diagnostics', methods=['GET'])
+def api_mcp_diagnostics():
+    """Get detailed diagnostics for all MCP servers."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        manager = mcp.get_mcp_manager()
+        diagnostics = {
+            "timestamp": datetime.now().isoformat(),
+            "servers": {},
+            "stats": manager.stats() if hasattr(manager, 'stats') else {},
+        }
+        
+        for name, server in manager.servers.items():
+            server_diag = {
+                "name": name,
+                "connected": server.is_connected(),
+                "transport": server.transport_type,
+                "tools_count": len(server.tools),
+                "tools": list(server.tools.keys()),
+                "config": {
+                    "transport": server.transport_type,
+                    "command": server.config.get("command", "") if server.transport_type == "stdio" else "",
+                    "url": server.config.get("url", "") if server.transport_type == "http" else "",
+                }
+            }
+            diagnostics["servers"][name] = server_diag
+        
+        return jsonify(diagnostics), 200
+    except Exception as e:
+        logger.error(f"MCP diagnostics error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/test/<server_name>/<tool_name>', methods=['POST'])
+def api_mcp_test_tool(server_name, tool_name):
+    """Test a specific MCP tool with provided arguments."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        data = request.get_json() or {}
+        arguments = data.get("arguments", {})
+        
+        manager = mcp.get_mcp_manager()
+        if server_name not in manager.servers:
+            return jsonify({
+                "status": "error",
+                "message": f"Server '{server_name}' not found"
+            }), 404
+        
+        server = manager.servers[server_name]
+        if not server.is_connected():
+            return jsonify({
+                "status": "error",
+                "message": f"Server '{server_name}' is not connected"
+            }), 503
+        
+        # Execute tool and measure time
+        start_time = time.time()
+        try:
+            result = server.call_tool(tool_name, arguments)
+            elapsed = time.time() - start_time
+            
+            # Parse result if it's JSON
+            try:
+                result_obj = json.loads(result) if isinstance(result, str) else result
+            except (json.JSONDecodeError, TypeError):
+                result_obj = {"result": result}
+            
+            return jsonify({
+                "status": "success",
+                "server": server_name,
+                "tool": tool_name,
+                "arguments": arguments,
+                "result": result_obj,
+                "execution_time_ms": round(elapsed * 1000, 2),
+            }), 200
+        except Exception as e:
+            elapsed = time.time() - start_time
+            return jsonify({
+                "status": "error",
+                "server": server_name,
+                "tool": tool_name,
+                "error": str(e),
+                "execution_time_ms": round(elapsed * 1000, 2),
+            }), 500
+    except Exception as e:
+        logger.error(f"MCP test tool error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/server/<server_name>/tools', methods=['GET'])
+def api_mcp_server_tools(server_name):
+    """Get tools for a specific MCP server."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({
+                "status": "error",
+                "message": "MCP support not available"
+            }), 501
+        
+        manager = mcp.get_mcp_manager()
+        if server_name not in manager.servers:
+            return jsonify({
+                "status": "error",
+                "message": f"Server '{server_name}' not found"
+            }), 404
+        
+        server = manager.servers[server_name]
+        tools_list = []
+        
+        for tool_name, tool_info in server.tools.items():
+            tools_list.append({
+                "name": tool_name,
+                "description": tool_info.get("description", ""),
+                "inputSchema": tool_info.get("inputSchema", {}),
+            })
+        
+        return jsonify({
+            "status": "success",
+            "server": server_name,
+            "connected": server.is_connected(),
+            "tools": tools_list,
+            "total_tools": len(tools_list),
+        }), 200
+    except Exception as e:
+        logger.error(f"MCP server tools error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ Nanobot-Inspired Features Endpoints ============
+
+@app.route('/api/fallback/stats', methods=['GET'])
+def api_fallback_stats():
+    """Get multi-provider fallback chain statistics."""
+    try:
+        if not FALLBACK_AVAILABLE:
+            return jsonify({"status": "error", "message": "Fallback not available"}), 501
+        
+        chain = fallback.get_fallback_chain()
+        if not chain:
+            return jsonify({"status": "error", "message": "Fallback chain not initialized"}), 503
+        
+        stats = chain.get_stats()
+        return jsonify({
+            "status": "success",
+            "fallback_stats": stats,
+        }), 200
+    except Exception as e:
+        logger.error(f"Fallback stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/cache/semantic/stats', methods=['GET'])
+def api_semantic_cache_stats():
+    """Get semantic cache statistics."""
+    try:
+        if not SEMANTIC_CACHE_AVAILABLE:
+            return jsonify({"status": "error", "message": "Semantic cache not available"}), 501
+        
+        cache = semantic_cache.get_semantic_cache()
+        if not cache:
+            return jsonify({"status": "error", "message": "Semantic cache not initialized"}), 503
+        
+        stats = cache.stats()
+        return jsonify({
+            "status": "success",
+            "cache_stats": stats,
+        }), 200
+    except Exception as e:
+        logger.error(f"Semantic cache stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/cache/semantic/clear', methods=['POST'])
+def api_semantic_cache_clear():
+    """Clear semantic cache."""
+    try:
+        if not SEMANTIC_CACHE_AVAILABLE:
+            return jsonify({"status": "error", "message": "Semantic cache not available"}), 501
+        
+        cache = semantic_cache.get_semantic_cache()
+        if not cache:
+            return jsonify({"status": "error", "message": "Semantic cache not initialized"}), 503
+        
+        cache.clear()
+        return jsonify({
+            "status": "success",
+            "message": "Semantic cache cleared",
+        }), 200
+    except Exception as e:
+        logger.error(f"Semantic cache clear error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/tools/optimizer/stats', methods=['GET'])
+def api_tool_optimizer_stats():
+    """Get tool execution optimizer statistics."""
+    try:
+        if not TOOL_OPTIMIZER_AVAILABLE:
+            return jsonify({"status": "error", "message": "Tool optimizer not available"}), 501
+        
+        optimizer = tool_optimizer.get_tool_optimizer()
+        stats = optimizer.stats()
+        return jsonify({
+            "status": "success",
+            "optimizer_stats": stats,
+        }), 200
+    except Exception as e:
+        logger.error(f"Tool optimizer stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/quality/stats', methods=['GET'])
+def api_quality_metrics_stats():
+    """Get response quality metrics statistics."""
+    try:
+        if not QUALITY_METRICS_AVAILABLE:
+            return jsonify({"status": "error", "message": "Quality metrics not available"}), 501
+        
+        analyzer = quality_metrics.get_quality_analyzer()
+        stats = analyzer.get_stats()
+        return jsonify({
+            "status": "success",
+            "quality_stats": stats,
+        }), 200
+    except Exception as e:
+        logger.error(f"Quality metrics stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ Image Support Endpoints ============
+
+@app.route('/api/image/stats', methods=['GET'])
+def api_image_stats():
+    """Get image analyzer statistics."""
+    try:
+        if not IMAGE_SUPPORT_AVAILABLE:
+            return jsonify({"status": "error", "message": "Image support not available"}), 501
+        analyzer = image_support.get_image_analyzer()
+        return jsonify({"status": "success", "image_stats": analyzer.get_stats()}), 200
+    except Exception as e:
+        logger.error(f"Image stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/image/analyze', methods=['POST'])
+def api_image_analyze():
+    """Analyze an image file using vision models with automatic fallback.
+    
+    JSON body: { "image_path": "/config/amira/images/photo.jpg", "prompt": "Describe this image" }
+    """
+    try:
+        if not IMAGE_SUPPORT_AVAILABLE:
+            return jsonify({"status": "error", "message": "Image support not available"}), 501
+        data = request.json or {}
+        image_path = data.get("image_path", "")
+        prompt = data.get("prompt", "Describe this image in detail.")
+        if not image_path:
+            return jsonify({"status": "error", "message": "image_path is required"}), 400
+        analyzer = image_support.get_image_analyzer()
+        success, analysis, provider = analyzer.analyze_with_fallback(image_path, prompt)
+        if success:
+            return jsonify({"status": "success", "analysis": analysis, "provider": provider}), 200
+        else:
+            return jsonify({"status": "error", "message": analysis}), 502
+    except Exception as e:
+        logger.error(f"Image analyze error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ Scheduled Tasks Endpoints ============
+
+@app.route('/api/scheduled/stats', methods=['GET'])
+def api_scheduled_stats():
+    """Get scheduled tasks statistics."""
+    try:
+        if not SCHEDULED_TASKS_AVAILABLE:
+            return jsonify({"status": "error", "message": "Scheduled tasks not available"}), 501
+        scheduler = scheduled_tasks.get_scheduler()
+        return jsonify({"status": "success", "scheduler_stats": scheduler.get_stats()}), 200
+    except Exception as e:
+        logger.error(f"Scheduled stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/scheduled/tasks', methods=['GET'])
+def api_scheduled_tasks_list():
+    """List all registered scheduled tasks."""
+    try:
+        if not SCHEDULED_TASKS_AVAILABLE:
+            return jsonify({"status": "error", "message": "Scheduled tasks not available"}), 501
+        scheduler = scheduled_tasks.get_scheduler()
+        tasks = [
+            {
+                "task_id": t.task_id,
+                "name": t.name,
+                "cron": t.cron_expression,
+                "description": t.description,
+                "enabled": t.enabled,
+                "run_count": t.run_count,
+                "last_run": t.last_run,
+                "next_run": t.next_run,
+                "message": t.message,
+                "builtin": t.builtin,
+            }
+            for t in scheduler.tasks.values()
+        ]
+        return jsonify({"status": "success", "tasks": tasks, "count": len(tasks)}), 200
+    except Exception as e:
+        logger.error(f"Scheduled tasks list error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/scheduled/tasks', methods=['POST'])
+def api_scheduled_tasks_create():
+    """Create a new scheduled task (nanobot-style: cron + message inviato all'agente).
+    JSON body: { "name": "...", "cron": "0 9 * * *", "message": "...", "description": "...", "enabled": true }
+    """
+    try:
+        if not SCHEDULED_TASKS_AVAILABLE:
+            return jsonify({"status": "error", "message": "Scheduled tasks not available"}), 501
+        data = request.json or {}
+        name = data.get("name", "").strip()
+        cron = data.get("cron", "").strip()
+        message = data.get("message", "").strip()
+        if not name or not cron or not message:
+            return jsonify({"status": "error", "message": "name, cron e message sono obbligatori"}), 400
+        task_id = data.get("task_id") or f"task_{uuid.uuid4().hex[:8]}"
+        scheduler = scheduled_tasks.get_scheduler()
+        if task_id in scheduler.tasks:
+            return jsonify({"status": "error", "message": f"Task '{task_id}' esiste già"}), 409
+        task = scheduler.add_message_task(
+            task_id=task_id, name=name, cron_expression=cron, message=message,
+            description=data.get("description", ""), enabled=data.get("enabled", True),
+        )
+        return jsonify({"status": "success", "task_id": task.task_id,
+                        "message": f"Task '{name}' creato ({cron})"}), 201
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
+    except Exception as e:
+        logger.error(f"Scheduled task create error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/scheduled/tasks/<task_id>', methods=['DELETE'])
+def api_scheduled_task_delete(task_id):
+    """Elimina un task pianificato (non built-in)."""
+    try:
+        if not SCHEDULED_TASKS_AVAILABLE:
+            return jsonify({"status": "error", "message": "Scheduled tasks not available"}), 501
+        scheduler = scheduled_tasks.get_scheduler()
+        t = scheduler.tasks.get(task_id)
+        if t and t.builtin:
+            return jsonify({"status": "error", "message": "Impossibile eliminare un task built-in"}), 403
+        ok = scheduler.remove_task(task_id)
+        if not ok:
+            return jsonify({"status": "error", "message": f"Task '{task_id}' non trovato"}), 404
+        return jsonify({"status": "success", "message": f"Task '{task_id}' eliminato"}), 200
+    except Exception as e:
+        logger.error(f"Scheduled task delete error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/scheduled/tasks/<task_id>/toggle', methods=['POST'])
+def api_scheduled_task_toggle(task_id):
+    """Enable or disable a scheduled task."""
+    try:
+        if not SCHEDULED_TASKS_AVAILABLE:
+            return jsonify({"status": "error", "message": "Scheduled tasks not available"}), 501
+        data = request.json or {}
+        enabled = data.get("enabled", True)
+        scheduler = scheduled_tasks.get_scheduler()
+        if task_id not in scheduler.tasks:
+            return jsonify({"status": "error", "message": f"Task '{task_id}' not found"}), 404
+        scheduler.tasks[task_id].enabled = enabled
+        scheduler.save_tasks()
+        action = "enabled" if enabled else "disabled"
+        return jsonify({"status": "success", "message": f"Task '{task_id}' {action}"}), 200
+    except Exception as e:
+        logger.error(f"Scheduled task toggle error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ Agent Discovery ============
+
+@app.route('/api/agents', methods=['GET'])
+def api_agents_list():
+    """List all available agents with their capabilities and endpoint info."""
+    agents = [
+        {
+            "id": "main",
+            "name": "Home Assistant AI",
+            "description": "Main AI agent: home automation, devices, automations, scripts, dashboards.",
+            "endpoint": "/api/chat",
+            "method": "POST",
+            "available": True,
+            "builtin": True,
+            "icon": "🏠",
+        },
+    ]
+    if SCHEDULER_AGENT_AVAILABLE:
+        agents.append({
+            "id": "scheduler",
+            "name": "SchedulerAgent",
+            "description": "Create, list, enable/disable and delete scheduled tasks using natural language.",
+            "endpoint": "/api/agent/scheduler",
+            "method": "POST",
+            "available": True,
+            "builtin": False,
+            "icon": "🗓️",
+            "extra_endpoints": {
+                "sessions": "GET /api/agent/scheduler/sessions",
+                "clear_session": "DELETE /api/agent/scheduler/session/<session_id>",
+            },
+        })
+    return jsonify({
+        "status": "success",
+        "agents": agents,
+        "count": len(agents),
+    }), 200
+
+
+# ============ SchedulerAgent Endpoints ============
+
+@app.route('/api/agent/scheduler', methods=['POST'])
+def api_scheduler_agent_chat():
+    """Chat con lo SchedulerAgent per creare/elencare/gestire task pianificati in linguaggio naturale.
+
+    JSON body: { "message": "...", "session_id": "..." (optional) }
+    """
+    try:
+        if not SCHEDULER_AGENT_AVAILABLE:
+            return jsonify({"status": "error", "message": "SchedulerAgent non disponibile"}), 501
+        data = request.json or {}
+        user_message = (data.get("message") or "").strip()
+        if not user_message:
+            return jsonify({"status": "error", "message": "Campo 'message' obbligatorio"}), 400
+        session_id = data.get("session_id") or "default"
+        reply = scheduler_agent.chat(user_message, session_id=session_id)
+        history = scheduler_agent.get_session_history(session_id)
+        # Conta solo i messaggi role=user/assistant (non tool_result)
+        msg_count = sum(
+            1 for m in history
+            if m.get("role") in ("user", "assistant") and isinstance(m.get("content"), str)
+        )
+        return jsonify({
+            "status": "success",
+            "reply": reply,
+            "session_id": session_id,
+            "message_count": len(history),
+        }), 200
+    except Exception as e:
+        logger.error(f"SchedulerAgent chat error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/agent/scheduler/sessions', methods=['GET'])
+def api_scheduler_agent_sessions():
+    """Elenca tutte le sessioni attive dello SchedulerAgent."""
+    try:
+        if not SCHEDULER_AGENT_AVAILABLE:
+            return jsonify({"status": "error", "message": "SchedulerAgent non disponibile"}), 501
+        sessions = scheduler_agent.list_sessions()
+        return jsonify({"status": "success", "sessions": sessions, "count": len(sessions)}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/agent/scheduler/session/<session_id>', methods=['DELETE'])
+def api_scheduler_agent_clear_session(session_id):
+    """Cancella la cronologia di una sessione SchedulerAgent."""
+    try:
+        if not SCHEDULER_AGENT_AVAILABLE:
+            return jsonify({"status": "error", "message": "SchedulerAgent non disponibile"}), 501
+        scheduler_agent.clear_session(session_id)
+        return jsonify({"status": "success", "message": f"Sessione '{session_id}' cancellata"}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ Voice Transcription Endpoints ============
+
+@app.route('/api/voice/stats', methods=['GET'])
+def api_voice_stats():
+    """Get voice transcription statistics."""
+    try:
+        if not VOICE_TRANSCRIPTION_AVAILABLE:
+            return jsonify({"status": "error", "message": "Voice transcription not available"}), 501
+        transcriber = voice_transcription.get_voice_transcriber()
+        return jsonify({"status": "success", "voice_stats": transcriber.get_stats()}), 200
+    except Exception as e:
+        logger.error(f"Voice stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/voice/transcribe', methods=['POST'])
+def api_voice_transcribe():
+    """Transcribe uploaded audio file to text (Groq Whisper → OpenAI → Google fallback).
+    
+    Multipart: audio file in field 'file'
+    """
+    try:
+        if not VOICE_TRANSCRIPTION_AVAILABLE:
+            return jsonify({"status": "error", "message": "Voice transcription not available"}), 501
+        if 'file' not in request.files:
+            return jsonify({"status": "error", "message": "No audio file in request (field: 'file')"}), 400
+        audio_file = request.files['file']
+        # Save to a temporary path
+        import tempfile, os as _os
+        suffix = _os.path.splitext(audio_file.filename or 'audio.wav')[1] or '.wav'
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            audio_file.save(tmp.name)
+            tmp_path = tmp.name
+        try:
+            transcriber = voice_transcription.get_voice_transcriber()
+            success, text, provider = transcriber.transcribe_with_fallback(tmp_path)
+        finally:
+            _os.unlink(tmp_path)
+        if success:
+            return jsonify({"status": "success", "text": text, "provider": provider}), 200
+        else:
+            return jsonify({"status": "error", "message": text}), 502
+    except Exception as e:
+        logger.error(f"Voice transcribe error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/voice/tts', methods=['POST'])
+def api_voice_tts():
+    """Convert text to speech (OpenAI → Google fallback).
+    
+    JSON body: { "text": "..." }
+    Returns: audio/mpeg binary or JSON error
+    """
+    try:
+        if not VOICE_TRANSCRIPTION_AVAILABLE:
+            return jsonify({"status": "error", "message": "Voice transcription not available"}), 501
+        data = request.json or {}
+        text = data.get("text", "")
+        if not text:
+            return jsonify({"status": "error", "message": "text is required"}), 400
+        tts = voice_transcription.get_text_to_speech()
+        success, audio_bytes = tts.speak_with_fallback(text)
+        if success and audio_bytes:
+            from flask import Response as FlaskResponse
+            return FlaskResponse(audio_bytes, mimetype="audio/mpeg")
+        else:
+            return jsonify({"status": "error", "message": "TTS failed — no provider available"}), 502
+    except Exception as e:
+        logger.error(f"Voice TTS error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============ Messaging Integration Endpoints ============
+
+@app.route('/api/messaging/stats', methods=['GET'])
+def api_messaging_stats():
+    """Get messaging system statistics."""
+    try:
+        from messaging import get_messaging_manager
+        mgr = get_messaging_manager()
+        stats = mgr.get_stats()
+        return jsonify({
+            "status": "success",
+            "messaging_stats": stats,
+        }), 200
+    except Exception as e:
+        logger.error(f"Messaging stats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+def _ai_banner() -> str:
+    """Return a short intro line showing the active AI provider and model."""
+    provider = AI_PROVIDER
+    model = get_active_model()
+    display = MODEL_DISPLAY_MAPPING.get(model, model)
+    # Use display name if it contains the provider prefix, else build one
+    if display and any(display.startswith(p) for p in ("Claude", "OpenAI", "Google", "GitHub", "NVIDIA", "Groq", "Mistral", "DeepSeek", "Ollama")):
+        label = display
+    else:
+        label = f"{provider.replace('_', ' ').title()} • {display or model}"
+    return f"🤖 Amira • {label}"
+
+
+def _strip_markdown_for_telegram(text: str) -> str:
+    """Strip Markdown formatting for plain-text Telegram messages."""
+    import re
+    # Headers → plain text
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+    # Bold/italic: **text**, *text*, __text__, _text_
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    text = re.sub(r'__(.+?)__', r'\1', text)
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
+    text = re.sub(r'_(.+?)_', r'\1', text)
+    # Inline code → plain
+    text = re.sub(r'`(.+?)`', r'\1', text)
+    # Fenced code blocks → keep content
+    text = re.sub(r'```[a-z]*\n?', '', text)
+    # Links [text](url) → text
+    text = re.sub(r'\[([^\]]+)\]\([^\)]+\)', r'\1', text)
+    # Horizontal rules
+    text = re.sub(r'^---+$', '', text, flags=re.MULTILINE)
+    return text.strip()
+
+
+@app.route('/api/telegram/message', methods=['POST'])
+def api_telegram_message():
+    """Process incoming Telegram message and return AI response."""
+    try:
+        data = request.get_json()
+        user_id = data.get("user_id")
+        chat_id = data.get("chat_id")
+        text = data.get("text", "").strip()
+        logger.info(f"Telegram API: message from user {user_id}: {text[:60]}")
+
+        if not text:
+            return jsonify({"status": "error", "message": "Empty message"}), 400
+
+        # Get AI response — session history is already managed by chat_with_ai
+        response_text = ""
+        try:
+            response_text = chat_with_ai(text, f"telegram_{user_id}")
+        except Exception as e:
+            logger.error(f"Telegram AI response error: {e}")
+            response_text = f"⚠️ Errore: {str(e)[:100]}"
+
+        # Strip Markdown so Telegram can send plain text without parse errors
+        response_text = _strip_markdown_for_telegram(response_text)
+
+        # Trim to Telegram's limit
+        response_text = response_text[:4096]
+
+        return jsonify({
+            "status": "success",
+            "response": response_text
+        }), 200
+    except Exception as e:
+        logger.error(f"Telegram message error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/messaging/chats', methods=['GET'])
+def api_messaging_chats():
+    """Get all messaging chats grouped by channel."""
+    try:
+        from messaging import get_messaging_manager
+        mgr = get_messaging_manager()
+        chats = mgr.get_all_chats()
+        return jsonify({
+            "status": "success",
+            "chats": chats
+        }), 200
+    except Exception as e:
+        logger.error(f"Get messaging chats error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/messaging/chat/<channel>/<user_id>', methods=['GET', 'DELETE'])
+def api_messaging_chat(channel, user_id):
+    """Get or delete chat history for a user."""
+    try:
+        from messaging import get_messaging_manager
+        mgr = get_messaging_manager()
+        
+        if request.method == 'GET':
+            history = mgr.get_chat_history(channel, user_id, limit=50)
+            return jsonify({
+                "status": "success",
+                "channel": channel,
+                "user_id": user_id,
+                "messages": history
+            }), 200
+        
+        elif request.method == 'DELETE':
+            mgr.clear_chat(channel, user_id)
+            return jsonify({
+                "status": "success",
+                "message": f"Chat {channel}:{user_id} cleared"
+            }), 200
+    except Exception as e:
+        logger.error(f"Chat endpoint error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/whatsapp/webhook', methods=['POST'])
+def api_whatsapp_webhook():
+    """Handle incoming WhatsApp messages via Twilio webhook."""
+    try:
+        from whatsapp_bot import get_whatsapp_bot
+        from messaging import get_messaging_manager
+        
+        # Get WhatsApp bot and manager
+        whatsapp = get_whatsapp_bot(
+            os.getenv("TWILIO_ACCOUNT_SID", ""),
+            os.getenv("TWILIO_AUTH_TOKEN", ""),
+            os.getenv("TWILIO_WHATSAPP_FROM", "")
+        )
+        
+        if not whatsapp or not whatsapp.enabled:
+            return jsonify({"status": "error", "message": "WhatsApp not configured"}), 501
+        
+        # Validate signature.
+        # Behind a reverse proxy (Nginx, Nabu Casa, ngrok) Flask rebuilds the
+        # URL from internal headers which may differ from the public URL that
+        # Twilio signed.  Reconstruct the public URL using X-Forwarded-* headers
+        # when available so the HMAC check uses the same string Twilio used.
+        signature = request.headers.get("X-Twilio-Signature", "")
+        fwd_proto = request.headers.get("X-Forwarded-Proto", "")
+        fwd_host  = request.headers.get("X-Forwarded-Host", "")
+        if fwd_proto and fwd_host:
+            public_url = (
+                f"{fwd_proto}://{fwd_host}"
+                f"{request.path}"
+                + (f"?{request.query_string.decode()}" if request.query_string else "")
+            )
+        else:
+            public_url = request.url
+        if not whatsapp.validate_webhook_signature(
+            public_url,
+            request.form.to_dict(),
+            signature,
+        ):
+            logger.warning(
+                f"WhatsApp webhook signature invalid (url tried: {public_url!r})"
+            )
+            return jsonify({"status": "error", "message": "Signature invalid"}), 403
+        
+        # Parse message
+        msg = whatsapp.parse_webhook(request.form.to_dict())
+        if not msg or not msg.get("text"):
+            # Likely a status update or media message, just acknowledge
+            return jsonify({"status": "ok"}), 200
+        
+        from_number = msg.get("from")
+        text = msg.get("text")
+        
+        logger.debug(f"WhatsApp message from {from_number}: {text[:50]}...")
+
+        # Check if first message BEFORE adding to history
+        mgr = get_messaging_manager()
+        is_first = len(mgr.get_chat_history("whatsapp", from_number, limit=1)) == 0
+
+        # Add to chat history
+        mgr.add_message("whatsapp", from_number, text, role="user")
+        
+        # Get history for context
+        history = mgr.get_chat_history("whatsapp", from_number, limit=5)
+        
+        # Build prompt
+        prompt_text = text
+        if history:
+            context = "\n".join([f"{m['role'].upper()}: {m['text']}" for m in history[-3:]])
+            prompt_text = f"Recent context:\n{context}\n\nNew message: {text}"
+        
+        # Get AI response using the active provider/model (same as web UI)
+        response_text = ""
+        try:
+            response_text = chat_with_ai(prompt_text, f"whatsapp_{from_number}")
+        except Exception as e:
+            logger.error(f"WhatsApp AI response error: {e}")
+            response_text = f"⚠️ Error: {str(e)[:100]}"
+
+        # Prepend AI banner on first message of this conversation
+        if is_first:
+            response_text = f"{_ai_banner()}\n\n{response_text}"
+
+        # Trim to WhatsApp limit (1600 chars)
+        response_text = response_text[:1600]
+        
+        # Save response and send
+        mgr.add_message("whatsapp", from_number, response_text, role="assistant")
+        whatsapp.send_message(from_number, response_text)
+        
+        # Return OK to Twilio (prevents retry)
+        return jsonify({"status": "ok"}), 200
+        
+    except Exception as e:
+        logger.error(f"WhatsApp webhook error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/system/features', methods=['GET'])
+def api_system_features():
+    """Get list of available advanced features."""
+    features = {
+        "mcp_support": MCP_AVAILABLE,
+        "fallback_chain": FALLBACK_AVAILABLE,
+        "semantic_cache": SEMANTIC_CACHE_AVAILABLE,
+        "tool_optimizer": TOOL_OPTIMIZER_AVAILABLE,
+        "quality_metrics": QUALITY_METRICS_AVAILABLE,
+        "prompt_caching": ANTHROPIC_PROMPT_CACHING if ANTHROPIC_PROMPT_CACHING else False,
+        "file_memory": MEMORY_AVAILABLE if MEMORY_AVAILABLE else False,
+        "image_support": IMAGE_SUPPORT_AVAILABLE,
+        "scheduled_tasks": SCHEDULED_TASKS_AVAILABLE,
+        "voice_transcription": VOICE_TRANSCRIPTION_AVAILABLE,
+        "scheduler_agent": SCHEDULER_AGENT_AVAILABLE,
+    }
+    
+    return jsonify({
+        "status": "success",
+        "features": features,
+        "enabled_count": sum(1 for v in features.values() if v),
+    }), 200
+
+
+@app.route('/api/mcp/conversations/<session_id>/messages', methods=['GET'])
 def api_conversation_messages(session_id):
     """Get all messages for a conversation session."""
     msgs = conversations.get(session_id, [])
@@ -3640,7 +5557,7 @@ def api_conversations_list():
 
 @app.route('/api/snapshots', methods=['GET'])
 def api_snapshots_list():
-    """List all file snapshots (backups) created by AI Assistant."""
+    """List all file snapshots (backups) created by Amira."""
     if not os.path.isdir(SNAPSHOTS_DIR):
         return jsonify({"snapshots": []}), 200
     
@@ -3682,6 +5599,43 @@ def api_snapshots_list():
     return jsonify({"snapshots": snapshots}), 200
 
 
+def _is_tool_call_artifact(content: str, msg: dict) -> bool:
+    """Return True if this assistant message content is a raw tool-call artifact
+    that should be hidden from the chat history UI.
+
+    This happens when:
+    - The message has a 'tool_calls' field (OpenAI format intermediate step)
+    - The content is JSON that looks like a tool-call dict serialised by default=str
+      e.g. '{"name": "get_current_time", "arguments": {}}'
+    - The content is a list-repr of Anthropic SDK content blocks (tool_use blocks)
+    - The content is a [TOOL RESULT: ...] block (internal context, not user-facing)
+    """
+    import re as _re
+    if msg.get("tool_calls"):
+        return True
+    if not content:
+        return False
+    stripped = content.strip()
+    # JSON dict with a "name" key and "arguments"/"input" key → tool call artifact
+    if stripped.startswith("{") and stripped.endswith("}"):
+        try:
+            obj = json.loads(stripped)
+            if isinstance(obj, dict) and "name" in obj and ("arguments" in obj or "input" in obj):
+                return True
+        except Exception:
+            pass
+    # Python repr of Anthropic SDK ToolUseBlock: ToolUseBlock(id=..., name=..., ...)
+    if "ToolUseBlock(" in stripped or "tool_use" in stripped[:30]:
+        return True
+    # List repr of content blocks (saved by default=str): "[ToolUseBlock(...)]"
+    if stripped.startswith("[") and "ToolUseBlock" in stripped:
+        return True
+    # Internal [TOOL RESULT: ...] blocks injected by tool_simulator
+    if stripped.startswith("[TOOL RESULT:") or stripped.startswith("[Called tools:"):
+        return True
+    return False
+
+
 @app.route('/api/conversations/<session_id>', methods=['GET'])
 def api_conversation_get(session_id):
     """Get a specific conversation session."""
@@ -3690,6 +5644,7 @@ def api_conversation_get(session_id):
         msgs = conversations.get(session_id, [])
         display_msgs = []
         for m in msgs:
+            role = m.get("role", "")
             content = m.get("content", "")
             # For multimodal messages, extract text content
             if isinstance(content, list):
@@ -3701,12 +5656,16 @@ def api_conversation_get(session_id):
                             text_parts.append(block.get("text", ""))
                         elif isinstance(block.get("text"), str):
                             text_parts.append(block["text"])
+                        # Skip tool_use / tool_result blocks — not user-facing
                 content = "\n".join(text_parts) if text_parts else ""
-            
-            if m.get("role") in ("user", "assistant") and isinstance(content, str) and content.strip():
-                msg_data = {"role": m["role"], "content": content}
+
+            if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                # Skip internal tool-call artifact messages
+                if role == "assistant" and _is_tool_call_artifact(content, m):
+                    continue
+                msg_data = {"role": role, "content": content}
                 # Include model/provider metadata for assistant messages
-                if m.get("role") == "assistant":
+                if role == "assistant":
                     if m.get("model"):
                         msg_data["model"] = m["model"]
                     if m.get("provider"):
@@ -3741,14 +5700,73 @@ def api_get_models():
             available_providers.append({"id": "nvidia", "name": "NVIDIA NIM"})
         if GITHUB_TOKEN:
             available_providers.append({"id": "github", "name": "GitHub Models"})
+        if GROQ_API_KEY:
+            available_providers.append({"id": "groq", "name": "Groq"})
+        if MISTRAL_API_KEY:
+            available_providers.append({"id": "mistral", "name": "Mistral"})
+        if OPENROUTER_API_KEY:
+            available_providers.append({"id": "openrouter", "name": "OpenRouter"})
+        if DEEPSEEK_API_KEY:
+            available_providers.append({"id": "deepseek", "name": "DeepSeek"})
+        if MINIMAX_API_KEY:
+            available_providers.append({"id": "minimax", "name": "MiniMax"})
+        if AIHUBMIX_API_KEY:
+            available_providers.append({"id": "aihubmix", "name": "AiHubMix"})
+        if SILICONFLOW_API_KEY:
+            available_providers.append({"id": "siliconflow", "name": "SiliconFlow"})
+        if VOLCENGINE_API_KEY:
+            available_providers.append({"id": "volcengine", "name": "VolcEngine"})
+        if DASHSCOPE_API_KEY:
+            available_providers.append({"id": "dashscope", "name": "DashScope (Qwen)"})
+        if MOONSHOT_API_KEY:
+            available_providers.append({"id": "moonshot", "name": "Moonshot (Kimi)"})
+        if ZHIPU_API_KEY:
+            available_providers.append({"id": "zhipu", "name": "Zhipu (GLM)"})
+        if PERPLEXITY_API_KEY:
+            available_providers.append({"id": "perplexity", "name": "Perplexity (Sonar)"})
+        if CUSTOM_API_BASE:
+            available_providers.append({"id": "custom", "name": "Custom Endpoint"})
+        # Ollama: sempre disponibile se ha un URL configurato (è locale)
+        if OLLAMA_BASE_URL:
+            available_providers.append({"id": "ollama", "name": "Ollama (Local)"})
+        # GitHub Copilot: sempre visibile nel selettore; il banner OAuth guida l'autenticazione
+        available_providers.append({"id": "github_copilot", "name": "GitHub Copilot"})
+        # OpenAI Codex: sempre visibile nel selettore; il banner OAuth guida l'autenticazione
+        available_providers.append({"id": "openai_codex", "name": "OpenAI Codex"})
+        # Provider web non ufficiali — sempre visibili; il token di sessione guida l'autenticazione
+        available_providers.append({"id": "claude_web", "name": "Claude.ai Web [UNSTABLE]"})
+        # chatgpt_web: in standby — Cloudflare blocca le richieste da server nel 2026
+        # available_providers.append({"id": "chatgpt_web", "name": "ChatGPT Web [UNSTABLE]"})
 
         # --- Tutti i modelli per provider (come li vuole la chat: display/prefissi) ---
         models_display = {}
         models_technical = {}
         nvidia_models_tested_display: list[str] = []
         nvidia_models_to_test_display: list[str] = []
+        
+        # Get list of configured providers (only those with API keys)
+        configured_providers = {p["id"] for p in available_providers}
+        
         for provider, models in PROVIDER_MODELS.items():
+            # ONLY include models for providers that have API keys configured
+            if provider not in configured_providers:
+                continue
+
             filtered_models = list(models)
+
+            # Live discovery for GitHub Copilot (models depend on subscription)
+            # Live discovery for GitHub Copilot: use cache only on regular loads.
+            # The full network discovery (token + /models) runs exclusively via
+            # the manual "Refresh models" button (api/refresh_models endpoint).
+            # This avoids automatic HTTP calls on every UI startup/reload.
+            if provider == "github_copilot":
+                try:
+                    from providers.github_copilot import get_copilot_models_cached
+                    live = get_copilot_models_cached()
+                    if live:
+                        filtered_models = live
+                except Exception as _e:
+                    logger.debug(f"Copilot model discovery skipped: {_e}")
 
             # Live discovery for NVIDIA (per-key availability)
             if provider == "nvidia":
@@ -3777,7 +5795,13 @@ def api_get_models():
 
         # --- Current model (sia tech che display) ---
         current_model_tech = get_active_model()
-        current_model_display = MODEL_DISPLAY_MAPPING.get(current_model_tech, current_model_tech)
+        # Use provider-specific display to avoid cross-provider collisions
+        # (e.g. "openai/gpt-4o" exists in both GitHub and OpenRouter with different display names)
+        current_model_display = (
+            PROVIDER_DISPLAY.get(AI_PROVIDER, {}).get(current_model_tech)
+            or MODEL_DISPLAY_MAPPING.get(current_model_tech)
+            or current_model_tech
+        )
 
         # --- Modelli del provider corrente (per HA settings: lista con flag current) ---
         provider_models = models_technical.get(AI_PROVIDER, PROVIDER_MODELS.get(AI_PROVIDER, []))
@@ -3813,6 +5837,86 @@ def api_get_models():
     except Exception as e:
         logger.error(f"api_get_models error: {e}")
         return jsonify({"success": False, "error": str(e), "models": {}, "available_providers": []}), 500
+
+
+@app.route('/api/refresh_models', methods=['POST'])
+def api_refresh_models():
+    """Fetch latest model lists from official provider APIs and update the cache.
+
+    Calls the /v1/models (or equivalent) endpoint for each configured provider,
+    filters out non-chat models, saves results to /data/amira_models_cache.json,
+    and updates the in-memory PROVIDER_MODELS dict so /api/get_models returns
+    the fresh lists immediately.
+    """
+    try:
+        from providers.model_fetcher import refresh_all_providers
+
+        provider_keys = {
+            "openai":      OPENAI_API_KEY,
+            "anthropic":   ANTHROPIC_API_KEY,
+            "google":      GOOGLE_API_KEY,
+            "groq":        GROQ_API_KEY,
+            "mistral":     MISTRAL_API_KEY,
+            "nvidia":      NVIDIA_API_KEY,
+            "deepseek":    DEEPSEEK_API_KEY,
+            "openrouter":  OPENROUTER_API_KEY,
+            "zhipu":       ZHIPU_API_KEY,
+            "siliconflow": SILICONFLOW_API_KEY,
+            "moonshot":    MOONSHOT_API_KEY,
+            "dashscope":   DASHSCOPE_API_KEY,
+            "minimax":     MINIMAX_API_KEY,
+            "aihubmix":    AIHUBMIX_API_KEY,
+            "volcengine":  VOLCENGINE_API_KEY,
+            "custom":      CUSTOM_API_KEY,
+            "ollama":      "",  # key-less, uses base URL
+        }
+        extra = {
+            "ollama_base_url": OLLAMA_BASE_URL,
+            "custom_api_base": CUSTOM_API_BASE,
+        }
+
+        results = refresh_all_providers(provider_keys, extra)
+
+        # Update in-memory model lists so the UI reflects the fresh data immediately
+        for provider, models in results["updated"].items():
+            PROVIDER_MODELS[provider] = models
+
+        # GitHub Copilot: full live discovery (token + /models) runs ONLY here,
+        # triggered by the manual refresh button — never on automatic get_models calls.
+        if os.path.exists("/data/oauth_copilot.json"):
+            try:
+                from providers.github_copilot import (
+                    _fetch_models_from_api,
+                    _get_copilot_session_token,
+                    _get_best_gh_token,
+                )
+                gh_tok = _get_best_gh_token(GITHUB_COPILOT_TOKEN)
+                if gh_tok:
+                    session_tok = _get_copilot_session_token(gh_tok)
+                    copilot_models = _fetch_models_from_api(session_tok)
+                    if copilot_models:
+                        PROVIDER_MODELS["github_copilot"] = copilot_models
+                        results["updated"]["github_copilot"] = copilot_models
+                        logger.info(f"refresh_models: github_copilot discovered {len(copilot_models)} models")
+            except Exception as _ce:
+                logger.debug(f"refresh_models: github_copilot discovery failed: {_ce}")
+                results["errors"]["github_copilot"] = str(_ce)
+
+        logger.info(
+            f"refresh_models: updated={list(results['updated'].keys())} "
+            f"errors={list(results['errors'].keys())} "
+            f"skipped={results['skipped']}"
+        )
+        return jsonify({
+            "success": True,
+            "updated": {p: len(m) for p, m in results["updated"].items()},
+            "errors":  results["errors"],
+            "skipped": results["skipped"],
+        }), 200
+
+    except Exception as e:
+        logger.error(f"refresh_models error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/snapshots/restore', methods=['POST'])
@@ -4650,6 +6754,222 @@ def rag_stats():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+# ---------------------------------------------------------------------------
+# OpenAI Codex OAuth flow endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/oauth/codex/start", methods=["GET"])
+def oauth_codex_start():
+    """Start the OpenAI Codex OAuth flow. Returns the authorization URL."""
+    try:
+        from providers.openai_codex import start_oauth_flow
+        authorize_url, state = start_oauth_flow()
+        return jsonify({"authorize_url": authorize_url, "state": state}), 200
+    except Exception as e:
+        logger.error(f"Codex OAuth start error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/oauth/codex/exchange", methods=["POST"])
+def oauth_codex_exchange():
+    """Exchange the redirect URL (or code) for an access token."""
+    try:
+        from providers.openai_codex import exchange_code
+        data = request.json or {}
+        redirect_url = data.get("redirect_url", "").strip()
+        state = data.get("state", "").strip()
+        if not redirect_url or not state:
+            return jsonify({"error": "Missing redirect_url or state"}), 400
+        token = exchange_code(redirect_url, state)
+        return jsonify({"ok": True, "account_id": token.get("account_id")}), 200
+    except Exception as e:
+        logger.error(f"Codex OAuth exchange error: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/oauth/codex/status", methods=["GET"])
+def oauth_codex_status():
+    """Return whether a valid Codex token is available."""
+    try:
+        from providers.openai_codex import get_token_status
+        return jsonify(get_token_status()), 200
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)}), 200
+
+
+@app.route("/api/oauth/codex/revoke", methods=["POST"])
+def oauth_codex_revoke():
+    """Delete the stored Codex OAuth token (logout)."""
+    try:
+        import providers.openai_codex as _codex_mod
+        _codex_mod._stored_token = None
+        token_file = _codex_mod._TOKEN_FILE
+        try:
+            import os as _os
+            if _os.path.exists(token_file):
+                _os.remove(token_file)
+        except Exception:
+            pass
+        logger.info("Codex: OAuth token revoked by user.")
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ---------------------------------------------------------------------------
+# GitHub Copilot Device Code OAuth flow endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/oauth/copilot/start", methods=["GET"])
+def oauth_copilot_start():
+    """Start the GitHub Device Code flow. Returns {user_code, verification_uri, interval}."""
+    try:
+        from providers.github_copilot import start_device_flow
+        result = start_device_flow()
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Copilot OAuth start error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/oauth/copilot/poll", methods=["GET"])
+def oauth_copilot_poll():
+    """Poll GitHub for the access token. Returns {status: pending|success|error}."""
+    try:
+        from providers.github_copilot import poll_device_flow
+        return jsonify(poll_device_flow()), 200
+    except Exception as e:
+        logger.error(f"Copilot OAuth poll error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/oauth/copilot/status", methods=["GET"])
+def oauth_copilot_status():
+    """Return whether a valid Copilot token is available."""
+    try:
+        from providers.github_copilot import get_token_status
+        return jsonify(get_token_status()), 200
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)}), 200
+
+
+
+# ---------------------------------------------------------------------------
+# Claude Web session endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/session/claude_web/store", methods=["POST"])
+def session_claude_web_store():
+    """Store a Claude.ai session key."""
+    try:
+        from providers.claude_web import store_session_key
+        data = request.json or {}
+        session_key = data.get("session_key", "").strip()
+        if not session_key:
+            return jsonify({"error": "Missing session_key"}), 400
+        result = store_session_key(session_key)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Claude Web session store error: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/session/claude_web/status", methods=["GET"])
+def session_claude_web_status():
+    """Return Claude Web session status."""
+    try:
+        from providers.claude_web import get_session_status
+        return jsonify(get_session_status()), 200
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)}), 200
+
+
+@app.route("/api/session/claude_web/clear", methods=["POST"])
+def session_claude_web_clear():
+    """Clear stored Claude Web session token."""
+    try:
+        from providers.claude_web import clear_session
+        clear_session()
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+# ---------------------------------------------------------------------------
+# ChatGPT Web session endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/session/chatgpt_web/store", methods=["POST"])
+def session_chatgpt_web_store():
+    """Store a ChatGPT Web access token."""
+    try:
+        from providers.chatgpt_web import store_access_token
+        data = request.json or {}
+        access_token = data.get("access_token", "").strip()
+        cf_clearance = data.get("cf_clearance", "").strip()
+        if not access_token:
+            return jsonify({"error": "Missing access_token"}), 400
+        result = store_access_token(access_token, cf_clearance=cf_clearance)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"ChatGPT Web session store error: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/session/chatgpt_web/status", methods=["GET"])
+def session_chatgpt_web_status():
+    """Return ChatGPT Web session status."""
+    try:
+        from providers.chatgpt_web import get_session_status
+        return jsonify(get_session_status()), 200
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)}), 200
+
+
+@app.route("/api/session/chatgpt_web/clear", methods=["POST"])
+def session_chatgpt_web_clear():
+    """Clear stored ChatGPT Web access token."""
+    try:
+        from providers.chatgpt_web import clear_session
+        clear_session()
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
+def start_messaging_bots() -> None:
+    """Initialize and start Telegram and WhatsApp bots if configured.
+    Called from server.py so it runs regardless of __name__.
+    """
+    # bashio::config returns the string "null" for unset optional fields
+    def _env(key: str) -> str:
+        v = os.getenv(key, "")
+        return "" if v in ("", "null", "none", "None", "NULL") else v
+
+    if MESSAGING_AVAILABLE:
+        try:
+            t_token = _env("TELEGRAM_BOT_TOKEN")
+            if t_token:
+                bot = telegram_bot.get_telegram_bot(t_token)
+                if bot:
+                    bot.start()
+                    logger.info("✅ Telegram bot started")
+            else:
+                logger.info("Telegram bot not configured (no token)")
+        except Exception as e:
+            logger.warning(f"⚠️ Telegram bot initialization error: {e}")
+
+        try:
+            wa_sid   = _env("TWILIO_ACCOUNT_SID")
+            wa_token = _env("TWILIO_AUTH_TOKEN")
+            wa_from  = _env("TWILIO_WHATSAPP_FROM")
+            if wa_sid and wa_token and wa_from:
+                whatsapp_bot.get_whatsapp_bot(wa_sid, wa_token, wa_from)
+                logger.info("✅ WhatsApp bot initialized (webhook mode)")
+            else:
+                logger.info("WhatsApp bot not configured (no Twilio credentials)")
+        except Exception as e:
+            logger.warning(f"⚠️ WhatsApp bot initialization error: {e}")
+
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Endpoint not found"}), 404
@@ -4661,11 +6981,175 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 
+def initialize_mcp() -> None:
+    """Initialize MCP servers from config. Called by server.py at startup."""
+    if not MCP_AVAILABLE:
+        logger.debug("MCP support not available")
+        return
+
+    try:
+        mcp_config = None
+
+        # Priority 1: MCP_SERVERS environment variable (JSON string, set by run script)
+        mcp_env = os.getenv("MCP_SERVERS", "").strip()
+        if mcp_env and mcp_env != "{}":
+            try:
+                mcp_config = json.loads(mcp_env)
+                logger.info("🔌 MCP: config loaded from MCP_SERVERS env var")
+            except json.JSONDecodeError as e:
+                logger.warning(f"⚠️ MCP_SERVERS env var is invalid JSON: {e}")
+
+        # Priority 2: /config/amira/mcp_config.json (user-editable file on HA)
+        if not mcp_config:
+            mcp_json_path = "/config/amira/mcp_config.json"
+            if os.path.isfile(mcp_json_path):
+                try:
+                    with open(mcp_json_path, encoding="utf-8") as f:
+                        mcp_config = json.load(f)
+                    logger.info(f"🔌 MCP: config loaded from {mcp_json_path}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Failed to read {mcp_json_path}: {e}")
+
+        # Priority 3: config.yaml mcp_servers field (legacy / fallback)
+        if not mcp_config:
+            try:
+                import yaml
+                config_path = os.path.join(os.path.dirname(__file__), "config.yaml")
+                with open(config_path, encoding="utf-8") as f:
+                    config_data = yaml.safe_load(f) or {}
+                yaml_mcp = config_data.get("mcp_servers", {})
+                if yaml_mcp and yaml_mcp != "{}":
+                    mcp_config = json.loads(yaml_mcp) if isinstance(yaml_mcp, str) else yaml_mcp
+                    if mcp_config:
+                        logger.info("🔌 MCP: config loaded from config.yaml")
+            except Exception as e:
+                logger.debug(f"MCP config.yaml fallback skipped: {e}")
+
+        # Initialize servers
+        if mcp_config and isinstance(mcp_config, dict) and mcp_config:
+            connected = mcp.initialize_mcp_servers(mcp_config)
+            logger.info(f"🔌 MCP: Initialized {connected} server(s)")
+        else:
+            logger.debug("MCP servers not configured (no mcp_config.json or MCP_SERVERS env var)")
+    except Exception as e:
+        logger.warning(f"⚠️ MCP initialization error: {e}")
+
+
 if __name__ == "__main__":
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
     logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
     # get_ha_token() è già definita sopra, quindi qui è sicuro
     logger.info(f"HA Token: {'available' if get_ha_token() else 'NOT available'}")
+    
+    # Log memory system status
+    if MEMORY_AVAILABLE:
+        try:
+            file_cache = memory.get_config_file_cache()
+            logger.info("✨ File memory cache (Layer 2) initialized for config_edit")
+        except Exception as e:
+            logger.warning(f"File memory cache initialization: {e}")
+    
+    # Log prompt caching status
+    if ANTHROPIC_PROMPT_CACHING:
+        logger.info("💾 Anthropic prompt caching ENABLED for config_edit (ephemeral)")
+    else:
+        logger.debug("Anthropic prompt caching disabled")
+
+    # MCP initialization is handled by initialize_mcp() called from server.py
+    pass
+
+    # Initialize fallback chain if available
+    if FALLBACK_AVAILABLE:
+        try:
+            provider_order = [AI_PROVIDER]  # Primary provider
+            available_providers = []
+            if ANTHROPIC_API_KEY:
+                available_providers.append("anthropic")
+            if OPENAI_API_KEY:
+                available_providers.append("openai")
+            if GOOGLE_API_KEY:
+                available_providers.append("google")
+            if GITHUB_TOKEN:
+                available_providers.append("github")
+            if NVIDIA_API_KEY:
+                available_providers.append("nvidia")
+            
+            if available_providers:
+                fallback.initialize_fallback_chain(available_providers[:3])
+                logger.info(f"🔄 Fallback chain: {' → '.join(available_providers[:3])}")
+        except Exception as e:
+            logger.warning(f"Fallback chain initialization: {e}")
+    
+    # Initialize semantic cache if available
+    if SEMANTIC_CACHE_AVAILABLE:
+        try:
+            semantic_cache.initialize_semantic_cache(max_entries=100, threshold=0.85)
+            logger.info("💾 Semantic cache initialized (threshold: 85%)")
+        except Exception as e:
+            logger.warning(f"Semantic cache initialization: {e}")
+    
+    # Initialize quality metrics if available
+    if QUALITY_METRICS_AVAILABLE:
+        logger.info("📊 Response quality metrics initialized")
+
+    # Initialize image support if available
+    if IMAGE_SUPPORT_AVAILABLE:
+        try:
+            image_support.initialize_image_analyzer()
+            logger.info("🖼 Image analyzer (vision) initialized")
+        except Exception as e:
+            logger.warning(f"Image support initialization: {e}")
+
+    # Initialize scheduled tasks if available
+    if SCHEDULED_TASKS_AVAILABLE:
+        try:
+            def _scheduled_message_callback(task_id: str, message: str):
+                try:
+                    port = int(os.getenv("PORT", 7766))
+                    requests.post(
+                        f"http://127.0.0.1:{port}/api/chat",
+                        json={"message": message, "session_id": f"cron_{task_id}", "stream": False},
+                        timeout=60,
+                    )
+                except Exception as _e:
+                    logger.warning(f"Scheduled task message delivery failed: {_e}")
+
+            scheduler = scheduled_tasks.initialize_scheduler(
+                check_interval=60,
+                message_callback=_scheduled_message_callback,
+            )
+
+            if MEMORY_AVAILABLE:
+                def _memory_trim():
+                    try:
+                        history_file = getattr(memory, 'HISTORY_FILE', None)
+                        if history_file and os.path.exists(history_file):
+                            with open(history_file, encoding="utf-8") as f:
+                                lines = f.readlines()
+                            if len(lines) > 500:
+                                with open(history_file, "w", encoding="utf-8") as f:
+                                    f.writelines(lines[-500:])
+                                logger.info("✂️ HISTORY.md trimmed to last 500 lines")
+                    except Exception as _e:
+                        logger.warning(f"Memory trim failed: {_e}")
+
+                scheduler.register_task(
+                    "memory_trim", "Trim HISTORY.md", "0 0 * * *", _memory_trim,
+                    description="Mantiene HISTORY.md sotto 500 righe (esegue a mezzanotte)",
+                    builtin=True,
+                )
+
+            logger.info("⏰ Task scheduler initialized")
+        except Exception as e:
+            logger.warning(f"Scheduled tasks initialization: {e}")
+
+    # Initialize voice transcription if available
+    if VOICE_TRANSCRIPTION_AVAILABLE:
+        try:
+            voice_transcription.initialize_voice_system()
+            logger.info("🎙 Voice transcription (Whisper) initialized")
+        except Exception as e:
+            logger.warning(f"Voice transcription initialization: {e}")
 
     # Validate provider/model compatibility
     is_valid, error_msg = validate_model_provider_compatibility()
@@ -4711,7 +7195,9 @@ if __name__ == "__main__":
                     for fname in os.listdir(d):
                         if fname.endswith(".html"):
                             html_names.add(fname.replace(".html", ""))
-
+                    for fname in os.listdir(d):
+                        if fname.endswith(".html"):
+                            html_names.add(fname.replace(".html", ""))
             if not html_names:
                 return
 
@@ -4723,6 +7209,16 @@ if __name__ == "__main__":
             fixed = 0
             for dash in ws_dashboards:
                 url_path = dash.get("url_path", "")
+                if url_path not in html_names:
+                    continue
+
+                try:
+                    config = call_ha_websocket("lovelace/config", url_path=url_path)
+                    if isinstance(config, dict) and "result" in config:
+                        config = config["result"]
+                except Exception:
+                    continue
+
                 if url_path not in html_names:
                     continue
 
@@ -4768,6 +7264,9 @@ if __name__ == "__main__":
             logger.warning(f"⚠️ Dashboard migration error: {e}")
 
     migrate_html_dashboards()
+
+    # Initialize messaging bots (Telegram + WhatsApp)
+    start_messaging_bots()
 
     # Use Waitress production WSGI server instead of Flask development server
     from waitress import serve

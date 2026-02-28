@@ -16,11 +16,11 @@ Don't forget to follow me on social media:
 [![Instagram](https://img.shields.io/badge/Follow_Instagram-%23E1306C?style=for-the-badge&logo=instagram&logoColor=white)](https://www.instagram.com/silviosmartalexa)
 
 [![YouTube](https://img.shields.io/badge/Subscribe_YouTube-%23FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@silviosmartalexa)
-# 🏠🤖 AI Assistant for Home Assistant
+# 🏠🤖 Amira Ai Assistant
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
-Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM (free Kimi K2.5), and GitHub Models (GPT, Llama, Mistral, DeepSeek, Grok, Phi, Cohere and more).
+Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot (OAuth), OpenAI Codex (OAuth), Groq, Mistral, DeepSeek, Ollama and more. Chat via **Telegram** or **WhatsApp** in addition to the built-in web UI.
 
 [![GitHub Release](https://img.shields.io/github/v/release/Bobsilvio/ha-claude)](https://github.com/Bobsilvio/ha-claude/releases)
 [![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm%20NC%201.0-blue)](LICENSE)
@@ -83,6 +83,12 @@ Supports **5 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google
 - **Config UI Translations**: Settings labels and descriptions in all 4 languages (v3.0.2)
 - **Fully Localized**: Complete multilingual experience
 
+### 📱 Messaging Integration
+- **Telegram Bot**: Long polling — no public IP needed, works out of the box
+- **WhatsApp**: Twilio integration with webhook support
+- **Context Aware**: Full conversation history per user per channel
+- **Multi-channel**: Use both simultaneously
+
 ### 🛠️ Dashboard Creation
 - **Lovelace Dashboards**: Create custom dashboards with cards
 - **HTML Dashboards**: AI-generated Vue 3 interactive dashboards with real-time data
@@ -115,7 +121,7 @@ In Home Assistant:
 ### 2️⃣ Install Add-on
 
 1. Open **Add-on Store**
-2. Search for **"AI Assistant"**
+2. Search for **"Amira"**
 3. Click **Install**
 
 ### 3️⃣ Configure
@@ -125,126 +131,90 @@ In Home Assistant:
 3. (Optional) Select **Language**: en, it, es, or fr
 4. (Optional) Enable **File Access** to allow config file operations
 5. **Save** and **Start** the addon
-6. Open **AI Assistant** from the sidebar and pick an **agent/model** from the top dropdown (your choice is saved automatically)
+6. Open **Amira** from the sidebar and pick an **agent/model** from the top dropdown (your choice is saved automatically)
 
 ### 4️⃣ Access
 
-Click **"AI Assistant"** in the Home Assistant sidebar!
+Click **"Amira"** in the Home Assistant sidebar!
 
 ---
 
 ## 🔑 Provider Setup
 
-### 🟠 GitHub Models (Recommended - Free tier)
+| Provider | Get Key | Free? |
+|----------|---------|-------|
+| 🟠 GitHub Models | [github.com/settings/tokens](https://github.com/settings/tokens) | ✅ Rate limited |
+| 🟣 Anthropic Claude | [console.anthropic.com](https://console.anthropic.com) | ❌ ~$1-5/mo typical |
+| 🟢 OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | ❌ ~$1-3/mo typical |
+| 🔵 Google Gemini | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | ✅ 1500 req/day |
+| 🟩 NVIDIA NIM | [build.nvidia.com](https://build.nvidia.com) | ✅ Unlimited |
+| ⚡ Groq | [console.groq.com](https://console.groq.com) | ✅ Unlimited |
+| 🌐 OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) | ❌ Pay per use |
+| + 12 more | See [SETUP_HA.md](SETUP_HA.md) | — |
 
-> **40+ models** with one token. Includes GPT-4o, Llama, Mistral, DeepSeek, Grok, Phi, Cohere. **Free tier** available with rate limits.
->
-> ⚠️ **Note:** GitHub Models is free but has usage limits (requests per minute/hour/day). If you see a *"budget limit"* or *"403 Forbidden"* error, your account's spending limit has been reached — check [github.com/settings/billing](https://github.com/settings/billing) → *Spending limits*. Models marked as "preview" may be unavailable or return 404 — use **GPT-4o** or **Llama** as reliable alternatives.
-
-**Get Token:**
-1. Go to https://github.com/settings/tokens
-2. Click **"Generate new token"** → **"Fine-grained token"**
-3. Name: `HA AI Assistant`
-4. Expiration: choose duration
-5. **No special permissions needed**
-6. Click **"Generate token"**
-7. **Copy token** (starts with `github_pat_...`)
-
-**Configure Addon:**
-1. Paste the **GitHub Token** in the add-on configuration
-2. In the chat UI, select **GitHub Models** and choose a model from the dropdown
+→ Step-by-step key creation guide: [SETUP_HA.md](SETUP_HA.md)
 
 ---
 
-### 🟣 Anthropic Claude
+## 🔑 GitHub Copilot & OpenAI Codex (OAuth)
 
-> Claude Sonnet 4, Opus 4, Haiku 4. Excellent reasoning and analysis.
+These providers use **OAuth authentication** — no API key to paste, just a one-time login.
 
-**Get API Key:**
-1. Go to https://console.anthropic.com/
-2. Create account or sign in
-3. Go to **"API Keys"**
-4. Click **"Create Key"**
-5. Copy key (starts with `sk-ant-...`)
-6. **Add credit**: Billing → Add funds (minimum $5)
+### GitHub Copilot
+Requires an active **GitHub Copilot subscription** (Individual, Business, or Enterprise).
 
-**Pricing (pay-per-use):**
-- Claude Haiku 4: ~$0.25/1M input tokens
-- Claude Sonnet 4: ~$3/1M input tokens
-- Typical home use: **$1-5/month**
+1. Select **GitHub Copilot** from the model dropdown in Amira
+2. A blue banner **"GitHub Copilot requires authentication"** appears → click **Connect GitHub Copilot**
+3. A code like `ABCD-1234` is shown → open [github.com/login/device](https://github.com/login/device) and enter it
+4. Authorize the app on GitHub → the addon polls automatically and confirms ✔ Connected
+5. Token is saved persistently in `/data/oauth_copilot.json`
 
-**Configure Addon:**
-1. Paste the **Anthropic API Key** in the add-on configuration
-2. In the chat UI, select **Anthropic** and choose a model from the dropdown
+Available models: `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`, `claude-3.7-sonnet`, `gemini-2.0-flash`, and more.
 
----
+### OpenAI Codex
+Requires **ChatGPT Plus or Pro**.
 
-### 🟢 OpenAI (ChatGPT)
+1. Select **OpenAI Codex** from the model dropdown
+2. Click **Connect OpenAI Codex** in the yellow banner
+3. A browser tab opens to OpenAI login → after login, copy the full redirect URL and paste it in the Amira modal
+4. Token saved in `/data/oauth_codex.json` and auto-refreshed
 
-> GPT-4o, GPT-4o-mini. Industry standard.
-
-**Get API Key:**
-1. Go to https://platform.openai.com/
-2. Create account or sign in
-3. Go to **API Keys** → https://platform.openai.com/api-keys
-4. Click **"Create new secret key"**
-5. Copy key (starts with `sk-...`)
-6. **Add credit**: Billing → Add to credit balance (minimum $5)
-
-⚠️ **Note**: OpenAI API is **separate** from ChatGPT Plus subscription.
-
-**Pricing:**
-- GPT-4o-mini: ~$0.15/1M input tokens
-- GPT-4o: ~$2.50/1M input tokens
-- Typical home use: **$1-3/month** with GPT-4o-mini
-
-**Configure Addon:**
-1. Paste the **OpenAI API Key** in the add-on configuration
-2. In the chat UI, select **OpenAI** and choose a model from the dropdown
+Available models: `o4-mini`, `o3`, `o3-mini`, `gpt-4.5`, `o1`.
 
 ---
 
-### 🔵 Google Gemini
+## 📱 Telegram & WhatsApp
 
-> Gemini 2.0 Flash, Gemini 2.5 Pro. Generous free tier.
+Amira supports **Telegram** (long polling, no public IP needed) and **WhatsApp** (via Twilio webhook).
 
-**Get API Key:**
-1. Go to https://aistudio.google.com/apikey
-2. Sign in with Google account
-3. Click **"Create API Key"**
-4. Select or create Google Cloud project
-5. Copy API key
+### Telegram (quick setup)
+1. Open Telegram → **@BotFather** → `/newbot` → get your token
+2. In addon **Configuration**:
+   ```
+   telegram_bot_token: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+   ```
+3. Save & Restart — message your bot and it replies with Amira AI responses
 
-**Free Tier:** 15 RPM, 1M TPM, 1500 requests/day — **completely free!**
+### WhatsApp via Twilio (requires public URL)
+1. Sign up at [twilio.com](https://twilio.com) → get **Account SID**, **Auth Token**, and a WhatsApp Sandbox number
+2. In addon **Configuration**:
+   ```
+   twilio_account_sid: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   twilio_auth_token:  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+   twilio_whatsapp_from: +14155238886
+   ```
+3. In Twilio Console (Messaging → Try it out → Send a WhatsApp message → **Sandbox settings**) set:
+   - **"When a message comes in"** → `http://YOUR-HA-IP:5010/api/whatsapp/webhook`
+   - Method: **HTTP POST**
+4. Open port **5010** on your router (Port Forwarding → TCP → your HA IP)
+5. Save & Restart the addon
+6. Send `join <your-sandbox-code>` from WhatsApp to the Twilio number to join the Sandbox
 
-**Configure Addon:**
-1. Paste the **Google API Key** in the add-on configuration
-2. In the chat UI, select **Google** and choose a model from the dropdown
+> ⚠️ Amira listens on port **5010** directly — the URL must include `:5010/api/whatsapp/webhook`.
+> Using `https://ha.yourdomain.eu/api/whatsapp/webhook` (port 443) gives a **404** because that
+> hits the HA frontend, not Amira. See the full guide for Nginx reverse proxy alternative.
 
----
-
-### 🟩 NVIDIA NIM
-
-> OpenAI-compatible API via NVIDIA NIM.
-
-**Get API Key:**
-- Create an API key in NVIDIA's developer portal for NIM.
-
-**Configure Addon:**
-1. Paste the **NVIDIA API Key** in the add-on configuration
-2. In the chat UI, select **NVIDIA NIM** and choose a model from the dropdown
-
----
-
-## 🏆 Which Provider to Choose?
-
-| Use Case | Recommended |
-|----------|-------------|
-| **Free, no credit card** | 🟠 GitHub Models or 🔵 Google Gemini |
-| **Best quality** | 🟣 Anthropic Claude Sonnet 4 |
-| **Most models (40+)** | 🟠 GitHub Models |
-| **Low cost, high usage** | 🟢 OpenAI GPT-4o-mini |
-| **Open-source models** | 🟠 GitHub Models (Llama, Mistral) |
+→ **Full setup guide (italiano/english):** [docs/WHATSAPP.md](docs/WHATSAPP.md)
 
 ---
 
@@ -281,7 +251,7 @@ When **Enable File Access** is enabled, the AI can:
 **Safety features:**
 - Automatic backup before any modification
 - Read-only by default (disabled)
-- Snapshots stored in `/config/.storage/claude_snapshots/`
+- Snapshots stored in `/config/amira/snapshots/`
 - Restore or delete backups from the UI
 - Per-file snapshot limits (configurable, default 5 per file)
 
@@ -292,158 +262,64 @@ When **Enable File Access** is enabled, the AI can:
 
 ---
 
-## 💡 Usage Examples
+## � Data Storage
 
-The AI assistant uses keyword-based intent detection to route your request to the right tools. Below are example phrases that work well, in all supported languages.
+All persistent data is stored in **`/config/amira/`** — one folder, easy to backup or inspect.
 
-### Device Control
+```
+/config/amira/
+├── conversations.json        # Chat history
+├── runtime_selection.json    # Last selected model/provider
+├── snapshots/                # Config file backups (before edits)
+├── mcp_config.json           # MCP servers (create manually)
+└── memory/
+    ├── MEMORY.md             # Long-term facts (always in context)
+    └── HISTORY.md            # Session log (append-only)
+```
 
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Accendi le luci del soggiorno"* / *"Spegni il climatizzatore"* |
-| 🇬🇧 EN | *"Turn on the living room lights"* / *"Set thermostat to 22 degrees"* |
-| 🇪🇸 ES | *"Enciende las luces del salón"* / *"Apaga el aire acondicionado"* |
-| 🇫🇷 FR | *"Allume les lumières du salon"* / *"Éteins la climatisation"* |
-
-### Query State
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Qual è lo stato della temperatura in camera?"* / *"Quanta energia produce il fotovoltaico?"* |
-| 🇬🇧 EN | *"What is the temperature in the bedroom?"* / *"How much power is the solar producing?"* |
-| 🇪🇸 ES | *"¿Cuál es la temperatura del dormitorio?"* / *"¿Cuánta energía produce el solar?"* |
-| 🇫🇷 FR | *"Quel est l'état de la température dans la chambre?"* / *"Combien d'énergie produit le solaire?"* |
-
-### Create Automation
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Crea un'automazione che accende le luci al tramonto"* / *"Fammi una nuova automazione per la sera"* |
-| 🇬🇧 EN | *"Create an automation that turns on lights at sunset"* / *"Make a new automation for the morning routine"* |
-| 🇪🇸 ES | *"Crea una automatización que encienda las luces al atardecer"* / *"Haz una nueva automatización para la mañana"* |
-| 🇫🇷 FR | *"Crée une automatisation qui allume les lumières au coucher du soleil"* / *"Fais une nouvelle automatisation pour le matin"* |
-
-### Modify Automation
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Modifica l'automazione delle luci del corridoio"* / *"Cambia l'orario dell'automazione serale"* |
-| 🇬🇧 EN | *"Modify the hallway lights automation"* / *"Change the schedule of the evening automation"* |
-| 🇪🇸 ES | *"Modifica la automatización de las luces del pasillo"* / *"Cambia el horario de la automatización nocturna"* |
-| 🇫🇷 FR | *"Modifie l'automatisation des lumières du couloir"* / *"Change l'horaire de l'automatisation du soir"* |
-
-### Create Dashboard (Lovelace)
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Crea una dashboard per l'energia solare"* / *"Fammi un pannello con i sensori di temperatura"* |
-| 🇬🇧 EN | *"Create a dashboard for the living room lights"* / *"Build a panel with all temperature sensors"* |
-| 🇪🇸 ES | *"Crea un dashboard para la energía solar"* / *"Haz un tablero con los sensores de temperatura"* |
-| 🇫🇷 FR | *"Crée un dashboard pour l'énergie solaire"* / *"Fais un tableau de bord avec les capteurs de température"* |
-
-### Create HTML Dashboard (Interactive)
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Crea una dashboard HTML interattiva per il fotovoltaico"* / *"Fammi un pannello web live con i dati energia"* |
-| 🇬🇧 EN | *"Create an interactive HTML dashboard for solar monitoring"* / *"Build a responsive web app for energy data"* |
-| 🇪🇸 ES | *"Crea un dashboard HTML interactivo para el solar"* / *"Haz una app web responsive con datos de energía"* |
-| 🇫🇷 FR | *"Crée un dashboard HTML interactif pour le solaire"* / *"Fais une app web responsive avec les données d'énergie"* |
-
-### History & Statistics
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Mostrami lo storico della temperatura di ieri"* / *"Qual è la media dei consumi dell'ultima settimana?"* |
-| 🇬🇧 EN | *"Show me the temperature history from yesterday"* / *"What's the average consumption over the last week?"* |
-| 🇪🇸 ES | *"Muéstrame el historial de temperatura de ayer"* / *"¿Cuál es la media de consumo de la última semana?"* |
-| 🇫🇷 FR | *"Montre-moi l'historique de température d'hier"* / *"Quelle est la moyenne de consommation de la semaine dernière?"* |
-
-### Scripts
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Crea uno script che accende tutte le luci"* / *"Esegui lo script della routine mattutina"* |
-| 🇬🇧 EN | *"Create a script that turns on all lights"* / *"Run the morning routine script"* |
-| 🇪🇸 ES | *"Crea un script que encienda todas las luces"* / *"Ejecuta la rutina de la mañana"* |
-| 🇫🇷 FR | *"Crée un script qui allume toutes les lumières"* / *"Lance le script de la routine du matin"* |
-
-### Helpers
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Crea un helper input_boolean per la modalità vacanza"* / *"Mostra tutti gli helper"* |
-| 🇬🇧 EN | *"Create an input_boolean helper for vacation mode"* / *"List all helpers"* |
-| 🇪🇸 ES | *"Crea un helper input_boolean para el modo vacaciones"* / *"Muestra todos los helpers"* |
-| 🇫🇷 FR | *"Crée un helper input_boolean pour le mode vacances"* / *"Affiche tous les helpers"* |
-
-### Repairs & Diagnostics
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Ci sono riparazioni o problemi?"* / *"Mostrami la salute del sistema"* |
-| 🇬🇧 EN | *"Are there any repairs or issues?"* / *"Show me the system health"* |
-| 🇪🇸 ES | *"¿Hay reparaciones o problemas?"* / *"Muéstrame la salud del sistema"* |
-| 🇫🇷 FR | *"Y a-t-il des réparations ou problèmes?"* / *"Montre-moi la santé du système"* |
-
-### Delete
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Elimina l'automazione 'vecchia routine'"* / *"Cancella la dashboard energia"* |
-| 🇬🇧 EN | *"Delete the automation 'old routine'"* / *"Remove the energy dashboard"* |
-| 🇪🇸 ES | *"Elimina la automatización 'rutina vieja'"* / *"Borra el dashboard de energía"* |
-| 🇫🇷 FR | *"Supprime l'automatisation 'ancienne routine'"* / *"Efface le dashboard énergie"* |
-
-### Configuration Files *(requires File Access enabled)*
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *"Mostrami il file configuration.yaml"* / *"Elenca i file nella cartella config"* |
-| 🇬🇧 EN | *"Show me the configuration.yaml file"* / *"List files in the config folder"* |
-| 🇪🇸 ES | *"Muéstrame el archivo configuration.yaml"* / *"Lista los archivos en la carpeta config"* |
-| 🇫🇷 FR | *"Montre-moi le fichier configuration.yaml"* / *"Liste les fichiers dans le dossier config"* |
-
-### Vision / Image Upload
-
-| Language | Example |
-|----------|---------|
-| 🇮🇹 IT | *📸 Carica un'immagine, poi chiedi: "Ricrea queste card per i miei sensori"* |
-| 🇬🇧 EN | *📸 Upload an image, then ask: "Recreate these cards for my sensors"* |
-| 🇪🇸 ES | *📸 Sube una imagen, luego pregunta: "Recrea estas tarjetas para mis sensores"* |
-| 🇫🇷 FR | *📸 Télécharge une image, puis demande: "Recrée ces cartes pour mes capteurs"* |
+> Files from older versions (`/config/.storage/claude_*`) are migrated automatically on first start.
 
 ---
 
-## 🎨 YAML Diff Display
+## 🧠 Memory
 
-When modifying configs, the AI shows **before/after** with diff markers:
+When `enable_memory: true`, Amira uses a two-file system:
 
-**Before:**
-```yaml
-- conditions: []
+- **`MEMORY.md`** — Injected once in every session. Write here what the AI should always know.
+- **`HISTORY.md`** — Automatic, append-only log of past sessions. Never auto-injected.
+
+```bash
+# SSH into HA, then:
+nano /config/amira/memory/MEMORY.md
 ```
 
-**After:**
-```yaml
-+ conditions:
-+   - condition: state
-+     entity_id: binary_sensor.presence
-+     state: "on"
-```
+No per-message keyword search, no cross-session contamination. Token-efficient.
 
-✅ Clear visualization of changes
-✅ Only shows modified sections
-✅ Easy to review before applying
+→ Full detail: [addons/claude-backend/README.md](addons/claude-backend/README.md)
+
+---
+
+## 💡 Usage Examples
+
+Just talk naturally — Amira understands intent in English, Italian, Spanish and French:
+
+- *"Turn on the living room lights"* / *"Accendi le luci del soggiorno"*
+- *"Create an automation that turns lights off at midnight"*
+- *"Show me the temperature history from yesterday"*
+- *"Add a condition to the morning routine automation"*
+- *"Create an HTML dashboard for my solar panels"*
+- 📸 *Upload an image* → *"Recreate these cards for my sensors"*
+
+→ Full multilingual example list: [DOCS.md](DOCS.md)
 
 ---
 
 ## 💬 Chat History
 
 - **Persistent**: Conversations survive addon restarts
-- **Last 10**: Keep your 10 most recent conversations
+- **Configurable depth**: Keep last N chats (default 10)
 - **Switchable**: Click any conversation to reload it
-- **Storage**: Saved in `/config/.storage/claude_conversations.json`
+- **Storage**: `/config/amira/conversations.json`
 
 ---
 
@@ -464,7 +340,7 @@ When modifying configs, the AI shows **before/after** with diff markers:
 
 ## 🆘 Troubleshooting
 
-### AI Assistant not in sidebar
+### Amira not in sidebar
 - Restart Home Assistant completely
 - Check addon logs for errors
 - Verify addon is in "Running" state
@@ -495,8 +371,8 @@ When modifying configs, the AI shows **before/after** with diff markers:
 - Ensure files exist in `/config/` directory
 
 ### Chat history not saving
-- Conversations stored in `/config/.storage/claude_conversations.json`
-- Check file permissions on `/config/.storage/`
+- Conversations stored in `/config/amira/conversations.json`
+- Check file permissions on `/config/amira/`
 - Try sending a message to trigger save
 - Restart addon if conversations don't persist
 

@@ -1,10 +1,10 @@
 # Home Assistant Add-on configuration
-name: AI Assistant
-version: "3.17.6"
+name: Amira Ai Assistant
+version: "4.1.0"
 slug: claude-backend
 description: >-
-  AI-powered smart home assistant with Claude, ChatGPT, Gemini,
-  NVIDIA NIM and GitHub Models (40+ AI models)
+  Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
+  NVIDIA NIM and GitHub Models (40+ AI models) + Telegram & WhatsApp
 url: https://github.com/Bobsilvio/ha-claude
 init: false
 arch:
@@ -18,60 +18,106 @@ ingress: true
 ingress_port: 5010
 ingress_entry: /
 panel_icon: mdi:robot
-panel_title: AI Assistant
+panel_title: Amira
 homeassistant_api: true
 map:
   - config:rw
 ports:
-  5010/tcp: null
+  5010/tcp: 5010
 ports_description:
-  5010/tcp: AI Assistant API
+  5010/tcp: "Amira API & WhatsApp webhook (Twilio)"
 environment:
   DEBUG_MODE: "False"
   API_PORT: "5010"
 options:
+  language: en
   anthropic_api_key: ""
   openai_api_key: ""
   google_api_key: ""
   github_token: ""
   nvidia_api_key: ""
+  groq_api_key: ""
+  mistral_api_key: ""
+  openrouter_api_key: ""
+  deepseek_api_key: ""
+  minimax_api_key: ""
+  aihubmix_api_key: ""
+  siliconflow_api_key: ""
+  volcengine_api_key: ""
+  dashscope_api_key: ""
+  moonshot_api_key: ""
+  zhipu_api_key: ""
+  perplexity_api_key: ""
+  custom_api_key: ""
+  custom_api_base: ""
+  custom_model_name: ""
+  ollama_base_url: "http://localhost:11434"
   nvidia_thinking_mode: false
   anthropic_extended_thinking: false
+  anthropic_prompt_caching: false
   openai_extended_thinking: false
   enable_file_access: false
-  language: en
-  timeout: "30"
-  max_retries: "3"
   enable_memory: false
   enable_file_upload: false
+  enable_voice_input: true
   enable_rag: false
   enable_chat_bubble: false
+  timeout: "30"
+  max_retries: "3"
   max_snapshots_per_file: 5
   max_conversations: 10
   cost_currency: USD
+  mcp_config_file: /config/amira/mcp_config.json
+  telegram_bot_token: ""
+  twilio_account_sid: ""
+  twilio_auth_token: ""
+  twilio_whatsapp_from: ""
   colored_logs: true
   debug_mode: false
   log_level: normal
 schema:
+  language: list(en|it|es|fr)?
   anthropic_api_key: password?
   openai_api_key: password?
   google_api_key: password?
   github_token: password?
   nvidia_api_key: password?
+  groq_api_key: password?
+  mistral_api_key: password?
+  openrouter_api_key: password?
+  deepseek_api_key: password?
+  minimax_api_key: password?
+  aihubmix_api_key: password?
+  siliconflow_api_key: password?
+  volcengine_api_key: password?
+  dashscope_api_key: password?
+  moonshot_api_key: password?
+  zhipu_api_key: password?
+  perplexity_api_key: password?
+  custom_api_key: password?
+  custom_api_base: str?
+  custom_model_name: str?
+  ollama_base_url: str?
   nvidia_thinking_mode: bool?
   anthropic_extended_thinking: bool?
+  anthropic_prompt_caching: bool?
   openai_extended_thinking: bool?
   enable_file_access: bool?
-  language: list(en|it|es|fr)?
-  timeout: str?
-  max_retries: str?
   enable_memory: bool?
   enable_file_upload: bool?
+  enable_voice_input: bool?
   enable_rag: bool?
   enable_chat_bubble: bool?
+  timeout: str?
+  max_retries: str?
   max_snapshots_per_file: "int(1,50)?"
   max_conversations: "int(1,100)?"
-  cost_currency: "list(USD|EUR)?"
+  cost_currency: "list(USD|EUR|GBP|JPY)?"
+  mcp_config_file: str?
+  telegram_bot_token: password?
+  twilio_account_sid: password?
+  twilio_auth_token: password?
+  twilio_whatsapp_from: str?
   colored_logs: bool?
   debug_mode: bool?
   log_level: list(normal|verbose|debug)?

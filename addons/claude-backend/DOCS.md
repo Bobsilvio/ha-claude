@@ -1,59 +1,120 @@
-# AI Assistant Documentation
+# Amira Documentation
 
 ## Overview
 
-The **AI Assistant add-on** brings enterprise-grade AI to your Home Assistant instance. It provides a web-based chat interface with multi-provider AI support (Anthropic Claude, OpenAI GPT, Google Gemini, NVIDIA NIM, GitHub Models), file access capabilities, persistent memory, document analysis, and more.
+The **Amira add-on** brings enterprise-grade AI to your Home Assistant instance. It provides a web-based chat interface with multi-provider AI support (20+ providers, 60+ models), file access capabilities, persistent memory, document analysis, MCP tool integration, Telegram & WhatsApp messaging, and more.
 
-The add-on integrates seamlessly with Home Assistant's Supervisor API, requiring no long-lived tokens—just your AI provider API keys.
+The add-on integrates seamlessly with Home Assistant's Supervisor API — no long-lived tokens required, just your AI provider API keys.
 
 ## Features
 
 ### Core Features
 - **Streaming chat UI** with real-time responses
-- **Multi-provider support**: Anthropic, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models (40+ models)
+- **Multi-provider support**: 20+ AI providers, 60+ models
 - **Model switching**: Change AI providers and models on-the-fly without restarting
 - **Persistent model selection**: Your chosen agent is saved and restored after restart
 - **Multi-language UI**: English, Italian, Spanish, French
 - **Home Assistant integration**: Read device states, call services directly from chat
+- **Floating Chat Bubble**: AI accessible on every HA page
+- **MCP Tools**: Extend AI with external tools and APIs
 
-### Advanced Features (Experimental)
-- **File Upload & Analysis** (v3.3.0+): Upload PDF, DOCX, TXT, MD, YAML files for AI analysis
-- **Persistent Memory** (v3.3.0+): AI remembers past conversations across sessions
-- **RAG (Retrieval-Augmented Generation)** (v3.3.0+): Semantic search over uploaded documents
+### Advanced Features
+- **File Upload & Analysis**: Upload PDF, DOCX, TXT, MD, YAML files for AI analysis
+- **Persistent Memory**: AI remembers past conversations across sessions via MEMORY.md
+- **RAG (Retrieval-Augmented Generation)**: Semantic search over uploaded documents
 - **File Access**: Optional read/write access to `/config` directory with automatic snapshots
+- **Vision Support**: Image upload and analysis (screenshots, photos, dashboard images)
+- **Telegram Bot**: Long polling — no public IP needed
+- **WhatsApp**: Twilio integration with webhook support
 
 ## AI Providers
 
 ### Anthropic Claude
-- **Models**: Claude 3.5 Sonnet, Haiku, Opus
-- **Cost**: ~$3/$0.80/$15 per 1M tokens
+- **Models**: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5, and more
+- **Cost**: ~$3–$15 per 1M tokens depending on model
 - **Setup**: Get API key from [console.anthropic.com](https://console.anthropic.com)
 - **Best for**: Complex reasoning, creative tasks, long context
 
 ### OpenAI
-- **Models**: GPT-4o, GPT-4 Turbo, GPT-4, GPT-3.5 Turbo, o1-preview, o3-mini
-- **Cost**: $5-$20 per 1M tokens (varies by model)
-- **Setup**: Create API key at [platform.openai.com](https://platform.openai.com)
-- **Best for**: Balanced performance, variety of models, tools integration
+- **Models**: GPT-4o, GPT-4 Turbo, o1, o3-mini, and more
+- **Cost**: $5–$20 per 1M tokens (varies by model)
+- **Setup**: Create API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- **Best for**: Balanced performance, variety of models
 
 ### Google Gemini
-- **Models**: Gemini 2.0 Flash, Pro, Pro Vision
-- **Cost**: Free tier available, ~$7.50 per 1M tokens (paid)
-- **Setup**: Get API key from [ai.google.dev](https://ai.google.dev)
+- **Models**: Gemini 2.0 Flash, Gemini 1.5 Pro, and more
+- **Cost**: Free tier (1500 req/day), ~$7.50 per 1M tokens (paid)
+- **Setup**: Get API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
 - **Best for**: Fast responses, vision capabilities, free tier users
 
 ### NVIDIA NIM
-- **Models**: NVIDIA Llama 3.1 405B, Mistral, Mixtral, etc.
+- **Models**: Llama 3.1 405B/70B, Mistral Large, Mixtral, Kimi K2.5, and more
 - **Cost**: Free tier (rate-limited)
 - **Setup**: Get API key from [build.nvidia.com](https://build.nvidia.com)
-- **Thinking Mode**: Available on supported models (opt-in)
 - **Best for**: Open-source models, free inference, high throughput
 
 ### GitHub Models
-- **Models**: OpenAI o1-preview, o3-mini, GPT-4o, Llama, Phi, etc.
-- **Cost**: Free for GitHub users (token limits apply)
-- **Setup**: Use GitHub PAT (fine-grained, no special permissions needed)
+- **Models**: GPT-4o, o1, o3-mini, Llama, Phi, and more
+- **Cost**: Free for GitHub users (rate limits apply)
+- **Setup**: GitHub PAT from [github.com/settings/tokens](https://github.com/settings/tokens) (no special permissions needed)
 - **Best for**: GitHub users, experimental models, free access
+
+### Groq
+- **Models**: Llama 3.1 70B/8B, Mixtral, and more
+- **Cost**: Free tier (generous limits)
+- **Setup**: Get API key from [console.groq.com](https://console.groq.com)
+- **Best for**: Very fast inference, free usage
+
+### Mistral
+- **Models**: Mistral Large, Medium, Small, and more
+- **Cost**: Pay per use (~$2–$8 per 1M tokens)
+- **Setup**: Get API key from [console.mistral.ai](https://console.mistral.ai)
+- **Best for**: European users, efficient models
+
+### Ollama (Local)
+- **Models**: Any model you pull locally (Llama, Qwen, Mistral, etc.)
+- **Cost**: Free (runs on your hardware)
+- **Setup**: Install [ollama.com](https://ollama.com), set `ollama_base_url` (e.g. `http://192.168.1.x:11434`)
+- **Best for**: Privacy, offline use, no API costs
+
+### DeepSeek
+- **Models**: DeepSeek Chat, DeepSeek Reasoner
+- **Cost**: Very low (~$0.14–$0.55 per 1M tokens)
+- **Setup**: Get API key from [platform.deepseek.com](https://platform.deepseek.com)
+- **Best for**: Cost-efficient inference, reasoning tasks
+
+### OpenRouter
+- **Models**: Access to 100+ models from multiple providers
+- **Cost**: Pay per use (varies by model)
+- **Setup**: Get API key from [openrouter.ai/keys](https://openrouter.ai/keys)
+- **Best for**: Switching between many providers with one key
+
+### GitHub Copilot (OAuth)
+- **Models**: GPT-4o, o3-mini, Claude 3.7 Sonnet, Gemini 2.0 Flash, and more
+- **Cost**: Requires active GitHub Copilot subscription
+- **Setup**: OAuth device flow — click "Connect GitHub Copilot" in the UI, enter the code at [github.com/login/device](https://github.com/login/device)
+- **Best for**: GitHub Copilot subscribers getting extra value
+
+### OpenAI Codex (OAuth)
+- **Models**: gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, gpt-5-codex, gpt-5-codex-mini and more
+- **Cost**: Included with **ChatGPT Plus** ($20/mo) or **Pro** ($200/mo) — no extra API charges
+- **Setup**: OAuth flow — click "Connect OpenAI Codex" in the UI; once logged in a green banner confirms the connection with expiry info
+- **Best for**: Users who already pay for ChatGPT Plus/Pro and want to use Codex models without a separate API key
+
+> 💡 **Already paying for ChatGPT?** Use this provider instead of the standard OpenAI API — it's included in your subscription at no extra cost. The Codex models (`gpt-5.3-codex`, etc.) are optimized for agentic coding tasks and work well for Home Assistant automations, scripts and dashboard generation.
+
+> ⚠️ Generic OpenAI reasoning models (o3, o4-mini) are **not** supported via this endpoint. Use the `openai` provider with an API key for those.
+
+### Other Providers
+- **Perplexity**: Real-time web search models — [perplexity.ai/api](https://www.perplexity.ai/api)
+- **MiniMax**: Chinese LLM with long context — [minimaxi.com](https://www.minimaxi.com)
+- **AiHubMix**: Aggregator with many models — [aihubmix.com](https://aihubmix.com)
+- **SiliconFlow**: Fast Chinese inference — [siliconflow.cn](https://siliconflow.cn)
+- **VolcEngine**: ByteDance AI — [volcengine.com](https://www.volcengine.com)
+- **DashScope**: Alibaba Qwen models — [dashscope.aliyun.com](https://dashscope.aliyun.com)
+- **Moonshot**: Kimi models — [platform.moonshot.cn](https://platform.moonshot.cn)
+- **Zhipu AI**: GLM models — [open.bigmodel.cn](https://open.bigmodel.cn)
+- **Custom**: Any OpenAI-compatible endpoint — set `custom_api_base` and `custom_api_key`
 
 ## Installation
 
@@ -62,9 +123,8 @@ The add-on integrates seamlessly with Home Assistant's Supervisor API, requiring
    - Add: `https://github.com/Bobsilvio/ha-claude`
 
 2. **Install Add-on**:
-   - Search for "AI Assistant"
-   - Click **AI Assistant for Home Assistant**
-   - Click **Install**
+   - Search for "Amira"
+   - Click **Amira Ai Assistant** → **Install**
 
 3. **Configure & Start**:
    - Open the **Configuration** tab
@@ -72,15 +132,6 @@ The add-on integrates seamlessly with Home Assistant's Supervisor API, requiring
    - Click **Save** and **Start**
 
 ## Configuration
-
-### Required
-
-At least one AI provider API key is required. Choose based on:
-- **Anthropic API Key**: Best all-rounder, most reliable
-- **OpenAI API Key**: Variety of models, popular choice
-- **Google API Key**: Free options available
-- **NVIDIA API Key**: Open-source models, free tier
-- **GitHub Token**: Free for GitHub users
 
 ### Optional Features
 
@@ -91,24 +142,23 @@ At least one AI provider API key is required. Choose based on:
 | `enable_file_upload` | `false` | Allow uploading documents (PDF, DOCX, TXT, etc.) |
 | `enable_memory` | `false` | Enable persistent conversation memory |
 | `enable_rag` | `false` | Enable RAG for document search |
+| `enable_chat_bubble` | `false` | Floating AI button on every HA page |
 | `nvidia_thinking_mode` | `false` | Extra reasoning tokens on NVIDIA models |
 | `colored_logs` | `true` | Pretty-print add-on logs |
 | `debug_mode` | `false` | Verbose logging for troubleshooting |
 | `timeout` | `30` | API request timeout (seconds) |
 | `max_retries` | `3` | Retry failed requests |
 | `log_level` | `normal` | Log verbosity: `normal`, `verbose`, `debug` |
+| `max_conversations` | `10` | Chat history depth (1–100) |
+| `max_snapshots_per_file` | `5` | Max backups per config file |
 
 ## Using the Chat
 
 ### First Launch
-1. Open **AI Assistant** from the Home Assistant sidebar
+1. Open **Amira** from the Home Assistant sidebar
 2. Click the **model dropdown** (top left of chat area)
-3. Select an agent/model (e.g., "OpenAI → GPT-4o")
+3. Select an agent/model (e.g., "Groq → Llama 3.1 70B")
 4. Start chatting
-
-### Model Switching
-- Click the **model dropdown** to switch providers/models instantly
-- Selection is **saved automatically** and persists across restarts
 
 ### Home Assistant Integration
 Ask the AI about your smart home:
@@ -116,169 +166,100 @@ Ask the AI about your smart home:
 - Services: *"Turn on the living room lights"*
 - Automations: *"Show me my evening routine automation"*
 
-The AI reads states and can trigger actions directly from chat.
-
-### File Upload (Experimental)
+### File Upload
 If `enable_file_upload: true`:
-1. Click the **file upload button** (orange, in input area)
+1. Click the **file upload button** (in input area)
 2. Select a document (PDF, DOCX, TXT, MD, YAML)
-3. Documents are auto-injected into AI context
+3. Documents are auto-injected into AI context (limit: 10MB)
 
-Files are cleaned up after use. Upload limit: **10MB per file**.
+### Persistent Memory
+If `enable_memory: true`, Amira uses a two-file system:
 
-### Persistent Memory (Experimental)
-If `enable_memory: true`:
-- AI **remembers past conversations** across sessions
-- Memory searches by keywords and message content
-- Old conversations are kept (never deleted)
-- Memory is local (no cloud sync)
+- **`MEMORY.md`** — Injected in every session. Write here what the AI should always know.
+- **`HISTORY.md`** — Append-only log of past sessions (for your reference).
 
-### Document Search (RAG)
-If `enable_rag: true` and `enable_file_upload: true`:
-- Upload documents to build a knowledge base
-- AI performs semantic search over documents
-- Results automatically injected into prompts
+```bash
+# SSH into HA, then:
+nano /config/amira/memory/MEMORY.md
+```
 
 ## Advanced Configuration
 
 ### File Access
-Requires `enable_file_access: true` in config.
+Requires `enable_file_access: true`. Snapshots stored in `/config/amira/snapshots/`.
 
-**Snapshot & Restore Mechanism**:
-- When you edit `/config` via chat, the add-on creates an automatic backup
-- If edit fails or causes issues, you can restore the last snapshot
-- Snapshots are kept in `/config/.claude_backups/`
+### MCP Tools
+Create `/config/amira/mcp_config.json` to add external tools:
 
-**Example Uses**:
-- Edit `configuration.yaml` to add automations
-- Update secrets in `secrets.yaml`
-- Write custom Python scripts to `python_scripts/`
+```json
+{
+  "my_server": {
+    "transport": "http",
+    "url": "http://192.168.1.x:7660"
+  }
+}
+```
 
-### Logging & Debugging
+→ Full guide: [MCP.md](../../../MCP.md)
 
-Set `log_level` to control verbosity:
-
-- **`normal`** (default): Core messages only (clean logs)
-- **`verbose`**: Includes all API request/response logs
-- **`debug`**: Maximum detail, including internal state
-
-Use via YAML config or environment variable `LOG_LEVEL`.
+### Logging
+Set `log_level`:
+- **`normal`** (default): Core messages only
+- **`verbose`**: Includes API request/response logs
+- **`debug`**: Maximum detail
 
 ## Troubleshooting
 
-### Chat UI doesn't load
-1. Verify add-on is **Running** (check green status in Add-ons)
-2. Check add-on logs for errors
-3. Hard-refresh browser (Ctrl+F5 / Cmd+Shift+R)
-4. Restart Home Assistant if persists
-
-### API errors (401, 403, 429)
-- **401**: API key is invalid → Check provider account and key format
-- **403**: Permissions issue → Verify API key has chat/inference permissions
-- **429**: Rate limited → Wait or upgrade to higher tier with provider
-
-### Home Assistant integration not working
-- Check `/api/status` endpoint (add `/ha-claude/` to HA URL)
-- Verify HA connection status shows `ok`
-- Restart add-on if status shows `error`
-
-### File Upload not working
-- Ensure `enable_file_upload: true` and**Save** config
-- Verify file is < 10MB
-- Check supported formats: PDF, DOCX, DOC, TXT, MD, YAML, YML, ODT
-- Restart add-on if issues persist
-
-### Memory feature not saving
-- Ensure `enable_memory: true` in config
-- Check `/config/.claude_memory/` folder exists
-- Restart add-on
-- Check add-on logs for permission errors
-
-### Module import errors
-- Example: `ModuleNotFoundError: No module named 'PyPDF2'`
-- Solution: Restart the add-on (dependencies are installed on start)
+| Problem | Solution |
+|---------|----------|
+| Chat UI doesn't load | Restart add-on, hard-refresh browser (Ctrl+F5) |
+| 401 API error | API key invalid — check format and account balance |
+| 429 Rate limit | Wait or upgrade to higher tier with provider |
+| File access not working | Enable `enable_file_access: true`, restart |
+| Memory not saving | Check `/config/amira/memory/` folder exists and is writable |
+| MCP not loading | Validate JSON at `/config/amira/mcp_config.json`; check logs |
+| Module import errors | Restart the add-on (dependencies install on start) |
 
 ## API Reference
 
-The add-on exposes a REST API at `/ha-claude/api/` (or direct port 5010 if not using Ingress).
+The add-on exposes a REST API accessible via HA Ingress or directly on port 5010.
 
-### Chat Endpoints
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/chat/stream` | POST | Streaming chat (SSE) |
+| `/api/models` | GET | List available providers and models |
+| `/api/set_model` | POST | Change active provider/model |
+| `/api/status` | GET | System status (HA connection, features, version) |
+| `/api/conversations` | GET | List all conversations |
+| `/api/snapshots` | GET | List config file backups |
+| `/api/documents/upload` | POST | Upload document for analysis |
+| `/api/messaging/stats` | GET | Telegram & WhatsApp statistics |
+| `/health` | GET | Simple health check |
 
-**POST `/api/chat/stream`**
-- Stream-based chat API
-- Request body: `{"message": "...", "conversation_id": "..." (optional)}`
-- Response: Server-Sent Events (SSE) with streamed tokens
+## Data Storage
 
-**GET `/api/models`**
-- List available providers and models
-- Returns: `{"providers": {...}, "models": [...]}`
+All persistent data lives in **`/config/amira/`**:
 
-**POST `/api/set_model`**
-- Change active provider/model
-- Request body: `{"provider": "openai", "model": "gpt-4o"}`
-- Returns: `{"success": true}`
-
-**GET `/api/status`**
-- System status (HA connection, feature flags, version)
-- Returns: `{"ha_connection_ok": true, "version": "3.3.0", ...}`
-
-### Document Endpoints (File Upload/RAG)
-
-**POST `/api/documents/upload`**
-- Upload document for analysis
-- Multipart form-data with file
-- Returns: `{"success": true, "filename": "...", "pages": N}`
-
-**DELETE `/api/documents/{filename}`**
-- Remove uploaded document
-- Returns: `{"success": true}`
-
-**GET `/api/documents`**
-- List uploaded documents
-- Returns: `{"documents": [...]}`
-
-### Memory Endpoints
-
-**GET `/api/memory/search`**
-- Search conversation history
-- Query params: `q=<query>`
-- Returns: `{"results": [...]}`
-
-**DELETE `/api/memory/clear`**
-- Clear all memory (use with caution!)
-- Returns: `{"success": true}`
-
-For full API details, visit the `/api/` endpoint directly.
-
-## Home Assistant Integration Examples
-
-### Read Device State
-*"What's the current temperature in the living room?"*
-- AI reads the temperature sensor state from HA
-
-### Call Service
-*"Turn off the bedroom lights"*
-- AI calls the `light.turn_off` service on bedroom lights
-
-### Complex Automation
-*"Create an automation that turns on kitchen lights when motion is detected after sunset"*
-- AI reads existing automations and can write new ones to `configuration.yaml`
-
-## Performance Tips
-
-1. **Streaming**: Modern models stream responses (GPT-4o, Claude 3.5) → faster perceived performance
-2. **Model Size**: Smaller models (o3-mini, Llama 3.1 70B) are faster but less capable
-3. **Timeout Setting**: Increase if using complex reasoning or long documents
-4. **Document Size**: Keep uploaded files < 5MB for best performance
-5. **Memory Size**: Limit active memory by clearing old conversations occasionally
+```
+/config/amira/
+├── conversations.json        # Chat history
+├── runtime_selection.json    # Last selected model/provider
+├── mcp_config.json           # MCP servers (create manually)
+├── snapshots/                # Config file backups (before edits)
+├── documents/                # Uploaded files
+├── rag/                      # RAG document index
+└── memory/
+    ├── MEMORY.md             # Long-term facts (always in context)
+    └── HISTORY.md            # Session log (append-only)
+```
 
 ## Security Notes
 
 - **API Keys**: Stored in HA configuration, never exposed to UI
 - **File Access**: Only reads/writes under `/config` directory
-- **Ingress**: All traffic through HA Ingress by default (no direct internet exposure)
+- **Ingress**: All traffic through HA Ingress by default
 - **Memory**: Local only, no cloud sync
-- **Documents**: Deleted after use, not persisted
+- **MCP Config**: Never commit `/config/amira/mcp_config.json` to git if it contains API keys
 
 ## Support
 
@@ -288,4 +269,4 @@ For full API details, visit the `/api/` endpoint directly.
 
 ## Changelog
 
-See [CHANGELOG.md](https://github.com/Bobsilvio/ha-claude/blob/main/addons/claude-backend/CHANGELOG.md) for version history and updates.
+See [CHANGELOG.md](https://github.com/Bobsilvio/ha-claude/blob/main/CHANGELOG.md) for version history.

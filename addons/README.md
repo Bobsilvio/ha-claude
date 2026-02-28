@@ -6,7 +6,7 @@ Repository for Home Assistant Add-ons providing Claude AI Backend integration.
 
 ### Claude AI Backend
 
-Backend API service for Claude AI Assistant Home Assistant integration.
+Backend API service for Amira Home Assistant integration.
 
 - **Repository**: https://github.com/Bobsilvio/ha-claude-addon-repo
 - **Issues**: https://github.com/Bobsilvio/ha-claude/issues

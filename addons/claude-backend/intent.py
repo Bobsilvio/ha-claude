@@ -22,7 +22,7 @@ INTENT_TOOL_SETS = {
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
     "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_frontend_resources"],
-    "create_html_dashboard": ["read_html_dashboard", "create_html_dashboard", "search_entities", "get_frontend_resources"],
+    "create_html_dashboard": ["read_html_dashboard", "create_html_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
     "control_device": ["call_service", "search_entities", "get_entity_state"],
     "query_state": ["get_entities", "get_entity_state", "search_entities"],
@@ -205,8 +205,36 @@ Respond in the user's language.""",
     "create_html_dashboard": """You are a creative Home Assistant HTML dashboard designer.
 The user wants a UNIQUE, beautiful HTML dashboard page with real Home Assistant entities.
 
-WORKFLOW:
+⚠️ CRITICAL OUTPUT RULE — READ FIRST:
+- NEVER write HTML code as text in the chat. Not a single line. Not a snippet. Nothing.
+- ALL HTML goes EXCLUSIVELY inside the 'html' parameter of the create_html_dashboard tool call.
+- Your only text in the chat should be a single short sentence AFTER the tool completes,
+  e.g. "Dashboard Tigo creata! Aprila qui: /local/dashboards/tigo.html"
+- Violating this rule wastes tokens and confuses the user.
+
+MODIFICATION MODE — If the message contains [CURRENT_DASHBOARD_HTML]:
+- The full current HTML is already provided. Do NOT call read_html_dashboard.
+- Modify the HTML as requested, preserving all existing sections, CSS, and JS.
+- Call create_html_dashboard IMMEDIATELY with the complete modified HTML.
+- Use the same name as shown in the CONTEXT tag (e.g. name="tigo").
+- NEVER output any HTML as text — put it only in the tool call arguments.
+
+MULTI-PAGE / MULTI-SECTION DETECTION — Ask the user BEFORE creating:
+If the user request mentions multiple pages, sections, tabs, or areas (e.g. "luci, clima e sicurezza",
+"3 pagine", "tab per ogni stanza", "sezioni diverse"), you MUST ask a clarifying question first:
+
+  "Preferisci:
+   A) **Una sola plancia** con tab interni HTML (navigazione via pulsanti nella pagina)
+   B) **Plance separate** nel menu laterale di HA (una per ogni sezione)"
+
+Wait for the user's answer before generating any HTML or calling any tool.
+- If they choose A: create a single HTML file with a JS tab router (show/hide div sections).
+- If they choose B: call create_html_dashboard once per section (each with a unique name/title).
+Do NOT ask this question if the request is clearly for a single-page dashboard.
+
+CREATION WORKFLOW (no [CURRENT_DASHBOARD_HTML] in message):
 1. Call search_entities to find the correct entity_ids. NEVER guess entity_ids.
+   If entities are already listed in the DATA section, skip search_entities.
 2. Send the HTML in 2-3 CHUNKED tool calls (draft mode) to avoid output token limits:
    - Call 1: create_html_dashboard(title="...", name="slug", entities=[...], html="<!DOCTYPE html>...<style>CSS HERE</style></head><body>...", draft=true)
    - Call 2: create_html_dashboard(name="slug", html="...rest of template...", draft=true)
@@ -237,7 +265,9 @@ JS DATA CONNECTION:
 - Vue 3 CDN: <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 - Chart.js 4: <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 - Date adapter: <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
-- Auth token: JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token
+- Auth token + redirect if not logged in (ALWAYS use this pattern at the very start of your <script>):
+    const tok = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;
+    if (!tok) { location.href = '/?redirect=' + encodeURIComponent(location.href); }
 - WebSocket: connect to (location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/api/websocket'
   → auth_required: send {type:'auth',access_token:token}
   → auth_ok: send {type:'subscribe_events',event_type:'state_changed'} + fetch /api/states with Bearer
@@ -246,11 +276,47 @@ JS DATA CONNECTION:
 - Service calls: POST /api/services/{domain}/{service} with Bearer token
 - History: GET /api/history/period/{ISO_start}?filter_entity_id=...&end_time={ISO_end}&minimal_response&no_attributes
 
+FETCHING ALL ENTITIES BY CATEGORY — use this pattern when the user asks for "all batteries", "all lights", "all temperatures", etc.:
+  const all = await fetch('/api/states', {headers:{Authorization:'Bearer '+tok}}).then(r=>r.json());
+  // Battery sensors:  all.filter(s => s.attributes?.device_class === 'battery')
+  // Motion sensors:   all.filter(s => s.attributes?.device_class === 'motion')
+  // Temperature:      all.filter(s => s.attributes?.device_class === 'temperature')
+  // Lights:           all.filter(s => s.entity_id.startsWith('light.'))
+  // Switches:         all.filter(s => s.entity_id.startsWith('switch.'))
+  // Any domain:       all.filter(s => s.entity_id.startsWith('DOMAIN.'))
+  NEVER hardcode a fixed list of entity_ids when the user asks for "all" of a category — always fetch /api/states and filter dynamically so the dashboard stays up to date as new devices are added.
+
 UI RULES:
 - Do NOT show debug/technical info (connection status pills, token values, accent color hex, series counts, entity_id strings)
 - The dashboard is for END USERS, not developers — show only useful data: entity values, labels, charts, status indicators
 - A small colored dot (green=live, grey=offline) in the header is OK, but do NOT label it "WebSocket"/"REST" — just use "Live"/"Offline"
 - Do NOT show raw entity_ids in badges — use friendly names or short labels
+
+ENTITY CLICK — MORE INFO DIALOG:
+When the user clicks on a sensor/entity card, show a detail popup with history chart.
+Use this pattern (works when the page is inside HA, e.g. as a sidebar iframe):
+  function openMoreInfo(entityId) {
+    // Try native HA More Info dialog first (works inside HA iframe/sidebar)
+    const haEl = document.querySelector('home-assistant') ||
+                 parent?.document?.querySelector('home-assistant');
+    if (haEl) {
+      haEl.dispatchEvent(new CustomEvent('hass-more-info',
+        { detail: { entityId }, bubbles: true, composed: true }));
+      return;
+    }
+    // Fallback: custom modal with history chart from /api/history
+    showHistoryModal(entityId);
+  }
+Custom modal fallback (always implement this alongside the native attempt):
+  async function showHistoryModal(entityId) {
+    const end = new Date().toISOString();
+    const start = new Date(Date.now() - 24*3600*1000).toISOString();
+    const url = `/api/history/period/${start}?filter_entity_id=${entityId}&end_time=${end}&minimal_response`;
+    const data = await fetch(url, {headers:{Authorization:'Bearer '+tok}}).then(r=>r.json());
+    // data[0] is array of {state, last_changed} — render in a modal with Chart.js
+    // Show: entity name, current value, unit, mini line chart of last 24h, last_changed timestamp
+  }
+Add cursor:pointer to all entity cards and call openMoreInfo(entityId) on click.
 
 DESIGN FREEDOM — be creative! Vary these across dashboards:
 - Color schemes: warm, cool, neon, pastel, monochrome, earth tones, gradients
@@ -499,7 +565,6 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
     if not has_dash and has_modify and smart_context:
         if "/local/dashboards" in smart_context or ".html" in smart_context:
             has_dash = True
-
     # Check for HTML/Vue/Web dashboard keywords
     html_keywords = ["html", "vue", "web", "javascript", "js", "react", "svelte",
                      "interattiv", "realtime", "live", "responsive", "app", "custom css",
@@ -514,6 +579,31 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
     has_html_dash_ref = any(k in msg for k in html_dash_ref_keywords)
     if not has_html_dash_ref and smart_context:
         has_html_dash_ref = "/local/dashboards" in smart_context or ".html" in smart_context
+    # Check if any word/slug in the message matches an existing HTML dashboard file on disk.
+    # This handles "aggiungi le temperature alla dashboard tutti-batterie" even without
+    # an explicit ".html" or "/local/dashboards" mention.
+    if not has_html_dash_ref or (not has_dash and has_modify):
+        try:
+            _dash_dir = os.path.join(api.HA_CONFIG_DIR, "www", "dashboards")
+            if os.path.isdir(_dash_dir):
+                _existing_html = {
+                    f[:-5].lower()  # strip .html, lowercase
+                    for f in os.listdir(_dash_dir)
+                    if f.endswith(".html")
+                }
+                _msg_words = set(re.findall(r"[\w-]+", msg))
+                _matched = _existing_html & _msg_words
+                if _matched:
+                    has_html_dash_ref = True
+                    has_dash = True  # treat as dashboard op even without "dashboard" keyword
+                    logger.debug(f"Intent: HTML dashboard detected via filesystem match: {_matched}")
+        except Exception:
+            pass
+
+    # "crea una pagina html", "crea un pannello web" ecc. — non richiedono la parola "dashboard"
+    if has_create and has_html_dash:
+        return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
+                "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
 
     if has_dash and has_create:
         if has_html_dash or has_html_dash_ref:
@@ -546,15 +636,15 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
         return {"intent": "delete", "tools": INTENT_TOOL_SETS["delete"],
                 "prompt": None, "specific_target": False}
 
+    # --- HISTORY --- (must come BEFORE query_state: "storico temperatura" should be history, not state)
+    if any(k in msg for k in history_kw):
+        return {"intent": "query_history", "tools": INTENT_TOOL_SETS["query_history"],
+                "prompt": None, "specific_target": False}
+
     # --- QUERY STATE ---
     if any(k in msg for k in query_kw):
         return {"intent": "query_state", "tools": INTENT_TOOL_SETS["query_state"],
                 "prompt": INTENT_PROMPTS["query_state"], "specific_target": False}
-
-    # --- HISTORY ---
-    if any(k in msg for k in history_kw):
-        return {"intent": "query_history", "tools": INTENT_TOOL_SETS["query_history"],
-                "prompt": None, "specific_target": False}
 
     # --- CONFIG EDIT ---
     if any(k in msg for k in config_kw):
@@ -646,13 +736,19 @@ def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
 MAX_SMART_CONTEXT = 10000  # Max chars to inject — keeps tokens under control
 
 
-def build_smart_context(user_message: str, intent: str = None) -> str:
+def build_smart_context(user_message: str, intent: str = None, max_chars: int = None) -> str:
     """Pre-load relevant context based on user's message intent.
     Works like VS Code: gathers all needed data BEFORE sending to AI,
     so Claude can respond with a single action instead of multiple tool rounds.
     IMPORTANT: Context must be compact to avoid rate limits.
     CRITICAL: If intent is 'create_automation' or 'create_script', skip fuzzy matching
-    to avoid incorrectly injecting an existing automation/script to be modified."""
+    to avoid incorrectly injecting an existing automation/script to be modified.
+
+    Args:
+        max_chars: Override the default MAX_SMART_CONTEXT cap. Useful when the message
+                   already contains large blocks (e.g. [CURRENT_DASHBOARD_HTML]) so the
+                   combined payload stays within model context limits.
+    """
     msg_lower = user_message.lower()
     context_parts = []
 
@@ -681,23 +777,43 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
             target_auto_id = None
             target_auto_alias = None
 
-            # Find the BEST matching automation using scored matching
-            best_score = 0
-            best_match = None
+            # ── Priority 1: explicit automation_id from bubble context prefix ──────
+            # The bubble injects [CONTEXT: User is viewing automation id="<id>". ...]
+            # Parse this directly — no fuzzy matching needed.
+            _ctx_id_m = re.search(
+                r'\[CONTEXT:[^\]]*automation\s+id=["\x27]*(\d+)',
+                user_message,
+                re.IGNORECASE,
+            )
+            if _ctx_id_m:
+                _ctx_id = _ctx_id_m.group(1)
+                # Verify it exists in the state list
+                _ctx_match = next((a for a in auto_list if str(a.get("id", "")) == _ctx_id), None)
+                if _ctx_match:
+                    target_auto_id = _ctx_id
+                    target_auto_alias = _ctx_match.get("friendly_name", "")
+                    logger.info(f"Smart context: using bubble context automation id='{target_auto_id}' ('{target_auto_alias}')")
 
-            # Words to IGNORE in matching
-            STOP_WORDS = {"questa", "questo", "quella", "quello", "della", "delle", "dello",
-                          "degli", "dalla", "dalle", "stessa", "stesso", "altra", "altro",
-                          "prima", "dopo", "quando", "perché", "quindi", "anche", "ancora",
-                          "molto", "troppo", "sempre", "dovremmo", "dovrebbe", "potrebbe",
-                          "voglio", "vorrei", "puoi", "fammi", "invia", "manda", "notifica",
-                          "about", "this", "that", "with", "from", "have", "which", "there",
-                          "their", "would", "should", "could"}
+            # ── Priority 2: fuzzy matching of automation name in message ──────────
+            if not target_auto_id:
+                best_score = 0
+                best_match = None
 
-            # Extract meaningful words from user message (>3 chars, not stop words)
-            msg_words = [w for w in msg_lower.split() if len(w) > 3 and w not in STOP_WORDS]
+                # Words to IGNORE in matching
+                STOP_WORDS = {"questa", "questo", "quella", "quello", "della", "delle", "dello",
+                              "degli", "dalla", "dalle", "stessa", "stesso", "altra", "altro",
+                              "prima", "dopo", "quando", "perché", "quindi", "anche", "ancora",
+                              "molto", "troppo", "sempre", "dovremmo", "dovrebbe", "potrebbe",
+                              "voglio", "vorrei", "puoi", "fammi", "invia", "manda", "notifica",
+                              "about", "this", "that", "with", "from", "have", "which", "there",
+                              "their", "would", "should", "could"}
+
+                # Extract meaningful words from user message (>3 chars, not stop words)
+                msg_words = [w for w in msg_lower.split() if len(w) > 3 and w not in STOP_WORDS]
 
             for a in auto_list:
+                if target_auto_id:
+                    break  # already found via context prefix — skip fuzzy loop
                 fname = str(a.get("friendly_name", "")).lower()
                 if not fname:
                     continue
@@ -728,10 +844,12 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
                     best_score = score
                     best_match = a
 
-            if best_match and best_score >= 5:
-                target_auto_id = best_match.get("id", "")
-                target_auto_alias = best_match.get("friendly_name", "")
-                logger.info(f"Smart context: matched automation '{target_auto_alias}' (score: {best_score})")
+            _bm = locals().get("best_match")
+            _bs = locals().get("best_score", 0)
+            if not target_auto_id and _bm and _bs >= 5:
+                target_auto_id = _bm.get("id", "")
+                target_auto_alias = _bm.get("friendly_name", "")
+                logger.info(f"Smart context: matched automation '{target_auto_alias}' (score: {_bs})")
 
             if target_auto_id:
                 # Try YAML first
@@ -787,13 +905,28 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
                     with open(yaml_path, "r", encoding="utf-8") as f:
                         all_scripts = yaml.safe_load(f)
                     if isinstance(all_scripts, dict):
+                        # Priority 1: explicit script_id from bubble context prefix
+                        _ctx_sid_m = re.search(
+                            r'\[CONTEXT:[^\]]*script\s+id=["\x27]*([^\s"\x27>\]]+)',
+                            user_message,
+                            re.IGNORECASE,
+                        )
+                        _ctx_sid = _ctx_sid_m.group(1) if _ctx_sid_m else None
+
+                        _script_found = False
                         for sid, sconfig in all_scripts.items():
                             alias = str(sconfig.get("alias", "")).lower() if isinstance(sconfig, dict) else ""
-                            if alias and (alias in msg_lower or sid in msg_lower or any(word in alias for word in msg_lower.split() if len(word) > 4)):
+                            # Match by context script_id, alias, or fuzzy word match
+                            if (_ctx_sid and (sid == _ctx_sid or alias == _ctx_sid.lower())) or \
+                               (not _ctx_sid and alias and (
+                                   alias in msg_lower or sid in msg_lower
+                                   or any(word in alias for word in msg_lower.split() if len(word) > 4)
+                               )):
                                 script_yaml = yaml.dump({sid: sconfig}, default_flow_style=False, allow_unicode=True)
                                 if len(script_yaml) > 6000:
                                     script_yaml = script_yaml[:6000] + "\n... [TRUNCATED]"
                                 context_parts.append(api.tr("smart_context_script_found", alias=sconfig.get('alias', sid), sid=sid, yaml=script_yaml))
+                                _script_found = True
                                 break
                 except Exception:
                     pass
@@ -857,7 +990,107 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
             if kw in msg_lower and domain not in matched_domains:
                 matched_domains.append(domain)
 
-        if matched_domains:
+        # --- INTEGRATION-SPECIFIC ENTITY CONTEXT (for create_html_dashboard and generic searches) ---
+        # Extract device/integration keywords from the message (e.g. "epcube", "shelly", "tasmota")
+        # These are words that don't match stop-words and likely refer to an integration or device name.
+        # IMPORTANT: strip [CONTEXT:...] and [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML] blocks
+        # BEFORE keyword extraction — these contain HTML/CSS that would generate thousands of false matches.
+        _clean_user_msg = re.sub(r'\[CONTEXT:[^\]]*\]', '', user_message, flags=re.IGNORECASE)
+        _clean_user_msg = re.sub(
+            r'\[CURRENT_DASHBOARD_HTML\][\s\S]*?\[/CURRENT_DASHBOARD_HTML\]', '',
+            _clean_user_msg, flags=re.IGNORECASE
+        )
+        _clean_msg_lower = _clean_user_msg.lower()
+
+        _ctx_stop = {"mi", "crei", "crea", "una", "un", "la", "il", "con", "i", "de", "dei", "degli",
+                     "delle", "del", "le", "sensori", "sensore", "di", "e", "pagina", "html", "web",
+                     "per", "make", "create", "page", "dashboard", "pannello", "plancia", "scheda",
+                     "tutti", "tutte", "the", "and", "with", "for", "all", "my", "miei", "mie",
+                     "fotovoltaico", "energia", "energy", "solar", "solare", "impianto", "sono",
+                     "voglio", "vorrei", "puoi", "fammi", "bello", "bella", "mostra", "vedi",
+                     "which", "that", "this", "show", "see", "have", "about",
+                     "aggiungi", "aggiunge", "modify", "modifica", "anche", "pure"}
+        _msg_words = [w for w in re.sub(r'[^\w\s]', ' ', _clean_msg_lower).split()
+                      if len(w) >= 4 and w not in _ctx_stop]
+
+        # Try to find integration-specific entities if user mentions a device/brand
+        _integration_matches = []
+        if _msg_words and (intent == "create_html_dashboard" or any(k in msg_lower for k in entity_keywords)):
+            try:
+                all_states = api.get_all_states()
+                for keyword in _msg_words:
+                    matched = [
+                        {"entity_id": s.get("entity_id"),
+                         "state": s.get("state"),
+                         "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                         "unit": s.get("attributes", {}).get("unit_of_measurement", "")}
+                        for s in all_states
+                        if keyword in s.get("entity_id", "").lower()
+                        or keyword in s.get("attributes", {}).get("friendly_name", "").lower()
+                    ]
+                    if matched:
+                        _integration_matches.extend(matched)
+                        logger.info(f"Smart context: found {len(matched)} entities matching keyword '{keyword}'")
+
+                # Deduplicate by entity_id
+                _seen = set()
+                _deduped = []
+                for e in _integration_matches:
+                    if e["entity_id"] not in _seen:
+                        _seen.add(e["entity_id"])
+                        _deduped.append(e)
+                _integration_matches = _deduped
+            except Exception as _e:
+                logger.warning(f"Smart context: integration entity search failed: {_e}")
+
+        # For create_html_dashboard: ALWAYS also search entity registry by platform name.
+        # Keyword search may miss entities whose names don't contain the brand word
+        # (e.g. Tigo solar panels: "tigo" is in platform="tigo_energy" but not in entity names).
+        # We merge both results so the AI gets the full picture.
+        if _msg_words and intent == "create_html_dashboard":
+            try:
+                reg_result = api.call_ha_websocket("config/entity_registry/list")
+                registry = reg_result.get("result", []) if isinstance(reg_result, dict) else []
+                if registry:
+                    all_states_reg = api.get_all_states()
+                    state_map_reg = {s.get("entity_id"): s for s in all_states_reg}
+                    for keyword in _msg_words:
+                        reg_matches = [
+                            r for r in registry
+                            if keyword in (r.get("platform") or "").lower()
+                        ]
+                        for r in reg_matches:
+                            eid = r.get("entity_id", "")
+                            state = state_map_reg.get(eid, {})
+                            _integration_matches.append({
+                                "entity_id": eid,
+                                "state": state.get("state", "unavailable"),
+                                "friendly_name": (
+                                    state.get("attributes", {}).get("friendly_name")
+                                    or r.get("name") or r.get("original_name") or ""
+                                ),
+                                "unit": state.get("attributes", {}).get("unit_of_measurement", ""),
+                            })
+                        if reg_matches:
+                            logger.info(f"Smart context: registry search found {len(reg_matches)} entities for platform '{keyword}'")
+                    # Deduplicate
+                    _seen2 = set()
+                    _deduped2 = []
+                    for e in _integration_matches:
+                        if e["entity_id"] not in _seen2:
+                            _seen2.add(e["entity_id"])
+                            _deduped2.append(e)
+                    _integration_matches = _deduped2
+            except Exception as _e:
+                logger.warning(f"Smart context: entity registry search failed: {_e}")
+
+        if _integration_matches:
+            context_parts.append(
+                f"## ENTITÀ TROVATE (keyword: {', '.join(_msg_words[:5])})\n"
+                + json.dumps(_integration_matches, ensure_ascii=False, indent=1)
+            )
+        elif matched_domains:
+            # Fallback: generic domain entities (for non-integration requests)
             states = api.get_all_states()
             for domain in matched_domains[:3]:  # Max 3 domains
                 domain_entities = [{"entity_id": s.get("entity_id"),
@@ -867,19 +1100,62 @@ def build_smart_context(user_message: str, intent: str = None) -> str:
                 if domain_entities:
                     context_parts.append(f"## ENTITÀ {domain.upper()}\n{json.dumps(domain_entities, ensure_ascii=False, indent=1)}")
 
+        # --- HISTORY PRE-LOADING (for query_history intent) ---
+        # Pre-load history data so providers without tool-calling (Mistral, Groq, etc.) can answer directly.
+        if intent == "query_history":
+            from datetime import datetime as _dt, timedelta as _td
+            # Collect entity IDs to fetch history for (from already-matched entities)
+            _hist_eids = [e["entity_id"] for e in _integration_matches[:4]]
+            if not _hist_eids and matched_domains:
+                # Fall back to keyword+domain search
+                try:
+                    _all_s = api.get_all_states()
+                    for _s in _all_s:
+                        _eid = _s.get("entity_id", "")
+                        _fname = _s.get("attributes", {}).get("friendly_name", "").lower()
+                        if any(_eid.startswith(f"{d}.") for d in matched_domains):
+                            if any(kw in _eid.lower() or kw in _fname for kw in _msg_words):
+                                _hist_eids.append(_eid)
+                        if len(_hist_eids) >= 4:
+                            break
+                except Exception:
+                    pass
+            for _eid in _hist_eids[:4]:
+                try:
+                    _hours = 24
+                    _start = (_dt.utcnow() - _td(hours=_hours)).strftime("%Y-%m-%dT%H:%M:%S")
+                    _endpoint = f"history/period/{_start}?filter_entity_id={_eid}&significant_changes_only=1"
+                    _result = api.call_ha_api("GET", _endpoint)
+                    if isinstance(_result, list) and _result:
+                        _entries = _result[0] if isinstance(_result[0], list) else _result
+                        _summary = [{"state": _e.get("state"), "last_changed": _e.get("last_changed")}
+                                    for _e in _entries[-30:]]
+                        context_parts.append(
+                            f"## STORICO {_eid} (ultime {_hours}h, {len(_entries)} cambiamenti)\n"
+                            + json.dumps({"entity_id": _eid, "history": _summary},
+                                         ensure_ascii=False, indent=1)
+                        )
+                        logger.info(f"Smart context: pre-loaded history for {_eid} ({len(_entries)} entries)")
+                except Exception as _he:
+                    logger.warning(f"Smart context: history fetch for {_eid} failed: {_he}")
+
     except Exception as e:
         logger.warning(f"Smart context error: {e}")
 
     if context_parts:
         context = "\n\n".join(context_parts)
         # Cap total context size to avoid rate limits
-        limit = MAX_SMART_CONTEXT
-        try:
-            if api.AI_PROVIDER == "github" and "o4-mini" in (api.get_active_model() or "").lower():
-                # Smaller context for free/low-limit models
-                limit = 2500
-        except Exception:
-            pass
+        if max_chars is not None:
+            # Caller-supplied override (e.g. when [CURRENT_DASHBOARD_HTML] is already in the message)
+            limit = max_chars
+        else:
+            limit = MAX_SMART_CONTEXT
+            try:
+                if api.AI_PROVIDER == "github" and "o4-mini" in (api.get_active_model() or "").lower():
+                    # Smaller context for free/low-limit models
+                    limit = 2500
+            except Exception:
+                pass
         if len(context) > limit:
             context = context[:limit] + "\n... [CONTEXT TRUNCATED]"
         logger.info(f"Smart context: injected {len(context)} chars of pre-loaded data")

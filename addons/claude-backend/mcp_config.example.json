@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "mcp.server.stdio.filesystem"],
+      "env": {
+        "MCP_FILESYSTEM_ROOTS": "/config",
+        "MCP_ALLOWED_DIRS": "/config:/config/automations:/config/scripts"
+      }
+    },
+    "web_search": {
+      "command": "python",
+      "args": ["-m", "mcp.server.brave_search"],
+      "env": {
+        "BRAVE_API_KEY": "YOUR_BRAVE_API_KEY_HERE"
+      }
+    },
+    "git": {
+      "command": "python",
+      "args": ["-m", "mcp.server.git"],
+      "env": {
+        "GIT_REPOSITORY_PATH": "/config"
+      }
+    },
+    "slack": {
+      "command": "uvx",
+      "args": ["mcp-server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "xoxb-YOUR-TOKEN"
+      }
+    },
+    "github": {
+      "command": "uvx",
+      "args": ["mcp-server-github", "--repository", "owner/repo"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_YOUR-TOKEN"
+      }
+    },
+    "database": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "/config/my_database.db"],
+      "env": {}
+    }
+  }
+}

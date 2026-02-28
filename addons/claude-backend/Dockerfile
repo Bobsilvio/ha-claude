@@ -13,7 +13,8 @@ RUN apk add --no-cache \
     build-base \
     python3-dev \
     openssl-dev \
-    libffi-dev
+    libffi-dev \
+    curl-dev
 
 WORKDIR /app
 
@@ -26,9 +27,6 @@ COPY api.py .
 COPY server.py .
 COPY tools.py .
 COPY intent.py .
-COPY providers_openai.py .
-COPY providers_anthropic.py .
-COPY providers_google.py .
 COPY pricing.py .
 COPY chat_ui.py .
 COPY keywords.json .
@@ -37,6 +35,22 @@ COPY file_upload.py .
 COPY rag.py .
 COPY memory.py .
 COPY chat_bubble.py .
+COPY messaging.py .
+COPY telegram_bot.py .
+COPY whatsapp_bot.py .
+COPY fallback.py .
+COPY quality_metrics.py .
+COPY tool_optimizer.py .
+COPY semantic_cache.py .
+COPY mcp.py .
+COPY mcp_auth.py .
+COPY memory_system.py .
+COPY prompt_caching.py .
+COPY image_support.py .
+COPY scheduler_agent.py .
+
+# Copy new providers module (v3.17.12+)
+COPY providers /app/providers
 
 # Copy rootfs (s6-overlay v3 service structure)
 COPY rootfs /

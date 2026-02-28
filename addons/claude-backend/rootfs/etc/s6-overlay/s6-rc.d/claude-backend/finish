@@ -12,8 +12,11 @@ fi
 
 if test "$e" -ne 0; then
     bashio::log.warning "claude-backend exited with code $e (by signal $2)."
-    echo "$e" > /run/s6-linux-init-container-results/exitcode
-    exec /run/s6/basedir/bin/halt
 else
-    bashio::log.info "claude-backend exited with code $e (by signal $2)."
+    bashio::log.info "claude-backend exited cleanly (code $e)."
 fi
+
+# Always halt the container — prevents s6 from restarting the service
+# and ensures the Supervisor sees the addon as properly stopped.
+echo "$e" > /run/s6-linux-init-container-results/exitcode
+exec /run/s6/basedir/bin/halt

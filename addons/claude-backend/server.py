@@ -40,6 +40,12 @@ def main() -> None:
     # Register floating chat bubble (if enabled)
     api.setup_chat_bubble()
 
+    # Start Telegram / WhatsApp bots if configured
+    api.start_messaging_bots()
+
+    # Initialize MCP servers if configured
+    api.initialize_mcp()
+
     from waitress import serve
 
     api.logger.info(f"Starting production server on 0.0.0.0:{api.API_PORT}")

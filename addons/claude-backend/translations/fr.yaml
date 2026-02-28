@@ -1,10 +1,9 @@
 configuration:
-  ai_provider:
-    name: Fournisseur d'IA
-    description: "Sélectionnez votre fournisseur d'IA. 🆓 GRATUIT: NVIDIA, GitHub Models | 💳 PAYANT: Anthropic, OpenAI, Google"
-  ai_model:
-    name: Modèle d'IA
-    description: "Selon fournisseur: Claude=Sonnet/Opus/Haiku, OpenAI=GPT-5.2/5/o3, Google=Gemini, NVIDIA=6 modèles🧪🆓 (Kimi/Llama/Mistral/Phi/Nemotron), GitHub=40+ modèles🆓"
+
+  language:
+    name: Langue
+    description: Langue des réponses de l'IA (Anglais, Italien, Espagnol ou Français)
+
   anthropic_api_key:
     name: Clé API Anthropic
     description: Clé API de console.anthropic.com (sauvegardez même si non utilisée, pour changement rapide)
@@ -14,54 +13,138 @@ configuration:
   google_api_key:
     name: Clé API Google
     description: Clé API de aistudio.google.com (sauvegardez même si non utilisée, pour changement rapide)
-  nvidia_api_key:
-    name: Clé API NVIDIA
-    description: Clé API de build.nvidia.com (gratuite - sauvegardez même si non utilisée, pour changement rapide)
-  nvidia_thinking_mode:
-    name: Mode Thinking NVIDIA
-    description: "Active le mode thinking pour voir le processus de raisonnement de l'IA (plus lent mais plus transparent)"
   github_token:
     name: Token GitHub
     description: Personal Access Token de github.com/settings/tokens (sauvegardez même si non utilisé, pour changement rapide)
-  debug_mode:
-    name: Mode Debug
-    description: Activer la journalisation détaillée pour le dépannage (crée des journaux plus volumineux)
+  nvidia_api_key:
+    name: Clé API NVIDIA
+    description: Clé API de build.nvidia.com (gratuite - sauvegardez même si non utilisée, pour changement rapide)
+  groq_api_key:
+    name: Clé API Groq
+    description: "Fournisseur LLM gratuit et rapide avec transcription vocale Whisper intégrée - obtenez sur console.groq.com"
+  mistral_api_key:
+    name: Clé API Mistral
+    description: "Modèles open-source rapides de Mistral - obtenez sur console.mistral.ai"
+  openrouter_api_key:
+    name: Clé API OpenRouter
+    description: "Passerelle mondiale avec accès à 100+ modèles de tous les fournisseurs (Claude, GPT, Llama, Mistral, etc.) - obtenez sur openrouter.ai"
+  deepseek_api_key:
+    name: Clé API DeepSeek
+    description: "Modèles rapides et économiques avec raisonnement avancé (R1, V3) - obtenez sur platform.deepseek.com"
+  minimax_api_key:
+    name: Clé API MiniMax
+    description: "Fournisseur LLM chinois avancé avec support multimodal - obtenez sur platform.minimax.io"
+  aihubmix_api_key:
+    name: Clé API AiHubMix
+    description: "Passerelle API universelle avec accès à tous les modèles principaux (ChatGPT, Claude, Gemini, etc.) - obtenez sur aihubmix.com"
+  siliconflow_api_key:
+    name: Clé API SiliconFlow
+    description: "Passerelle chinoise avec accès aux modèles open-source (Qwen, Llama, Mistral) à haute vitesse - obtenez sur siliconflow.cn"
+  volcengine_api_key:
+    name: Clé API VolcEngine
+    description: "Passerelle d'entreprise Aliyun pour LLM - obtenez sur volcengine.com"
+  dashscope_api_key:
+    name: Clé API DashScope
+    description: "Modèles Qwen d'Aliyun avec support vision/multimodal - obtenez sur dashscope.console.aliyun.com"
+  moonshot_api_key:
+    name: Clé API Moonshot
+    description: "Modèle Kimi de Moonshot (raisonnement rapide, meilleur pour le chinois) - obtenez sur platform.moonshot.cn"
+  zhipu_api_key:
+    name: Clé API Zhipu
+    description: "Modèles GLM de Zhipu avec support vision - obtenez sur open.bigmodel.cn"
+  perplexity_api_key:
+    name: Clé API Perplexity
+    description: "Modèles Sonar avec recherche web en temps réel (sonar-pro, sonar-reasoning-pro, r1-1776) - obtenez sur perplexity.ai/api"
+
+  custom_api_key:
+    name: Clé API Endpoint Personnalisé
+    description: "Clé API pour votre endpoint compatible OpenAI (ex. LM Studio, vLLM, LocalAI) - laisser vide si vous n'utilisez pas d'endpoint personnalisé"
+  custom_api_base:
+    name: URL de Base Endpoint Personnalisé
+    description: "URL de base de votre API compatible OpenAI (ex. http://localhost:1234/v1) - laisser vide si vous n'utilisez pas d'endpoint personnalisé"
+  custom_model_name:
+    name: Nom du Modèle Personnalisé
+    description: "Identifiant du modèle à envoyer à votre endpoint (ex. mistral-7b-instruct, llama3) - laisser vide si vous n'utilisez pas d'endpoint personnalisé"
+
+  ollama_base_url:
+    name: URL du Serveur Ollama
+    description: "URL du serveur Ollama local (par défaut : http://localhost:11434) - pas de clé API, exécution locale"
+
+  nvidia_thinking_mode:
+    name: Mode Thinking NVIDIA
+    description: "Active le mode thinking pour voir le processus de raisonnement de l'IA (plus lent mais plus transparent)"
+  anthropic_extended_thinking:
+    name: Pensée Étendue Anthropic
+    description: "Activer la pensée étendue de Claude Opus pour les tâches de raisonnement complexe (plus lent, utilise plus de tokens)"
+  anthropic_prompt_caching:
+    name: Mise en Cache des Prompts Anthropic
+    description: "Met en cache les instructions longues et répétitives pour économiser les coûts et améliorer la vitesse"
+  openai_extended_thinking:
+    name: Pensée Étendue OpenAI
+    description: "Activer le mode raisonnement o1/o3 pour la résolution de problèmes complexes (plus lent, utilise plus de tokens)"
+
   enable_file_access:
     name: Activer l'Accès aux Fichiers
     description: Autoriser l'IA à lire/écrire les fichiers de configuration Home Assistant (automatisations, scripts, YAML)
-  language:
-    name: Langue
-    description: Langue des réponses de l'IA (Anglais, Italien, Espagnol ou Français)
-  timeout:
-    name: Délai d'Attente
-    description: Délai d'attente des requêtes API en secondes (par défaut 30, augmenter si les réponses sont lentes)
-  max_retries:
-    name: Tentatives Maximales
-    description: Nombre maximal de tentatives pour les appels API échoués (par défaut 3)
-  colored_logs:
-    name: Journaux Colorés
-    description: Activer les indicateurs emoji colorés dans les journaux de l'addon (🟢 succès, 🔴 erreur, etc.)
-  log_level:
-    name: Niveau de Journal
-    description: "Verbosité des journaux : normal (filtrer le bruit), verbose (tous les journaux), debug (inclut les données payload)"
   enable_memory:
     name: Activer la Mémoire
     description: "[EXPÉRIMENTAL] Activer la mémoire persistante - l'IA se souvient des conversations passées entre les sessions"
   enable_file_upload:
     name: Activer l'Upload de Fichiers
     description: "[EXPÉRIMENTAL] Autoriser le téléchargement de documents (PDF, DOCX, TXT, MD, YAML) pour l'analyse IA"
+  enable_voice_input:
+    name: Activer la Saisie Vocale
+    description: "Activer le bouton microphone pour les messages vocaux (Groq Whisper, avec fallback OpenAI/Google) - nécessite HTTPS"
   enable_rag:
     name: Activer RAG
     description: "[EXPÉRIMENTAL] Activer RAG (Génération Augmentée par Récupération) pour la recherche de documents et l'injection de contexte"
   enable_chat_bubble:
     name: Bulle de Chat
     description: "Afficher une bulle de chat IA flottante sur chaque page Home Assistant. Détecte le contexte (automatisations, scripts, tableaux de bord). Inclut saisie vocale, rendu markdown et changement d'agent en direct. Masquée sur mobile."
+
+  timeout:
+    name: Délai d'Attente
+    description: Délai d'attente des requêtes API en secondes (par défaut 30, augmenter si les réponses sont lentes)
+  max_retries:
+    name: Tentatives Maximales
+    description: Nombre maximal de tentatives pour les appels API échoués (par défaut 3)
   max_snapshots_per_file:
     name: Sauvegardes Max par Fichier
     description: "Nombre maximal de copies de sauvegarde par fichier (ex. 5 pour automations.yaml, 5 pour scripts.yaml). Les copies les plus anciennes sont supprimées automatiquement."
   max_conversations:
     name: Conversations Maximales
     description: "Nombre maximal de conversations de chat dans l'historique (1-100)"
+
   cost_currency:
     name: Devise des Coûts
-    description: "Devise pour l'affichage des coûts de tokens (USD ou EUR)"
+    description: "Devise pour l'affichage des coûts de tokens (USD, EUR, GBP ou JPY)"
+  mcp_config_file:
+    name: Fichier de Configuration MCP
+    description: "Chemin du fichier JSON de configuration MCP (par défaut: /config/amira/mcp_config.json) - créez ce fichier avec vos serveurs MCP personnalisés"
+
+  telegram_bot_token:
+    name: Token du Bot Telegram
+    description: "Token du bot Telegram de @BotFather - laissez vide pour désactiver la messagerie Telegram"
+  twilio_account_sid:
+    name: SID du Compte Twilio
+    description: "Votre SID du Compte Twilio pour l'intégration WhatsApp - obtenu de console.twilio.com"
+  twilio_auth_token:
+    name: Token d'Authentification Twilio
+    description: "Votre Token d'Authentification Twilio pour l'intégration WhatsApp - obtenu de console.twilio.com"
+  twilio_whatsapp_from:
+    name: Numéro WhatsApp Twilio
+    description: "Votre numéro WhatsApp Twilio (ex. +1234567890) - laissez vide pour désactiver WhatsApp"
+
+  colored_logs:
+    name: Journaux Colorés
+    description: Activer les indicateurs emoji colorés dans les journaux de l'addon (🟢 succès, 🔴 erreur, etc.)
+  debug_mode:
+    name: Mode Debug
+    description: Activer la journalisation détaillée pour le dépannage (crée des journaux plus volumineux)
+  log_level:
+    name: Niveau de Journal
+    description: "Verbosité des journaux : normal (filtrer le bruit), verbose (tous les journaux), debug (inclut les données payload)"
+
+  api_port:
+    name: Port API
+    description: "Port sur lequel le complément expose son API interne (par défaut : 5010) - ne modifier qu'en cas de conflit avec un autre complément"

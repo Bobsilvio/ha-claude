@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "mcp.server.stdio.filesystem"],
+      "env": {
+        "MCP_FILESYSTEM_ROOTS": "/config",
+        "MCP_ALLOWED_DIRS": "/config:/config/automations:/config/scripts"
+      }
+    }
+  }
+}

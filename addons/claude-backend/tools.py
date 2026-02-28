@@ -8,9 +8,15 @@ from datetime import datetime, timedelta
 
 import api
 
+try:
+    import mcp
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
-AI_SIGNATURE = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+AI_SIGNATURE = getattr(api, "AGENT_NAME", "Amira") or "Amira"
 
 # Buffer for chunked HTML dashboard creation (draft mode)
 # Key: dashboard name (slug), Value: {"html": str, "title": str, "entities": list, ...}
@@ -55,7 +61,7 @@ def _build_dashboard_html(title: str, entities: list, theme: str,
     if lang not in ("en", "it", "es", "fr"):
         lang = "en"
 
-    agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+    agent_name = getattr(api, "AGENT_NAME", "Amira") or "Amira"
     default_footer = getattr(api, "HTML_DASHBOARD_FOOTER", "") or ""
     if not footer_text:
         footer_text = default_footer.strip() or f"Dashboard by {agent_name} · Real-time"
@@ -537,7 +543,7 @@ def _fill_html_placeholders(
     if lang not in ("en", "it", "es", "fr"):
         lang = "en"
 
-    agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+    agent_name = getattr(api, "AGENT_NAME", "Amira") or "Amira"
     default_footer = getattr(api, "HTML_DASHBOARD_FOOTER", "") or ""
     if not footer_text:
         footer_text = default_footer.strip() or f"Dashboard by {agent_name} · Real-time"
@@ -581,7 +587,7 @@ def _fix_css_var_in_js(html: str) -> str:
 
 
 def _stamp_description(description: str, action: str = "create") -> str:
-    """Add AI Assistant watermark to a description field.
+    """Add Amira watermark to a description field.
 
     action: 'create' or 'modify' — selects the verb prefix by language.
     If the signature is already present, returns description unchanged.
@@ -608,6 +614,7 @@ TOOL_DESCRIPTIONS = {
     "get_entity_state": "Leggo stato dispositivo",
     "call_service": "Eseguo comando",
     "search_entities": "Cerco dispositivi",
+    "get_integration_entities": "Cerco entità integrazione",
     "get_automations": "Carico automazioni",
     "update_automation": "Modifico automazione",
     "create_automation": "Creo automazione",
@@ -783,6 +790,25 @@ HA_TOOLS_DESCRIPTION = [
                 }
             },
             "required": ["query"]
+        }
+    },
+    {
+        "name": "get_integration_entities",
+        "description": (
+            "Find all entities belonging to a specific integration/custom component by its platform name. "
+            "Use this when the user mentions an integration or brand (e.g. 'Tigo', 'Shelly', 'SolarEdge', 'EPCube') "
+            "and search_entities returns nothing — the entities may not have the brand name in their entity_id or friendly_name. "
+            "This searches the HA entity registry by platform name."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "integration": {
+                    "type": "string",
+                    "description": "Integration/platform name to search for (e.g. 'tigo', 'shelly', 'solaredge', 'epcube'). Case-insensitive partial match."
+                }
+            },
+            "required": ["integration"]
         }
     },
     {
@@ -1157,7 +1183,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1171,7 +1197,7 @@ HA_TOOLS_DESCRIPTION = [
                 "footer_text": {"type": "string", "description": "Footer text. Default: configured html_dashboard_footer or 'Dashboard by <agent_name> · Real-time'."},
                 "html": {"type": "string", "description": "Raw HTML mode: full HTML/CSS/JS code. If provided, 'sections' is optional. For large HTML (>6000 chars), use draft=true and send in multiple calls."},
                 "draft": {"type": "boolean", "description": "If true, buffer this HTML chunk without creating the dashboard. Call again with same 'name' to append more chunks. Omit draft (or false) on the last call to finalize."},
-                "return_html": {"type": "boolean", "description": "If true, include the generated/saved HTML content in the tool response (useful when user asked for the full code)."},
+                "return_html": {"type": "boolean", "description": "Leave false (default). The dashboard is always saved to a file. NEVER set true — do NOT echo HTML in chat."},
                 "sections": {
                     "type": "array",
                     "description": "Array of dashboard sections. Each has a 'type' + type-specific props.",
@@ -1235,6 +1261,65 @@ HA_TOOLS_DESCRIPTION = [
 ]
 
 
+# ============================================================================
+# MCP TOOLS INTEGRATION (Model Context Protocol)
+# ============================================================================
+
+def _get_mcp_tools_anthropic():
+    """Convert MCP tools to Anthropic format."""
+    if not MCP_AVAILABLE:
+        return []
+    
+    try:
+        manager = mcp.get_mcp_manager()
+        all_mcp_tools = manager.get_all_tools()
+        
+        mcp_tools = []
+        for tool_name, tool_info in all_mcp_tools.items():
+            mcp_tools.append({
+                "name": tool_name,
+                "description": f"{tool_info['description']} (MCP: {tool_info['server']})",
+                "input_schema": tool_info.get("inputSchema", {"type": "object", "properties": {}})
+            })
+        
+        if mcp_tools:
+            logger.debug(f"Added {len(mcp_tools)} MCP tools to Anthropic toolkit")
+        
+        return mcp_tools
+    except Exception as e:
+        logger.warning(f"Error loading MCP tools: {e}")
+        return []
+
+
+def _get_mcp_tools_openai():
+    """Convert MCP tools to OpenAI format."""
+    if not MCP_AVAILABLE:
+        return []
+    
+    try:
+        manager = mcp.get_mcp_manager()
+        all_mcp_tools = manager.get_all_tools()
+        
+        mcp_tools = []
+        for tool_name, tool_info in all_mcp_tools.items():
+            mcp_tools.append({
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "description": f"{tool_info['description']} (MCP: {tool_info['server']})",
+                    "parameters": tool_info.get("inputSchema", {"type": "object", "properties": {}})
+                }
+            })
+        
+        if mcp_tools:
+            logger.debug(f"Added {len(mcp_tools)} MCP tools to OpenAI toolkit")
+        
+        return mcp_tools
+    except Exception as e:
+        logger.warning(f"Error loading MCP tools: {e}")
+        return []
+
+
 def get_anthropic_tools():
     """Convert tools to Anthropic format."""
     from intent import INTENT_TOOL_SETS
@@ -1244,10 +1329,16 @@ def get_anthropic_tools():
         filtered_count = len([t for t in tools if t["name"] in config_edit_tools])
         logger.info(f"ENABLE_FILE_ACCESS=False: filtering {filtered_count} config_edit tools: {config_edit_tools}")
         tools = [t for t in tools if t["name"] not in config_edit_tools]
-    return [
+    
+    anthropic_tools = [
         {"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
         for t in tools
     ]
+    
+    # Add MCP tools if available
+    anthropic_tools.extend(_get_mcp_tools_anthropic())
+    
+    return anthropic_tools
 
 
 def get_openai_tools():
@@ -1259,10 +1350,16 @@ def get_openai_tools():
         filtered_count = len([t for t in tools if t["name"] in config_edit_tools])
         logger.debug(f"OpenAI: filtering {filtered_count} config_edit tools")
         tools = [t for t in tools if t["name"] not in config_edit_tools]
-    return [
+    
+    openai_tools = [
         {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
         for t in tools
     ]
+    
+    # Add MCP tools if available
+    openai_tools.extend(_get_mcp_tools_openai())
+    
+    return openai_tools
 
 
 def get_gemini_tools(intent_info: dict | None = None):
@@ -1352,10 +1449,36 @@ def _read_only_response(tool_name: str, tool_input: dict) -> str:
     }, ensure_ascii=False, default=str)
 
 
-def _extract_entity_ids(obj):
-    """Recursively extract all entity_id references from a config dict/list."""
+def _extract_entity_ids(obj, _in_service_key=False):
+    """Recursively extract all entity_id references from a config dict/list.
+
+    Skips values that are HA service names (e.g. 'switch.turn_on') — those
+    live in the 'service' / 'action' keys and look like domain.verb but are
+    NOT entity_ids.  Only strings found under an 'entity_id' key (or inside
+    a bare string that is clearly an entity) are collected.
+    """
+    # Known HA service verbs — strings ending with these are service calls,
+    # not entity_ids, and must be excluded from validation.
+    _SERVICE_VERBS = {
+        "turn_on", "turn_off", "toggle", "open_cover", "close_cover",
+        "stop_cover", "lock", "unlock", "trigger", "press", "set_temperature",
+        "set_humidity", "set_hvac_mode", "set_fan_mode", "set_swing_mode",
+        "set_preset_mode", "set_value", "set_speed", "play_media",
+        "media_play", "media_pause", "media_stop", "media_next_track",
+        "media_previous_track", "volume_up", "volume_down", "volume_mute",
+        "volume_set", "send_message", "notify", "reload", "restart",
+        "start", "stop", "pause", "resume", "activate", "deactivate",
+        "enable", "disable", "update_entity", "install", "skip",
+        "set_datetime", "select_option", "select_first", "select_last",
+        "select_next", "select_previous", "increment", "decrement",
+        "open", "close", "set_position", "set_tilt_position",
+    }
+
     ids = set()
     if isinstance(obj, str):
+        # If we're inside a "service" key, never extract entity_ids from the value
+        if _in_service_key:
+            return ids
         import re as _re
         for m in _re.finditer(
             r'(?:sensor|switch|light|climate|binary_sensor|input_boolean|'
@@ -1364,7 +1487,11 @@ def _extract_entity_ids(obj):
             r'input_select|input_text|person|device_tracker|calendar|'
             r'camera|update|group|sun)\.[a-z0-9_]+', obj
         ):
-            ids.add(m.group(0))
+            candidate = m.group(0)
+            # Exclude service calls: domain.verb where verb is a known service
+            suffix = candidate.split(".", 1)[1] if "." in candidate else ""
+            if suffix not in _SERVICE_VERBS:
+                ids.add(candidate)
     elif isinstance(obj, dict):
         for k, v in obj.items():
             if k == "entity_id":
@@ -1373,7 +1500,9 @@ def _extract_entity_ids(obj):
                 elif isinstance(v, list):
                     ids.update(e for e in v if isinstance(e, str))
             else:
-                ids.update(_extract_entity_ids(v))
+                # Pass flag so string values under "service"/"action" are skipped
+                in_svc = k in ("service", "action")
+                ids.update(_extract_entity_ids(v, _in_service_key=in_svc))
     elif isinstance(obj, list):
         for item in obj:
             ids.update(_extract_entity_ids(item))
@@ -1383,6 +1512,17 @@ def _extract_entity_ids(obj):
 def execute_tool(tool_name: str, tool_input: dict) -> str:
     """Execute a tool call and return the result as string."""
     try:
+        # Handle MCP tools first
+        if tool_name.startswith("mcp_"):
+            if MCP_AVAILABLE:
+                logger.info(f"Executing MCP tool: {tool_name}")
+                manager = mcp.get_mcp_manager()
+                result = manager.call_tool(tool_name, tool_input)
+                logger.debug(f"MCP tool result ({len(result)} chars): {result[:300]}")
+                return result
+            else:
+                return json.dumps({"error": f"MCP tool '{tool_name}' requested but MCP module not available"})
+        
         # Read-only mode: block write tools and return YAML preview
         session_id = getattr(api, 'current_session_id', 'default')
         if api.read_only_sessions.get(session_id, False):
@@ -1592,6 +1732,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "get_automations":
             query = tool_input.get("query") if isinstance(tool_input, dict) else None
+            # Accept automation_id as an alias for query (model may pass it directly)
+            if not query and isinstance(tool_input, dict):
+                query = tool_input.get("automation_id") or tool_input.get("id") or ""
             query = (query or "").strip()
             limit = tool_input.get("limit") if isinstance(tool_input, dict) else None
             try:
@@ -2066,6 +2209,66 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             return json.dumps(matches, ensure_ascii=False, default=str)
 
+        elif tool_name == "get_integration_entities":
+            keyword = tool_input.get("integration", "").lower().strip()
+            if not keyword:
+                return json.dumps({"error": "integration keyword is required"})
+
+            # Get entity registry via WebSocket (contains platform/integration info)
+            reg_result = api.call_ha_websocket("config/entity_registry/list")
+            registry = reg_result.get("result", []) if isinstance(reg_result, dict) else []
+            if not registry:
+                return json.dumps({"error": "Could not retrieve entity registry", "detail": str(reg_result)[:200]})
+
+            # Try to also match by config_entry title (e.g. "Tigo Energy" for keyword "tigo")
+            matched_entry_ids: set = set()
+            try:
+                cfg_result = api.call_ha_websocket("config_entries/get_entries")
+                entries = cfg_result.get("result", []) if isinstance(cfg_result, dict) else []
+                for e in entries:
+                    domain = (e.get("domain") or "").lower()
+                    title = (e.get("title") or "").lower()
+                    if keyword in domain or keyword in title:
+                        matched_entry_ids.add(e.get("entry_id", ""))
+            except Exception:
+                pass  # optional, platform match is enough
+
+            # Filter entities by platform name OR config_entry_id match
+            matched_registry = [
+                r for r in registry
+                if keyword in (r.get("platform") or "").lower()
+                or (matched_entry_ids and r.get("config_entry_id") in matched_entry_ids)
+            ]
+
+            if not matched_registry:
+                return json.dumps({
+                    "found": 0, "entities": [],
+                    "note": f"No entities found for integration '{keyword}'. Try search_entities for name-based search."
+                })
+
+            # Enrich with current states
+            all_states = api.get_all_states()
+            state_map = {s.get("entity_id"): s for s in all_states}
+            entities = []
+            for r in matched_registry:
+                eid = r.get("entity_id", "")
+                state = state_map.get(eid, {})
+                entities.append({
+                    "entity_id": eid,
+                    "state": state.get("state", "unavailable"),
+                    "friendly_name": (
+                        state.get("attributes", {}).get("friendly_name")
+                        or r.get("name")
+                        or r.get("original_name")
+                        or ""
+                    ),
+                    "unit": state.get("attributes", {}).get("unit_of_measurement", ""),
+                    "platform": r.get("platform", ""),
+                })
+            entities.sort(key=lambda x: x["entity_id"])
+            return json.dumps({"found": len(entities), "integration": keyword, "entities": entities},
+                              ensure_ascii=False, default=str)
+
         elif tool_name == "get_events":
             events = api.call_ha_api("GET", "events")
             if isinstance(events, list):
@@ -2193,7 +2396,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         elif tool_name == "send_notification":
             message = tool_input.get("message", "")
-            title = tool_input.get("title", "AI Assistant")
+            title = tool_input.get("title", "Amira")
             target = tool_input.get("target", "")
             if target:
                 result = api.call_ha_api("POST", f"services/notify/{target}", {"message": message, "title": title})
@@ -2301,7 +2504,11 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             return json.dumps({"status": "error", "message": f"Dashboard '{name}' not found. Use list: /custom_dashboards"})
 
         elif tool_name == "create_html_dashboard":
-            title = tool_input.get("title", "Custom Dashboard")
+            _raw_title = tool_input.get("title", "Custom Dashboard")
+            # Always prefix with "Amira — " so all HTML dashboards are clearly identified
+            # in the HA sidebar, regardless of what name the AI chose.
+            _PREFIX = "Amira \u2014 "  # em-dash
+            title = _raw_title if _raw_title.startswith(_PREFIX) else _PREFIX + _raw_title
             name = tool_input.get("name", "dashboard")
             icon = tool_input.get("icon", "mdi:web")
             entities = tool_input.get("entities", [])
@@ -2398,8 +2605,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                         "{\"title\":\"...\",\"name\":\"...\",\"entities\":[...],\"html\":\"<!DOCTYPE html><html>...</html>\"} "
                         "Include title, name, entities array, and the complete html string."
                     )}, default=str)
-            if not entities:
+            # In raw HTML mode, entities are optional metadata (the HTML is already complete).
+            # In structured (sections) mode, entities are required to build the template.
+            if not entities and raw_html is None:
                 return json.dumps({"error": "entities is required. Provide an array of entity_ids to monitor."}, default=str)
+            if not entities:
+                logger.info("create_html_dashboard: no entities provided for raw HTML — saving as-is")
 
             # Validate entities: only keep those that exist and are not unknown/unavailable
             original_count = len(entities)
@@ -2423,9 +2634,19 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 logger.info(f"🧹 Filtered {len(invalid_entities)}/{original_count} entities: {invalid_entities}")
 
             if not valid_entities:
-                return json.dumps({"error": f"No valid entities found. All {original_count} entities are either missing or unknown/unavailable: {invalid_entities}"}, default=str)
-
-            entities = valid_entities
+                if raw_html is not None:
+                    # Raw HTML mode: entities are optional metadata, the HTML is already complete.
+                    # Save anyway even if extracted entity references are wrong/unknown.
+                    if original_count > 0:
+                        logger.warning(
+                            f"⚠️ All {original_count} entities invalid for raw HTML dashboard — "
+                            f"saving without entity metadata: {invalid_entities}"
+                        )
+                    entities = []
+                else:
+                    return json.dumps({"error": f"No valid entities found. All {original_count} entities are either missing or unknown/unavailable: {invalid_entities}"}, default=str)
+            else:
+                entities = valid_entities
 
             mode = "raw" if raw_html is not None else "structured"
             logger.info(
@@ -2472,6 +2693,16 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     safe_filename += ".html"
 
                 file_path = os.path.join(html_dashboards_dir, safe_filename)
+
+                # Read old content for diff (if file already exists)
+                _old_html = ""
+                if os.path.exists(file_path):
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as _f:
+                            _old_html = _f.read()
+                    except Exception:
+                        pass
+
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
 
@@ -2483,6 +2714,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
                 # Create a Lovelace dashboard wrapper with iframe in sidebar
                 safe_url_path = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+                # HA requires url_path to contain at least one hyphen
+                if "-" not in safe_url_path:
+                    safe_url_path = safe_url_path + "-dash"
                 dashboard_created = False
                 
                 try:
@@ -2497,6 +2731,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     logger.info(f"📊 Dashboard create WS response: {ws_result}")
                     if ws_result.get("success") is not False:
                         dashboard_created = True
+                    else:
+                        # If it already exists, treat as success (upsert)
+                        err_code = (ws_result.get("error") or {}).get("code", "")
+                        if err_code in ("already_exists", "home_assistant_error"):
+                            logger.info(f"📊 Dashboard '{safe_url_path}' already exists — updating config")
+                            dashboard_created = True
                 except Exception as e:
                     logger.error(f"❌ Exception creating Lovelace dashboard: {e}")
 
@@ -2532,9 +2772,24 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "entities_count": len(entities),
                     "mode": mode,
                     "sections_count": len(sections) if isinstance(sections, list) else 0,
-                    "IMPORTANT": f"✨ Your dashboard '{title}' is ready in the sidebar! Click on it to view.",
-                    "DISPLAY_NOTE": "If the user asked for the full HTML code, show it in a single ```html code block. Otherwise, just confirm the dashboard was created and where to find it."
+                    "IMPORTANT": f"✨ Dashboard '{title}' is ready! Reply with ONE short sentence confirming it was created. Do NOT include any HTML code in your reply.",
                 }
+                # Compute diff if we overwrote an existing file
+                if _old_html and _old_html != html_content:
+                    import difflib as _difflib
+                    _old_lines = _old_html.splitlines(keepends=True)
+                    _new_lines = html_content.splitlines(keepends=True)
+                    _diff_lines = list(_difflib.unified_diff(
+                        _old_lines, _new_lines, fromfile="old", tofile="new", lineterm=""
+                    ))
+                    if _diff_lines:
+                        _MAX_DIFF_LINES = 120
+                        _diff_str = "".join(_diff_lines[:_MAX_DIFF_LINES])
+                        if len(_diff_lines) > _MAX_DIFF_LINES:
+                            _diff_str += f"\n... ({len(_diff_lines) - _MAX_DIFF_LINES} righe aggiuntive)"
+                        result["diff"] = _diff_str
+                        result["IMPORTANT"] = f"✨ Dashboard '{title}' modificata! Reply with ONE short sentence confirming the edit. Do NOT include any HTML code in your reply."
+
                 if return_html:
                     result["html"] = html_content
                 if invalid_entities:
@@ -3478,7 +3733,7 @@ IMPORTANT for config editing:
 ## Custom HTML Dashboards
 - Use **create_html_dashboard** to create a custom HTML dashboard.
 - For FULL customization, provide the full HTML in the tool input field **html** and use placeholder **__ENTITIES_JSON__** to bind exactly the validated entities.
-- If the user explicitly asks for the full HTML code, show it in a single ```html code block.
+- NEVER show HTML code in the chat. The dashboard is saved to a file — just confirm the URL.
 
 IMPORTANT: When modifying a dashboard, ALWAYS:
 1. First call get_dashboard_config to read the current config

@@ -21,7 +21,7 @@ except ImportError:
     DOCX_SUPPORT = False
 
 logger = logging.getLogger(__name__)
-STORAGE_DIR = "/config/.storage/claude_documents"
+STORAGE_DIR = "/config/amira/documents"
 
 
 def ensure_upload_dir() -> None:

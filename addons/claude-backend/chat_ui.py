@@ -6,7 +6,7 @@ import api
 
 def get_chat_ui():
     """Generate the chat UI with image upload support."""
-    agent_name = getattr(api, "AGENT_NAME", "AI Assistant") or "AI Assistant"
+    agent_name = getattr(api, "AGENT_NAME", "Amira") or "Amira"
     agent_avatar = getattr(api, "AGENT_AVATAR", "🤖") or "🤖"
 
     # Fallback for null/invalid provider
@@ -17,52 +17,21 @@ def get_chat_ui():
     status_color = "#4caf50" if configured else "#ff9800"
     status_text = provider_name if configured else f"{provider_name} (no key)"
 
-    # NOTE: The "thinking" message is also computed dynamically in the browser,
-    # because provider/model can change at runtime via /api/set_model.
-    provider_analyzing = {
-        "anthropic": {
-            "en": "🧠 Claude is thinking deeply...",
-            "it": "🧠 Claude sta pensando...",
-            "es": "🧠 Claude está pensando...",
-            "fr": "🧠 Claude réfléchit...",
-        },
-        "openai": {
-            "en": "⚡ GPT is processing your request...",
-            "it": "⚡ GPT sta elaborando...",
-            "es": "⚡ GPT está procesando...",
-            "fr": "⚡ GPT traite votre demande...",
-        },
-        "google": {
-            "en": "✨ Gemini is analyzing...",
-            "it": "✨ Gemini sta analizzando...",
-            "es": "✨ Gemini está analizando...",
-            "fr": "✨ Gemini analyse...",
-        },
-        "github": {
-            "en": "🚀 GitHub AI is working on it...",
-            "it": "🚀 GitHub AI sta lavorando...",
-            "es": "🚀 GitHub AI está trabajando...",
-            "fr": "🚀 GitHub AI travaille...",
-        },
-        "nvidia": {
-            "en": "🎯 NVIDIA AI is computing...",
-            "it": "🎯 NVIDIA AI sta calcolando...",
-            "es": "🎯 NVIDIA AI está computando...",
-            "fr": "🎯 NVIDIA AI calcule...",
-        },
+    # Generic thinking message — works for any provider/model combination.
+    analyzing_by_lang = {
+        "en": "🤖 Amira is thinking...",
+        "it": "🤖 Amira sta elaborando...",
+        "es": "🤖 Amira está procesando...",
+        "fr": "🤖 Amira réfléchit...",
     }
-
-    analyzing_msg = provider_analyzing.get(api.AI_PROVIDER, provider_analyzing["openai"]).get(
-        api.LANGUAGE,
-        provider_analyzing.get(api.AI_PROVIDER, provider_analyzing["openai"]).get("en"),
-    )
+    analyzing_msg = analyzing_by_lang.get(api.LANGUAGE, analyzing_by_lang["en"])
 
     ui_messages = {
         "en": {
             "welcome": f"{agent_avatar} Hi! I'm {agent_name}, your AI assistant for Home Assistant.",
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Model: <strong>{model_name}</strong>",
             "capabilities": "I can control devices, create automations, and manage your smart home.",
-            "vision_feature": "<strong>🖼 New in v3.0:</strong> Now you can send me images!",
+            "vision_feature": "",
             "o4mini_tokens_hint": "ℹ️ Note: o4-mini has a ~4000 token limit. Context and history are reduced automatically.",
             "analyzing": analyzing_msg
         },
@@ -70,7 +39,7 @@ def get_chat_ui():
             "welcome": f"{agent_avatar} Ciao! Sono {agent_name}, il tuo assistente AI per Home Assistant.",
             "provider_model": f"Provider: <strong>{provider_name}</strong> | Modello: <strong>{model_name}</strong>",
             "capabilities": "Posso controllare dispositivi, creare automazioni e gestire la tua casa smart.",
-            "vision_feature": "<strong>🖼 Novità v3.0:</strong> Ora puoi inviarmi immagini!",
+            "vision_feature": "",
             "o4mini_tokens_hint": "ℹ️ Nota: o4-mini ha un limite di ~4000 token. Contesto e cronologia vengono ridotti automaticamente.",
             "analyzing": analyzing_msg
         },
@@ -78,7 +47,7 @@ def get_chat_ui():
             "welcome": f"{agent_avatar} ¡Hola! Soy {agent_name}, tu asistente AI para Home Assistant.",
             "provider_model": f"Proveedor: <strong>{provider_name}</strong> | Modelo: <strong>{model_name}</strong>",
             "capabilities": "Puedo controlar dispositivos, crear automatizaciones y gestionar tu hogar inteligente.",
-            "vision_feature": "<strong>🖼 Nuevo en v3.0:</strong> ¡Ahora puedes enviarme imágenes!",
+            "vision_feature": "",
             "o4mini_tokens_hint": "ℹ️ Nota: o4-mini tiene un límite de ~4000 tokens. El contexto y el historial se reducen automáticamente.",
             "analyzing": analyzing_msg
         },
@@ -86,7 +55,7 @@ def get_chat_ui():
             "welcome": f"{agent_avatar} Salut ! Je suis {agent_name}, votre assistant IA pour Home Assistant.",
             "provider_model": f"Fournisseur: <strong>{provider_name}</strong> | Modèle: <strong>{model_name}</strong>",
             "capabilities": "Je peux contrôler des appareils, créer des automatisations et gérer votre maison intelligente.",
-            "vision_feature": "<strong>🖼 Nouveau dans v3.0:</strong> Vous pouvez maintenant m'envoyer des images!",
+            "vision_feature": "",
             "o4mini_tokens_hint": "ℹ️ Note : o4-mini a une limite d’environ 4000 tokens. Le contexte et l’historique sont réduits automatiquement.",
             "analyzing": analyzing_msg
         }
@@ -185,6 +154,13 @@ def get_chat_ui():
             "tab_bubble": "Bubble",
             "tab_backups": "Backups",
             "tab_devices": "Bubble Devices",
+            "tab_messaging": "📱 Messaging",
+            "messaging_no_chats": "No messaging chats yet",
+            "messaging_user": "User",
+            "messaging_messages": "Messages",
+            "messaging_last": "Last message",
+            "messaging_delete": "Delete",
+            "messaging_confirm_delete": "Delete this chat?",
             "no_backups": "No backups yet",
             "backup_file": "File",
             "backup_date": "Date",
@@ -297,6 +273,13 @@ def get_chat_ui():
             "tab_bubble": "Bubble",
             "tab_backups": "Backup",
             "tab_devices": "Bubble Devices",
+            "tab_messaging": "📱 Messaggi",
+            "messaging_no_chats": "Nessuna chat di messaggi",
+            "messaging_user": "Utente",
+            "messaging_messages": "Messaggi",
+            "messaging_last": "Ultimo messaggio",
+            "messaging_delete": "Elimina",
+            "messaging_confirm_delete": "Eliminare questa chat?",
             "no_backups": "Nessun backup",
             "backup_file": "File",
             "backup_date": "Data",
@@ -409,6 +392,13 @@ def get_chat_ui():
             "tab_bubble": "Bubble",
             "tab_backups": "Copias",
             "tab_devices": "Bubble Devices",
+            "tab_messaging": "📱 Mensajes",
+            "messaging_no_chats": "Sin chats de mensajes",
+            "messaging_user": "Usuario",
+            "messaging_messages": "Mensajes",
+            "messaging_last": "Último mensaje",
+            "messaging_delete": "Eliminar",
+            "messaging_confirm_delete": "¿Eliminar este chat?",
             "no_backups": "Sin copias de seguridad",
             "backup_file": "Archivo",
             "backup_date": "Fecha",
@@ -521,6 +511,13 @@ def get_chat_ui():
             "tab_bubble": "Bulle",
             "tab_backups": "Sauvegardes",
             "tab_devices": "Bubble Devices",
+            "tab_messaging": "📱 Messages",
+            "messaging_no_chats": "Pas de chats de messages",
+            "messaging_user": "Utilisateur",
+            "messaging_messages": "Messages",
+            "messaging_last": "Dernier message",
+            "messaging_delete": "Supprimer",
+            "messaging_confirm_delete": "Supprimer ce chat ?",
             "no_backups": "Aucune sauvegarde",
             "backup_file": "Fichier",
             "backup_date": "Date",
@@ -624,11 +621,151 @@ def get_chat_ui():
         .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
         .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 240px; min-width: 0; }}
         .model-selector:hover {{ background: rgba(255,255,255,0.35); }}
+        #refreshModelsBtn {{ background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 4px 7px; border-radius: 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; line-height: 1; display: inline-block; }}
+        #refreshModelsBtn:hover {{ background: rgba(255,255,255,0.3); }}
+        #refreshModelsBtn:disabled {{ opacity: 0.5; cursor: default; }}
+        @keyframes spin {{ 100% {{ transform: rotate(360deg); }} }}
+        #refreshModelsBtn.spinning {{ display: inline-block; animation: spin 0.8s linear infinite; }}
         .model-selector option {{ background: #2c3e50; color: white; }}
         .model-selector optgroup {{ background: #1a252f; color: #aaa; font-style: normal; font-weight: 600; padding: 4px 0; }}
         .header .status {{ margin-left: auto; font-size: 12px; display: flex; align-items: center; gap: 6px; }}
         .status-dot {{ width: 8px; height: 8px; border-radius: 50%; background: {status_color}; animation: pulse 2s infinite; }}
         @keyframes pulse {{ 0%, 100% {{ opacity: 1; }} 50% {{ opacity: 0.5; }} }}
+        #codexOAuthBanner {{ display:none; background:#fff3cd; border-bottom:2px solid #ffc107; padding:10px 20px; font-size:13px; color:#856404; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #codexOAuthBanner button {{ background:#ffc107; color:#333; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #codexOAuthBanner button:hover {{ background:#e0a800; }}
+        #codexOAuthConnectedBanner {{ display:none; background:#d4edda; border-bottom:2px solid #28a745; padding:8px 20px; font-size:13px; color:#155724; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #codexOAuthConnectedBanner .codex-conn-info {{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }}
+        #codexOAuthConnectedBanner .codex-conn-dot {{ width:8px; height:8px; border-radius:50%; background:#28a745; flex-shrink:0; }}
+        #codexOAuthConnectedBanner .codex-conn-text {{ font-weight:600; }}
+        #codexOAuthConnectedBanner .codex-conn-detail {{ opacity:0.75; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+        #codexOAuthConnectedBanner button {{ background:transparent; color:#155724; border:1px solid #28a745; border-radius:8px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #codexOAuthConnectedBanner button:hover {{ background:#c3e6cb; }}
+        #codexOAuthModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+        #codexOAuthModal.open {{ display:flex; }}
+        .codex-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:520px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
+        .codex-modal-box h3 {{ margin:0 0 16px; font-size:18px; color:#222; }}
+        .codex-modal-step {{ background:#f7f7f7; border-radius:10px; padding:14px 16px; margin-bottom:14px; }}
+        .codex-modal-step strong {{ display:block; margin-bottom:8px; color:#444; }}
+        .codex-modal-step button {{ background:#667eea; color:#fff; border:none; border-radius:8px; padding:8px 18px; cursor:pointer; font-size:13px; font-weight:600; }}
+        .codex-modal-step button:hover {{ background:#5a6fd6; }}
+        .codex-modal-step textarea {{ width:100%; box-sizing:border-box; height:70px; padding:8px; border-radius:8px; border:1px solid #ddd; font-size:12px; font-family:monospace; resize:vertical; }}
+        #codexOAuthStatus {{ margin-top:10px; padding:8px 12px; border-radius:8px; font-size:13px; display:none; }}
+        #codexOAuthStatus.ok {{ background:#d4edda; color:#155724; display:block; }}
+        #codexOAuthStatus.err {{ background:#f8d7da; color:#721c24; display:block; }}
+        .codex-modal-actions {{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }}
+        .codex-modal-actions button {{ padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; }}
+        .codex-modal-actions .btn-primary {{ background:#667eea; color:#fff; }}
+        .codex-modal-actions .btn-primary:hover {{ background:#5a6fd6; }}
+        .codex-modal-actions .btn-secondary {{ background:#e0e0e0; color:#333; }}
+        .codex-modal-actions .btn-secondary:hover {{ background:#c8c8c8; }}
+        #copilotOAuthBanner {{ display:none; background:#dbeafe; border-bottom:2px solid #0969da; padding:10px 20px; font-size:13px; color:#0a3069; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #copilotOAuthBanner button {{ background:#0969da; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #copilotOAuthBanner button:hover {{ background:#0758b8; }}
+        #copilotOAuthModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+        #copilotOAuthModal.open {{ display:flex; }}
+        .copilot-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:480px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
+        .copilot-modal-box h3 {{ margin:0 0 16px; font-size:18px; color:#222; }}
+        .copilot-user-code {{ font-size:28px; font-weight:700; letter-spacing:4px; color:#0969da; text-align:center; padding:18px 0 10px; }}
+        .copilot-poll-hint {{ font-size:12px; color:#666; text-align:center; margin-bottom:8px; }}
+        #copilotOAuthStatus {{ margin-top:10px; padding:8px 12px; border-radius:8px; font-size:13px; display:none; }}
+        #copilotOAuthStatus.ok {{ background:#d4edda; color:#155724; display:block; }}
+        #copilotOAuthStatus.err {{ background:#f8d7da; color:#721c24; display:block; }}
+        #copilotOAuthStatus.pending {{ background:#e8f4f8; color:#0a5e8a; display:block; }}
+        .copilot-modal-actions {{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }}
+        .copilot-modal-actions button {{ padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; }}
+        .copilot-modal-actions .btn-primary {{ background:#0969da; color:#fff; }}
+        .copilot-modal-actions .btn-primary:hover {{ background:#0758b8; }}
+        .copilot-modal-actions .btn-secondary {{ background:#e0e0e0; color:#333; }}
+        .copilot-modal-actions .btn-secondary:hover {{ background:#c8c8c8; }}
+        /* Claude Web session banner/modal */
+        #claudeWebBanner {{ display:none; background:#fde8d8; border-bottom:2px solid #e07042; padding:10px 20px; font-size:13px; color:#7b3010; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #claudeWebBanner button {{ background:#e07042; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #claudeWebBanner button:hover {{ background:#c45e32; }}
+        #claudeWebModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+        #claudeWebModal.open {{ display:flex; }}
+        .claudeweb-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:520px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
+        .claudeweb-modal-box h3 {{ margin:0 0 16px; font-size:18px; color:#222; }}
+        .claudeweb-modal-step {{ background:#f7f7f7; border-radius:10px; padding:14px 16px; margin-bottom:14px; }}
+        .claudeweb-modal-step strong {{ display:block; margin-bottom:8px; color:#444; }}
+        .claudeweb-modal-step textarea {{ width:100%; box-sizing:border-box; height:70px; padding:8px; border-radius:8px; border:1px solid #ddd; font-size:12px; font-family:monospace; resize:vertical; }}
+        #claudeWebStatus {{ margin-top:10px; padding:8px 12px; border-radius:8px; font-size:13px; display:none; }}
+        #claudeWebStatus.ok {{ background:#d4edda; color:#155724; display:block; }}
+        #claudeWebStatus.err {{ background:#f8d7da; color:#721c24; display:block; }}
+        .claudeweb-modal-actions {{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }}
+        .claudeweb-modal-actions button {{ padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; }}
+        .claudeweb-modal-actions .btn-primary {{ background:#e07042; color:#fff; }}
+        .claudeweb-modal-actions .btn-primary:hover {{ background:#c45e32; }}
+        .claudeweb-modal-actions .btn-secondary {{ background:#e0e0e0; color:#333; }}
+        .claudeweb-modal-actions .btn-secondary:hover {{ background:#c8c8c8; }}
+        /* ChatGPT Web session banner/modal */
+        #chatgptWebBanner {{ display:none; background:#fff8e1; border-bottom:2px solid #f59e0b; padding:10px 20px; font-size:13px; color:#7c4a00; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #chatgptWebBanner.configured {{ background:#e8f5e9; border-color:#4caf50; color:#1b5e20; }}
+        #chatgptWebBanner button {{ background:#f59e0b; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #chatgptWebBanner.configured button {{ background:#4caf50; }}
+        #chatgptWebBanner.configured button:hover {{ background:#388e3c; }}
+        #chatgptWebBanner button:hover {{ background:#d97706; }}
+        #chatgptWebModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+        #chatgptWebModal.open {{ display:flex; }}
+        .chatgptweb-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:520px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
+        .chatgptweb-modal-box h3 {{ margin:0 0 16px; font-size:18px; color:#222; }}
+        .chatgptweb-modal-step {{ background:#f7f7f7; border-radius:10px; padding:14px 16px; margin-bottom:14px; }}
+        .chatgptweb-modal-step strong {{ display:block; margin-bottom:8px; color:#444; }}
+        .chatgptweb-modal-step textarea {{ width:100%; box-sizing:border-box; height:70px; padding:8px; border-radius:8px; border:1px solid #ddd; font-size:12px; font-family:monospace; resize:vertical; }}
+        #chatgptWebStatus {{ margin-top:10px; padding:8px 12px; border-radius:8px; font-size:13px; display:none; }}
+        #chatgptWebStatus.ok {{ background:#d4edda; color:#155724; display:block; }}
+        #chatgptWebStatus.err {{ background:#f8d7da; color:#721c24; display:block; }}
+        .chatgptweb-modal-actions {{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; }}
+        .chatgptweb-modal-actions button {{ padding:8px 20px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; }}
+        .chatgptweb-modal-actions .btn-primary {{ background:#19c37d; color:#fff; }}
+        .chatgptweb-modal-actions .btn-primary:hover {{ background:#13a068; }}
+        .chatgptweb-modal-actions .btn-secondary {{ background:#e0e0e0; color:#333; }}
+        .chatgptweb-modal-actions .btn-secondary:hover {{ background:#c8c8c8; }}
+        /* Messaging chat modal */
+        #messagingChatModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.55); z-index:9999; align-items:center; justify-content:center; }}
+        #messagingChatModal.open {{ display:flex; }}
+        .msg-modal-box {{ background:#fff; border-radius:16px; width:min(600px,96vw); max-height:80vh; display:flex; flex-direction:column; box-shadow:0 8px 40px rgba(0,0,0,0.3); overflow:hidden; }}
+        .msg-modal-header {{ display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid #eee; font-size:15px; font-weight:600; background:#f9f9f9; }}
+        .msg-modal-header button {{ background:none; border:none; font-size:20px; cursor:pointer; color:#666; line-height:1; padding:2px 6px; border-radius:6px; }}
+        .msg-modal-header button:hover {{ background:#eee; }}
+        .msg-modal-body {{ flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:10px; }}
+        .msg-bubble {{ max-width:80%; padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.5; word-wrap:break-word; }}
+        .msg-bubble.user {{ align-self:flex-end; background:#2196F3; color:#fff; border-bottom-right-radius:4px; }}
+        .msg-bubble.assistant {{ align-self:flex-start; background:#f0f0f0; color:#222; border-bottom-left-radius:4px; }}
+        .msg-bubble.assistant.error {{ background:#fde8e8; color:#b71c1c; }}
+        .msg-bubble-label {{ font-size:10px; font-weight:600; opacity:0.65; margin-bottom:3px; }}
+        .theme-dark .msg-modal-box {{ background:#1e1e1e; color:#e8e8e8; }}
+        .theme-dark .msg-modal-header {{ background:#2a2a2a; border-bottom:1px solid #444; }}
+        .theme-dark .msg-modal-header button {{ color:#aaa; }}
+        .theme-dark .msg-modal-header button:hover {{ background:#333; }}
+        .theme-dark .msg-bubble.assistant {{ background:#2c2c2c; color:#ddd; }}
+        .theme-dark .msg-bubble.assistant.error {{ background:#3c1e1e; color:#f48; }}
+        /* Messaging chat list cards */
+        .messaging-list {{ display:flex; flex-direction:column; gap:8px; padding:10px 8px; }}
+        .messaging-card {{ background:#fff; border:1px solid #e8e8e8; border-radius:14px; padding:12px 14px; cursor:pointer; transition:box-shadow 0.15s,border-color 0.15s; display:flex; flex-direction:column; gap:6px; }}
+        .messaging-card:hover {{ box-shadow:0 3px 14px rgba(0,0,0,0.1); border-color:#bbb; }}
+        .messaging-card-header {{ display:flex; align-items:center; justify-content:space-between; gap:8px; }}
+        .messaging-card-channel {{ display:flex; align-items:center; gap:6px; }}
+        .messaging-card-badge {{ display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; padding:3px 8px; border-radius:20px; letter-spacing:0.3px; }}
+        .messaging-card-badge.telegram {{ background:#e3f2fd; color:#1565c0; }}
+        .messaging-card-badge.whatsapp {{ background:#e8f5e9; color:#2e7d32; }}
+        .messaging-card-uid {{ font-size:11px; color:#999; font-family:monospace; }}
+        .messaging-card-delete {{ background:none; border:none; cursor:pointer; color:#bbb; font-size:14px; padding:2px 6px; border-radius:6px; line-height:1; transition:color 0.15s,background 0.15s; }}
+        .messaging-card-delete:hover {{ color:#e53935; background:#fde8e8; }}
+        .messaging-card-preview {{ font-size:12px; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.4; }}
+        .messaging-card-footer {{ display:flex; align-items:center; justify-content:space-between; }}
+        .messaging-card-count {{ font-size:11px; color:#888; display:flex; align-items:center; gap:3px; }}
+        .messaging-card-time {{ font-size:10px; color:#bbb; }}
+        .theme-dark .messaging-card {{ background:#252525; border-color:#3a3a3a; }}
+        .theme-dark .messaging-card:hover {{ box-shadow:0 3px 14px rgba(0,0,0,0.35); border-color:#555; }}
+        .theme-dark .messaging-card-uid {{ color:#666; }}
+        .theme-dark .messaging-card-preview {{ color:#999; }}
+        .theme-dark .messaging-card-count {{ color:#666; }}
+        .theme-dark .messaging-card-time {{ color:#555; }}
+        .theme-dark .messaging-card-badge.telegram {{ background:#1a2a3a; color:#64b5f6; }}
+        .theme-dark .messaging-card-badge.whatsapp {{ background:#1a2e1a; color:#81c784; }}
+        .theme-dark .messaging-card-delete {{ color:#555; }}
+        .theme-dark .messaging-card-delete:hover {{ color:#ef9a9a; background:#3c1e1e; }}
         .chat-container {{ flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }}
         .message {{ max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-wrap: break-word; overflow-wrap: anywhere; animation: fadeIn 0.3s ease; }}
         @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
@@ -912,6 +1049,25 @@ def get_chat_ui():
             color: #e0e0e0;
         }}
 
+        body.dark-mode .message.assistant strong,
+        body.dark-mode .message.assistant b {{
+            color: #ffffff;
+        }}
+
+        body.dark-mode .message.assistant em,
+        body.dark-mode .message.assistant i {{
+            color: #c9d1d9;
+        }}
+
+        body.dark-mode .message.assistant h1,
+        body.dark-mode .message.assistant h2,
+        body.dark-mode .message.assistant h3,
+        body.dark-mode .message.assistant h4,
+        body.dark-mode .message.assistant h5,
+        body.dark-mode .message.assistant h6 {{
+            color: #e0e0e0;
+        }}
+
         body.dark-mode .chat-container {{
             background: #1a1a1a;
         }}
@@ -1082,6 +1238,7 @@ def get_chat_ui():
         <span class="badge">v{api.get_version()}</span>
         <button id="sidebarToggleBtn" class="new-chat mobile-only" onclick="toggleSidebar()" title="{ui_js['conversations']}">\u2630</button>
         <select id="modelSelect" class="model-selector" title="{ui_js['change_model']}"></select>
+        <button id="refreshModelsBtn" title="{ui_js.get('refresh_models', 'Refresh model list from provider APIs')}">&#x21bb;</button>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
         <button id="newChatBtn" class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
@@ -1104,6 +1261,137 @@ def get_chat_ui():
         </div>
     </div>
 
+    <div id="codexOAuthBanner">
+        <span>&#128273; <strong>OpenAI Codex</strong> requires authentication.</span>
+        <button id="codexOAuthConnectBtn">Connect OpenAI Codex</button>
+        <button id="codexOAuthDismissBtn" style="background:#e0e0e0;color:#666;">Dismiss</button>
+    </div>
+
+    <div id="codexOAuthConnectedBanner">
+        <div class="codex-conn-info">
+            <div class="codex-conn-dot"></div>
+            <span class="codex-conn-text">&#128273; OpenAI Codex</span>
+            <span class="codex-conn-detail" id="codexConnDetail">connected</span>
+        </div>
+        <button onclick="revokeCodexOAuth()">Disconnect</button>
+    </div>
+
+    <div id="codexOAuthModal">
+        <div class="codex-modal-box">
+            <h3>&#128273; Connect OpenAI Codex</h3>
+            <div class="codex-modal-step">
+                <strong>Step 1 &#8212; Open the OpenAI login page</strong>
+                <button id="codexOpenLoginBtn">Open login page &#x2197;</button>
+                <p style="margin:8px 0 0;font-size:12px;color:#666;">A new tab will open. Log in with your OpenAI account (ChatGPT Plus/Pro required).</p>
+            </div>
+            <div class="codex-modal-step">
+                <strong>Step 2 &#8212; Paste the redirect URL</strong>
+                <p style="margin:0 0 8px;font-size:12px;color:#666;">After logging in, the browser redirects to a page that fails to load (localhost:1455). <strong>Copy the full URL</strong> from your browser bar and paste it here:</p>
+                <textarea id="codexRedirectUrl" placeholder="http://localhost:1455/auth/callback?code=...&amp;state=..."></textarea>
+            </div>
+            <div id="codexOAuthStatus"></div>
+            <div class="codex-modal-actions">
+                <button class="btn-secondary" id="codexModalCancelBtn">Cancel</button>
+                <button class="btn-primary" id="codexModalConnectBtn">&#10004; Connect</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="copilotOAuthBanner">
+        <span>&#128273; <strong>GitHub Copilot</strong> requires authentication.</span>
+        <button id="copilotOAuthConnectBtn">Connect GitHub Copilot</button>
+        <button id="copilotOAuthDismissBtn" style="background:#c9d1fb;color:#0a3069;">Dismiss</button>
+    </div>
+
+    <div id="copilotOAuthModal">
+        <div class="copilot-modal-box">
+            <h3>&#128273; Connect GitHub Copilot</h3>
+            <p style="margin:0 0 12px;font-size:13px;color:#555;">Open <a href="https://github.com/login/device" target="_blank" id="copilotVerifyLink">github.com/login/device</a> and enter this code:</p>
+            <div class="copilot-user-code" id="copilotUserCode">&#8230;</div>
+            <p class="copilot-poll-hint" id="copilotPollHint">Waiting for you to authorize on GitHub&#8230;</p>
+            <div id="copilotOAuthStatus"></div>
+            <div class="copilot-modal-actions">
+                <button class="btn-secondary" id="copilotModalCancelBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="claudeWebBanner">
+        <span>&#9888;&#65039; <strong>Claude.ai Web [UNSTABLE]</strong> &mdash; session token required.</span>
+        <button id="claudeWebConnectBtn">Set Session Token</button>
+        <button id="claudeWebDismissBtn" style="background:#f0ded4;color:#7b3010;">Dismiss</button>
+    </div>
+
+    <div id="claudeWebModal">
+        <div class="claudeweb-modal-box">
+            <h3>&#128273; Claude.ai Web &mdash; Session Token</h3>
+            <div class="claudeweb-modal-step">
+                <strong>Step 1 &mdash; Get your sessionKey cookie</strong>
+                <p style="margin:0 0 8px;font-size:12px;color:#666;">Open <strong>claude.ai</strong>, press <kbd>F12</kbd> to open DevTools, then find the cookie:<br>&bull; <strong>Chrome / Edge:</strong> Application &rarr; Cookies &rarr; claude.ai<br>&bull; <strong>Firefox:</strong> Storage &rarr; Cookies &rarr; https://claude.ai<br>Copy the value of <code>sessionKey</code> (starts with <code>sk-ant-sid01-</code>).</p>
+            </div>
+            <div class="claudeweb-modal-step">
+                <strong>Step 2 &mdash; Paste the session key here</strong>
+                <textarea id="claudeWebSessionKeyInput" placeholder="sk-ant-sid01-..."></textarea>
+            </div>
+            <div id="claudeWebStatus"></div>
+            <div class="claudeweb-modal-actions">
+                <button class="btn-secondary" id="claudeWebModalCancelBtn">Cancel</button>
+                <button class="btn-primary" id="claudeWebModalConnectBtn">&#10004; Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="chatgptWebBanner">
+        <span>&#9888;&#65039; <strong>ChatGPT Web [UNSTABLE]</strong> &mdash; access token required.</span>
+        <button id="chatgptWebConnectBtn">Set Access Token</button>
+        <button id="chatgptWebDismissBtn" style="background:#c8f0e0;color:#0d5c3a;">Dismiss</button>
+    </div>
+
+    <div id="chatgptWebModal">
+        <div class="chatgptweb-modal-box">
+            <h3>&#128273; ChatGPT Web &mdash; Connessione</h3>
+            <div class="chatgptweb-modal-step">
+                <strong>Step 1 &mdash; Copia il JSON di sessione</strong>
+                <p style="margin:0 0 8px;font-size:12px;color:#666;">
+                    Da browser loggato su ChatGPT, apri una nuova scheda e vai su:<br>
+                    <a href="https://chatgpt.com/api/auth/session" target="_blank"><strong>chatgpt.com/api/auth/session</strong></a><br><br>
+                    Seleziona tutto (<strong>Ctrl+A</strong>) e incolla qui sotto.
+                </p>
+                <textarea id="chatgptWebTokenInput" placeholder="Incolla qui il JSON completo..." rows="4"></textarea>
+            </div>
+            <div id="chatgptWebPreview" style="display:none;background:#f0faf4;border:1px solid #b2dfcc;border-radius:8px;padding:10px 13px;margin-bottom:10px;font-size:12px;">
+                <div style="font-weight:600;color:#1a7a45;margin-bottom:6px;">&#10003; Chiavi estratte:</div>
+                <div style="margin-bottom:4px;">&#128272; <strong>accessToken:</strong> <span id="previewAccessToken" style="font-family:monospace;color:#333;"></span></div>
+                <div>&#127850; <strong>sessionToken:</strong> <span id="previewSessionToken" style="font-family:monospace;color:#333;"></span></div>
+            </div>
+            <div class="chatgptweb-modal-step" style="background:#fff8f0;border-color:#f59e0b;">
+                <strong>&#8505; Opzionale: cf_clearance (fix 403)</strong>
+                <p style="margin:4px 0 6px;font-size:12px;color:#7c4a00;">
+                    Se ricevi errori 403 e HA è sulla <strong>stessa rete del tuo browser</strong> (stesso IP pubblico),
+                    incolla qui il cookie <code>cf_clearance</code> da chatgpt.com:<br>
+                    DevTools (F12) → Application → Cookies → chatgpt.com → <code>cf_clearance</code>
+                </p>
+                <input type="text" id="chatgptWebCfClearance" placeholder="cf_clearance (opzionale — lascia vuoto se non necessario)"
+                    style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #f59e0b;border-radius:6px;font-size:12px;font-family:monospace;">
+            </div>
+            <div id="chatgptWebStatus"></div>
+            <div class="chatgptweb-modal-actions">
+                <button class="btn-secondary" id="chatgptWebModalCancelBtn">Annulla</button>
+                <button class="btn-primary" id="chatgptWebModalConnectBtn">&#10004; Salva</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="messagingChatModal">
+        <div class="msg-modal-box">
+            <div class="msg-modal-header">
+                <span id="msgModalTitle">💬 Chat</span>
+                <button id="msgModalCloseBtn" title="Close">✕</button>
+            </div>
+            <div class="msg-modal-body" id="msgModalBody"></div>
+        </div>
+    </div>
+
     <div class="main-container">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-tabs">
@@ -1111,6 +1399,7 @@ def get_chat_ui():
                 <button class="sidebar-tab" data-tab="bubble" onclick="switchSidebarTab('bubble')">\U0001f4ad {ui_js['tab_bubble']}</button>
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
                 <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">⚙️ {ui_js['tab_devices']}</button>
+                <button class="sidebar-tab" data-tab="messaging" onclick="switchSidebarTab('messaging')">{ui_js['tab_messaging']}</button>
             </div>
             <div class="sidebar-content active" id="tabChat">
                 <div class="chat-list" id="chatList"></div>
@@ -1123,6 +1412,9 @@ def get_chat_ui():
             </div>
             <div class="sidebar-content" id="tabDevices">
                 <div class="device-list" id="deviceList"></div>
+            </div>
+            <div class="sidebar-content" id="tabMessaging">
+                <div class="messaging-list" id="messagingList"></div>
             </div>
         </div>
         <div class="splitter" id="sidebarSplitter" title="{ui_js['drag_resize']}"></div>
@@ -1222,13 +1514,7 @@ def get_chat_ui():
         let currentProviderId = '{ai_provider}' || 'anthropic';
         let currentModelDisplay = '{model_name}';  // Updated by loadModels() and changeModel()
 
-        const ANALYZING_BY_PROVIDER = {{
-            'anthropic': {json.dumps(provider_analyzing['anthropic'].get(api.LANGUAGE, provider_analyzing['anthropic']['en']))},
-            'openai': {json.dumps(provider_analyzing['openai'].get(api.LANGUAGE, provider_analyzing['openai']['en']))},
-            'google': {json.dumps(provider_analyzing['google'].get(api.LANGUAGE, provider_analyzing['google']['en']))},
-            'github': {json.dumps(provider_analyzing['github'].get(api.LANGUAGE, provider_analyzing['github']['en']))},
-            'nvidia': {json.dumps(provider_analyzing['nvidia'].get(api.LANGUAGE, provider_analyzing['nvidia']['en']))}
-        }};
+        const ANALYZING_MSG = {json.dumps(analyzing_msg)};
 
         function _appendSystemRaw(text) {{
             try {{
@@ -1258,7 +1544,7 @@ def get_chat_ui():
         }});
 
         function getAnalyzingMsg() {{
-            return ANALYZING_BY_PROVIDER[currentProviderId] || ANALYZING_BY_PROVIDER['openai'];
+            return ANALYZING_MSG;
         }}
 
         function initSidebarResize() {{
@@ -1505,6 +1791,16 @@ def get_chat_ui():
                 /confirme[sz]?.*?\\?/i,
                 /tape[sz]?\\s+['"]?oui['"]?\\s+ou\\s+['"]?non['"]?/i,
                 /veux-tu\\s+que\\s+(j['\u2019]appliqu|je\\s+proc[eè]d|je\\s+sauvegard).*?\\?/i,
+                // Patterns generati dai no-tool prompt (claude_web, chatgpt_web, ecc.)
+                /conferma\\s+con\\s+s[i\u00ec]/i,
+                /s[i\u00ec]\\s*\\/\\s*yes\\s*\\/\\s*ok/i,
+                /perfetto\\?/i,
+                /salvo\\s+per\\s+te/i,
+                /creo\\s+per\\s+te/i,
+                /procedo\\s+con\\s+la\\s+creazione/i,
+                /posso\\s+(creare|salvare|procedere|confermare).*?\\?/i,
+                /ok\\s+per\\s+te\\??/i,
+                /va\\s+bene.*?\\?/i,
             ];
 
             const isConfirmation = CONFIRM_PATTERNS.some(function(p) {{ return p.test(fullText); }});
@@ -1792,6 +2088,39 @@ def get_chat_ui():
             }}
         }}
 
+        function renderDiff(diffText) {{
+            if (!diffText) return;
+            const wrapper = document.createElement('details');
+            wrapper.style.cssText = 'margin:8px 0;font-size:12px;border:1px solid #334155;border-radius:6px;overflow:hidden;';
+            const summary = document.createElement('summary');
+            summary.style.cssText = 'padding:6px 10px;cursor:pointer;background:#1e293b;color:#94a3b8;user-select:none;';
+            summary.textContent = '📝 Diff modifiche';
+            wrapper.appendChild(summary);
+            const pre = document.createElement('pre');
+            pre.style.cssText = 'margin:0;padding:8px;overflow-x:auto;background:#0f172a;font-size:11px;line-height:1.5;';
+            diffText.split('\\n').forEach(function(line) {{
+                const span = document.createElement('span');
+                span.style.cssText = 'display:block;white-space:pre;';
+                if (line.startsWith('+') && !line.startsWith('+++')) {{
+                    span.style.background = 'rgba(34,197,94,0.15)';
+                    span.style.color = '#86efac';
+                }} else if (line.startsWith('-') && !line.startsWith('---')) {{
+                    span.style.background = 'rgba(239,68,68,0.15)';
+                    span.style.color = '#fca5a5';
+                }} else if (line.startsWith('@@')) {{
+                    span.style.color = '#7dd3fc';
+                }} else if (line.startsWith('---') || line.startsWith('+++')) {{
+                    span.style.color = '#64748b';
+                }} else {{
+                    span.style.color = '#94a3b8';
+                }}
+                span.textContent = line;
+                pre.appendChild(span);
+            }});
+            wrapper.appendChild(pre);
+            return wrapper;
+        }}
+
         function formatUsage(usage) {{
             if (!usage || (!usage.input_tokens && !usage.output_tokens)) return '';
             const inp = (usage.input_tokens || 0).toLocaleString();
@@ -1846,7 +2175,7 @@ def get_chat_ui():
             el.style.display = 'block';
             const inp = conversationUsage.input_tokens.toLocaleString();
             const out = conversationUsage.output_tokens.toLocaleString();
-            let text = '\ud83d\udcca ' + inp + ' in / ' + out + ' out';
+            let text = '📊 ' + inp + ' in / ' + out + ' out';
             if (conversationUsage.cost > 0) {{
                 const sym = conversationUsage.currency === 'EUR' ? '\u20ac' : '$';
                 text += ' \u2022 ' + sym + conversationUsage.cost.toFixed(4) + ' total';
@@ -1880,7 +2209,7 @@ def get_chat_ui():
                 // If the assistant is asking to choose an entity_id, provide tap-to-select UI
                 injectEntityPicker(div, text);
             }} else {{
-                div.textContent = text;
+                div.textContent = stripContextInjections(text);
                 if (imageData) {{
                     const img = document.createElement('img');
                     img.src = imageData;
@@ -1896,6 +2225,31 @@ def get_chat_ui():
             // Matches: "Snapshot creato: `SNAPSHOT_ID`"
             const m = text.match(/Snapshot creato:\\s*`([^`]+)`/i);
             return m ? (m[1] || '').trim() : '';
+        }}
+
+        /**
+         * Remove technical context injections from user messages before display.
+         * These blocks are added by intent.py / chat_bubble.py for AI context but should not
+         * be visible to users when viewing past conversation messages.
+         *
+         * Patterns stripped:
+         *   [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML]   (large HTML block)
+         *   [CONTEXT: ...(single-line content)...]                  (bracket context tag)
+         *   --- CONTEXT: ... ---                                    (separator-style context)
+         */
+        function stripContextInjections(text) {{
+            if (!text || typeof text !== 'string') return text;
+            let t = text;
+            // 1. Strip [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML] (may be very large)
+            t = t.replace(/\\[CURRENT_DASHBOARD_HTML\\][\\s\\S]*?\\[\\/CURRENT_DASHBOARD_HTML\\]\\n?/g, '');
+            // 2. Strip [CONTEXT: ... ] blocks — content ends at first ] not inside nested brackets
+            //    These are always single-line context tags injected by the bubble
+            t = t.replace(/\\[CONTEXT:[^\\]]*\\]\\s*/g, '');
+            // 3. Strip --- CONTEXT: ... --- separator sections
+            t = t.replace(/---\\s*CONTEXT:[\\s\\S]*?---\\s*/g, '');
+            // 4. Clean up excess blank lines left behind
+            t = t.replace(/\\n{{3,}}/g, '\\n\\n').trim();
+            return t;
         }}
 
         function appendUndoButton(div, snapshotId) {{
@@ -2313,9 +2667,18 @@ def get_chat_ui():
                                     ? ('<div class="progress-steps">' + renderStepLines(pendingSteps) + '</div>')
                                     : '';
                                 div.innerHTML = prefix + formatMarkdown(fullText);
+                            }} else if (evt.type === 'diff') {{
+                                // Show colored diff block in the assistant message div
+                                if (div && evt.content) {{
+                                    const diffEl = renderDiff(evt.content);
+                                    if (diffEl) div.appendChild(diffEl);
+                                }}
                             }} else if (evt.type === 'error') {{
                                 removeThinking();
                                 addMessage('\u274c ' + evt.message, 'system');
+                                // If web session expired server-side, refresh banner immediately
+                                if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
+                                else if (currentProviderId === 'claude_web') checkClaudeWebSession();
                             }} else if (evt.type === 'done') {{
                                 removeThinking();
 
@@ -2376,6 +2739,9 @@ def get_chat_ui():
             }} else if (tabName === 'devices') {{
                 document.getElementById('tabDevices').classList.add('active');
                 loadDeviceList();
+            }} else if (tabName === 'messaging') {{
+                document.getElementById('tabMessaging').classList.add('active');
+                loadMessagingList();
             }}
         }}
 
@@ -2694,6 +3060,126 @@ def get_chat_ui():
             }}
         }}
 
+        // Messaging Functions
+        async function loadMessagingList() {{
+            const listEl = document.getElementById('messagingList');
+            try {{
+                const resp = await fetch(apiUrl('api/messaging/chats'));
+                if (!resp.ok) throw new Error('messaging failed: ' + resp.status);
+                const data = await resp.json();
+                listEl.innerHTML = '';
+                
+                const chats = data.chats || {{}};
+                const allChats = [
+                    ...(chats.telegram || []).map(c => ({{...c, channel: 'telegram'}})),
+                    ...(chats.whatsapp || []).map(c => ({{...c, channel: 'whatsapp'}}))
+                ];
+                
+                if (allChats.length === 0) {{
+                    listEl.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + (T.messaging_no_chats || 'No messaging chats') + '</div>';
+                    return;
+                }}
+                
+                allChats.forEach(chat => {{
+                    const isTg = chat.channel === 'telegram';
+                    const badgeLabel = isTg ? '✈️ Telegram' : '💬 WhatsApp';
+                    const badgeCls   = isTg ? 'telegram' : 'whatsapp';
+                    const timeStr    = chat.last_timestamp
+                        ? new Date(chat.last_timestamp).toLocaleString([], {{dateStyle:'short', timeStyle:'short'}})
+                        : '';
+                    const preview = (chat.last_message || '').slice(0, 80);
+                    const msgCount = chat.message_count || 0;
+
+                    const card = document.createElement('div');
+                    card.className = 'messaging-card';
+                    card.onclick = () => loadMessagesPreview(chat.channel, chat.user_id);
+                    card.innerHTML = `
+                        <div class="messaging-card-header">
+                            <div class="messaging-card-channel">
+                                <span class="messaging-card-badge ${{badgeCls}}">${{badgeLabel}}</span>
+                                <span class="messaging-card-uid">${{chat.user_id}}</span>
+                            </div>
+                            <button class="messaging-card-delete" title="${{T.messaging_delete || 'Delete'}}">🗑</button>
+                        </div>
+                        <div class="messaging-card-preview">${{preview || '—'}}</div>
+                        <div class="messaging-card-footer">
+                            <span class="messaging-card-count">💬 ${{msgCount}} ${{T.messaging_messages || 'messages'}}</span>
+                            <span class="messaging-card-time">${{timeStr}}</span>
+                        </div>`;
+
+                    card.querySelector('.messaging-card-delete').addEventListener('click', e => {{
+                        e.stopPropagation();
+                        deleteMessagingChat(chat.channel, chat.user_id);
+                    }});
+                    listEl.appendChild(card);
+                }});
+            }} catch(e) {{
+                console.error('Error loading messaging chats:', e);
+                listEl.innerHTML = '<div style="padding: 12px; color: #f00;">Error loading chats</div>';
+            }}
+        }}
+
+        async function loadMessagesPreview(channel, userId) {{
+            try {{
+                const resp = await fetch(apiUrl(`api/messaging/chat/${{encodeURIComponent(channel)}}/${{encodeURIComponent(userId)}}`));
+                if (!resp.ok) throw new Error('Failed to load messages');
+                const data = await resp.json();
+                const messages = data.messages || [];
+
+                const channelLabel = channel === 'telegram' ? '🤖 Telegram' : '💬 WhatsApp';
+                document.getElementById('msgModalTitle').textContent = `${{channelLabel}} · ${{userId}}`;
+
+                const body = document.getElementById('msgModalBody');
+                body.innerHTML = '';
+                if (messages.length === 0) {{
+                    body.innerHTML = '<div style="text-align:center;color:#999;padding:20px;font-size:13px;">Nessun messaggio</div>';
+                }} else {{
+                    messages.forEach(msg => {{
+                        const isUser = msg.role === 'user';
+                        const isError = (msg.text || '').startsWith('⚠️') || (msg.text || '').startsWith('❌');
+                        const wrap = document.createElement('div');
+                        wrap.style.display = 'flex';
+                        wrap.style.flexDirection = 'column';
+                        wrap.style.alignItems = isUser ? 'flex-end' : 'flex-start';
+
+                        const label = document.createElement('div');
+                        label.className = 'msg-bubble-label';
+                        label.textContent = isUser ? '👤 Tu' : '🤖 Bot';
+                        label.style.textAlign = isUser ? 'right' : 'left';
+
+                        const bubble = document.createElement('div');
+                        bubble.className = 'msg-bubble ' + (isUser ? 'user' : 'assistant') + (isError ? ' error' : '');
+                        bubble.textContent = isUser ? stripContextInjections(msg.text || '') : (msg.text || '');
+
+                        wrap.appendChild(label);
+                        wrap.appendChild(bubble);
+                        body.appendChild(wrap);
+                    }});
+                    // scroll to bottom
+                    setTimeout(() => {{ body.scrollTop = body.scrollHeight; }}, 50);
+                }}
+
+                document.getElementById('messagingChatModal').classList.add('open');
+            }} catch(e) {{
+                console.error('Error loading messages:', e);
+                addMessage('❌ Errore nel caricare i messaggi', 'system');
+            }}
+        }}
+
+        async function deleteMessagingChat(channel, userId) {{
+            if (!confirm(T.messaging_confirm_delete || 'Delete this chat?')) return;
+            try {{
+                const resp = await fetch(apiUrl(`api/messaging/chat/${{encodeURIComponent(channel)}}/${{encodeURIComponent(userId)}}`), {{ method: 'DELETE' }});
+                if (resp.ok) {{
+                    addMessage('✅ Chat deleted', 'system');
+                    loadMessagingList();
+                }}
+            }} catch(e) {{
+                console.error('Error deleting chat:', e);
+                addMessage('❌ Error deleting chat', 'system');
+            }}
+        }}
+
         async function deleteConversation(event, sessionId) {{
             event.stopPropagation();
             if (!confirm(T.confirm_delete)) return;
@@ -2775,7 +3261,23 @@ def get_chat_ui():
             'openai': '⚡ OpenAI',
             'google': '✨ Google Gemini',
             'nvidia': '🎯 NVIDIA NIM',
-            'github': '🚀 GitHub Models'
+            'github': '🚀 GitHub Models',
+            'groq': '⚡ Groq',
+            'mistral': '🌊 Mistral',
+            'ollama': '🦙 Ollama (Local)',
+            'openrouter': '🔀 OpenRouter',
+            'deepseek': '🔍 DeepSeek',
+            'minimax': '🎭 MiniMax',
+            'aihubmix': '🌐 AiHubMix',
+            'siliconflow': '💎 SiliconFlow',
+            'volcengine': '🌋 VolcEngine',
+            'dashscope': '☁️ DashScope (Qwen)',
+            'moonshot': '🌙 Moonshot (Kimi)',
+            'zhipu': '🧬 Zhipu (GLM)',
+            'github_copilot': '🤖 GitHub Copilot',
+            'openai_codex': '⌨️ OpenAI Codex',
+            'claude_web': '🌐 Claude.ai Web ⚠️',
+            'chatgpt_web': '🌐 ChatGPT Web ⚠️'
         }};
 
         // Build the welcome provider/model line dynamically (always reflects current selection)
@@ -2797,6 +3299,35 @@ def get_chat_ui():
 
             statusTextEl.textContent = configured ? providerName : (providerName ? (providerName + ' (no key)') : '');
             statusDotEl.style.background = configured ? '#4caf50' : '#ff9800';
+        }}
+
+        // Refresh model lists by calling official provider /v1/models endpoints
+        async function refreshModels() {{
+            const btn = document.getElementById('refreshModelsBtn');
+            if (!btn) return;
+            btn.classList.add('spinning');
+            btn.disabled = true;
+            try {{
+                const r = await fetch(apiUrl('api/refresh_models'), {{method: 'POST', credentials: 'same-origin'}});
+                const data = await r.json();
+                if (data.success) {{
+                    const updated = Object.keys(data.updated || {{}});
+                    const counts = updated.map(p => p + ':' + data.updated[p]).join(', ');
+                    if (updated.length > 0) {{
+                        addMessage('\u2705 Models refreshed \u2014 ' + updated.length + ' provider(s): ' + counts, 'system');
+                    }} else {{
+                        addMessage('\u2139\ufe0f No updates \u2014 all providers already up to date or no endpoint available.', 'system');
+                    }}
+                    await loadModels();
+                }} else {{
+                    addMessage('\u26a0\ufe0f Refresh failed: ' + (data.error || 'unknown error'), 'system');
+                }}
+            }} catch(e) {{
+                addMessage('\u26a0\ufe0f Could not reach refresh endpoint: ' + e.message, 'system');
+            }} finally {{
+                btn.classList.remove('spinning');
+                btn.disabled = false;
+            }}
         }}
 
         // Load models and populate dropdown with ALL providers
@@ -2839,12 +3370,21 @@ def get_chat_ui():
                 select.innerHTML = '';
 
                 // Add models for ALL available providers, grouped by optgroup
-                const providerOrder = ['anthropic', 'openai', 'google', 'nvidia', 'github'];
                 let availableProviders = data.available_providers && data.available_providers.length
                     ? data.available_providers.map(p => p.id)
                     : Object.keys(data.models || {{}});
                 if (!availableProviders.length && currentProvider) {{
                     availableProviders = [currentProvider];
+                }}
+                const providerOrder = [
+                    'anthropic', 'openai', 'google', 'nvidia', 'github',
+                    'github_copilot', 'groq', 'mistral', 'ollama', 'openrouter',
+                    'deepseek', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
+                    'dashscope', 'moonshot', 'zhipu'
+                ];
+                // Append any provider returned by the API not already in the order list
+                for (const p of availableProviders) {{
+                    if (!providerOrder.includes(p)) providerOrder.push(p);
                 }}
 
                 for (const providerId of providerOrder) {{
@@ -2867,7 +3407,7 @@ def get_chat_ui():
                             g.models.forEach(model => {{
                                 const option = document.createElement('option');
                                 option.value = JSON.stringify({{model: model, provider: providerId}});
-                                const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub):\\s*/, '');
+                                const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
                                 option.textContent = displayName;
                                 if (model === currentModel && providerId === currentProvider) {{
                                     option.selected = true;
@@ -2886,7 +3426,7 @@ def get_chat_ui():
                         const option = document.createElement('option');
                         option.value = JSON.stringify({{model: model, provider: providerId}});
                         // Show just the model name without provider prefix
-                        const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub):\\s*/, '');
+                        const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
                         option.textContent = displayName;
                         if (model === currentModel && providerId === currentProvider) {{
                             option.selected = true;
@@ -2896,6 +3436,16 @@ def get_chat_ui():
 
                     select.appendChild(group);
                 }}
+                
+                // Hide dropdown only if there are truly no providers to choose from
+                const providerCount = availableProviders.filter(p => data.models && data.models[p] && data.models[p].length > 0).length;
+                if (providerCount === 0) {{
+                    select.style.display = 'none';
+                    console.log('[loadModels] No providers available, hiding dropdown');
+                }} else {{
+                    select.style.display = '';
+                }}
+                
                 if (!select.options.length) {{
                     const option = document.createElement('option');
                     option.textContent = T.no_models;
@@ -2911,7 +3461,9 @@ def get_chat_ui():
             }} catch (error) {{
                 console.error('[loadModels] Error loading models:', error);
                 if (!window._modelsErrorNotified) {{
-                    addMessage('\u26a0\ufe0f ' + T.models_load_error + (error.message || error), 'system');
+                    const isAuthErr = error.message && (error.message.includes('401') || error.message.includes('403') || error.message.includes('Failed to fetch'));
+                    const hint = isAuthErr ? ' — Prova a fare un hard refresh (Ctrl+Shift+R) dalla sidebar di HA.' : '';
+                    addMessage('\u26a0\ufe0f ' + T.models_load_error + (error.message || error) + hint, 'system');
                     window._modelsErrorNotified = true;
                 }}
             }}
@@ -2991,9 +3543,384 @@ def get_chat_ui():
                     }}
                     // Refresh dropdown state from server (ensures UI stays consistent)
                     loadModels();
+                    // Show OAuth banners for providers that need authentication
+                    if (parsed.provider === 'openai_codex') {{
+                        checkCodexOAuth();
+                        const cb = document.getElementById('copilotOAuthBanner');
+                        if (cb) cb.style.display = 'none';
+                        ['claudeWebBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
+                    }} else if (parsed.provider === 'github_copilot') {{
+                        checkCopilotOAuth();
+                        ['codexOAuthBanner','codexOAuthConnectedBanner','claudeWebBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
+                    }} else if (parsed.provider === 'claude_web') {{
+                        checkClaudeWebSession();
+                        ['codexOAuthBanner','codexOAuthConnectedBanner','copilotOAuthBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
+                    }} else if (parsed.provider === 'chatgpt_web') {{
+                        checkChatGPTWebSession();
+                        ['codexOAuthBanner','codexOAuthConnectedBanner','copilotOAuthBanner','claudeWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
+                    }} else {{
+                        const codexBanner   = document.getElementById('codexOAuthBanner');
+                        const copilotBanner = document.getElementById('copilotOAuthBanner');
+                        const codexConnBanner = document.getElementById('codexOAuthConnectedBanner');
+                        if (codexBanner)     codexBanner.style.display = 'none';
+                        if (copilotBanner)   copilotBanner.style.display = 'none';
+                        if (codexConnBanner) codexConnBanner.style.display = 'none';
+                        ['claudeWebBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
+                    }}
                 }}
             }} catch (error) {{
                 console.error('Error changing model:', error);
+            }}
+        }}
+
+        // ---- OpenAI Codex OAuth helpers ----
+        let _codexOAuthState = null;
+
+        async function checkCodexOAuth() {{
+            try {{
+                const r = await fetch(apiUrl('api/oauth/codex/status'));
+                const d = await r.json();
+                const banner        = document.getElementById('codexOAuthBanner');
+                const connBanner    = document.getElementById('codexOAuthConnectedBanner');
+                const connDetail    = document.getElementById('codexConnDetail');
+                if (d.configured) {{
+                    if (banner)     banner.style.display = 'none';
+                    if (connBanner) {{
+                        // Build detail string: account id + expiry
+                        let detail = 'connected';
+                        if (d.account_id) detail = d.account_id;
+                        if (d.expires_in_seconds != null) {{
+                            const h = Math.floor(d.expires_in_seconds / 3600);
+                            const m = Math.floor((d.expires_in_seconds % 3600) / 60);
+                            const expStr = h > 0 ? `expires in ${{h}}h ${{m}}m` : `expires in ${{m}}m`;
+                            detail += (d.account_id ? ' · ' : '') + expStr;
+                        }}
+                        if (connDetail) connDetail.textContent = detail;
+                        connBanner.style.display = 'flex';
+                    }}
+                }} else {{
+                    if (banner)     banner.style.display = 'flex';
+                    if (connBanner) connBanner.style.display = 'none';
+                }}
+            }} catch (e) {{ /* silently ignore */ }}
+        }}
+
+        async function revokeCodexOAuth() {{
+            if (!confirm('Disconnect OpenAI Codex? You will need to log in again to use it.')) return;
+            try {{
+                await fetch(apiUrl('api/oauth/codex/revoke'), {{ method: 'POST' }});
+            }} catch (e) {{ /* ignore if endpoint missing */ }}
+            // Hide connected banner, will show login banner next time Codex is selected
+            const connBanner = document.getElementById('codexOAuthConnectedBanner');
+            if (connBanner) connBanner.style.display = 'none';
+            addMessage('🔒 OpenAI Codex disconnected. Select Codex provider to reconnect.', 'system');
+            checkCodexOAuth();
+        }}
+
+        async function openCodexOAuthModal() {{
+            // Reset state
+            const statusEl = document.getElementById('codexOAuthStatus');
+            const urlEl    = document.getElementById('codexRedirectUrl');
+            if (statusEl) {{ statusEl.className = ''; statusEl.textContent = ''; }}
+            if (urlEl)    urlEl.value = '';
+            // Start OAuth flow → get authorize URL + state
+            try {{
+                const r = await fetch(apiUrl('api/oauth/codex/start'));
+                const d = await r.json();
+                if (!d.authorize_url) throw new Error(d.error || 'No URL returned');
+                _codexOAuthState = d.state;
+                const loginBtn = document.getElementById('codexOpenLoginBtn');
+                if (loginBtn) {{
+                    loginBtn.onclick = () => window.open(d.authorize_url, '_blank');
+                }}
+            }} catch (e) {{
+                if (statusEl) {{
+                    statusEl.className = 'err';
+                    statusEl.textContent = 'Error starting OAuth: ' + (e.message || String(e));
+                }}
+            }}
+            const modal = document.getElementById('codexOAuthModal');
+            if (modal) modal.classList.add('open');
+        }}
+
+        function closeCodexOAuthModal() {{
+            const modal = document.getElementById('codexOAuthModal');
+            if (modal) modal.classList.remove('open');
+            _codexOAuthState = null;
+        }}
+
+        async function submitCodexCode() {{
+            const urlEl    = document.getElementById('codexRedirectUrl');
+            const statusEl = document.getElementById('codexOAuthStatus');
+            const btn      = document.getElementById('codexModalConnectBtn');
+            if (!urlEl || !statusEl || !btn) return;
+            const redirectUrl = urlEl.value.trim();
+            if (!redirectUrl) {{
+                statusEl.className = 'err';
+                statusEl.textContent = 'Please paste the redirect URL first.';
+                return;
+            }}
+            if (!_codexOAuthState) {{
+                statusEl.className = 'err';
+                statusEl.textContent = 'Session expired — please close and try again.';
+                return;
+            }}
+            btn.disabled = true;
+            btn.textContent = 'Connecting...';
+            statusEl.className = '';
+            statusEl.textContent = '';
+            try {{
+                const r = await fetch(apiUrl('api/oauth/codex/exchange'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ redirect_url: redirectUrl, state: _codexOAuthState }})
+                }});
+                const d = await r.json();
+                if (d.ok) {{
+                    statusEl.className = 'ok';
+                    statusEl.textContent = '\u2714 Connected! Token saved.';
+                    setTimeout(() => {{
+                        closeCodexOAuthModal();
+                        checkCodexOAuth();
+                        addMessage('\u2705 OpenAI Codex authenticated successfully.', 'system');
+                    }}, 1500);
+                }} else {{
+                    throw new Error(d.error || 'Exchange failed');
+                }}
+            }} catch (e) {{
+                statusEl.className = 'err';
+                statusEl.textContent = '\u26a0\ufe0f ' + (e.message || String(e));
+            }} finally {{
+                btn.disabled = false;
+                btn.textContent = '\u2714 Connect';
+            }}
+        }}
+        // ---- GitHub Copilot OAuth helpers ----
+        let _copilotPollTimer = null;
+        let _copilotPollInterval = 5;
+
+        async function checkCopilotOAuth() {{
+            try {{
+                const r = await fetch(apiUrl('api/oauth/copilot/status'));
+                const d = await r.json();
+                const banner = document.getElementById('copilotOAuthBanner');
+                if (!banner) return;
+                banner.style.display = d.configured ? 'none' : 'flex';
+            }} catch (e) {{ /* ignore */ }}
+        }}
+
+        async function openCopilotOAuthModal() {{
+            const statusEl  = document.getElementById('copilotOAuthStatus');
+            const codeEl    = document.getElementById('copilotUserCode');
+            const hintEl    = document.getElementById('copilotPollHint');
+            const linkEl    = document.getElementById('copilotVerifyLink');
+            if (statusEl) {{ statusEl.className = ''; statusEl.textContent = ''; }}
+            if (codeEl)   codeEl.textContent = '\u2026';
+            if (hintEl)   hintEl.textContent = 'Starting\u2026';
+            _stopCopilotPoll();
+            try {{
+                const r = await fetch(apiUrl('api/oauth/copilot/start'));
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                if (codeEl)  codeEl.textContent = d.user_code || '?';
+                if (hintEl)  hintEl.textContent = 'Waiting for you to authorize on GitHub\u2026';
+                if (linkEl)  linkEl.href = d.verification_uri || 'https://github.com/login/device';
+                _copilotPollInterval = d.interval || 5;
+                const modal = document.getElementById('copilotOAuthModal');
+                if (modal) modal.classList.add('open');
+                _startCopilotPoll();
+            }} catch (e) {{
+                if (statusEl) {{ statusEl.className = 'err'; statusEl.textContent = 'Error: ' + (e.message || String(e)); }}
+                const modal = document.getElementById('copilotOAuthModal');
+                if (modal) modal.classList.add('open');
+            }}
+        }}
+
+        function closeCopilotOAuthModal() {{
+            _stopCopilotPoll();
+            const modal = document.getElementById('copilotOAuthModal');
+            if (modal) modal.classList.remove('open');
+        }}
+
+        function _startCopilotPoll() {{
+            _copilotPollTimer = setInterval(_doCopilotPoll, _copilotPollInterval * 1000);
+        }}
+
+        function _stopCopilotPoll() {{
+            if (_copilotPollTimer) {{ clearInterval(_copilotPollTimer); _copilotPollTimer = null; }}
+        }}
+
+        async function _doCopilotPoll() {{
+            try {{
+                const r = await fetch(apiUrl('api/oauth/copilot/poll'));
+                const d = await r.json();
+                const statusEl = document.getElementById('copilotOAuthStatus');
+                const hintEl   = document.getElementById('copilotPollHint');
+                if (d.status === 'success') {{
+                    _stopCopilotPoll();
+                    if (statusEl) {{ statusEl.className = 'ok'; statusEl.textContent = '\u2714 Connected! Token saved.'; }}
+                    if (hintEl)   hintEl.textContent = '';
+                    setTimeout(() => {{
+                        closeCopilotOAuthModal();
+                        checkCopilotOAuth();
+                        addMessage('\u2705 GitHub Copilot authenticated successfully.', 'system');
+                    }}, 1500);
+                }} else if (d.status === 'error') {{
+                    _stopCopilotPoll();
+                    if (statusEl) {{ statusEl.className = 'err'; statusEl.textContent = '\u26a0\ufe0f ' + (d.message || 'Error'); }}
+                    if (hintEl)   hintEl.textContent = '';
+                }} else if (d.slow_down) {{
+                    _copilotPollInterval = Math.min(_copilotPollInterval + 5, 30);
+                    _stopCopilotPoll();
+                    _startCopilotPoll();
+                }}
+            }} catch (e) {{ /* ignore transient network errors during polling */ }}
+        }}
+
+        // ---- Claude Web session helpers ----
+        async function checkClaudeWebSession() {{
+            try {{
+                const r = await fetch(apiUrl('api/session/claude_web/status'));
+                const d = await r.json();
+                const banner = document.getElementById('claudeWebBanner');
+                if (!banner) return;
+                banner.style.display = d.configured ? 'none' : 'flex';
+            }} catch (e) {{ /* ignore */ }}
+        }}
+
+        function openClaudeWebModal() {{
+            const statusEl = document.getElementById('claudeWebStatus');
+            const inputEl  = document.getElementById('claudeWebSessionKeyInput');
+            if (statusEl) {{ statusEl.className = ''; statusEl.textContent = ''; }}
+            if (inputEl)  inputEl.value = '';
+            const modal = document.getElementById('claudeWebModal');
+            if (modal) modal.classList.add('open');
+        }}
+
+        function closeClaudeWebModal() {{
+            const modal = document.getElementById('claudeWebModal');
+            if (modal) modal.classList.remove('open');
+        }}
+
+        async function submitClaudeWebToken() {{
+            const inputEl  = document.getElementById('claudeWebSessionKeyInput');
+            const statusEl = document.getElementById('claudeWebStatus');
+            const btn      = document.getElementById('claudeWebModalConnectBtn');
+            if (!inputEl || !statusEl || !btn) return;
+            const sessionKey = inputEl.value.trim();
+            if (!sessionKey) {{ statusEl.className = 'err'; statusEl.textContent = 'Please paste the session key first.'; return; }}
+            btn.disabled = true; btn.textContent = 'Saving...';
+            statusEl.className = ''; statusEl.textContent = '';
+            try {{
+                const r = await fetch(apiUrl('api/session/claude_web/store'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ session_key: sessionKey }})
+                }});
+                const d = await r.json();
+                if (d.ok || d.configured) {{
+                    statusEl.className = 'ok'; statusEl.textContent = '\u2714 Session saved!';
+                    setTimeout(() => {{ closeClaudeWebModal(); checkClaudeWebSession(); addMessage('\u2705 Claude.ai Web session token saved.', 'system'); }}, 1200);
+                }} else {{
+                    throw new Error(d.error || 'Save failed');
+                }}
+            }} catch (e) {{
+                statusEl.className = 'err'; statusEl.textContent = '\u26a0\ufe0f ' + (e.message || String(e));
+            }} finally {{
+                btn.disabled = false; btn.textContent = '\u2714 Save';
+            }}
+        }}
+
+        // ---- ChatGPT Web session helpers ----
+        async function checkChatGPTWebSession() {{
+            try {{
+                const r = await fetch(apiUrl('api/session/chatgpt_web/status'));
+                const d = await r.json();
+                const banner = document.getElementById('chatgptWebBanner');
+                if (!banner) return;
+                if (d.configured) {{
+                    // Show compact green banner with reconfigure button
+                    banner.className = 'configured';
+                    banner.style.display = 'flex';
+                    banner.innerHTML = '&#9989; <strong>ChatGPT Web</strong> &mdash; Token configurato' +
+                        (d.age_days ? ` (${{d.age_days}}g fa)` : '') +
+                        ' &nbsp;<button id="chatgptWebConnectBtn">&#128273; Riconfigura</button>' +
+                        '<button id="chatgptWebDismissBtn" style="background:#c8e6c9;color:#1b5e20;">Nascondi</button>';
+                    document.getElementById('chatgptWebConnectBtn')?.addEventListener('click', openChatGPTWebModal);
+                    document.getElementById('chatgptWebDismissBtn')?.addEventListener('click', () => {{ banner.style.display='none'; }});
+                }} else {{
+                    banner.className = '';
+                    banner.style.display = 'flex';
+                    banner.innerHTML = '&#9888;&#65039; <strong>ChatGPT Web [UNSTABLE]</strong> &mdash; access token required.' +
+                        ' <button id="chatgptWebConnectBtn">Set Access Token</button>' +
+                        '<button id="chatgptWebDismissBtn" style="background:#fff3e0;color:#7c4a00;">Dismiss</button>';
+                    document.getElementById('chatgptWebConnectBtn')?.addEventListener('click', openChatGPTWebModal);
+                    document.getElementById('chatgptWebDismissBtn')?.addEventListener('click', () => {{ banner.style.display='none'; }});
+                }}
+            }} catch (e) {{ /* ignore */ }}
+        }}
+
+        function openChatGPTWebModal() {{
+            const statusEl = document.getElementById('chatgptWebStatus');
+            const inputEl  = document.getElementById('chatgptWebTokenInput');
+            if (statusEl) {{ statusEl.className = ''; statusEl.textContent = ''; }}
+            if (inputEl)  inputEl.value = '';
+            const modal = document.getElementById('chatgptWebModal');
+            if (modal) modal.classList.add('open');
+        }}
+
+        function closeChatGPTWebModal() {{
+            const modal = document.getElementById('chatgptWebModal');
+            if (modal) modal.classList.remove('open');
+        }}
+
+        function previewChatGPTTokens() {{
+            const raw = (document.getElementById('chatgptWebTokenInput')?.value || '').trim();
+            const preview = document.getElementById('chatgptWebPreview');
+            if (!raw.startsWith('{{')) {{ if (preview) preview.style.display = 'none'; return; }}
+            try {{
+                const parsed = JSON.parse(raw);
+                const at = parsed.accessToken || parsed.access_token || '';
+                const st = parsed.sessionToken || '';
+                if (!at) {{ if (preview) preview.style.display = 'none'; return; }}
+                document.getElementById('previewAccessToken').textContent = at.slice(0,12) + '...' + at.slice(-6);
+                document.getElementById('previewSessionToken').textContent = st ? st.slice(0,12) + '...' + st.slice(-6) : '(non trovato)';
+                if (preview) preview.style.display = 'block';
+            }} catch(e) {{ if (preview) preview.style.display = 'none'; }}
+        }}
+
+        async function submitChatGPTWebToken() {{
+            const inputEl  = document.getElementById('chatgptWebTokenInput');
+            const statusEl = document.getElementById('chatgptWebStatus');
+            const btn      = document.getElementById('chatgptWebModalConnectBtn');
+            const cfEl     = document.getElementById('chatgptWebCfClearance');
+            if (!inputEl || !statusEl || !btn) return;
+            const accessToken  = inputEl.value.trim();
+            const cfClearance  = cfEl ? cfEl.value.trim() : '';
+            if (!accessToken) {{ statusEl.className = 'err'; statusEl.textContent = 'Incolla prima il JSON o il token.'; return; }}
+            btn.disabled = true; btn.textContent = 'Salvataggio...';
+            statusEl.className = ''; statusEl.textContent = '';
+            try {{
+                const payload = {{ access_token: accessToken }};
+                if (cfClearance) payload.cf_clearance = cfClearance;
+                const r = await fetch(apiUrl('api/session/chatgpt_web/store'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify(payload)
+                }});
+                const d = await r.json();
+                if (d.ok || d.configured) {{
+                    const hasSession = d.has_session_token ? ' + sessionToken' : '';
+                    const hasCf = d.has_cf_clearance ? ' + cf_clearance' : '';
+                    statusEl.className = 'ok'; statusEl.textContent = `\u2714 Salvato! accessToken${{hasSession}}${{hasCf}}`;
+                    setTimeout(() => {{ closeChatGPTWebModal(); checkChatGPTWebSession(); addMessage('\u2705 ChatGPT Web connesso.', 'system'); }}, 1400);
+                }} else {{
+                    throw new Error(d.error || 'Salvataggio fallito');
+                }}
+            }} catch (e) {{
+                statusEl.className = 'err'; statusEl.textContent = '\u26a0\ufe0f ' + (e.message || String(e));
+            }} finally {{
+                btn.disabled = false; btn.textContent = '\u2714 Save';
             }}
         }}
 
@@ -3010,8 +3937,75 @@ def get_chat_ui():
                 const testBtn = document.getElementById('testNvidiaBtn');
                 if (testBtn) testBtn.addEventListener('click', testNvidiaModel);
 
+                const refreshModelsBtn = document.getElementById('refreshModelsBtn');
+                if (refreshModelsBtn) refreshModelsBtn.addEventListener('click', refreshModels);
+
                 const newChatBtn = document.getElementById('newChatBtn');
                 if (newChatBtn) newChatBtn.addEventListener('click', newChat);
+
+                // Codex OAuth banner/modal bindings
+                const codexConnectBtn  = document.getElementById('codexOAuthConnectBtn');
+                const codexDismissBtn  = document.getElementById('codexOAuthDismissBtn');
+                const codexCancelBtn   = document.getElementById('codexModalCancelBtn');
+                const codexSubmitBtn   = document.getElementById('codexModalConnectBtn');
+                if (codexConnectBtn)  codexConnectBtn.addEventListener('click', openCodexOAuthModal);
+                if (codexDismissBtn)  codexDismissBtn.addEventListener('click', () => {{
+                    const banner = document.getElementById('codexOAuthBanner');
+                    if (banner) banner.style.display = 'none';
+                }});
+                if (codexCancelBtn)   codexCancelBtn.addEventListener('click', closeCodexOAuthModal);
+                if (codexSubmitBtn)   codexSubmitBtn.addEventListener('click', submitCodexCode);
+
+                // Copilot OAuth banner/modal bindings
+                const copilotConnectBtn = document.getElementById('copilotOAuthConnectBtn');
+                const copilotDismissBtn = document.getElementById('copilotOAuthDismissBtn');
+                const copilotCancelBtn  = document.getElementById('copilotModalCancelBtn');
+                if (copilotConnectBtn) copilotConnectBtn.addEventListener('click', openCopilotOAuthModal);
+                if (copilotDismissBtn) copilotDismissBtn.addEventListener('click', () => {{
+                    const banner = document.getElementById('copilotOAuthBanner');
+                    if (banner) banner.style.display = 'none';
+                }});
+                if (copilotCancelBtn)  copilotCancelBtn.addEventListener('click', closeCopilotOAuthModal);
+
+                // Claude Web session banner/modal bindings
+                const claudeWebConnectBtn  = document.getElementById('claudeWebConnectBtn');
+                const claudeWebDismissBtn  = document.getElementById('claudeWebDismissBtn');
+                const claudeWebCancelBtn   = document.getElementById('claudeWebModalCancelBtn');
+                const claudeWebSubmitBtn   = document.getElementById('claudeWebModalConnectBtn');
+                if (claudeWebConnectBtn) claudeWebConnectBtn.addEventListener('click', openClaudeWebModal);
+                if (claudeWebDismissBtn) claudeWebDismissBtn.addEventListener('click', () => {{
+                    const banner = document.getElementById('claudeWebBanner');
+                    if (banner) banner.style.display = 'none';
+                }});
+                if (claudeWebCancelBtn) claudeWebCancelBtn.addEventListener('click', closeClaudeWebModal);
+                if (claudeWebSubmitBtn) claudeWebSubmitBtn.addEventListener('click', submitClaudeWebToken);
+
+                // ChatGPT Web session banner/modal bindings
+                const chatgptWebConnectBtn  = document.getElementById('chatgptWebConnectBtn');
+                const chatgptWebDismissBtn  = document.getElementById('chatgptWebDismissBtn');
+                const chatgptWebCancelBtn   = document.getElementById('chatgptWebModalCancelBtn');
+                const chatgptWebSubmitBtn   = document.getElementById('chatgptWebModalConnectBtn');
+                if (chatgptWebConnectBtn) chatgptWebConnectBtn.addEventListener('click', openChatGPTWebModal);
+                if (chatgptWebDismissBtn) chatgptWebDismissBtn.addEventListener('click', () => {{
+                    const banner = document.getElementById('chatgptWebBanner');
+                    if (banner) banner.style.display = 'none';
+                }});
+                if (chatgptWebCancelBtn) chatgptWebCancelBtn.addEventListener('click', closeChatGPTWebModal);
+                if (chatgptWebSubmitBtn) chatgptWebSubmitBtn.addEventListener('click', submitChatGPTWebToken);
+
+                // Messaging chat modal close
+                const msgModalCloseBtn = document.getElementById('msgModalCloseBtn');
+                if (msgModalCloseBtn) msgModalCloseBtn.addEventListener('click', () => {{
+                    document.getElementById('messagingChatModal').classList.remove('open');
+                }});
+                const msgChatModal = document.getElementById('messagingChatModal');
+                if (msgChatModal) msgChatModal.addEventListener('click', (e) => {{
+                    if (e.target === msgChatModal) msgChatModal.classList.remove('open');
+                }});
+
+                // ChatGPT Web token live preview
+                const cgptInput = document.getElementById('chatgptWebTokenInput');
+                if (cgptInput) cgptInput.addEventListener('input', previewChatGPTTokens);
 
                 const readOnlyToggle = document.getElementById('readOnlyToggle');
                 if (readOnlyToggle) readOnlyToggle.addEventListener('change', (e) => toggleReadOnly(!!e.target.checked));
@@ -3086,7 +4080,43 @@ def get_chat_ui():
                 loadModels();
                 loadChatList();
                 loadHistory();
+                if (currentProviderId === 'openai_codex') checkCodexOAuth();
+                if (currentProviderId === 'github_copilot') checkCopilotOAuth();
+                if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
                 if (input) input.focus();
+
+                // Poll every 10s for model/provider changes made from other UIs (e.g. bubble)
+                let _statusFailures = 0;
+                const _statusInterval = setInterval(async () => {{
+                    try {{
+                        const r = await fetch(apiUrl('api/status'), {{credentials:'same-origin'}});
+                        if (!r.ok) {{ _statusFailures++; }} else {{ _statusFailures = 0; }}
+                        if (_statusFailures >= 3) {{
+                            clearInterval(_statusInterval);
+                            _appendSystemRaw('⚠️ Server non raggiungibile. Ricarica la pagina per riconnetterti.');
+                            return;
+                        }}
+                        if (!r.ok) return;
+                        const d = await r.json();
+                        const sp = d.provider || '';
+                        const sm = d.model || '';
+                        if (sp && sm && (sp !== currentProviderId || sm !== currentModelDisplay)) {{
+                            await loadModels();
+                        }}
+                    }} catch(e) {{
+                        _statusFailures++;
+                        if (_statusFailures >= 3) {{
+                            clearInterval(_statusInterval);
+                            _appendSystemRaw('⚠️ Server non raggiungibile. Ricarica la pagina per riconnetterti.');
+                        }}
+                    }}
+                }}, 10000);
+                // Poll session status every 30s for web providers so the banner reappears when token expires
+                setInterval(async () => {{
+                    if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
+                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                }}, 30000);
             }} catch (e) {{
                 const msg = (e && e.message) ? e.message : String(e);
                 _appendSystemRaw('❌ UI boot error: ' + msg);
@@ -3098,6 +4128,7 @@ def get_chat_ui():
         window.removeDocument = removeDocument;
         window.changeModel = changeModel;
         window.handleButtonClick = handleButtonClick;
+        window.refreshModels = refreshModels;
         }}
         
     </script>

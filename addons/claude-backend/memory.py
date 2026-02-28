@@ -5,19 +5,41 @@ Enables the AI assistant to remember past conversations and learn from previous 
 
 import json
 import os
+import subprocess
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 
-MEMORY_DIR = "/config/.storage/claude_memory"
+AMIRA_DIR = "/config/amira"
+MEMORY_DIR = os.path.join(AMIRA_DIR, "memory")
 CONVERSATIONS_FILE = os.path.join(MEMORY_DIR, "conversations.json")
 MEMORY_INDEX_FILE = os.path.join(MEMORY_DIR, "memory_index.json")
 
+# Nanobot-style two-layer memory files
+MEMORY_FILE = os.path.join(MEMORY_DIR, "MEMORY.md")   # long-term facts, always in context
+HISTORY_FILE = os.path.join(MEMORY_DIR, "HISTORY.md")  # append-only session log
+
 
 def ensure_memory_dir() -> None:
-    """Ensure memory directory exists."""
+    """Ensure memory directory exists. Migrates from legacy /config/.storage/claude_memory if needed."""
     os.makedirs(MEMORY_DIR, exist_ok=True)
+    # One-time migration from old path
+    old_dir = "/config/.storage/claude_memory"
+    if os.path.isdir(old_dir):
+        import shutil
+        try:
+            for fname in os.listdir(old_dir):
+                src = os.path.join(old_dir, fname)
+                dst = os.path.join(MEMORY_DIR, fname)
+                if os.path.isfile(src) and not os.path.exists(dst):
+                    shutil.copy2(src, dst)
+                    logger.info(f"Migrated memory file: {fname} → /config/amira/memory/")
+        except Exception as e:
+            logger.warning(f"Legacy memory migration error: {e}")
 
 
 def save_conversation(
@@ -71,7 +93,16 @@ def save_conversation(
     
     # Update index for faster searching
     _update_memory_index(conversations)
-    
+
+    # Append summary entry to HISTORY.md (nanobot-style append-only log)
+    try:
+        summary = record.get("summary", "")
+        date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        history_entry = f"[{date_str}] {title} ({provider}/{model}) — {summary}"
+        append_history(history_entry)
+    except Exception as e:
+        logger.warning(f"Could not append to HISTORY.md: {e}")
+
     return record
 
 
@@ -114,6 +145,12 @@ def get_past_conversations(
     results.sort(key=lambda x: x["updated"], reverse=True)
     
     return results[:limit]
+
+
+# Minimum relevance score to consider a past conversation worth injecting.
+# Score 2.0 means at least: 1 keyword match (1.5) + 1 word in summary (0.5).
+# This prevents generic greetings like "ciao" from triggering unrelated memories.
+MIN_MEMORY_SCORE = 2.0
 
 
 def search_memory(
@@ -177,7 +214,7 @@ def search_memory(
         content_matches = sum(1 for word in query_words if word in msg_text)
         score += content_matches * 0.8
         
-        if score > 0:
+        if score >= MIN_MEMORY_SCORE:
             results.append((conv, score))
     
     # Sort by score (highest first)
@@ -186,68 +223,52 @@ def search_memory(
     return results[:limit]
 
 
-def get_memory_context(
-    query: Optional[str] = None,
-    limit: int = 3,
-    max_tokens: int = 2000
-) -> str:
+def get_long_term_memory() -> str:
+    """Read MEMORY.md content (long-term facts). Returns empty string if not present or empty."""
+    ensure_memory_dir()
+    try:
+        if os.path.exists(MEMORY_FILE):
+            content = open(MEMORY_FILE, encoding='utf-8').read().strip()
+            # Return content only if it has substantive data (> 150 chars filters out empty templates)
+            if content and len(content) > 150:
+                return content
+    except Exception as e:
+        logger.warning(f"Could not read MEMORY.md: {e}")
+    return ""
+
+
+def update_long_term_memory(content: str) -> None:
+    """Write/replace MEMORY.md with new content."""
+    ensure_memory_dir()
+    try:
+        with open(MEMORY_FILE, 'w', encoding='utf-8') as f:
+            f.write(content)
+    except Exception as e:
+        logger.warning(f"Could not write MEMORY.md: {e}")
+
+
+def append_history(entry: str) -> None:
+    """Append an entry to HISTORY.md (append-only session log)."""
+    ensure_memory_dir()
+    try:
+        with open(HISTORY_FILE, 'a', encoding='utf-8') as f:
+            f.write(entry.rstrip() + "\n\n")
+    except Exception as e:
+        logger.warning(f"Could not append to HISTORY.md: {e}")
+
+
+def get_memory_context() -> str:
     """
-    Generate memory context for AI - relevant past conversations formatted for injection.
-    
-    Args:
-        query: Current user query (used for semantic search)
-        limit: Number of conversations to include
-        max_tokens: Approximate token limit for context
-    
-    Returns:
-        Formatted string of past conversations to inject into system prompt
+    Return long-term memory content for system prompt injection (nanobot style).
+
+    Reads MEMORY.md once and returns its content formatted for the system prompt.
+    No per-message search, no cross-session BM25 injection.
+    Returns empty string if MEMORY.md is empty or does not exist.
     """
-    if query:
-        # Search for relevant conversations
-        results = search_memory(query, limit=limit)
-        conversations = [conv for conv, _score in results]
-    else:
-        # Just get recent ones
-        conversations = get_past_conversations(limit=limit)
-    
-    if not conversations:
-        return ""
-    
-    context_lines = ["## MEMORIA PERSISTENTE - Conversazioni passate rilevanti:\n"]
-    token_count = 0
-    
-    for i, conv in enumerate(conversations, 1):
-        title = conv.get("title", "Untitled")
-        created = conv.get("created", "Unknown date")[:10]
-        
-        # Include actual messages for better context, not just summary
-        messages = conv.get("messages", [])
-        msg_lines = []
-        for m in messages:
-            content = m.get("content", "")
-            if not isinstance(content, str):
-                continue
-            role = m.get("role", "unknown")
-            if role in ("user", "assistant"):
-                msg_lines.append(f"  {role}: {content[:200]}")
-        
-        block = f"{i}. [{created}] {title}\n"
-        if msg_lines:
-            block += "\n".join(msg_lines[:8]) + "\n"  # Max 8 messages per conversation
-        else:
-            block += f"  {conv.get('summary', 'No summary')}\n"
-        
-        block_tokens = len(block) // 4
-        if token_count + block_tokens > max_tokens:
-            context_lines.append(f"   ... ({len(conversations) - i} more conversations disponibili)")
-            break
-        
-        context_lines.append(block)
-        token_count += block_tokens
-    
-    context_lines.append("\nUSA queste informazioni dalle conversazioni passate per dare risposte personalizzate e coerenti. Se l'utente ha condiviso informazioni personali (nome, età, preferenze), ricordale.\n")
-    
-    return "\n".join(context_lines)
+    long_term = get_long_term_memory()
+    if long_term:
+        return f"## MEMORIA A LUNGO TERMINE\n\n{long_term}\n"
+    return ""
 
 
 def delete_conversation(session_id: str) -> bool:
@@ -403,3 +424,265 @@ def _update_memory_index(conversations: Dict) -> None:
     
     with open(MEMORY_INDEX_FILE, 'w', encoding='utf-8') as f:
         json.dump(index, f, indent=2)
+
+# ============================================================================
+# ============================================================================
+# GREP SEARCH — fast recursive search on YAML config files
+# ============================================================================
+
+class GrepSearch:
+    """Fast grep-based text search on HA config files."""
+
+    @staticmethod
+    def search_in_file(filepath: str, pattern: str) -> List[Dict[str, Any]]:
+        """Search for a regex pattern in a single file. Returns list of {line, content}."""
+        try:
+            if not os.path.exists(filepath):
+                return []
+            result = subprocess.run(
+                ["grep", "-n", "-i", "-E", pattern, filepath],
+                capture_output=True, text=True, timeout=5,
+            )
+            if result.returncode != 0:
+                return []
+            matches = []
+            for line in result.stdout.strip().split("\n"):
+                if not line:
+                    continue
+                parts = line.split(":", 1)
+                if len(parts) == 2:
+                    try:
+                        matches.append({"line": int(parts[0]), "content": parts[1].strip()})
+                    except ValueError:
+                        pass
+            return matches
+        except Exception as e:
+            logger.error(f"GrepSearch.search_in_file error: {e}")
+            return []
+
+    @staticmethod
+    def search_in_directory(
+        directory: str,
+        pattern: str,
+        file_pattern: str = "*.yaml",
+    ) -> Dict[str, List[str]]:
+        """Recursively search for a regex pattern in all matching files under directory.
+
+        Returns {filepath: [matching_line, ...]} for files that contain matches.
+        """
+        try:
+            result = subprocess.run(
+                ["grep", "-r", "-n", "-i", "-E", pattern, directory,
+                 f"--include={file_pattern}"],
+                capture_output=True, text=True, timeout=10,
+            )
+            if result.returncode != 0:
+                return {}
+            results: Dict[str, List[str]] = {}
+            for line in result.stdout.strip().split("\n"):
+                if not line or ":" not in line:
+                    continue
+                filepath, content = line.split(":", 1)
+                results.setdefault(filepath, []).append(content.strip())
+            return results
+        except Exception as e:
+            logger.error(f"GrepSearch.search_in_directory error: {e}")
+            return {}
+
+
+# Convenience module-level function
+def grep_config(pattern: str, file_pattern: str = "*.yaml") -> Dict[str, List[str]]:
+    """Search recursively in /config for a regex pattern. Returns {filepath: [lines]}."""
+    return GrepSearch.search_in_directory("/config", pattern, file_pattern)
+
+
+# ============================================================================
+# TWO-LAYER MEMORY SYSTEM FOR CONFIG_EDIT (Layer 2: File Cache)
+# ============================================================================
+
+import hashlib
+from collections import Counter as CounterCollections
+
+
+class FileMemoryCache:
+    """Long-term file cache for config_edit operations with grep-based search.
+    
+    Caches read YAML files for fast access and search during multi-round config editing.
+    Uses MD5 hashing for invalidation detection.
+    """
+    
+    def __init__(self, max_files: int = 20, max_size_per_file: int = 100000):
+        """Initialize file memory cache.
+        
+        Args:
+            max_files: Maximum files to keep in cache (default 20)
+            max_size_per_file: Max bytes per file before skipping cache (default 100KB)
+        """
+        self.cache: Dict[str, Dict] = {}  # filename -> {content, hash, size}
+        self.max_files = max_files
+        self.max_size_per_file = max_size_per_file
+        self.access_order: List[str] = []  # For LRU eviction
+        
+    def store(self, filename: str, content: str) -> bool:
+        """Store file in cache.
+        
+        Args:
+            filename: File path (relative, e.g. 'packages/sensor.yaml')
+            content: File content
+            
+        Returns:
+            True if cached, False if too large
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        if len(content) > self.max_size_per_file:
+            logger.warning(f"FileCache: {filename} too large ({len(content)} bytes), skipping")
+            return False
+        
+        content_hash = hashlib.md5(content.encode()).hexdigest()
+        
+        # Store in cache
+        self.cache[filename] = {
+            "content": content,
+            "hash": content_hash,
+            "size": len(content),
+        }
+        
+        # Update access order for LRU
+        if filename in self.access_order:
+            self.access_order.remove(filename)
+        self.access_order.append(filename)
+        
+        # Evict oldest if over limit
+        if len(self.cache) > self.max_files:
+            oldest = self.access_order.pop(0)
+            del self.cache[oldest]
+            logger.debug(f"FileCache: Evicted {oldest} (LRU)")
+        
+        logger.debug(f"FileCache: Cached {filename} ({len(content)} bytes)")
+        return True
+    
+    def get(self, filename: str) -> Optional[str]:
+        """Retrieve file from cache.
+        
+        Args:
+            filename: File path
+            
+        Returns:
+            File content if cached, None otherwise
+        """
+        if filename in self.cache:
+            # Update access order (LRU)
+            self.access_order.remove(filename)
+            self.access_order.append(filename)
+            return self.cache[filename]["content"]
+        return None
+    
+    def check_changed(self, filename: str, new_content: str) -> bool:
+        """Check if file has changed since caching.
+        
+        Args:
+            filename: File path
+            new_content: New file content
+            
+        Returns:
+            True if file changed, False if unchanged (cache hit)
+        """
+        if filename not in self.cache:
+            return True  # Not cached, consider as "changed"
+        
+        new_hash = hashlib.md5(new_content.encode()).hexdigest()
+        old_hash = self.cache[filename]["hash"]
+        
+        return new_hash != old_hash
+    
+    def search(self, filename: str, search_term: str, max_results: int = 5) -> List[Tuple[int, str]]:
+        """Search for lines in cached file (grep-like).
+        
+        Args:
+            filename: File path
+            search_term: Search term (case-insensitive)
+            max_results: Max results to return
+            
+        Returns:
+            List of (line_number, line_text) tuples
+        """
+        content = self.get(filename)
+        if not content:
+            return []
+        
+        results = []
+        search_lower = search_term.lower()
+        
+        for line_num, line in enumerate(content.split("\n"), 1):
+            if search_lower in line.lower():
+                results.append((line_num, line))
+                if len(results) >= max_results:
+                    break
+        
+        return results
+    
+    def get_yaml_path_suggestions(self, filename: str, depth: int = 1, max_count: int = 10) -> List[str]:
+        """Extract YAML keys at indentation depth (for autocomplete suggestions).
+        
+        Args:
+            filename: File path
+            depth: Indentation level (1 = top-level)
+            max_count: Max suggestions
+            
+        Returns:
+            List of key names
+        """
+        content = self.get(filename)
+        if not content:
+            return []
+        
+        keys = []
+        target_indent = (depth - 1) * 2  # Assuming 2-space indent
+        
+        for line in content.split("\n"):
+            if not line.strip() or line.strip().startswith("#"):
+                continue
+            
+            indent = len(line) - len(line.lstrip())
+            if indent == target_indent:
+                key = line.strip().split(":")[0].lstrip("- ").strip()
+                if key and key not in keys:
+                    keys.append(key)
+                    if len(keys) >= max_count:
+                        break
+        
+        return keys
+    
+    def stats(self) -> Dict:
+        """Get cache statistics.
+        
+        Returns:
+            Dict with cache info
+        """
+        total_bytes = sum(item["size"] for item in self.cache.values())
+        return {
+            "cached_files": len(self.cache),
+            "total_bytes": total_bytes,
+            "files": list(self.cache.keys()),
+            "capacity": f"{len(self.cache)}/{self.max_files}",
+        }
+    
+    def clear(self) -> None:
+        """Clear all cached files."""
+        self.cache.clear()
+        self.access_order.clear()
+
+
+# Global file memory cache instance (Layer 2)
+_config_file_cache = FileMemoryCache(max_files=20)
+
+
+def get_config_file_cache() -> FileMemoryCache:
+    """Get the global file memory cache for config_edit.
+    
+    Returns:
+        FileMemoryCache instance
+    """
+    return _config_file_cache

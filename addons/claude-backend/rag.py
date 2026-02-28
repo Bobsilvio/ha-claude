@@ -15,7 +15,7 @@ from pathlib import Path
 from collections import Counter
 
 logger = logging.getLogger(__name__)
-STORAGE_DIR = "/config/.storage/claude_rag"
+STORAGE_DIR = "/config/amira/rag"
 
 # Global vocabulary built from indexed documents (word -> doc_count)
 _idf_vocab: Dict[str, int] = {}
