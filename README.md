@@ -91,7 +91,6 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Read/Write YAML**: Access automations, scripts, scenes, and custom configs
 - **File Explorer**: Browse your Home Assistant config directory
 - **Safe Editing**: Automatic snapshots before modifications
-- **Backup Management**: Restore or delete backups, per-file snapshot limits
 - **Config Validation**: Check configuration before applying changes
 
 ### 💬 Interactive Chat Interface
@@ -99,7 +98,6 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Streaming Responses**: Real-time token-by-token output
 - **Tool Indicators**: See what the AI is doing (badges for each tool call)
 - **Copy Button**: One-click copy for all code blocks (YAML, JSON, Python)
-- **Persistent Storage**: Conversations survive addon restarts
 
 ### 🫧 Floating Chat Bubble
 - **Always Available**: AI chat bubble on every Home Assistant page
@@ -107,81 +105,50 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **HTML Dashboard Editing**: Modify dashboards in-place keeping same style
 - **Voice Input**: Built-in voice recognition
 - **Agent Switching**: Change AI provider/model on the fly
-- **Hidden on Mobile**: Automatically hidden on companion app
 
 ### 🌍 Multilingual Support
 - **4 Languages**: English, Italian, Spanish, French
 - **AI Responses**: AI always responds in your chosen language
 - **Config UI Translations**: Settings labels and descriptions in all 4 languages
-- **Fully Localized**: Complete multilingual experience
 
 ### 🔌 MCP (Model Context Protocol)
 - **Custom Tools**: Connect external services via MCP servers
-- **Filesystem**: Let AI read/write files outside HA config
-- **Web Search**: Real-time search via Brave Search API
-- **Git & Databases**: Access git history, SQLite, GitHub, Slack and more
+- **Filesystem, Web Search, Git, Databases**: and any custom MCP-compatible server
 - **Multi-server**: Run multiple MCP servers simultaneously
 
 ### 📱 Messaging Integration
 - **Telegram Bot**: Long polling — no public IP needed, works out of the box
 - **WhatsApp**: Twilio integration with webhook support
 - **Context Aware**: Full conversation history per user per channel
-- **Multi-channel**: Use both simultaneously
 
 ### ⏰ Scheduled Tasks
 - **Cron-based**: Schedule automations using cron expressions
 - **Background Execution**: Tasks run independently without user interaction
 - **History Tracking**: Log of past executions with error reporting
-- **Enable/Disable**: Toggle tasks without deleting them
 
 ### 🛠️ Dashboard Creation
 - **Lovelace Dashboards**: Create custom dashboards with cards
 - **HTML Dashboards**: AI-generated Vue 3 interactive dashboards with real-time data
 - **11 Section Types**: Hero, pills, flow, gauge, gauges, kpi, chart, entities, controls, stats, value
-- **Live Data**: WebSocket real-time updates with automatic proxy fallback (no browser auth needed)
-- **Card Library**: Supports standard and custom cards
-- **View Organization**: Multiple views with icons and titles
+- **Live Data**: WebSocket real-time updates with automatic proxy fallback
 
 ---
 
 ## 📋 Requirements
 
 - **Home Assistant** 2024.1.0+ with Supervisor
-- **API Key** for at least one AI provider (see setup guide below)
+- **API Key** for at least one AI provider
 
 ---
 
 ## 🚀 Quick Start
 
-Simply click the button below to add it automatically:
-
 [![Add Repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FBobsilvio%2Fha-claude)
 
-### 1️⃣ Add Repository
-
-In Home Assistant:
-1. Go to **Settings** → **Add-ons & Backups** → **Add-on Store**
-2. Click **⋮** (top right) → **Repositories**
-3. Add: `https://github.com/Bobsilvio/ha-claude`
-
-### 2️⃣ Install Add-on
-
-1. Open **Add-on Store**
-2. Search for **"Amira"**
-3. Click **Install**
-
-### 3️⃣ Configure
-
-1. Open addon **Configuration** tab
-2. Paste **at least one provider key** (Anthropic / OpenAI / Google / NVIDIA / GitHub)
-3. (Optional) Select **Language**: en, it, es, or fr
-4. (Optional) Enable **File Access** to allow config file operations
-5. **Save** and **Start** the addon
-6. Open **Amira** from the sidebar and pick an **agent/model** from the top dropdown (your choice is saved automatically)
-
-### 4️⃣ Access
-
-Click **"Amira"** in the Home Assistant sidebar!
+1. **Add repository** — Settings → Add-ons → Add-on Store → ⋮ → Repositories → add `https://github.com/Bobsilvio/ha-claude`
+2. **Install** — search "Amira" → click Install
+3. **Configure** — open **Configuration** tab, paste at least one API key, Save
+4. **Start** — click Start, open **Amira** from the sidebar, pick a model
 
 ---
 
@@ -190,160 +157,29 @@ Click **"Amira"** in the Home Assistant sidebar!
 | Provider | Get Key | Free? |
 |----------|---------|-------|
 | 🟠 GitHub Models | [github.com/settings/tokens](https://github.com/settings/tokens) | ✅ Rate limited |
-| 🟣 Anthropic Claude | [console.anthropic.com](https://console.anthropic.com) | ❌ ~$1-5/mo typical |
-| 🟢 OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | ❌ ~$1-3/mo typical |
+| 🟣 Anthropic Claude | [console.anthropic.com](https://console.anthropic.com) | ❌ ~$1-5/mo |
+| 🟢 OpenAI | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) | ❌ ~$1-3/mo |
 | 🔵 Google Gemini | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) | ✅ 1500 req/day |
 | 🟩 NVIDIA NIM | [build.nvidia.com](https://build.nvidia.com) | ✅ Unlimited |
 | ⚡ Groq | [console.groq.com](https://console.groq.com) | ✅ Unlimited |
 | 🌐 OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) | ❌ Pay per use |
-| + 12 more | See [SETUP_HA.md](docs/SETUP_HA.md) | — |
+| + 12 more | See [DOCS.md](addons/claude-backend/DOCS.md) | — |
 
-→ Step-by-step key creation guide: [SETUP_HA.md](docs/SETUP_HA.md)
-
----
-
-## 🔐 OAuth Providers (GitHub Copilot & OpenAI Codex)
-
-These providers use **OAuth authentication** — no API key to paste, just a one-time login.
-
-### GitHub Copilot
-Requires an active **GitHub Copilot subscription** (Individual, Business, or Enterprise).
-
-1. Select **GitHub Copilot** from the model dropdown in Amira
-2. A blue banner **"GitHub Copilot requires authentication"** appears → click **Connect GitHub Copilot**
-3. A code like `ABCD-1234` is shown → open [github.com/login/device](https://github.com/login/device) and enter it
-4. Authorize the app on GitHub → the addon polls automatically and confirms ✔ Connected
-5. Token is saved persistently in `/data/oauth_copilot.json`
-
-Available models: `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o1`, `claude-3.7-sonnet`, `gemini-2.0-flash`, and more.
-
-### OpenAI Codex
-Requires **ChatGPT Plus or Pro**.
-
-1. Select **OpenAI Codex** from the model dropdown
-2. Click **Connect OpenAI Codex** in the yellow banner
-3. A browser tab opens to OpenAI login → after login, copy the full redirect URL and paste it in the Amira modal
-4. Token saved in `/data/oauth_codex.json` and auto-refreshed
-
-Available models: `o4-mini`, `o3`, `o3-mini`, `gpt-4.5`, `o1`.
+**GitHub Copilot & OpenAI Codex** use OAuth — no API key needed, just a one-time login. → [Full guide](addons/claude-backend/DOCS.md)
 
 ---
 
 ## 📱 Telegram & WhatsApp
 
-Amira supports **Telegram** (long polling, no public IP needed) and **WhatsApp** (via Twilio webhook).
+Amira supports **Telegram** (long polling, no public IP) and **WhatsApp** (via Twilio webhook).
 
-### Telegram (quick setup)
-1. Open Telegram → **@BotFather** → `/newbot` → get your token
-2. In addon **Configuration**:
-   ```
-   telegram_bot_token: 123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
-   ```
-3. Save & Restart — message your bot and it replies with Amira AI responses
-
-### WhatsApp via Twilio (requires public URL)
-1. Sign up at [twilio.com](https://twilio.com) → get **Account SID**, **Auth Token**, and a WhatsApp Sandbox number
-2. In addon **Configuration**:
-   ```
-   twilio_account_sid: ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   twilio_auth_token:  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   twilio_whatsapp_from: +14155238886
-   ```
-3. In Twilio Console (Messaging → Try it out → Send a WhatsApp message → **Sandbox settings**) set:
-   - **"When a message comes in"** → `http://YOUR-HA-IP:5010/api/whatsapp/webhook`
-   - Method: **HTTP POST**
-4. Open port **5010** on your router (Port Forwarding → TCP → your HA IP)
-5. Save & Restart the addon
-6. Send `join <your-sandbox-code>` from WhatsApp to the Twilio number to join the Sandbox
-
-> ⚠️ Amira listens on port **5010** directly — the URL must include `:5010/api/whatsapp/webhook`.
-> Using `https://ha.yourdomain.eu/api/whatsapp/webhook` (port 443) gives a **404** because that
-> hits the HA frontend, not Amira. See the full guide for Nginx reverse proxy alternative.
-
-→ **Full setup guide (italiano/english):** [docs/WHATSAPP.md](docs/WHATSAPP.md)
-
----
-
-## ⚙️ Configuration Options
-
-| Option | Description | Default | Required |
-|--------|-------------|---------|----------|
-| **Anthropic API Key** | Claude API key from console.anthropic.com | - | If using Claude |
-| **OpenAI API Key** | OpenAI API key from platform.openai.com | - | If using OpenAI |
-| **Google API Key** | Gemini API key from aistudio.google.com | - | If using Gemini |
-| **NVIDIA API Key** | NVIDIA NIM API key | - | If using NVIDIA |
-| **NVIDIA Thinking Mode** | Enable extra reasoning tokens (when supported) | `false` | ❌ |
-| **GitHub Token** | Personal Access Token from GitHub | - | If using GitHub |
-| **Language** | AI response language (en/it/es/fr) | `en` | ❌ |
-| **Enable File Access** | Allow AI to read/write config files | `false` | ❌ |
-| **Chat Bubble** | Floating AI bubble on every HA page (context-aware) | `false` | ❌ |
-| **Max Backups per File** | Max backup snapshots per file (oldest auto-deleted) | `5` | ❌ |
-| **Max Conversations** | Max chat conversations in history (1-100) | `10` | ❌ |
-| **Debug Mode** | Enable detailed logging | `false` | ❌ |
-| **Colored Logs** | Emoji indicators in addon logs | `true` | ❌ |
-| **Log Level** | Log verbosity (normal/verbose/debug) | `normal` | ❌ |
-| **API Port** | Internal API port | `5010` | ❌ |
-| **Timeout** | API request timeout (seconds) | `30` | ❌ |
-| **Max Retries** | Retry attempts for failed API calls | `3` | ❌ |
-
-### 🔒 File Access Feature
-
-When **Enable File Access** is enabled, the AI can:
-- ✅ Read automation, script, and configuration files
-- ✅ List files in your config directory (including custom folders like `lovelace/`)
-- ✅ Modify YAML files with automatic snapshots (backups)
-- ✅ Validate configuration before applying changes
-
-**Safety features:**
-- Automatic backup before any modification
-- Read-only by default (disabled)
-- Snapshots stored in `/config/amira/snapshots/`
-- Restore or delete backups from the UI
-- Per-file snapshot limits (configurable, default 5 per file)
-
----
-
-## 📁 Data Storage
-
-All persistent data is stored in **`/config/amira/`** — one folder, easy to backup or inspect.
-
-```
-/config/amira/
-├── conversations.json        # Chat history
-├── runtime_selection.json    # Last selected model/provider
-├── snapshots/                # Config file backups (before edits)
-├── mcp_config.json           # MCP servers (create manually)
-├── scheduled_tasks.json      # Scheduled task definitions
-└── memory/
-    ├── MEMORY.md             # Long-term facts (always in context)
-    └── HISTORY.md            # Session log (append-only)
-```
-
-> Files from older versions (`/config/.storage/claude_*`) are migrated automatically on first start.
-
----
-
-## 🧠 Memory
-
-When `enable_memory: true`, Amira uses a two-file system:
-
-- **`MEMORY.md`** — Injected once in every session. Write here what the AI should always know.
-- **`HISTORY.md`** — Automatic, append-only log of past sessions. Never auto-injected.
-
-```bash
-# SSH into HA, then:
-nano /config/amira/memory/MEMORY.md
-```
-
-No per-message keyword search, no cross-session contamination. Token-efficient.
-
-→ Full detail: [addons/claude-backend/README.md](addons/claude-backend/README.md)
+→ Setup guide: [docs/MESSAGING.md](docs/MESSAGING.md) · WhatsApp details: [docs/WHATSAPP.md](docs/WHATSAPP.md)
 
 ---
 
 ## 🔌 MCP (Model Context Protocol)
 
-Extend Amira with external tools via the **Model Context Protocol**. Place your configuration at `/config/amira/mcp_config.json` and restart the addon.
+Extend Amira with external tools. Create `/config/amira/mcp_config.json` and restart:
 
 ```json
 {
@@ -355,83 +191,36 @@ Extend Amira with external tools via the **Model Context Protocol**. Place your 
 }
 ```
 
-Supported server types: **Filesystem, Brave Search, Git, SQLite, Slack, GitHub**, and any custom MCP-compatible server.
-
-→ Full setup guide with examples: [MCP.md](docs/MCP.md)
+→ Full guide: [docs/MCP.md](docs/MCP.md)
 
 ---
 
 ## 💡 Usage Examples
 
-Just talk naturally — Amira understands intent in English, Italian, Spanish and French:
-
 - *"Turn on the living room lights"* / *"Accendi le luci del soggiorno"*
 - *"Create an automation that turns lights off at midnight"*
 - *"Show me the temperature history from yesterday"*
-- *"Add a condition to the morning routine automation"*
 - *"Create an HTML dashboard for my solar panels"*
 - 📸 *Upload an image* → *"Recreate these cards for my sensors"*
 
 ---
 
-## 🔧 API Endpoints
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Chat UI interface |
-| `/api/chat/stream` | POST | Streaming chat (SSE) |
-| `/api/conversations` | GET | List all conversations |
-| `/api/conversations/<id>` | GET | Get specific conversation |
-| `/api/snapshots` | GET | List backup snapshots |
-| `/api/snapshots/<id>` | DELETE | Delete a backup snapshot |
-| `/api/status` | GET | Diagnostics & health check |
-| `/health` | GET | Simple health check |
-
----
-
 ## 🆘 Troubleshooting
 
-### Amira not in sidebar
-- Restart Home Assistant completely
-- Check addon logs for errors
-- Verify addon is in "Running" state
-- Try clearing browser cache
+| Problem | Fix |
+|---------|-----|
+| Amira not in sidebar | Restart HA, clear browser cache |
+| Error 401 on HA API | Visit `/api/status`, restart addon |
+| API Key errors | Check format, verify account has credit |
+| Rate limits | Switch model or wait a few minutes |
 
-### Error 401 on HA API
-- `SUPERVISOR_TOKEN` is managed automatically
-- Visit `/api/status` to check `ha_connection_ok`
-- Restart the addon
-- Check addon logs for token errors
-
-### API Key errors
-- Verify correct key for selected provider
-- For Anthropic/OpenAI: ensure you've added credit to account
-- For GitHub: token must be valid (not expired)
-- Check key format (starts with correct prefix)
-
-### Model not responding / rate limits
-- GitHub Models free tier has daily limits (check the GitHub Models dashboard / provider docs)
-- Try switching to a different model
-- Wait a few minutes if rate limited
-- Consider upgrading to paid tier
-
-### File Access not working
-- Verify **Enable File Access** is set to `true` in config
-- Restart addon after enabling
-- Check logs for "ENABLE_FILE_ACCESS: true"
-- Ensure files exist in `/config/` directory
-
-### Chat history not saving
-- Conversations stored in `/config/amira/conversations.json`
-- Check file permissions on `/config/amira/`
-- Try sending a message to trigger save
-- Restart addon if conversations don't persist
+Logs: **Settings → Add-ons → Amira → Logs** · Full troubleshooting: [DOCS.md](addons/claude-backend/DOCS.md)
 
 ---
 
 ## 🤝 Contributing
 
-Issues and pull requests welcome! Visit [github.com/Bobsilvio/ha-claude/issues](https://github.com/Bobsilvio/ha-claude/issues).
+Issues and pull requests welcome: [github.com/Bobsilvio/ha-claude/issues](https://github.com/Bobsilvio/ha-claude/issues)
 
 ---
 
@@ -440,22 +229,14 @@ Issues and pull requests welcome! Visit [github.com/Bobsilvio/ha-claude/issues](
 **PolyForm Noncommercial License 1.0.0** — see [LICENSE](LICENSE) for full terms.
 
 - ✅ Personal use, hobby projects, home automation enthusiasts: **free**
-- ✅ Non-profit organizations, educational and government institutions: **free**
-- ❌ Commercial use (paid services, businesses, installers charging clients): **not permitted without explicit written permission from the author**
-
-To request a commercial license: open an issue on [GitHub](https://github.com/Bobsilvio/ha-claude/issues).
+- ✅ Non-profit and educational institutions: **free**
+- ❌ Commercial use: **not permitted without explicit written permission**
 
 ---
 
 ## 🙏 Credits
 
-Created with ❤️ for the Home Assistant community
-
-**Special thanks to:**
-- Anthropic for Claude API
-- OpenAI for GPT models
-- Google for Gemini
-- GitHub for GitHub Models access
+Created with ❤️ for the Home Assistant community — Anthropic, OpenAI, Google, GitHub.
 
 ---
 
