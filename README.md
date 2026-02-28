@@ -1,21 +1,53 @@
-[![Sample](https://storage.ko-fi.com/cdn/generated/zfskfgqnf/2025-03-07_rest-7d81acd901abf101cbdf54443c38f6f0-dlmmonph.jpg)](https://ko-fi.com/silviosmart)
+<p align="center">
+  <img src="image/amira-logo.png" width="48%">
+</p>
 
-## Supportami / Support Me
+<table align="center">
+  <tr>
+    <td align="center" width="260">
+      <a href="https://ko-fi.com/silviosmart">
+        <img src="https://storage.ko-fi.com/cdn/generated/zfskfgqnf/2025-03-07_rest-7d81acd901abf101cbdf54443c38f6f0-dlmmonph.jpg" width="220">
+      </a>
+    </td>
+    <td align="left">
+      <h2>☕ Support My Work</h2>
+      <p>
+        🇮🇹 Se ti piace il mio lavoro e vuoi che continui nello sviluppo delle card,
+        puoi offrirmi un caffè.
+      </p>
+      <p>
+        🇬🇧 If you like my work and want me to continue developing the cards,
+        you can buy me a coffee.
+      </p>
+    </td>
+  </tr>
+</table>
 
-Se ti piace il mio lavoro e vuoi che continui nello sviluppo delle card, puoi offrirmi un caffè.\
-If you like my work and want me to continue developing the cards, you can buy me a coffee.
+<br>
 
+<p align="center">
+  <a href="https://www.paypal.com/donate/?hosted_button_id=Z6KY9V6BBZ4BN">
+    <img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=for-the-badge&logo=paypal&logoColor=white">
+  </a>
+</p>
 
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-%2300457C?style=for-the-badge&logo=paypal&logoColor=white)](https://www.paypal.com/donate/?hosted_button_id=Z6KY9V6BBZ4BN)
+---
 
-Non dimenticare di seguirmi sui social:\
-Don't forget to follow me on social media:
+### 🌍 Follow Me
 
-[![TikTok](https://img.shields.io/badge/Follow_TikTok-%23000000?style=for-the-badge&logo=tiktok&logoColor=white)](https://www.tiktok.com/@silviosmartalexa)
-
-[![Instagram](https://img.shields.io/badge/Follow_Instagram-%23E1306C?style=for-the-badge&logo=instagram&logoColor=white)](https://www.instagram.com/silviosmartalexa)
-
-[![YouTube](https://img.shields.io/badge/Subscribe_YouTube-%23FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com/@silviosmartalexa)
+<p align="center">
+  <a href="https://www.tiktok.com/@silviosmartalexa">
+    <img src="https://img.shields.io/badge/Follow-TikTok-000000?style=for-the-badge&logo=tiktok&logoColor=white">
+  </a>
+  &nbsp;
+  <a href="https://www.instagram.com/silviosmartalexa">
+    <img src="https://img.shields.io/badge/Follow-Instagram-E1306C?style=for-the-badge&logo=instagram&logoColor=white">
+  </a>
+  &nbsp;
+  <a href="https://www.youtube.com/@silviosmartalexa">
+    <img src="https://img.shields.io/badge/Subscribe-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white">
+  </a>
+</p>
 # 🏠🤖 Amira Ai Assistant
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
