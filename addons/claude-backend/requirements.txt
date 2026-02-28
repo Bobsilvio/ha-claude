@@ -13,5 +13,4 @@ python-docx>=1.0.0
 python-telegram-bot>=20.0
 twilio>=8.10.0
 httpx>=0.24.0
-curl_cffi>=0.7.0
 mcp>=1.0.0

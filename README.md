@@ -115,6 +115,13 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Config UI Translations**: Settings labels and descriptions in all 4 languages (v3.0.2)
 - **Fully Localized**: Complete multilingual experience
 
+### 🔌 MCP (Model Context Protocol)
+- **Custom Tools**: Connect external services via MCP servers
+- **Filesystem**: Let AI read/write files outside HA config
+- **Web Search**: Real-time search via Brave Search API
+- **Git & Databases**: Access git history, SQLite, GitHub, Slack and more
+- **Multi-server**: Run multiple MCP servers simultaneously
+
 ### 📱 Messaging Integration
 - **Telegram Bot**: Long polling — no public IP needed, works out of the box
 - **WhatsApp**: Twilio integration with webhook support
@@ -328,6 +335,26 @@ nano /config/amira/memory/MEMORY.md
 No per-message keyword search, no cross-session contamination. Token-efficient.
 
 → Full detail: [addons/claude-backend/README.md](addons/claude-backend/README.md)
+
+---
+
+## 🔌 MCP (Model Context Protocol)
+
+Extend Amira with external tools via the **Model Context Protocol**. Place your configuration at `/config/amira/mcp_config.json` and restart the addon.
+
+```json
+{
+  "web_search": {
+    "command": "python",
+    "args": ["-m", "mcp.server.brave_search"],
+    "env": { "BRAVE_API_KEY": "YOUR_KEY" }
+  }
+}
+```
+
+Supported server types: **Filesystem, Brave Search, Git, SQLite, Slack, GitHub**, and any custom MCP-compatible server.
+
+→ Full setup guide with examples: [MCP.md](MCP.md)
 
 ---
 
