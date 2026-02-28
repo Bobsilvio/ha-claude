@@ -268,6 +268,3 @@ All persistent data lives in **`/config/amira/`**:
 - **Discussions**: [github.com/Bobsilvio/ha-claude/discussions](https://github.com/Bobsilvio/ha-claude/discussions)
 - **Repository**: [github.com/Bobsilvio/ha-claude](https://github.com/Bobsilvio/ha-claude)
 
-## Changelog
-
-See [CHANGELOG.md](https://github.com/Bobsilvio/ha-claude/blob/main/CHANGELOG.md) for version history.
