@@ -31,8 +31,6 @@
   </a>
 </p>
 
----
-
 ### 🌍 Follow Me
 
 <p align="center">
@@ -48,7 +46,10 @@
     <img src="https://img.shields.io/badge/Subscribe-YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white">
   </a>
 </p>
-# 🏠🤖 Amira Ai Assistant
+
+---
+
+### 🏠🤖 Amira Ai Assistant
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
