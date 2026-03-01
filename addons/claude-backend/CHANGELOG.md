@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.2 — Two-level AI selector: provider first, then model
+- Header now shows two separate dropdowns instead of one grouped dropdown
+- First select: choose provider (Anthropic, OpenAI, Google, GitHub Copilot…)
+- Second select: choose model for that provider (auto-populated on provider change)
+- Switching provider auto-selects and applies the first model of that provider
+- Responsive: stacked full-width on mobile, compact side-by-side on tablet/desktop
+
 ## 4.2.1 — Fix Ollama HTTP 400 "can't find closing '}' symbol"
 - `providers/ollama.py`: Ollama's template engine (Go `text/template`) interprets literal `{` / `}` in message content and tool descriptions as template actions, causing 400 errors when smart context includes JSON entity data
 - Added `_escape_braces()`: inserts a zero-width space after `{` and before `}` to break template patterns without affecting visible text

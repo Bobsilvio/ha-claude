@@ -619,8 +619,11 @@ def get_chat_ui():
         .header .badge {{ font-size: 11px; opacity: 1; background: rgba(255,255,255,0.2); padding: 3px 10px; border-radius: 10px; font-weight: 500; letter-spacing: 0.3px; }}
         .header .new-chat {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 12px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; white-space: nowrap; }}
         .header .new-chat:hover {{ background: rgba(255,255,255,0.35); }}
-        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 240px; min-width: 0; }}
+        .model-selector {{ background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: background 0.2s; max-width: 160px; min-width: 0; }}
         .model-selector:hover {{ background: rgba(255,255,255,0.35); }}
+        #modelSelectWrap {{ display: flex; gap: 5px; align-items: center; min-width: 0; }}
+        #providerSelect {{ max-width: 130px; }}
+        #modelSelect {{ max-width: 160px; }}
         #refreshModelsBtn {{ background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 4px 7px; border-radius: 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; line-height: 1; display: inline-block; }}
         #refreshModelsBtn:hover {{ background: rgba(255,255,255,0.3); }}
         #refreshModelsBtn:disabled {{ opacity: 0.5; cursor: default; }}
@@ -875,7 +878,10 @@ def get_chat_ui():
             .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
             .header h1 {{ font-size: 16px; }}
             .header .status {{ order: 99; width: 100%; margin-left: 0; justify-content: flex-end; }}
-            .model-selector {{ flex: 1 1 100%; max-width: none; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+            #modelSelectWrap {{ flex: 1 1 100%; width: 100%; }}
+            .model-selector {{ flex: 1 1 0; max-width: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+            #providerSelect {{ max-width: none; }}
+            #modelSelect {{ max-width: none; }}
 
             .header .new-chat {{ display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 10px; border-radius: 16px; }}
             #testNvidiaBtn {{ flex: 1 1 160px; }}
@@ -907,7 +913,10 @@ def get_chat_ui():
             .sidebar {{ width: 160px; min-width: 140px; max-width: 180px; }}
             .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
             .header h1 {{ font-size: 16px; }}
-            .model-selector {{ flex: 1 1 auto; max-width: 180px; font-size: 11px; }}
+            #modelSelectWrap {{ flex: 1 1 auto; }}
+            .model-selector {{ flex: 1 1 auto; font-size: 11px; }}
+            #providerSelect {{ max-width: 110px; }}
+            #modelSelect {{ max-width: 140px; }}
             .chat-list {{ max-height: 35svh; }}
             .message {{ max-width: 90%; padding: 10px 12px; }}
             .input-area {{ padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); }}
@@ -1237,7 +1246,10 @@ def get_chat_ui():
         <h1>{agent_name}</h1>
         <span class="badge">v{api.get_version()}</span>
         <button id="sidebarToggleBtn" class="new-chat mobile-only" onclick="toggleSidebar()" title="{ui_js['conversations']}">\u2630</button>
-        <select id="modelSelect" class="model-selector" title="{ui_js['change_model']}"></select>
+        <div id="modelSelectWrap">
+          <select id="providerSelect" class="model-selector" title="{ui_js['change_model']}"></select>
+          <select id="modelSelect" class="model-selector" title="{ui_js['change_model']}"></select>
+        </div>
         <button id="refreshModelsBtn" title="{ui_js.get('refresh_models', 'Refresh model list from provider APIs')}">&#x21bb;</button>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
@@ -3337,132 +3349,124 @@ def get_chat_ui():
         }}
 
         // Load models and populate dropdown with ALL providers
+        // Stores full models data for use by populateModelSelect()
+        let _modelsData = null;
+
+        function _stripProviderPrefix(model) {{
+            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\s*/, '');
+        }}
+
+        // Populate the model <select> based on selected provider
+        function populateModelSelect(providerId, currentModel) {{
+            const modelSel = document.getElementById('modelSelect');
+            if (!modelSel || !_modelsData) return;
+            modelSel.innerHTML = '';
+
+            const models = (_modelsData.models || {{}})[providerId] || [];
+
+            // NVIDIA: split into tested / to-test groups
+            if (providerId === 'nvidia' && (Array.isArray(_modelsData.nvidia_models_tested) || Array.isArray(_modelsData.nvidia_models_to_test))) {{
+                const tested = Array.isArray(_modelsData.nvidia_models_tested) ? _modelsData.nvidia_models_tested : [];
+                const toTest = Array.isArray(_modelsData.nvidia_models_to_test) ? _modelsData.nvidia_models_to_test : [];
+                [
+                    {{ label: '\u2705 ' + T.nvidia_tested, models: tested }},
+                    {{ label: T.nvidia_to_test, models: toTest }},
+                ].filter(g => g.models.length).forEach(g => {{
+                    const grp = document.createElement('optgroup');
+                    grp.label = g.label;
+                    g.models.forEach(m => {{
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = _stripProviderPrefix(m);
+                        if (m === currentModel) opt.selected = true;
+                        grp.appendChild(opt);
+                    }});
+                    modelSel.appendChild(grp);
+                }});
+            }} else {{
+                models.forEach(m => {{
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = _stripProviderPrefix(m);
+                    if (m === currentModel) opt.selected = true;
+                    modelSel.appendChild(opt);
+                }});
+            }}
+
+            if (!modelSel.options.length) {{
+                const opt = document.createElement('option');
+                opt.textContent = T.no_models;
+                opt.disabled = true;
+                opt.selected = true;
+                modelSel.appendChild(opt);
+            }}
+        }}
+
         async function loadModels() {{
             try {{
                 const response = await fetch(apiUrl('api/get_models'));
-                if (!response.ok) {{
-                    throw new Error('get_models failed: ' + response.status);
-                }}
+                if (!response.ok) throw new Error('get_models failed: ' + response.status);
                 const data = await response.json();
+                _modelsData = data;
                 console.log('[loadModels] API response:', data);
 
-                const select = document.getElementById('modelSelect');
+                const providerSel = document.getElementById('providerSelect');
                 const currentProvider = data.current_provider;
                 const currentModel = data.current_model;
 
-                // First-time onboarding: prompt user to pick an agent once
                 if (data.needs_first_selection && !window._firstSelectionPrompted) {{
                     addMessage('\U0001f446 ' + T.select_agent, 'system');
                     window._firstSelectionPrompted = true;
                 }}
-
-                if (currentProvider) {{
-                    currentProviderId = currentProvider;
-                }}
-                if (currentModel) {{
-                    currentModelDisplay = currentModel;
-                }}
+                if (currentProvider) currentProviderId = currentProvider;
+                if (currentModel) currentModelDisplay = currentModel;
 
                 updateHeaderProviderStatus(currentProviderId, data.available_providers);
-
                 const testBtn = document.getElementById('testNvidiaBtn');
-                if (testBtn) {{
-                    testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';
-                }}
+                if (testBtn) testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';
 
-                console.log('[loadModels] Provider:', currentProvider, 'Current model:', currentModel);
-
-                // Clear existing options
-                select.innerHTML = '';
-
-                // Add models for ALL available providers, grouped by optgroup
+                // Build ordered provider list
                 let availableProviders = data.available_providers && data.available_providers.length
                     ? data.available_providers.map(p => p.id)
                     : Object.keys(data.models || {{}});
-                if (!availableProviders.length && currentProvider) {{
-                    availableProviders = [currentProvider];
-                }}
+                if (!availableProviders.length && currentProvider) availableProviders = [currentProvider];
+
                 const providerOrder = [
                     'anthropic', 'openai', 'google', 'nvidia', 'github',
-                    'github_copilot', 'groq', 'mistral', 'ollama', 'openrouter',
+                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web',
+                    'groq', 'mistral', 'ollama', 'openrouter',
                     'deepseek', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
                     'dashscope', 'moonshot', 'zhipu'
                 ];
-                // Append any provider returned by the API not already in the order list
                 for (const p of availableProviders) {{
                     if (!providerOrder.includes(p)) providerOrder.push(p);
                 }}
 
-                for (const providerId of providerOrder) {{
-                    if (!availableProviders.includes(providerId)) continue;
-                    if (!data.models || !data.models[providerId] || data.models[providerId].length === 0) continue;
-
-                    // Special grouping for NVIDIA: split into tested vs to-test
-                    if (providerId === 'nvidia' && (Array.isArray(data.nvidia_models_tested) || Array.isArray(data.nvidia_models_to_test))) {{
-                        const tested = Array.isArray(data.nvidia_models_tested) ? data.nvidia_models_tested : [];
-                        const toTest = Array.isArray(data.nvidia_models_to_test) ? data.nvidia_models_to_test : [];
-
-                        const groups = [
-                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' \u2705 ' + T.nvidia_tested, models: tested }},
-                            {{ label: (PROVIDER_LABELS[providerId] || providerId) + ' ' + T.nvidia_to_test, models: toTest }},
-                        ].filter(g => Array.isArray(g.models) && g.models.length > 0);
-
-                        for (const g of groups) {{
-                            const group = document.createElement('optgroup');
-                            group.label = g.label;
-                            g.models.forEach(model => {{
-                                const option = document.createElement('option');
-                                option.value = JSON.stringify({{model: model, provider: providerId}});
-                                const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
-                                option.textContent = displayName;
-                                if (model === currentModel && providerId === currentProvider) {{
-                                    option.selected = true;
-                                }}
-                                group.appendChild(option);
-                            }});
-                            select.appendChild(group);
-                        }}
-                        continue;
-                    }}
-
-                    const group = document.createElement('optgroup');
-                    group.label = PROVIDER_LABELS[providerId] || providerId;
-
-                    data.models[providerId].forEach(model => {{
-                        const option = document.createElement('option');
-                        option.value = JSON.stringify({{model: model, provider: providerId}});
-                        // Show just the model name without provider prefix
-                        const displayName = model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
-                        option.textContent = displayName;
-                        if (model === currentModel && providerId === currentProvider) {{
-                            option.selected = true;
-                        }}
-                        group.appendChild(option);
-                    }});
-
-                    select.appendChild(group);
+                // Populate provider select
+                providerSel.innerHTML = '';
+                let anyProvider = false;
+                for (const pid of providerOrder) {{
+                    if (!availableProviders.includes(pid)) continue;
+                    if (!data.models || !data.models[pid] || !data.models[pid].length) continue;
+                    const opt = document.createElement('option');
+                    opt.value = pid;
+                    opt.textContent = PROVIDER_LABELS[pid] || pid;
+                    if (pid === currentProvider) opt.selected = true;
+                    providerSel.appendChild(opt);
+                    anyProvider = true;
                 }}
-                
-                // Hide dropdown only if there are truly no providers to choose from
-                const providerCount = availableProviders.filter(p => data.models && data.models[p] && data.models[p].length > 0).length;
-                if (providerCount === 0) {{
-                    select.style.display = 'none';
-                    console.log('[loadModels] No providers available, hiding dropdown');
+
+                const wrap = document.getElementById('modelSelectWrap');
+                if (!anyProvider) {{
+                    if (wrap) wrap.style.display = 'none';
+                    console.log('[loadModels] No providers available, hiding selectors');
                 }} else {{
-                    select.style.display = '';
+                    if (wrap) wrap.style.display = '';
+                    // Populate model select for current provider
+                    const activeProv = providerSel.value || currentProvider;
+                    populateModelSelect(activeProv, currentModel);
                 }}
-                
-                if (!select.options.length) {{
-                    const option = document.createElement('option');
-                    option.textContent = T.no_models;
-                    option.disabled = true;
-                    option.selected = true;
-                    select.appendChild(option);
-                    if (!window._modelsEmptyNotified) {{
-                        addMessage('\u26a0\ufe0f ' + T.no_models_msg, 'system');
-                        window._modelsEmptyNotified = true;
-                    }}
-                }}
+
                 console.log('[loadModels] Loaded models for', availableProviders.length, 'providers');
             }} catch (error) {{
                 console.error('[loadModels] Error loading models:', error);
@@ -3523,7 +3527,13 @@ def get_chat_ui():
         // Change model (with automatic provider switch)
         async function changeModel(value) {{
             try {{
-                const parsed = JSON.parse(value);
+                // value can be a JSON string (legacy) or plain model name (new two-select)
+                let parsed;
+                try {{ parsed = JSON.parse(value); }} catch(e) {{
+                    // New style: model name from #modelSelect, provider from #providerSelect
+                    const provSel = document.getElementById('providerSelect');
+                    parsed = {{ model: value, provider: provSel ? provSel.value : currentProviderId }};
+                }}
                 const response = await fetch(apiUrl('api/set_model'), {{
                     method: 'POST',
                     headers: {{'Content-Type': 'application/json'}},
@@ -3937,6 +3947,21 @@ def get_chat_ui():
                 const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
                 if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', toggleSidebar);
 
+                // Provider select: repopulate model select, then apply change
+                const providerSelect = document.getElementById('providerSelect');
+                if (providerSelect) providerSelect.addEventListener('change', (e) => {{
+                    const pid = e.target.value;
+                    // Repopulate models for this provider, pre-select first
+                    if (_modelsData) {{
+                        const models = (_modelsData.models || {{}})[pid] || [];
+                        populateModelSelect(pid, models[0] || '');
+                    }}
+                    // Auto-apply: switch to first model of selected provider
+                    const modelSel = document.getElementById('modelSelect');
+                    if (modelSel && modelSel.value) changeModel(modelSel.value);
+                }});
+
+                // Model select: apply change on selection
                 const modelSelect = document.getElementById('modelSelect');
                 if (modelSelect) modelSelect.addEventListener('change', (e) => changeModel(e.target.value));
 
@@ -4115,6 +4140,32 @@ def get_chat_ui():
                         if (_statusFailures >= 3) {{
                             clearInterval(_statusInterval);
                             _appendSystemRaw('⚠️ Server non raggiungibile. Ricarica la pagina per riconnetterti.');
+                        }}
+                    }}
+                }}, 10000);
+                // Poll session status every 30s for web providers so the banner reappears when token expires
+                setInterval(async () => {{
+                    if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
+                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                }}, 30000);
+            }} catch (e) {{
+                const msg = (e && e.message) ? e.message : String(e);
+                _appendSystemRaw('❌ UI boot error: ' + msg);
+            }}
+        }})();
+        
+        // Export global functions for onclick handlers
+        window.handleDocumentSelect = handleDocumentSelect;
+        window.removeDocument = removeDocument;
+        window.changeModel = changeModel;
+        window.handleButtonClick = handleButtonClick;
+        window.refreshModels = refreshModels;
+        }}
+        
+    </script>
+</body>
+</html>"""
+tterti.');
                         }}
                     }}
                 }}, 10000);
