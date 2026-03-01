@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.3.0 — Four bug fixes: Copilot tool round 2, bubble thinking label, log quick actions i18n, chatgpt_web warning
+- **GitHub Copilot HTTP 400 on tool round 2**: after `flatten_tool_messages()` the conversation ended with an `assistant` turn (tool result merged in), which Copilot rejects — now injects a `user` continuation prompt when the last message is an assistant turn
+- **`flatten_tool_messages` null content fix**: assistant messages with `content: None` now get a non-null placeholder so strict providers don't reject with 400
+- **Tool result missing `name` field**: `role=tool` messages now include `"name": fn_name` so flatten produces `[TOOL RESULT: get_automations]` instead of `[TOOL RESULT: ]`
+- **Bubble thinking label shows model name**: thinking indicator now shows active model — e.g. "Sto pensando · gpt-4o... (3s)" — using `agentData.current_model_technical`
+- **Log quick actions in wrong language**: `getQuickActions()` was sending hardcoded English text to AI regardless of UI language — added `qa_*_text` i18n keys for all 4 languages (IT/EN/ES/FR)
+- **chatgpt_web `curl_cffi` warning suppressed**: downgraded from `WARNING` to `DEBUG` since provider is hidden from UI
+
 ## 4.2.9 — GitHub Copilot: full model list + updated API headers
 - **Static model list extended**: GitHub Copilot provider now shows 30+ known models immediately, even before authentication — includes Claude Opus/Sonnet/Haiku 4.x, GPT-5.x-codex, GPT-5.1/5.2, Gemini 3.x, Grok Code Fast, and all GPT-4o/4.1 variants
 - **Updated API headers**: all Copilot HTTP calls (session token, /models, chat) now use `copilot-chat/0.26.7` and `vscode/1.100.0` (was `0.12.2` / `1.85.0`) — matches current Copilot extension version for full model access

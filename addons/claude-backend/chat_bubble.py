@@ -61,6 +61,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_explain_log": "Explain this error",
             "qa_fix_log": "How to fix this?",
             "qa_show_errors": "Show all errors",
+            "qa_explain_log_text": "Explain this log error and tell me what causes it",
+            "qa_fix_log_text": "How can I fix this log error? Give me step-by-step instructions",
+            "qa_show_errors_text": "Show me all current errors and warnings from the HA logs",
+            "qa_fix_logs_text": "What are the most critical issues in the logs and how to fix them?",
             "confirm_yes": "Yes, confirm",
             "confirm_no": "No, cancel",
             "confirm_yes_value": "yes",
@@ -95,6 +99,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_explain_log": "Spiega questo errore",
             "qa_fix_log": "Come si risolve?",
             "qa_show_errors": "Mostra tutti gli errori",
+            "qa_explain_log_text": "Spiega questo errore di log e dimmi cosa lo causa",
+            "qa_fix_log_text": "Come posso risolvere questo errore di log? Dammi le istruzioni passo per passo",
+            "qa_show_errors_text": "Mostrami tutti gli errori e avvisi attuali nei log di Home Assistant",
+            "qa_fix_logs_text": "Quali sono i problemi più critici nei log e come risolverli?",
             "confirm_yes": "Sì, conferma",
             "confirm_no": "No, annulla",
             "confirm_yes_value": "si",
@@ -129,6 +137,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_explain_log": "Explica este error",
             "qa_fix_log": "¿Cómo solucionarlo?",
             "qa_show_errors": "Ver todos los errores",
+            "qa_explain_log_text": "Explica este error de registro y dime qué lo causa",
+            "qa_fix_log_text": "¿Cómo puedo corregir este error de registro? Dame instrucciones paso a paso",
+            "qa_show_errors_text": "Muéstrame todos los errores y avisos actuales en los registros de Home Assistant",
+            "qa_fix_logs_text": "¿Cuáles son los problemas más críticos en los registros y cómo solucionarlos?",
             "confirm_yes": "Sí, confirma",
             "confirm_no": "No, cancela",
             "confirm_yes_value": "si",
@@ -163,6 +175,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_explain_log": "Expliquer cette erreur",
             "qa_fix_log": "Comment corriger?",
             "qa_show_errors": "Voir toutes les erreurs",
+            "qa_explain_log_text": "Explique cette erreur de journal et dis-moi ce qui la cause",
+            "qa_fix_log_text": "Comment puis-je corriger cette erreur de journal ? Donne-moi des instructions étape par étape",
+            "qa_show_errors_text": "Montre-moi toutes les erreurs et avertissements actuels dans les journaux Home Assistant",
+            "qa_fix_logs_text": "Quels sont les problèmes les plus critiques dans les journaux et comment les corriger ?",
             "confirm_yes": "Oui, confirme",
             "confirm_no": "Non, annule",
             "confirm_yes_value": "oui",
@@ -500,11 +516,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       const hasEntry = !!(ctx.logEntry || _cachedLogEntry);
       const actions = [];
       if (hasEntry) {{
-        actions.push({{ label: T.qa_explain_log, text: 'Explain this log error and tell me what causes it' }});
-        actions.push({{ label: T.qa_fix_log, text: 'How can I fix this log error? Give me step-by-step instructions' }});
+        actions.push({{ label: T.qa_explain_log, text: T.qa_explain_log_text }});
+        actions.push({{ label: T.qa_fix_log, text: T.qa_fix_log_text }});
       }}
-      actions.push({{ label: T.qa_show_errors, text: 'Show me all current errors and warnings from the HA logs' }});
-      actions.push({{ label: T.qa_fix, text: 'What are the most critical issues in the logs and how to fix them?' }});
+      actions.push({{ label: T.qa_show_errors, text: T.qa_show_errors_text }});
+      actions.push({{ label: T.qa_fix, text: T.qa_fix_logs_text }});
       return actions;
     }}
     return [];
@@ -709,6 +725,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
     #ha-claude-bubble .thinking-elapsed {{
       font-size: 10px; opacity: 0.7; margin-left: 4px;
+    }}
+    #ha-claude-bubble .thinking-model {{
+      font-size: 10px; opacity: 0.6; font-style: normal; margin-left: 2px;
     }}
     #ha-claude-bubble .thinking-dots span {{
       animation: bubble-blink 1.4s infinite both;
@@ -1351,7 +1370,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     sendBtn.disabled = false;
 
     const thinkingEl = addMessage('thinking', '', false);
-    thinkingEl.innerHTML = T.thinking + '... <span class="thinking-elapsed"></span><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span><div class="thinking-steps"></div>';
+    // Show current model name in the thinking label (like the main chat UI)
+    const _thinkModel = agentData ? (agentData.current_model_technical || '') : '';
+    const _thinkLabel = _thinkModel ? T.thinking + ' <span class="thinking-model">· ' + _thinkModel + '</span>' : T.thinking;
+    thinkingEl.innerHTML = _thinkLabel + '... <span class="thinking-elapsed"></span><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span><div class="thinking-steps"></div>';
     const _thinkingStart = Date.now();
     let _thinkingSteps = [];
     const _thinkingTimer = setInterval(() => {{

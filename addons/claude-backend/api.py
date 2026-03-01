@@ -3599,6 +3599,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 messages.append({
                     "role": "tool",
                     "tool_call_id": tc.get("id", f"call_{fn_name}"),
+                    "name": fn_name,
                     "content": result,
                 })
 

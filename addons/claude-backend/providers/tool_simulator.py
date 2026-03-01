@@ -238,7 +238,8 @@ def flatten_tool_messages(
             continue
 
         if role == "assistant":
-            # Keep visible text; replace empty content with tool-call summary
+            # Keep visible text; replace empty/None content with tool-call summary.
+            # Some providers (e.g. GitHub Copilot) reject null/empty content fields.
             m2 = {k: v for k, v in m.items() if k != "tool_calls"}
             if not (m2.get("content") or "").strip():
                 tcs = m.get("tool_calls", [])
@@ -248,6 +249,12 @@ def flatten_tool_messages(
                         for tc in tcs
                     )
                     m2["content"] = f"[Called tools: {names}]"
+                else:
+                    # Ensure content is never None/empty for strict providers
+                    m2["content"] = "..."
+            # Always ensure content is a string, never None
+            if m2.get("content") is None:
+                m2["content"] = "..."
             out.append(m2)
             continue
 

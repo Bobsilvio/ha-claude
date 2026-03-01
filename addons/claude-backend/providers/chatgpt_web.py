@@ -32,7 +32,7 @@ try:
     CFFI_AVAILABLE = True
 except ImportError:
     CFFI_AVAILABLE = False
-    logger.warning("curl_cffi not installed — ChatGPT Web provider will not work. Run: pip install curl_cffi")
+    logger.debug("curl_cffi not installed — ChatGPT Web provider disabled (hidden from UI)")
 
 try:
     import httpx

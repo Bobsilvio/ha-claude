@@ -348,9 +348,20 @@ class GitHubCopilotProvider(EnhancedProvider):
         try:
             copilot_token = _get_copilot_session_token(gh_token)
 
-            # Normalise tool-call history → plain user/assistant messages
+            # Normalise tool-call history → plain user/assistant messages.
+            # GitHub Copilot requires conversations to end with a user turn,
+            # so after flattening we inject a continuation prompt if the last
+            # message is an assistant turn (i.e. after a tool result round).
             from providers.tool_simulator import flatten_tool_messages
             messages = flatten_tool_messages(messages)
+            if messages and messages[-1].get("role") == "assistant":
+                messages = list(messages) + [{
+                    "role": "user",
+                    "content": (
+                        "Continue. Use the tool results above to provide "
+                        "the final answer to the user's original request."
+                    ),
+                }]
 
             # ── Inject intent-specific instructions (no native tool support) ──────
             intent_name_local = (intent_info or {}).get("intent", "")
