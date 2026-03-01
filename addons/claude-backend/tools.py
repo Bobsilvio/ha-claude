@@ -2650,19 +2650,18 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 logger.info("create_html_dashboard: no entities provided for raw HTML — saving as-is")
 
             # Pre-filter: discard strings that are clearly not HA entity_ids.
-            # The AI sometimes puts JS expressions (cdn.jsdelivr, s.entity_id, res.json, etc.)
-            # in the entities list instead of real HA entity_ids.
-            # Valid HA entity_ids always match: domain.slug (e.g. sensor.battery_level)
+            # The AI (especially codex) often passes JS variable expressions like
+            # stat.low, x.state, b.entity_id, arr.map, ids.tot instead of real entity_ids.
+            # Strategy: whitelist known HA domains — real entity_ids always start with one.
             import re as _re_eid
-            _HA_DOMAIN_RE = _re_eid.compile(
-                r'^[a-z_]+\.[a-z0-9_]+$'
-            )
-            _KNOWN_JS_FRAGMENTS = {
-                "cdn.jsdelivr", "chart.js", "s.entity_id", "s.state", "s.attributes",
-                "res.ok", "res.json", "r.json", "e.target", "card.onclick",
-                "modal.show", "location.href", "entities.map", "series.map",
-                "p.last_changed", "p.state", "state.attributes", "state.state",
-                "state.last_updated", "chart.destroy", "labels.slice", "values.slice",
+            _HA_DOMAINS = {
+                "sensor", "binary_sensor", "switch", "light", "climate", "cover",
+                "fan", "input_boolean", "input_number", "input_select", "input_text",
+                "input_datetime", "number", "select", "text", "automation", "script",
+                "scene", "media_player", "camera", "lock", "vacuum", "alarm_control_panel",
+                "weather", "person", "device_tracker", "zone", "sun", "timer", "counter",
+                "group", "remote", "siren", "update", "button", "event", "image",
+                "lawn_mower", "todo", "notify", "persistent_notification",
             }
             _prefiltered = []
             _prefilter_skipped = []
@@ -2670,14 +2669,35 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 if not isinstance(eid, str):
                     _prefilter_skipped.append(str(eid))
                     continue
-                # Skip known JS fragments and strings that don't look like domain.slug
-                if eid in _KNOWN_JS_FRAGMENTS or not _HA_DOMAIN_RE.match(eid):
-                    _prefilter_skipped.append(eid)
-                else:
+                _parts = eid.split(".", 1)
+                # Must be domain.slug, domain in HA whitelist, slug non-empty and only safe chars
+                if (len(_parts) == 2
+                        and _parts[0] in _HA_DOMAINS
+                        and len(_parts[1]) >= 2
+                        and _re_eid.match(r'^[a-z0-9_]+$', _parts[1])):
                     _prefiltered.append(eid)
+                else:
+                    _prefilter_skipped.append(eid)
             if _prefilter_skipped:
                 logger.info(f"🔍 Pre-filtered {len(_prefilter_skipped)} non-entity strings from entities list: {_prefilter_skipped[:10]}")
             entities = _prefiltered
+
+            # Fallback: if AI passed no valid entity_ids at all but we have raw HTML,
+            # scan the HTML for real HA entity_id literals (quoted strings matching domain.slug).
+            if not entities and raw_html:
+                try:
+                    _domains_re = '|'.join(sorted(_HA_DOMAINS, key=len, reverse=True))
+                    _html_eids = list(dict.fromkeys(
+                        m.strip("'\"") for m in _re_eid.findall(
+                            r'["\'](?:' + _domains_re + r')\.[a-z0-9_]{2,}["\']',
+                            raw_html
+                        )
+                    ))
+                    if _html_eids:
+                        logger.info(f"🔍 Extracted {len(_html_eids)} entity_ids from HTML content: {_html_eids[:10]}")
+                        entities = _html_eids
+                except Exception as _ex:
+                    logger.warning(f"Entity extraction from HTML failed: {_ex}")
 
             # Validate entities: only keep those that exist and are not unknown/unavailable
             original_count = len(entities)
