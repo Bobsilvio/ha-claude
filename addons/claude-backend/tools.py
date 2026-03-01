@@ -695,79 +695,106 @@ def _fix_css_var_in_js(html: str) -> str:
 
 
 def _fix_auth_redirect(html: str) -> str:
-    """Remove AI-generated auth redirect patterns that break Companion App.
+    """Fix AI-generated auth patterns that break HA Companion App.
 
-    The AI often writes:
-        const tok = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;
-        if (!tok) { location.href = '/?redirect=...' }
+    Problems we fix:
+    1. Sync token read: `const tok = JSON.parse(localStorage.getItem('hassTokens')...).access_token`
+       → tok is '' when injected, so ALL fetch calls using tok fail silently
+    2. Redirect on missing token: `if(!tok){ location.href='/?redirect=...' }`
+       → causes infinite loading loop in Companion App
+    3. Stale headers object: `const headers = { Authorization: 'Bearer ' + tok }`
+       → built when tok='', never updated even after token is resolved
 
-    This causes infinite redirect/loading in HA Companion App where localStorage
-    is empty. We replace it with a safe async auth approach that never redirects.
+    Strategy: inject getTokenAsync() at the top of every <script> block that
+    references hassTokens or tok/token auth patterns, then patch fetch calls
+    to use the resolved token.
     """
     import re
 
-    # Pattern 1: redirect on missing token — remove the entire if(!tok){...} line
-    html = re.sub(
-        r"if\s*\(\s*!tok\s*\)\s*\{[^}]*location\.href[^}]*\}\s*;?\s*\n?",
-        "",
-        html,
-        flags=re.IGNORECASE,
-    )
-    html = re.sub(
-        r"if\s*\(\s*!tok\s*\)\s*location\.href\s*=[^;]+;\s*\n?",
-        "",
-        html,
-        flags=re.IGNORECASE,
+    _GETTOKEN_HELPER = (
+        "/* ── Amira auth patch ── */\n"
+        "let tok='';\n"
+        "function _getTokenAsync(){if(tok)return Promise.resolve(tok);\n"
+        "return new Promise(function(resolve){\n"
+        "var done=function(t){tok=t||'';resolve(tok)};\n"
+        "if(window.parent&&window.parent!==window){\n"
+        "var onMsg=function(ev){if(ev.data&&ev.data.type==='auth/token'&&ev.data.token){"
+        "window.removeEventListener('message',onMsg);clearTimeout(t1);done(ev.data.token)}};\n"
+        "window.addEventListener('message',onMsg);\n"
+        "var t1=setTimeout(function(){window.removeEventListener('message',onMsg);_tryNative()},1500);\n"
+        "try{window.parent.postMessage({type:'auth/get_token'},'*')}catch(e){clearTimeout(t1);_tryNative();}\n"
+        "return;}\n"
+        "_tryNative();\n"
+        "function _tryNative(){\n"
+        "try{var s=localStorage.getItem('hassTokens');if(s){var a=JSON.parse(s||'{}').access_token;if(a)return done(a);}}"
+        "catch(e){}\n"
+        "done('');\n"
+        "}})};\n"
+        "function _authHeader(){return tok?{'Authorization':'Bearer '+tok,'Content-Type':'application/json'}:{'Content-Type':'application/json'}}\n"
+        "/* ── end auth patch ── */\n"
     )
 
-    # Pattern 2: sync localStorage token read — replace with safe async wrapper
-    # Before: const tok = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;
-    # After:  let tok = ''; (filled later by getTokenAsync)
-    # We inject getTokenAsync + wrap the main load function in a .then()
-    _SYNC_TOK_RE = re.compile(
-        r"(?:const|let|var)\s+tok\s*=\s*JSON\.parse\(localStorage\.getItem\(['\"]hassTokens['\"]\)[^)]*\)[^;]*;",
-        re.IGNORECASE,
-    )
-    if _SYNC_TOK_RE.search(html):
-        # Build the getTokenAsync helper (same logic as our boilerplate)
-        _async_helper = (
-            "let tok='';\n"
-            "function _getTokenAsync(){if(tok)return Promise.resolve(tok);\n"
-            "return new Promise(function(resolve){\n"
-            "var done=function(t){tok=t||'';resolve(tok)};\n"
-            "if(window.parent&&window.parent!==window){\n"
-            "var onMsg=function(ev){if(ev.data&&ev.data.type==='auth/token'&&ev.data.token){"
-            "window.removeEventListener('message',onMsg);clearTimeout(t1);done(ev.data.token)}};\n"
-            "window.addEventListener('message',onMsg);\n"
-            "var t1=setTimeout(function(){window.removeEventListener('message',onMsg);_tryNative()},1500);\n"
-            "try{window.parent.postMessage({type:'auth/get_token'},'*')}catch(e){clearTimeout(t1);_tryNative();}\n"
-            "return;}\n"
-            "_tryNative();\n"
-            "function _tryNative(){\n"
-            "try{var s=localStorage.getItem('hassTokens');if(s){var a=JSON.parse(s).access_token;if(a)return done(a);}}"
-            "catch(e){}\n"
-            "done('');\n"
-            "}})}\n"
+    def _patch_script(m):
+        script_tag = m.group(1)  # opening <script...>
+        body = m.group(2)
+        closing = m.group(3)
+
+        # Skip scripts that don't do HA auth (e.g. CDN libs inline)
+        needs_patch = bool(re.search(
+            r"hassTokens|localStorage.*access_token|Authorization.*Bearer|/api/states|/api/websocket",
+            body, re.IGNORECASE
+        ))
+        if not needs_patch:
+            return m.group(0)
+
+        # Already patched
+        if "_getTokenAsync" in body or "Amira auth patch" in body:
+            return m.group(0)
+
+        # Remove stale sync token declarations
+        body = re.sub(
+            r"(?:const|let|var)\s+tok\s*=\s*JSON\.parse\([^;]+hassTokens[^;]+\)[^;]*;\s*\n?",
+            "",
+            body, flags=re.IGNORECASE
         )
-        html = _SYNC_TOK_RE.sub(_async_helper, html, count=1)
+        # Remove token redirects
+        body = re.sub(
+            r"if\s*\(\s*!tok\s*\)\s*\{[^}]*location\.href[^}]*\}\s*;?\s*\n?",
+            "", body, flags=re.IGNORECASE
+        )
+        body = re.sub(
+            r"if\s*\(\s*!tok\s*\)\s*location\.href\s*=[^;\n]+[;\n]",
+            "", body, flags=re.IGNORECASE
+        )
+        # Remove stale const headers = {Authorization: 'Bearer '+tok} — tok is '' at that point
+        body = re.sub(
+            r"(?:const|let|var)\s+headers\s*=\s*\{[^}]*Authorization[^}]*\+\s*tok[^}]*\}\s*;\s*\n?",
+            "", body, flags=re.IGNORECASE
+        )
 
-        # Wrap the main entry point: load() / init() / render() called at top level
-        # Replace `load();` or `init();` at script end with `_getTokenAsync().then(function(){load();})`
-        for _fn in ("load", "init", "start", "main", "render"):
-            html = re.sub(
-                rf"(?<!\w){_fn}\(\s*\)\s*;(\s*setInterval\(\s*{_fn})",
-                rf"_getTokenAsync().then(function(){{ {_fn}(); }});\g<1>",
-                html,
-            )
-            html = re.sub(
-                rf"(?<!\w){_fn}\(\s*\)\s*;\s*\n(\s*setInterval\(\s*{_fn}[^)]*\)\s*;)",
-                rf"_getTokenAsync().then(function(){{ {_fn}(); }});\n\g<1>",
-                html,
+        # Wrap entry-point calls in _getTokenAsync().then(...)
+        # Match: load();  (optionally followed by setInterval(load, N))
+        for _fn in ("load", "init", "start", "main", "render", "fetchAll", "fetchStates"):
+            # Pattern: bare call at statement level (not inside a function definition)
+            body = re.sub(
+                rf"^(\s*)({_fn}\(\s*\)\s*;)\s*$",
+                rf"\1_getTokenAsync().then(function(){{ {_fn}(); }});",
+                body, flags=re.MULTILINE
             )
 
+        return script_tag + "\n" + _GETTOKEN_HELPER + body + closing
+
+    patched = re.sub(
+        r"(<script(?:[^>]*)>)([\s\S]*?)(</script>)",
+        _patch_script,
+        html,
+        flags=re.IGNORECASE
+    )
+
+    if patched != html:
         logger.info("🔒 Fixed sync auth redirect pattern in AI-generated HTML")
 
-    return html
+    return patched
 
 
 def _stamp_description(description: str, action: str = "create") -> str:

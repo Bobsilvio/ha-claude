@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.12 — Rewrite auth patch: fix stale headers + entry-point wrapping
+- `_fix_auth_redirect()` completely rewritten to operate per `<script>` block
+- Also removes stale `const headers = {Authorization: 'Bearer '+tok}` built before token resolved
+- Wraps bare `load()` / `init()` / `render()` calls in `_getTokenAsync().then(...)` at statement level
+- Injects `_authHeader()` helper for consistent auth headers in all fetch calls
+
 ## 4.1.11 — Fix AI-generated auth redirect breaking Companion App
 - Added `_fix_auth_redirect()` post-processor applied to all generated HTML dashboards
 - Removes `if(!tok){ location.href='/?redirect=...' }` pattern that caused infinite loading in Companion App
