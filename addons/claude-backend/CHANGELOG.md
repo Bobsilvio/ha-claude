@@ -1,6 +1,11 @@
 # Changelog
 
-## 4.1.5 — Smart context: larger window + compact entity lists
+## 4.1.6 — Fix messaging in chat UI + sort order
+- WhatsApp/Telegram sessions no longer appear in the main chat UI conversation list
+- Removed "Recent context: USER:..." prefix injected into WhatsApp messages (redundant, polluted saved conversations)
+- Messaging list (WhatsApp + Telegram) now sorted with most recent chat first
+
+## 4.1.5 — Smart context larger window + compact entity lists
 - `MAX_SMART_CONTEXT` raised from 10 000 to 25 000 chars (5× more sensor data visible per query)
 - Entity lists with >20 entries now use compact JSON, saving ~40% token space
 - Entity injection capped at 80 entries per query (prevents single-keyword floods like "temperature" from eating the whole context)

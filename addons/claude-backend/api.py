@@ -5423,19 +5423,11 @@ def api_whatsapp_webhook():
         # Add to chat history
         mgr.add_message("whatsapp", from_number, text, role="user")
         
-        # Get history for context
-        history = mgr.get_chat_history("whatsapp", from_number, limit=5)
-        
-        # Build prompt
-        prompt_text = text
-        if history:
-            context = "\n".join([f"{m['role'].upper()}: {m['text']}" for m in history[-3:]])
-            prompt_text = f"Recent context:\n{context}\n\nNew message: {text}"
-        
-        # Get AI response using the active provider/model (same as web UI)
+        # Get AI response — chat_with_ai reuses the persistent whatsapp_{number}
+        # session which already accumulates history; no need to inject "Recent context:"
         response_text = ""
         try:
-            response_text = chat_with_ai(prompt_text, f"whatsapp_{from_number}")
+            response_text = chat_with_ai(text, f"whatsapp_{from_number}")
         except Exception as e:
             logger.error(f"WhatsApp AI response error: {e}")
             response_text = f"⚠️ Error: {str(e)[:100]}"
@@ -5512,6 +5504,9 @@ def api_conversations_list():
     result = []
     for sid, msgs in conversations.items():
         if not msgs:
+            continue
+        # Exclude messaging sessions — they have their own dedicated UI section
+        if sid.startswith(("whatsapp_", "telegram_")):
             continue
         # Extract first user message as title
         title = "Nuova conversazione"

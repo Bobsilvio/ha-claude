@@ -3074,7 +3074,13 @@ def get_chat_ui():
                     ...(chats.telegram || []).map(c => ({{...c, channel: 'telegram'}})),
                     ...(chats.whatsapp || []).map(c => ({{...c, channel: 'whatsapp'}}))
                 ];
-                
+                // Sort by most recent message first
+                allChats.sort((a, b) => {{
+                    const ta = a.last_timestamp ? new Date(a.last_timestamp).getTime() : 0;
+                    const tb = b.last_timestamp ? new Date(b.last_timestamp).getTime() : 0;
+                    return tb - ta;
+                }});
+
                 if (allChats.length === 0) {{
                     listEl.innerHTML = '<div style="padding: 12px; text-align: center; color: #999; font-size: 12px;">' + (T.messaging_no_chats || 'No messaging chats') + '</div>';
                     return;
