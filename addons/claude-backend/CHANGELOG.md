@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.1.3 — Complete BoBot → Amira rename
+- **CHANGE**: Renamed all remaining `BoBot`/`bobot` references to `Amira`/`amira` in `config.yaml` (panel title, port description, MCP config path)
+
 ## 4.1.2 — Rename addon to Amira
 - **CHANGE**: Addon renamed from `BoBot` to `Amira` in Home Assistant addon store (`name` and `description` in `config.yaml`)
 
