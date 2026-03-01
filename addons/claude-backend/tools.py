@@ -636,10 +636,30 @@ def _fill_html_placeholders(
     if not footer_text:
         footer_text = default_footer.strip() or f"Dashboard by {agent_name} · Real-time"
 
+    # Build initial states snapshot — injected directly into HTML so the page
+    # renders immediately without needing client-side auth (works in Companion App)
+    initial_states_json = "{}"
+    try:
+        all_s = api.get_all_states()
+        if isinstance(all_s, list) and entities:
+            snap = {
+                s["entity_id"]: {
+                    "state": s.get("state", ""),
+                    "friendly_name": (s.get("attributes") or {}).get("friendly_name", ""),
+                    "unit": (s.get("attributes") or {}).get("unit_of_measurement", ""),
+                    "attributes": s.get("attributes") or {},
+                }
+                for s in all_s if s.get("entity_id") in entities
+            }
+            initial_states_json = json.dumps(snap, ensure_ascii=False)
+    except Exception:
+        pass
+
     out = str(html)
     out = out.replace("__TITLE__", safe_title)
     out = out.replace("__TITLE_JSON__", title_json)
     out = out.replace("__ENTITIES_JSON__", entities_json)
+    out = out.replace("__INITIAL_STATES_JSON__", initial_states_json)
     out = out.replace("__ACCENT__", accent_color)
     out = out.replace("__ACCENT_RGB__", accent_rgb)
     out = out.replace("__THEME_CSS__", theme_css)
@@ -672,6 +692,82 @@ def _fix_css_var_in_js(html: str) -> str:
         return fixed
 
     return re.sub(r'<script\b[^>]*>[\s\S]*?</script>', _fix_script_block, html, flags=re.IGNORECASE)
+
+
+def _fix_auth_redirect(html: str) -> str:
+    """Remove AI-generated auth redirect patterns that break Companion App.
+
+    The AI often writes:
+        const tok = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;
+        if (!tok) { location.href = '/?redirect=...' }
+
+    This causes infinite redirect/loading in HA Companion App where localStorage
+    is empty. We replace it with a safe async auth approach that never redirects.
+    """
+    import re
+
+    # Pattern 1: redirect on missing token — remove the entire if(!tok){...} line
+    html = re.sub(
+        r"if\s*\(\s*!tok\s*\)\s*\{[^}]*location\.href[^}]*\}\s*;?\s*\n?",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+    html = re.sub(
+        r"if\s*\(\s*!tok\s*\)\s*location\.href\s*=[^;]+;\s*\n?",
+        "",
+        html,
+        flags=re.IGNORECASE,
+    )
+
+    # Pattern 2: sync localStorage token read — replace with safe async wrapper
+    # Before: const tok = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token;
+    # After:  let tok = ''; (filled later by getTokenAsync)
+    # We inject getTokenAsync + wrap the main load function in a .then()
+    _SYNC_TOK_RE = re.compile(
+        r"(?:const|let|var)\s+tok\s*=\s*JSON\.parse\(localStorage\.getItem\(['\"]hassTokens['\"]\)[^)]*\)[^;]*;",
+        re.IGNORECASE,
+    )
+    if _SYNC_TOK_RE.search(html):
+        # Build the getTokenAsync helper (same logic as our boilerplate)
+        _async_helper = (
+            "let tok='';\n"
+            "function _getTokenAsync(){if(tok)return Promise.resolve(tok);\n"
+            "return new Promise(function(resolve){\n"
+            "var done=function(t){tok=t||'';resolve(tok)};\n"
+            "if(window.parent&&window.parent!==window){\n"
+            "var onMsg=function(ev){if(ev.data&&ev.data.type==='auth/token'&&ev.data.token){"
+            "window.removeEventListener('message',onMsg);clearTimeout(t1);done(ev.data.token)}};\n"
+            "window.addEventListener('message',onMsg);\n"
+            "var t1=setTimeout(function(){window.removeEventListener('message',onMsg);_tryNative()},1500);\n"
+            "try{window.parent.postMessage({type:'auth/get_token'},'*')}catch(e){clearTimeout(t1);_tryNative();}\n"
+            "return;}\n"
+            "_tryNative();\n"
+            "function _tryNative(){\n"
+            "try{var s=localStorage.getItem('hassTokens');if(s){var a=JSON.parse(s).access_token;if(a)return done(a);}}"
+            "catch(e){}\n"
+            "done('');\n"
+            "}})}\n"
+        )
+        html = _SYNC_TOK_RE.sub(_async_helper, html, count=1)
+
+        # Wrap the main entry point: load() / init() / render() called at top level
+        # Replace `load();` or `init();` at script end with `_getTokenAsync().then(function(){load();})`
+        for _fn in ("load", "init", "start", "main", "render"):
+            html = re.sub(
+                rf"(?<!\w){_fn}\(\s*\)\s*;(\s*setInterval\(\s*{_fn})",
+                rf"_getTokenAsync().then(function(){{ {_fn}(); }});\g<1>",
+                html,
+            )
+            html = re.sub(
+                rf"(?<!\w){_fn}\(\s*\)\s*;\s*\n(\s*setInterval\(\s*{_fn}[^)]*\)\s*;)",
+                rf"_getTokenAsync().then(function(){{ {_fn}(); }});\n\g<1>",
+                html,
+            )
+
+        logger.info("🔒 Fixed sync auth redirect pattern in AI-generated HTML")
+
+    return html
 
 
 def _stamp_description(description: str, action: str = "create") -> str:
@@ -2823,8 +2919,9 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     footer_text=footer_text,
                 )
 
-            # Sanitize: fix CSS var() used inside <script> (common AI model mistake)
+            # Sanitize: fix CSS var() and auth redirect patterns (common AI mistakes)
             html_content = _fix_css_var_in_js(html_content)
+            html_content = _fix_auth_redirect(html_content)
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 

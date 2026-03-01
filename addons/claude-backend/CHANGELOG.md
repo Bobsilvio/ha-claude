@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.11 — Fix AI-generated auth redirect breaking Companion App
+- Added `_fix_auth_redirect()` post-processor applied to all generated HTML dashboards
+- Removes `if(!tok){ location.href='/?redirect=...' }` pattern that caused infinite loading in Companion App
+- Replaces sync `localStorage.getItem('hassTokens')` token read with async `_getTokenAsync()` — tries parent iframe postMessage first, then localStorage
+- Injects initial states snapshot (`__INITIAL_STATES_JSON__`) so page renders immediately without client-side auth
+
 ## 4.1.10 — Fix HTML dashboard auth in Companion App
 - `getTokenAsync()` now tries `postMessage` to parent window first (correct channel when page is inside a Lovelace iframe in Companion App)
 - Token cached after first resolution to avoid repeated async lookups
