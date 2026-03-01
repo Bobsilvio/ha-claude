@@ -1015,22 +1015,63 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
 
         # Try to find integration-specific entities if user mentions a device/brand
         _integration_matches = []
+        # IT→EN keyword synonyms + device_class aliases for smarter entity matching
+        _keyword_synonyms = {
+            "batterie": ["battery", "batterie", "bat"],
+            "batteria": ["battery", "batteria", "bat"],
+            "temperatura": ["temperature", "temperatura", "temp"],
+            "umidità": ["humidity", "umidita", "humid"],
+            "consumo": ["consumption", "energy", "power", "consumo"],
+            "potenza": ["power", "potenza", "watt"],
+            "tensione": ["voltage", "tensione", "volt"],
+            "corrente": ["current", "corrente", "ampere"],
+            "luminosità": ["illuminance", "lux", "luminosity"],
+            "pressione": ["pressure", "pressione"],
+            "velocità": ["speed", "velocity", "velocita"],
+            "movimento": ["motion", "movimento"],
+        }
+        # device_class aliases: IT keyword → device_class values to match
+        _device_class_aliases = {
+            "batterie": ["battery"],
+            "batteria": ["battery"],
+            "temperatura": ["temperature"],
+            "umidità": ["humidity"],
+            "consumo": ["energy", "power"],
+            "potenza": ["power"],
+            "tensione": ["voltage"],
+            "corrente": ["current"],
+            "luminosità": ["illuminance"],
+            "pressione": ["pressure"],
+            "movimento": ["motion", "occupancy"],
+        }
         if _msg_words and (intent == "create_html_dashboard" or any(k in msg_lower for k in entity_keywords)):
             try:
                 all_states = api.get_all_states()
                 for keyword in _msg_words:
+                    # Expand keyword to synonyms (includes original)
+                    _search_terms = list(dict.fromkeys(
+                        [keyword] + _keyword_synonyms.get(keyword, [])
+                    ))
+                    _device_classes = _device_class_aliases.get(keyword, [])
                     matched = [
                         {"entity_id": s.get("entity_id"),
                          "state": s.get("state"),
                          "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
                          "unit": s.get("attributes", {}).get("unit_of_measurement", "")}
                         for s in all_states
-                        if keyword in s.get("entity_id", "").lower()
-                        or keyword in s.get("attributes", {}).get("friendly_name", "").lower()
+                        if any(
+                            term in s.get("entity_id", "").lower()
+                            or term in s.get("attributes", {}).get("friendly_name", "").lower()
+                            for term in _search_terms
+                        )
+                        or (
+                            _device_classes
+                            and s.get("attributes", {}).get("device_class", "") in _device_classes
+                        )
                     ]
                     if matched:
                         _integration_matches.extend(matched)
-                        logger.info(f"Smart context: found {len(matched)} entities matching keyword '{keyword}'")
+                        logger.info(f"Smart context: found {len(matched)} entities matching keyword '{keyword}' (terms: {_search_terms})")
 
                 # Deduplicate by entity_id
                 _seen = set()

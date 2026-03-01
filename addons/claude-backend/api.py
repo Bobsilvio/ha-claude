@@ -7037,7 +7037,11 @@ def initialize_mcp() -> None:
 
 if __name__ == "__main__":
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
-    logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
+    _OAUTH_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web"}
+    if AI_PROVIDER in _OAUTH_PROVIDERS:
+        logger.info("API Key: OAuth-based (use 🔑 button in UI)")
+    else:
+        logger.info(f"API Key: {'configured' if get_api_key() else 'NOT configured'}")
     # get_ha_token() è già definita sopra, quindi qui è sicuro
     logger.info(f"HA Token: {'available' if get_ha_token() else 'NOT available'}")
     

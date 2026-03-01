@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: Amira
-version: "4.1.6"
+version: "4.1.7"
 slug: claude-backend
 description: >-
   Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -63,12 +63,12 @@ options:
   enable_rag: false
   enable_chat_bubble: false
   enable_mcp: false
+  mcp_config_file: /config/amira/mcp_config.json
   timeout: "30"
   max_retries: "3"
   max_snapshots_per_file: 5
   max_conversations: 10
   cost_currency: USD
-  mcp_config_file: /config/amira/mcp_config.json
   telegram_bot_token: ""
   twilio_account_sid: ""
   twilio_auth_token: ""
@@ -110,12 +110,12 @@ schema:
   enable_rag: bool?
   enable_chat_bubble: bool?
   enable_mcp: bool?
+  mcp_config_file: str?
   timeout: str?
   max_retries: str?
   max_snapshots_per_file: "int(1,50)?"
   max_conversations: "int(1,100)?"
   cost_currency: "list(USD|EUR|GBP|JPY)?"
-  mcp_config_file: str?
   telegram_bot_token: password?
   twilio_account_sid: password?
   twilio_auth_token: password?

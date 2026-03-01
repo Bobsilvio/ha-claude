@@ -237,6 +237,26 @@ const DICO={sensor:'\ud83d\udcca',binary_sensor:'\ud83d\udd14',switch:'\ud83d\ud
 input_boolean:'\ud83d\udd18',input_number:'\ud83d\udd22',number:'\ud83d\udd22',automation:'\u2699\ufe0f',script:'\ud83d\udcdc',person:'\ud83d\udc64',weather:'\ud83c\udf24\ufe0f',
 media_player:'\ud83c\udfb5',camera:'\ud83d\udcf7',lock:'\ud83d\udd12',vacuum:'\ud83e\uddf9'};
 function getToken(){try{return JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''}catch(e){return''}}
+// Companion App uses window.externalApp (Android) or webkit.messageHandlers (iOS) for auth
+function getTokenAsync(){
+  return new Promise(resolve=>{
+    try{
+      if(window.externalApp&&window.externalApp.getExternalAuth){
+        window.externalApp.getExternalAuth({callback:'_haTokenCb',type:'bearer'});
+        window._haTokenCb=r=>{delete window._haTokenCb;resolve(r&&r.access_token?r.access_token:getToken())};
+        setTimeout(()=>{if(window._haTokenCb){delete window._haTokenCb;resolve(getToken())}},2000);
+        return;
+      }
+      if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.getExternalAuth){
+        window.webkit.messageHandlers.getExternalAuth.postMessage({callback:'_haTokenCb',type:'bearer'});
+        window._haTokenCb=r=>{delete window._haTokenCb;resolve(r&&r.access_token?r.access_token:getToken())};
+        setTimeout(()=>{if(window._haTokenCb){delete window._haTokenCb;resolve(getToken())}},2000);
+        return;
+      }
+    }catch(e){}
+    resolve(getToken());
+  });
+}
 function haHeaders(){const t=getToken();return t?{'Authorization':'Bearer '+t,'Content-Type':'application/json'}:{'Content-Type':'application/json'}}
 
 createApp({setup(){
@@ -277,7 +297,7 @@ fetch('/api/states',{headers:haHeaders()}).then(r=>{if(!r.ok)throw new Error(r.s
 
 function startPolling(){if(pollTimer)return;fetchStates();pollTimer=setInterval(fetchStates,5000)}
 
-function connect(){const token=getToken();
+function connect(){getTokenAsync().then(token=>{
 if(!token){error.value='';startPolling();return}
 try{const p=location.protocol==='https:'?'wss:':'ws:';
 ws=new WebSocket(p+'//'+location.host+'/api/websocket');
@@ -290,7 +310,7 @@ if(d&&ENTITIES.includes(d.entity_id)&&d.new_state){states[d.entity_id]={state:d.
 unit:d.new_state.attributes?.unit_of_measurement||'',attributes:d.new_state.attributes||{}};initCharts()}}};
 ws.onerror=()=>{connected.value=false;startPolling()};
 ws.onclose=()=>{connected.value=false;reconTimer=setTimeout(connect,10000)};
-}catch(e){startPolling()}}
+}catch(e){startPolling()}})}
 
 function initCharts(){const dk=window.matchMedia('(prefers-color-scheme:dark)').matches;
 SECTIONS.forEach((sec,i)=>{if(sec.type!=='chart')return;
@@ -429,33 +449,50 @@ createApp({
     let timeInterval, ws;
     const updateTime = () => { nowText.value = new Date().toLocaleTimeString(); };
 
+    const getTokenAsync = () => new Promise(resolve => {
+      try {
+        if (window.externalApp && window.externalApp.getExternalAuth) {
+          window.externalApp.getExternalAuth({callback:'_haTokenCb2',type:'bearer'});
+          window._haTokenCb2 = r => { delete window._haTokenCb2; resolve(r&&r.access_token?r.access_token:''); };
+          setTimeout(() => { if (window._haTokenCb2) { delete window._haTokenCb2; resolve(''); } }, 2000);
+          return;
+        }
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.getExternalAuth) {
+          window.webkit.messageHandlers.getExternalAuth.postMessage({callback:'_haTokenCb2',type:'bearer'});
+          window._haTokenCb2 = r => { delete window._haTokenCb2; resolve(r&&r.access_token?r.access_token:''); };
+          setTimeout(() => { if (window._haTokenCb2) { delete window._haTokenCb2; resolve(''); } }, 2000);
+          return;
+        }
+      } catch(e) {}
+      try { resolve(JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''); } catch(e) { resolve(''); }
+    });
     const connectWS = () => {
-      const tokensRaw = localStorage.getItem('hassTokens');
-      if (!tokensRaw) { conn.mode = 'no token'; return; }
-      const token = JSON.parse(tokensRaw).access_token;
-      fetch('/api/states', {headers:{'Authorization':'Bearer '+token}})
-        .then(r=>r.json()).then(list => {
-          if (Array.isArray(list)) list.forEach(s => {
-            if (ENTITIES.includes(s.entity_id))
-              states[s.entity_id] = {state: s.state, friendly_name: (s.attributes||{}).friendly_name || s.entity_id, unit: (s.attributes||{}).unit_of_measurement || ''};
+      getTokenAsync().then(token => {
+        if (!token) { conn.mode = 'no token'; return; }
+        fetch('/api/states', {headers:{'Authorization':'Bearer '+token}})
+          .then(r=>r.json()).then(list => {
+            if (Array.isArray(list)) list.forEach(s => {
+              if (ENTITIES.includes(s.entity_id))
+                states[s.entity_id] = {state: s.state, friendly_name: (s.attributes||{}).friendly_name || s.entity_id, unit: (s.attributes||{}).unit_of_measurement || ''};
+            });
           });
-        });
-      const proto = location.protocol==='https:'?'wss:':'ws:';
-      ws = new WebSocket(proto+'//'+location.host+'/api/websocket');
-      ws.onmessage = (e) => {
-        const msg = JSON.parse(e.data);
-        if (msg.type==='auth_required') ws.send(JSON.stringify({type:'auth',access_token:token}));
-        if (msg.type==='auth_ok') {
-          conn.ok=true; conn.mode='WebSocket';
-          ws.send(JSON.stringify({id:1,type:'subscribe_events',event_type:'state_changed'}));
-        }
-        if (msg.type==='event' && msg.event?.data?.new_state) {
-          const ns = msg.event.data.new_state;
-          if (ENTITIES.includes(ns.entity_id))
-            states[ns.entity_id] = {state: ns.state, friendly_name: (ns.attributes||{}).friendly_name || ns.entity_id, unit: (ns.attributes||{}).unit_of_measurement || ''};
-        }
-      };
-      ws.onclose = () => { conn.ok=false; conn.mode='reconnecting'; setTimeout(connectWS, 5000); };
+        const proto = location.protocol==='https:'?'wss:':'ws:';
+        ws = new WebSocket(proto+'//'+location.host+'/api/websocket');
+        ws.onmessage = (e) => {
+          const msg = JSON.parse(e.data);
+          if (msg.type==='auth_required') ws.send(JSON.stringify({type:'auth',access_token:token}));
+          if (msg.type==='auth_ok') {
+            conn.ok=true; conn.mode='WebSocket';
+            ws.send(JSON.stringify({id:1,type:'subscribe_events',event_type:'state_changed'}));
+          }
+          if (msg.type==='event' && msg.event?.data?.new_state) {
+            const ns = msg.event.data.new_state;
+            if (ENTITIES.includes(ns.entity_id))
+              states[ns.entity_id] = {state: ns.state, friendly_name: (ns.attributes||{}).friendly_name || ns.entity_id, unit: (ns.attributes||{}).unit_of_measurement || ''};
+          }
+        };
+        ws.onclose = () => { conn.ok=false; conn.mode='reconnecting'; setTimeout(connectWS, 5000); };
+      });
     };
 
     onMounted(() => { connectWS(); updateTime(); timeInterval = setInterval(updateTime, 1000); });
@@ -1183,7 +1220,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token from localStorage.hassTokens.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -2611,6 +2648,36 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 return json.dumps({"error": "entities is required. Provide an array of entity_ids to monitor."}, default=str)
             if not entities:
                 logger.info("create_html_dashboard: no entities provided for raw HTML — saving as-is")
+
+            # Pre-filter: discard strings that are clearly not HA entity_ids.
+            # The AI sometimes puts JS expressions (cdn.jsdelivr, s.entity_id, res.json, etc.)
+            # in the entities list instead of real HA entity_ids.
+            # Valid HA entity_ids always match: domain.slug (e.g. sensor.battery_level)
+            import re as _re_eid
+            _HA_DOMAIN_RE = _re_eid.compile(
+                r'^[a-z_]+\.[a-z0-9_]+$'
+            )
+            _KNOWN_JS_FRAGMENTS = {
+                "cdn.jsdelivr", "chart.js", "s.entity_id", "s.state", "s.attributes",
+                "res.ok", "res.json", "r.json", "e.target", "card.onclick",
+                "modal.show", "location.href", "entities.map", "series.map",
+                "p.last_changed", "p.state", "state.attributes", "state.state",
+                "state.last_updated", "chart.destroy", "labels.slice", "values.slice",
+            }
+            _prefiltered = []
+            _prefilter_skipped = []
+            for eid in entities:
+                if not isinstance(eid, str):
+                    _prefilter_skipped.append(str(eid))
+                    continue
+                # Skip known JS fragments and strings that don't look like domain.slug
+                if eid in _KNOWN_JS_FRAGMENTS or not _HA_DOMAIN_RE.match(eid):
+                    _prefilter_skipped.append(eid)
+                else:
+                    _prefiltered.append(eid)
+            if _prefilter_skipped:
+                logger.info(f"🔍 Pre-filtered {len(_prefilter_skipped)} non-entity strings from entities list: {_prefilter_skipped[:10]}")
+            entities = _prefiltered
 
             # Validate entities: only keep those that exist and are not unknown/unavailable
             original_count = len(entities)
