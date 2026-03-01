@@ -2446,10 +2446,18 @@ def get_chat_ui():
             return uniq;
         }}
 
+        function _stripCodeBlocks(text) {{
+            // Remove fenced code blocks (``` ... ```) to avoid false-positive entity parsing
+            // inside YAML / Jinja2 snippets shown by the AI
+            return String(text || '').replace(/```[\\s\\S]*?```/g, '').replace(/`[^`\n]+`/g, '');
+        }}
+
         function extractNumberedEntityOptions(text) {{
             if (!text || typeof text !== 'string') return [];
+            // Strip fenced code blocks first — numbered lines inside YAML/Jinja are not entity picks
+            const stripped = _stripCodeBlocks(text);
             // Handles formats like: 1) light.kitchen — Kitchen, 1. `light.kitchen`, option 1) device name
-            const lines = String(text).split(/\\r?\\n/);
+            const lines = String(stripped).split(/\\r?\\n/);
             const out = [];
             const seenNum = new Set();
 
@@ -2509,6 +2517,9 @@ def get_chat_ui():
         function injectEntityPicker(div, fullText) {{
             if (!div || !fullText) return;
             if (div.querySelector('.entity-picker') || div.querySelector('.entity-manual')) return;
+            // Do not activate picker if the response is primarily a code answer
+            // (contains fenced code blocks with YAML/Jinja content)
+            if (/```[\s\S]*?```/.test(fullText)) return;
 
             const numbered = extractNumberedEntityOptions(fullText);
             const entityIds = extractEntityIds(fullText);
