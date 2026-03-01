@@ -77,24 +77,114 @@ class OllamaProvider(EnhancedProvider):
         messages: List[Dict[str, Any]],
         intent_info: Optional[Dict[str, Any]] = None,
     ) -> Generator[Dict[str, Any], None, None]:
-        """Actual Ollama local API call via httpx with tool calling support."""
+        """Actual Ollama local API call via httpx with tool calling support.
+
+        Ollama applies the model's chat template (Go text/template or Jinja2)
+        to message content.  Literal ``{`` / ``}`` inside text — common in
+        smart-context JSON, tool descriptions, code examples — can trigger:
+            Ollama HTTP 400: "Value looks like object, but can't find closing '}' symbol"
+        We sanitise all string content to neutralise these patterns.
+        """
         import json
         import httpx
         model = self.model or "llama2"
         base_url = getattr(self, "base_url", "http://localhost:11434")
         _timeout = httpx.Timeout(connect=10.0, read=180.0, write=10.0, pool=5.0)
 
+        # Prepare messages (inject system prompt, same as base class)
+        msgs = self._prepare_messages(messages, intent_info)
+
+        # ---- Sanitise messages for Ollama's template engine ----
+        msgs = self._sanitize_messages(msgs)
+
         # Include tool schemas if provided by intent (models that support tool calling)
         tool_schemas = (intent_info or {}).get("tool_schemas") or []
         body: Dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": msgs,
             "stream": True,
         }
         if tool_schemas:
-            body["tools"] = tool_schemas
+            body["tools"] = self._sanitize_tool_schemas(tool_schemas)
 
         accumulated_tool_calls: Dict[int, Dict] = {}
+
+        try:
+            yield from self._ollama_stream(base_url, body, _timeout, accumulated_tool_calls)
+        except RuntimeError as exc:
+            # If Ollama chokes on tool schemas, retry without them
+            if "can't find closing" in str(exc) and tool_schemas:
+                logger.warning("Ollama: template error with tools — retrying without tool schemas")
+                body.pop("tools", None)
+                accumulated_tool_calls.clear()
+                yield from self._ollama_stream(base_url, body, _timeout, accumulated_tool_calls)
+            else:
+                raise
+
+    # ---- Ollama-specific helpers ------------------------------------------------
+
+    @staticmethod
+    def _escape_braces(text: str) -> str:
+        """Neutralise ``{`` / ``}`` so Go/Jinja2 template engines don't
+        interpret them as template actions.
+
+        Strategy: insert a zero-width space (U+200B) right after every ``{``
+        and right before every ``}``.  This is invisible when rendered but
+        breaks the ``{{ }}`` / ``{% %}`` patterns the template engine looks for.
+        Human-readable content is unaffected.
+        """
+        if not text or ('{' not in text and '}' not in text):
+            return text
+        return text.replace('{', '{\u200b').replace('}', '\u200b}')
+
+    @classmethod
+    def _sanitize_messages(cls, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Deep-sanitise message content so brace-heavy text doesn't break
+        Ollama's template engine."""
+        sanitized = []
+        for msg in messages:
+            msg = dict(msg)  # shallow copy
+            content = msg.get("content")
+            if isinstance(content, str):
+                msg["content"] = cls._escape_braces(content)
+            elif isinstance(content, list):
+                # Multi-modal content blocks
+                new_parts = []
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        part = dict(part)
+                        part["text"] = cls._escape_braces(part.get("text", ""))
+                    new_parts.append(part)
+                msg["content"] = new_parts
+            sanitized.append(msg)
+        return sanitized
+
+    @classmethod
+    def _sanitize_tool_schemas(cls, schemas: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Sanitise tool schema descriptions (which often contain JSON examples
+        with ``{`` chars) so Ollama doesn't choke."""
+        import copy
+        clean = copy.deepcopy(schemas)
+        for tool in clean:
+            fn = tool.get("function") or tool
+            if isinstance(fn.get("description"), str):
+                fn["description"] = cls._escape_braces(fn["description"])
+            params = fn.get("parameters") or {}
+            for _pname, pdef in (params.get("properties") or {}).items():
+                if isinstance(pdef.get("description"), str):
+                    pdef["description"] = cls._escape_braces(pdef["description"])
+        return clean
+
+    def _ollama_stream(
+        self,
+        base_url: str,
+        body: Dict[str, Any],
+        _timeout: Any,
+        accumulated_tool_calls: Dict[int, Dict],
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Low-level httpx streaming call to Ollama /api/chat."""
+        import json
+        import httpx
 
         with httpx.stream(
             "POST", f"{base_url}/api/chat",

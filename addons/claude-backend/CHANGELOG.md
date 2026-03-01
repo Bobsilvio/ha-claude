@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.1 — Fix Ollama HTTP 400 "can't find closing '}' symbol"
+- `providers/ollama.py`: Ollama's template engine (Go `text/template`) interprets literal `{` / `}` in message content and tool descriptions as template actions, causing 400 errors when smart context includes JSON entity data
+- Added `_escape_braces()`: inserts a zero-width space after `{` and before `}` to break template patterns without affecting visible text
+- Added `_sanitize_messages()` / `_sanitize_tool_schemas()`: deep-sanitise all text content before sending to Ollama
+- Added fallback: if Ollama still fails with tool schemas, automatically retry without tools
+- Fixed missing `_prepare_messages()` call (system prompt was not injected for Ollama)
+- Extracted HTTP streaming into `_ollama_stream()` for cleaner retry logic
+
 ## 4.2.0 — Entity discovery: use real HA device_class instead of keyword matching
 **Breaking change in entity matching logic — eliminates false positives entirely.**
 
