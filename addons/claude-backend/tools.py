@@ -236,28 +236,56 @@ const PAL=['#667eea','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4'
 const DICO={sensor:'\ud83d\udcca',binary_sensor:'\ud83d\udd14',switch:'\ud83d\udd0c',light:'\ud83d\udca1',climate:'\ud83c\udf21\ufe0f',cover:'\ud83e\ude9f',fan:'\ud83c\udf00',
 input_boolean:'\ud83d\udd18',input_number:'\ud83d\udd22',number:'\ud83d\udd22',automation:'\u2699\ufe0f',script:'\ud83d\udcdc',person:'\ud83d\udc64',weather:'\ud83c\udf24\ufe0f',
 media_player:'\ud83c\udfb5',camera:'\ud83d\udcf7',lock:'\ud83d\udd12',vacuum:'\ud83e\uddf9'};
+// Token cache — populated once, reused for all requests
+let _cachedToken='';
 function getToken(){try{return JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''}catch(e){return''}}
-// Companion App uses window.externalApp (Android) or webkit.messageHandlers (iOS) for auth
+// Resolve auth token across all HA contexts:
+// 1. postMessage to parent iframe (HA Lovelace panel — works in Companion App)
+// 2. window.externalApp (Android Companion App standalone)
+// 3. window.webkit.messageHandlers (iOS Companion App standalone)
+// 4. localStorage.hassTokens (desktop browser)
 function getTokenAsync(){
+  if(_cachedToken)return Promise.resolve(_cachedToken);
   return new Promise(resolve=>{
-    try{
-      if(window.externalApp&&window.externalApp.getExternalAuth){
-        window.externalApp.getExternalAuth({callback:'_haTokenCb',type:'bearer'});
-        window._haTokenCb=r=>{delete window._haTokenCb;resolve(r&&r.access_token?r.access_token:getToken())};
-        setTimeout(()=>{if(window._haTokenCb){delete window._haTokenCb;resolve(getToken())}},2000);
-        return;
-      }
-      if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.getExternalAuth){
-        window.webkit.messageHandlers.getExternalAuth.postMessage({callback:'_haTokenCb',type:'bearer'});
-        window._haTokenCb=r=>{delete window._haTokenCb;resolve(r&&r.access_token?r.access_token:getToken())};
-        setTimeout(()=>{if(window._haTokenCb){delete window._haTokenCb;resolve(getToken())}},2000);
-        return;
-      }
-    }catch(e){}
-    resolve(getToken());
+    const done=t=>{_cachedToken=t||'';resolve(_cachedToken)};
+    // Strategy 1: ask parent window (works when page is inside HA Lovelace iframe)
+    if(window.parent&&window.parent!==window){
+      const onMsg=ev=>{
+        if(ev.data&&ev.data.type==='auth/token'&&ev.data.token){
+          window.removeEventListener('message',onMsg);
+          clearTimeout(t1);
+          done(ev.data.token);
+        }
+      };
+      window.addEventListener('message',onMsg);
+      const t1=setTimeout(()=>{
+        window.removeEventListener('message',onMsg);
+        tryNative();
+      },1500);
+      try{window.parent.postMessage({type:'auth/get_token'},'*')}catch(e){clearTimeout(t1);tryNative();}
+      return;
+    }
+    tryNative();
+    function tryNative(){
+      try{
+        if(window.externalApp&&window.externalApp.getExternalAuth){
+          window.externalApp.getExternalAuth({callback:'_haTokenCb',type:'bearer'});
+          window._haTokenCb=r=>{delete window._haTokenCb;done(r&&r.access_token?r.access_token:getToken())};
+          setTimeout(()=>{if(window._haTokenCb){delete window._haTokenCb;done(getToken())}},2000);
+          return;
+        }
+        if(window.webkit&&window.webkit.messageHandlers&&window.webkit.messageHandlers.getExternalAuth){
+          window.webkit.messageHandlers.getExternalAuth.postMessage({callback:'_haTokenCb',type:'bearer'});
+          window._haTokenCb=r=>{delete window._haTokenCb;done(r&&r.access_token?r.access_token:getToken())};
+          setTimeout(()=>{if(window._haTokenCb){delete window._haTokenCb;done(getToken())}},2000);
+          return;
+        }
+      }catch(e){}
+      done(getToken());
+    }
   });
 }
-function haHeaders(){const t=getToken();return t?{'Authorization':'Bearer '+t,'Content-Type':'application/json'}:{'Content-Type':'application/json'}}
+function haHeaders(){return _cachedToken?{'Authorization':'Bearer '+_cachedToken,'Content-Type':'application/json'}:{'Content-Type':'application/json'}}
 
 createApp({setup(){
 const connected=ref(false),error=ref(''),sections=ref(SECTIONS),states=reactive({});
@@ -449,33 +477,56 @@ createApp({
     let timeInterval, ws;
     const updateTime = () => { nowText.value = new Date().toLocaleTimeString(); };
 
-    const getTokenAsync = () => new Promise(resolve => {
-      try {
-        if (window.externalApp && window.externalApp.getExternalAuth) {
-          window.externalApp.getExternalAuth({callback:'_haTokenCb2',type:'bearer'});
-          window._haTokenCb2 = r => { delete window._haTokenCb2; resolve(r&&r.access_token?r.access_token:''); };
-          setTimeout(() => { if (window._haTokenCb2) { delete window._haTokenCb2; resolve(''); } }, 2000);
+    let _tok = '';
+    const getTokenAsync = () => {
+      if (_tok) return Promise.resolve(_tok);
+      return new Promise(resolve => {
+        const done = t => { _tok = t||''; resolve(_tok); };
+        // 1. parent postMessage (HA Lovelace iframe — Companion App)
+        if (window.parent && window.parent !== window) {
+          const onMsg = ev => {
+            if (ev.data && ev.data.type === 'auth/token' && ev.data.token) {
+              window.removeEventListener('message', onMsg);
+              clearTimeout(t1);
+              done(ev.data.token);
+            }
+          };
+          window.addEventListener('message', onMsg);
+          const t1 = setTimeout(() => { window.removeEventListener('message', onMsg); tryNative(); }, 1500);
+          try { window.parent.postMessage({type:'auth/get_token'}, '*'); } catch(e) { clearTimeout(t1); tryNative(); }
           return;
         }
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.getExternalAuth) {
-          window.webkit.messageHandlers.getExternalAuth.postMessage({callback:'_haTokenCb2',type:'bearer'});
-          window._haTokenCb2 = r => { delete window._haTokenCb2; resolve(r&&r.access_token?r.access_token:''); };
-          setTimeout(() => { if (window._haTokenCb2) { delete window._haTokenCb2; resolve(''); } }, 2000);
-          return;
+        tryNative();
+        function tryNative() {
+          try {
+            if (window.externalApp && window.externalApp.getExternalAuth) {
+              window.externalApp.getExternalAuth({callback:'_haTokenCb2',type:'bearer'});
+              window._haTokenCb2 = r => { delete window._haTokenCb2; done(r&&r.access_token?r.access_token:''); };
+              setTimeout(() => { if (window._haTokenCb2) { delete window._haTokenCb2; done(''); } }, 2000);
+              return;
+            }
+            if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.getExternalAuth) {
+              window.webkit.messageHandlers.getExternalAuth.postMessage({callback:'_haTokenCb2',type:'bearer'});
+              window._haTokenCb2 = r => { delete window._haTokenCb2; done(r&&r.access_token?r.access_token:''); };
+              setTimeout(() => { if (window._haTokenCb2) { delete window._haTokenCb2; done(''); } }, 2000);
+              return;
+            }
+          } catch(e) {}
+          try { done(JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''); } catch(e) { done(''); }
         }
-      } catch(e) {}
-      try { resolve(JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token||''); } catch(e) { resolve(''); }
-    });
+      });
+    };
     const connectWS = () => {
       getTokenAsync().then(token => {
-        if (!token) { conn.mode = 'no token'; return; }
-        fetch('/api/states', {headers:{'Authorization':'Bearer '+token}})
+        const authHdr = token ? {'Authorization':'Bearer '+token} : {};
+        fetch('/api/states', {headers:{...authHdr,'Content-Type':'application/json'}})
           .then(r=>r.json()).then(list => {
             if (Array.isArray(list)) list.forEach(s => {
               if (ENTITIES.includes(s.entity_id))
                 states[s.entity_id] = {state: s.state, friendly_name: (s.attributes||{}).friendly_name || s.entity_id, unit: (s.attributes||{}).unit_of_measurement || ''};
             });
           });
+        if (!token) { conn.mode = 'polling'; return; }
         const proto = location.protocol==='https:'?'wss:':'ws:';
         ws = new WebSocket(proto+'//'+location.host+'/api/websocket');
         ws.onmessage = (e) => {
