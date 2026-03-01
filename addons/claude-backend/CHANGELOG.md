@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.14 — Fix iOS Companion App infinite loading + dashboard showing only 5 sensors
+- `_fix_auth_redirect()`: entry-point regex now uses **prefix matching** (`load\w*` catches `loadBatteries()`, `loadSensors()`, etc.) — previously only matched exact names like `load()`, so `tok` stayed empty on iOS
+- `_fix_auth_redirect()`: also wraps `setInterval`/`setTimeout` referencing entry-point functions in `_getTokenAsync().then(...)`
+- New `_inject_entity_filter_fallback()` post-processor: when AI HTML filters `/api/states` by `device_class` (e.g. `=== 'battery'`), injects the backend's pre-filtered entity list as `window._HA_ENTITIES` and extends the filter to include all matching entities
+- Dashboard creation pipeline now calls `_inject_entity_filter_fallback()` after auth redirect fix
+
 ## 4.1.13 — Fix AI using device_class filter instead of pre-loaded entity list
 - `intent.py`: add `device_class` field to entity objects injected in smart context (was missing — AI couldn't see it)
 - `tools.py`: tool description now explicitly instructs AI to copy entity_ids from ## ENTITÀ TROVATE and use `__ENTITIES_JSON__`, never filter `/api/states` by `device_class`

@@ -773,14 +773,21 @@ def _fix_auth_redirect(html: str) -> str:
         )
 
         # Wrap entry-point calls in _getTokenAsync().then(...)
-        # Match: load();  (optionally followed by setInterval(load, N))
-        for _fn in ("load", "init", "start", "main", "render", "fetchAll", "fetchStates"):
-            # Pattern: bare call at statement level (not inside a function definition)
+        # Use prefix matching: "load" matches loadBatteries(), loadSensors(), etc.
+        for _fn in ("load", "init", "start", "main", "render", "fetch", "update", "refresh", "get"):
+            # Pattern: bare call prefixed by _fn at statement level (not inside a function definition)
             body = re.sub(
-                rf"^(\s*)({_fn}\(\s*\)\s*;)\s*$",
-                rf"\1_getTokenAsync().then(function(){{ {_fn}(); }});",
+                rf"^(\s*)({_fn}\w*\(\s*\)\s*;)\s*$",
+                rf"\1_getTokenAsync().then(function(){{ \2 }});",
                 body, flags=re.MULTILINE
             )
+
+        # Also wrap setInterval/setTimeout that reference entry-point functions
+        body = re.sub(
+            r"^(\s*)((?:setInterval|setTimeout)\s*\(\s*(?:load|init|start|main|render|fetch|update|refresh|get)\w*\s*,\s*\d+\s*\)\s*;)\s*$",
+            r"\1_getTokenAsync().then(function(){ \2 });",
+            body, flags=re.MULTILINE
+        )
 
         return script_tag + "\n" + _GETTOKEN_HELPER + body + closing
 
@@ -795,6 +802,61 @@ def _fix_auth_redirect(html: str) -> str:
         logger.info("🔒 Fixed sync auth redirect pattern in AI-generated HTML")
 
     return patched
+
+
+def _inject_entity_filter_fallback(html: str, entities: list) -> str:
+    """Inject pre-filtered entity list into AI-generated HTML.
+
+    AI models often filter /api/states by device_class which misses many entities.
+    The backend pre-filters entities by keyword matching (80+ results), but the
+    AI HTML may use device_class === 'battery' (only 5 results).
+
+    This injects the backend's entity list as a JS fallback filter so all matching
+    entities are shown regardless of device_class.
+    """
+    import re as _re
+
+    if not entities:
+        return html
+
+    # Don't inject if the HTML already uses the placeholder or the fallback var
+    if '__ENTITIES_JSON__' in html or '_HA_ENTITIES' in html:
+        return html
+
+    # Check if HTML fetches /api/states and filters by device_class (common pattern)
+    has_api_fetch = bool(_re.search(r'/api/states', html))
+    has_device_class_filter = bool(_re.search(r'device_class\s*={2,3}\s*["\x27]', html))
+
+    if not has_api_fetch or not has_device_class_filter:
+        return html
+
+    entities_json = json.dumps(entities, ensure_ascii=False)
+
+    # Inject entity list as a global constant before the first <script>
+    injection_script = (
+        '<script>/* Amira: pre-filtered entity list from backend */\n'
+        'window._HA_ENTITIES = ' + entities_json + ';\n'
+        '</script>\n'
+    )
+
+    # Insert before first <script> tag
+    first_script = _re.search(r'<script\b', html, _re.IGNORECASE)
+    if first_script:
+        pos = first_script.start()
+        html = html[:pos] + injection_script + html[pos:]
+
+    # Extend device_class filter to also match pre-filtered entities
+    # Common patterns:
+    #   .filter(s => s.attributes?.device_class === 'battery')
+    #   .filter(s => s.attributes.device_class === 'battery')
+    # We add: || window._HA_ENTITIES?.includes(s.entity_id)
+    # The variable name for the state object varies (s, state, e, entity, etc.)
+    _dc_pattern = r"""\.filter\(\s*(\w+)\s*=>\s*\1\.(attributes\??\.device_class\s*={2,3}\s*["'][^"']+["'])\)"""
+    _dc_replace = r'.filter(\1 => \1.\2 || (window._HA_ENTITIES && window._HA_ENTITIES.includes(\1.entity_id)))'
+    html = _re.sub(_dc_pattern, _dc_replace, html)
+
+    logger.info(f"Injected pre-filtered entity list ({len(entities)} entities) as fallback filter")
+    return html
 
 
 def _stamp_description(description: str, action: str = "create") -> str:
@@ -2946,9 +3008,10 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     footer_text=footer_text,
                 )
 
-            # Sanitize: fix CSS var() and auth redirect patterns (common AI mistakes)
+            # Sanitize: fix CSS var(), auth redirect patterns, and entity filters (common AI mistakes)
             html_content = _fix_css_var_in_js(html_content)
             html_content = _fix_auth_redirect(html_content)
+            html_content = _inject_entity_filter_fallback(html_content, entities)
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
