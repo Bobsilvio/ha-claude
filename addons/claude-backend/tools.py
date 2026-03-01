@@ -830,7 +830,36 @@ def _inject_entity_filter_fallback(html: str, entities: list) -> str:
     if not has_api_fetch or not has_device_class_filter:
         return html
 
-    entities_json = json.dumps(entities, ensure_ascii=False)
+    # Extract the device_class value from the HTML filter (e.g. 'battery', 'temperature')
+    _dc_match = _re.search(r"device_class\s*={2,3}\s*['\"](\w+)['\"]", html)
+    _target_dc = _dc_match.group(1) if _dc_match else None
+
+    # If we know the target device_class, filter the entity list to only include
+    # entities whose entity_id is plausibly related.
+    # This prevents injecting unrelated entities (e.g. 'sabato_consumo' for a battery dashboard).
+    if _target_dc and _target_dc in ("battery", "temperature", "humidity", "power", "energy", "voltage", "current", "illuminance", "pressure", "motion"):
+        _dc_keywords = {
+            "battery": ["batter", "soc", "charge", "battery_level", "battery_state", "carica"],
+            "temperature": ["temperature", "temperatura", "temp_"],
+            "humidity": ["humidity", "umidita", "humid"],
+            "power": ["power", "potenza", "watt"],
+            "energy": ["energy", "energia", "consumo", "kwh"],
+            "voltage": ["voltage", "tensione", "volt"],
+            "current": ["current", "corrente", "ampere"],
+            "illuminance": ["illuminance", "lux", "luminosit"],
+            "pressure": ["pressure", "pressione"],
+            "motion": ["motion", "movimento", "occupancy"],
+        }
+        _kw_list = _dc_keywords.get(_target_dc, [_target_dc])
+        filtered = [e for e in entities if any(kw in e.lower() for kw in _kw_list)]
+        if filtered:
+            _dropped = len(entities) - len(filtered)
+            if _dropped > 0:
+                logger.info(f"\U0001f4cb Entity fallback: filtered {_dropped}/{len(entities)} unrelated entities for device_class='{_target_dc}'")
+            entities = filtered
+        # else: keep all \u2014 better to show too many than zero
+
+        entities_json = json.dumps(entities, ensure_ascii=False)
 
     # Inject entity list as a global constant before the first <script>
     injection_script = (

@@ -1017,9 +1017,9 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
         _integration_matches = []
         # IT→EN keyword synonyms + device_class aliases for smarter entity matching
         _keyword_synonyms = {
-            "batterie": ["battery", "batterie", "bat"],
-            "batteria": ["battery", "batteria", "bat"],
-            "temperatura": ["temperature", "temperatura", "temp"],
+            "batterie": ["battery", "batterie", "batter"],
+            "batteria": ["battery", "batteria", "batter"],
+            "temperatura": ["temperature", "temperatura"],
             "umidità": ["humidity", "umidita", "humid"],
             "consumo": ["consumption", "energy", "power", "consumo"],
             "potenza": ["power", "potenza", "watt"],

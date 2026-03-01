@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.1.15 — Fix keyword synonym 'bat' matching 'sabato' + entity fallback filter
+- `intent.py`: removed too-short synonym `bat` from battery keyword expansion — was matching `sabato` in entity_ids, pulling in all `sabato_elettrodomestici_*` consumption entities as battery sensors
+- `intent.py`: `bat` → `batter` (5 chars minimum, avoids false positives)
+- `tools.py` `_inject_entity_filter_fallback()`: now extracts the target `device_class` from the HTML filter and only injects entities whose entity_id contains related keywords (e.g. for `battery`: `batter`, `soc`, `charge`, `carica`)
+- Prevents unrelated entities (consumption, cost, schedule) from appearing in device_class-specific dashboards
+
 ## 4.1.14 — Fix iOS Companion App infinite loading + dashboard showing only 5 sensors
 - `_fix_auth_redirect()`: entry-point regex now uses **prefix matching** (`load\w*` catches `loadBatteries()`, `loadSensors()`, etc.) — previously only matched exact names like `load()`, so `tok` stayed empty on iOS
 - `_fix_auth_redirect()`: also wraps `setInterval`/`setTimeout` referencing entry-point functions in `_getTokenAsync().then(...)`
