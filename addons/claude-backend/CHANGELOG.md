@@ -1,5 +1,21 @@
 # Changelog
 
+## 4.2.9 — GitHub Copilot: full model list + updated API headers
+- **Static model list extended**: GitHub Copilot provider now shows 30+ known models immediately, even before authentication — includes Claude Opus/Sonnet/Haiku 4.x, GPT-5.x-codex, GPT-5.1/5.2, Gemini 3.x, Grok Code Fast, and all GPT-4o/4.1 variants
+- **Updated API headers**: all Copilot HTTP calls (session token, /models, chat) now use `copilot-chat/0.26.7` and `vscode/1.100.0` (was `0.12.2` / `1.85.0`) — matches current Copilot extension version for full model access
+- **Refresh button** (`Aggiorna modelli`) calls `GET /models` on `api.githubcopilot.com` and replaces the static list with the live models available on the user's subscription
+- **Legacy display name mappings** updated in `api.py` to include all new Claude/Gemini/Grok/GPT-5 model names
+- Reasoning/special models (`o1`, `o3`, `oswe-*`) excluded from `temperature`/`top_p` to avoid API errors
+
+## 4.2.8 — Bubble: fix log dialog closed by bubble button click
+- **Root cause**: HA dialogs close when clicking outside them; the bubble button is "outside" → clicking bubble always dismissed the open log popup before context could be captured
+- **`mousedown` pre-capture**: bubble button now captures `extractVisibleLogEntry()` on `mousedown` (fires before HA's document-level click handler closes the dialog), storing it in `_cachedLogEntry`
+- **Persistent log cache `_cachedLogEntry`**: survives dialog close — updated whenever a live entry is detected (1s poll or `mousedown`), never cleared just because the dialog was dismissed
+- **Fallback in `buildContextPrefix()`**: uses `ctx.logEntry || _cachedLogEntry` so AI sees the log entry even after the dialog is gone
+- **Fallback in `getQuickActions()`**: "Spiega questo errore" / "Come si risolve?" chips appear using cached entry
+- **Fallback in `updateContextBar()`**: shows "• log selezionato" indicator using cached entry
+- Cache cleared on: navigation away from logs page, or "Nuova chat" button
+
 ## 4.2.7 — Bubble: HA log page context-awareness + get_ha_logs tool
 - **Bubble detects `/config/logs` page**: shows "Log di sistema" in context bar, pulse animation on bubble
 - **Log entry extraction**: walks HA shadow DOM to find open log dialog text; if found, context bar shows "• log aperto" and quick actions are tailored to that specific entry

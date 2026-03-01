@@ -48,8 +48,8 @@ _COPILOT_MODELS_URL   = "https://api.githubcopilot.com/models"
 # Persistence
 _TOKEN_FILE = "/data/oauth_copilot.json"
 
-# Reasoning models that do NOT accept temperature/top_p
-_REASONING_MODEL_PREFIXES = ("o1", "o3")
+# Reasoning / special models that do NOT accept temperature/top_p
+_REASONING_MODEL_PREFIXES = ("o1", "o3", "oswe-")
 
 # ---------------------------------------------------------------------------
 # Module-level state
@@ -99,9 +99,11 @@ def _fetch_models_from_api(copilot_token: str) -> Optional[List[str]]:
     headers = {
         "Authorization": f"Bearer {copilot_token}",
         "Accept": "application/json",
-        "Editor-Version": "vscode/1.85.0",
-        "Editor-Plugin-Version": "copilot-chat/0.12.2",
-        "User-Agent": "GitHubCopilotChat/0.12.2 ha-amira",
+        "Editor-Version": "vscode/1.100.0",
+        "Editor-Plugin-Version": "copilot-chat/0.26.7",
+        "User-Agent": "GitHubCopilotChat/0.26.7",
+        "Copilot-Integration-Id": "vscode-chat",
+        "X-GitHub-Api-Version": "2025-04-01",
     }
     try:
         resp = httpx.get(_COPILOT_MODELS_URL, headers=headers, timeout=10.0)
@@ -249,7 +251,10 @@ def _get_copilot_session_token(gh_token: str) -> str:
             headers={
                 "Authorization": f"Bearer {gh_token}",
                 "Accept": "application/json",
-                "User-Agent": "ha-amira (python)",
+                "Editor-Version": "vscode/1.100.0",
+                "Editor-Plugin-Version": "copilot-chat/0.26.7",
+                "User-Agent": "GitHubCopilotChat/0.26.7",
+                "X-GitHub-Api-Version": "2025-04-01",
             },
         )
     if resp.status_code == 401:
@@ -392,10 +397,12 @@ class GitHubCopilotProvider(EnhancedProvider):
             "Authorization": f"Bearer {copilot_token}",
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
-            "Editor-Version": "vscode/1.85.0",
-            "Editor-Plugin-Version": "copilot-chat/0.12.2",
+            "Editor-Version": "vscode/1.100.0",
+            "Editor-Plugin-Version": "copilot-chat/0.26.7",
+            "Copilot-Integration-Id": "vscode-chat",
             "Openai-Intent": "conversation-panel",
-            "User-Agent": "GitHubCopilotChat/0.12.2 ha-amira",
+            "User-Agent": "GitHubCopilotChat/0.26.7",
+            "X-GitHub-Api-Version": "2025-04-01",
         }
         resolved_model = self._resolve_model()
         body: Dict[str, Any] = {
@@ -472,8 +479,25 @@ class GitHubCopilotProvider(EnhancedProvider):
                 return m[len(prefix):]
         return m
 
-    # Minimal static fallback — only models confirmed working via this client
-    _FALLBACK_MODELS = ["gpt-4o", "gpt-4o-mini"]
+    # Static fallback — full known model list (replaces after first token-based refresh)
+    _FALLBACK_MODELS = [
+        # Claude
+        "claude-opus-4.6-fast", "claude-opus-4.6",
+        "claude-sonnet-4.6", "claude-sonnet-4.5", "claude-sonnet-4",
+        "claude-haiku-4.5", "claude-opus-4.5",
+        # GPT-5 family
+        "gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5.1-codex",
+        "gpt-5.1-codex-mini", "gpt-5.1", "gpt-5.2", "gpt-5-mini",
+        # GPT-4o family
+        "gpt-4o", "gpt-4o-mini",
+        # GPT-4.1
+        "gpt-4.1",
+        # Gemini
+        "gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-3-flash-preview",
+        "gemini-2.5-pro",
+        # Grok
+        "grok-code-fast-1",
+    ]
 
     def get_available_models(self) -> List[str]:
         """Return list of available GitHub Copilot models.

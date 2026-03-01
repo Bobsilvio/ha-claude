@@ -458,8 +458,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (ctx.type === 'logs') {{
       let p = '[CONTEXT: User is on the Home Assistant system logs page. '
             + 'Use get_ha_logs to fetch recent errors and warnings. ';
-      if (ctx.logEntry) {{
-        p += 'The user has the following log entry open/visible:\\n---\\n' + ctx.logEntry + '\\n---\\n'
+      // Use live entry if available; fall back to cached entry captured before
+      // the dialog was dismissed by the bubble button click.
+      const logEntry = ctx.logEntry || _cachedLogEntry;
+      if (logEntry) {{
+        p += 'The user has the following log entry open/visible:\\n---\\n' + logEntry + '\\n---\\n'
            + 'Analyze this specific entry and help fix it if possible.';
       }}
       p += ']';
@@ -492,8 +495,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       {{ label: T.qa_analyze, text: 'Show me all entities for this device and their current states' }},
     ];
     if (ctx.type === 'logs') {{
-      const ctx2 = detectContext();
-      const hasEntry = !!(ctx2 && ctx2.logEntry);
+      // Use live logEntry from ctx, or fall back to cached entry (persists after
+      // dialog is dismissed when user clicked the bubble button)
+      const hasEntry = !!(ctx.logEntry || _cachedLogEntry);
       const actions = [];
       if (hasEntry) {{
         actions.push({{ label: T.qa_explain_log, text: 'Explain this log error and tell me what causes it' }});
@@ -1059,10 +1063,20 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (isOpen) {{ positionPanelNearButton(); updateContextBar(); updateQuickActions(); input.focus(); }}
   }}
 
+  // Capture log entry on mousedown (fires BEFORE HA's click-outside handler
+  // dismisses the dialog), so the cache is populated before the dialog closes.
+  btn.addEventListener('mousedown', () => {{
+    const curPath = window.location.pathname;
+    if (curPath.includes('/config/log')) {{
+      const live = extractVisibleLogEntry();
+      if (live) _cachedLogEntry = live;
+    }}
+  }});
   btn.addEventListener('click', () => {{ if (!dragStarted) togglePanel(); }});
   closeBtn.addEventListener('click', () => {{ isOpen = false; panel.classList.remove('open'); }});
   newBtn.addEventListener('click', () => {{
     resetSession(); clearHistory(); messagesEl.innerHTML = '';
+    _cachedLogEntry = null; // clear stale log cache on new chat
     updateContextBar(); updateQuickActions();
     broadcastEvent('clear', {{}});
   }});
@@ -1088,7 +1102,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (ctx.label) {{
       let text = ctx.label;
       if (ctx.entities && ctx.entities.length > 0) text += ' (' + ctx.entities.length + ' entities)';
-      if (ctx.type === 'logs' && ctx.logEntry) text += ' \u2022 log aperto';
+      if (ctx.type === 'logs' && (ctx.logEntry || _cachedLogEntry)) text += ' \u2022 log selezionato';
       contextBar.style.display = 'block'; contextBar.textContent = text;
       btn.classList.add('has-context');
     }} else {{
@@ -1118,23 +1132,34 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   // SPA navigation detection
   let lastPath = window.location.pathname;
   let lastLogEntry = null;
+  // Persistent log entry cache: survives dialog close so bubble can still use it
+  // after user clicks bubble (which dismisses the HA dialog).
+  // Cleared only when navigating away from the logs page or on new chat.
+  let _cachedLogEntry = null;
+
   setInterval(() => {{
     const curPath = window.location.pathname;
     if (curPath !== lastPath) {{
+      // Navigated to a different page — clear log cache
       lastPath = curPath;
       lastLogEntry = null;
+      _cachedLogEntry = null;
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
     }}
-    // On logs page, also re-check if a log entry dialog was opened/closed
-    // (the URL doesn't change when a dialog opens in HA)
-    if (isOpen && curPath.includes('/config/log')) {{
-      const ctx = detectContext();
-      const entry = ctx.logEntry || null;
+    // On logs page, poll for open log entry dialogs.
+    // Update cache whenever a NEW entry is detected; never clear cache just
+    // because the dialog was dismissed (it closes when bubble button is clicked).
+    if (curPath.includes('/config/log')) {{
+      const entry = extractVisibleLogEntry();
       const entryKey = entry ? entry.substring(0, 80) : null;
+      if (entry) {{
+        // A dialog is open — update (or refresh) the persistent cache
+        _cachedLogEntry = entry;
+      }}
+      // Only trigger a UI refresh when the detected entry key actually changes
       if (entryKey !== lastLogEntry) {{
         lastLogEntry = entryKey;
-        updateContextBar();
-        updateQuickActions();
+        if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
       }}
     }}
   }}, 1000);

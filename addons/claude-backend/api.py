@@ -1340,6 +1340,32 @@ _PROVIDER_MODELS_STATIC = {
         "sonar-reasoning",
         "r1-1776",
     ],
+    # GitHub Copilot (direct OAuth → api.githubcopilot.com)
+    # This list is used as a static fallback before the first token-based refresh.
+    # After authenticating and clicking "Refresh models", the live list replaces it.
+    "github_copilot": [
+        # Claude (via Copilot)
+        "claude-opus-4.6-fast", "claude-opus-4.6",
+        "claude-sonnet-4.6", "claude-sonnet-4.5", "claude-sonnet-4",
+        "claude-haiku-4.5", "claude-opus-4.5",
+        # GPT-5 family
+        "gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5.1-codex",
+        "gpt-5.1-codex-mini", "gpt-5.1", "gpt-5.2", "gpt-5-mini",
+        # GPT-4o family
+        "gpt-4o", "gpt-4o-mini", "gpt-4o-2024-11-20", "gpt-4o-2024-08-06",
+        "gpt-4o-mini-2024-07-18", "gpt-4o-2024-05-13", "gpt-4-o-preview",
+        "gpt-41-copilot",
+        # GPT-4.1 / GPT-4 legacy
+        "gpt-4.1", "gpt-4.1-2025-04-14", "gpt-4", "gpt-4-0613",
+        "gpt-4-0125-preview", "gpt-3.5-turbo", "gpt-3.5-turbo-0613",
+        # Gemini (via Copilot)
+        "gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-3-flash-preview",
+        "gemini-2.5-pro",
+        # Grok
+        "grok-code-fast-1",
+        # OSWE (internal Copilot agents)
+        "oswe-vscode-prime", "oswe-vscode-secondary",
+    ],
     "custom": [],  # model name comes from CUSTOM_MODEL_NAME env var
 }
 
@@ -1533,15 +1559,33 @@ MODEL_NAME_MAPPING = {
     "Zhipu: GLM-4 (legacy)": "glm-4",
     "Zhipu: GLM-4v (legacy)": "glm-4v",
     
+    # GitHub Copilot — legacy display name → model id mappings
     "GitHub Copilot: GPT-4o": "gpt-4o",
     "GitHub Copilot: GPT-4o-mini": "gpt-4o-mini",
+    "GitHub Copilot: GPT-4.1": "gpt-4.1",
     "GitHub Copilot: o3-mini": "o3-mini",
     "GitHub Copilot: o1": "o1",
     "GitHub Copilot: o1-mini": "o1-mini",
+    "GitHub Copilot: Claude Opus 4.6": "claude-opus-4.6",
+    "GitHub Copilot: Claude Opus 4.6 Fast": "claude-opus-4.6-fast",
+    "GitHub Copilot: Claude Sonnet 4.6": "claude-sonnet-4.6",
+    "GitHub Copilot: Claude Sonnet 4.5": "claude-sonnet-4.5",
+    "GitHub Copilot: Claude Sonnet 4": "claude-sonnet-4",
+    "GitHub Copilot: Claude Haiku 4.5": "claude-haiku-4.5",
     "GitHub Copilot: Claude 3.7 Sonnet": "claude-3.7-sonnet",
     "GitHub Copilot: Claude 3.5 Sonnet": "claude-3.5-sonnet",
+    "GitHub Copilot: Gemini 3.1 Pro": "gemini-3.1-pro-preview",
+    "GitHub Copilot: Gemini 3 Pro": "gemini-3-pro-preview",
+    "GitHub Copilot: Gemini 3 Flash": "gemini-3-flash-preview",
+    "GitHub Copilot: Gemini 2.5 Pro": "gemini-2.5-pro",
     "GitHub Copilot: Gemini 2.0 Flash": "gemini-2.0-flash",
     "GitHub Copilot: Gemini 1.5 Pro": "gemini-1.5-pro",
+    "GitHub Copilot: Grok Code Fast": "grok-code-fast-1",
+    "GitHub Copilot: GPT-5.3 Codex": "gpt-5.3-codex",
+    "GitHub Copilot: GPT-5.2 Codex": "gpt-5.2-codex",
+    "GitHub Copilot: GPT-5.1": "gpt-5.1",
+    "GitHub Copilot: GPT-5.2": "gpt-5.2",
+    "GitHub Copilot: GPT-5-mini": "gpt-5-mini",
 
     "OpenAI Codex: gpt-5.3-codex": "gpt-5.3-codex",
     "OpenAI Codex: gpt-5.3-codex-spark": "gpt-5.3-codex-spark",
