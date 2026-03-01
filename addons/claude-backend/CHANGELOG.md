@@ -1,5 +1,24 @@
 # Changelog
 
+## 4.1.10 — Fix HTML dashboard auth in Companion App
+- `getTokenAsync()` now tries `postMessage` to parent window first (correct channel when page is inside a Lovelace iframe in Companion App)
+- Token cached after first resolution to avoid repeated async lookups
+- Fetch proceeds even without token (HA session-cookie fallback)
+
+## 4.1.9 — Authoritative entity fallback from smart context
+- `intent.py` saves pre-loaded entity_ids to `api._last_smart_context_entity_ids`
+- `tools.py` uses those as last-resort fallback when AI passes only JS garbage in `entities[]` and HTML scan finds nothing
+
+## 4.1.8 — Entity pre-filter via HA domain whitelist + HTML fallback extraction
+- Replace regex pre-filter with HA domain whitelist (`sensor`, `binary_sensor`, `switch`, etc.) — JS vars like `stat.low`, `x.state`, `arr.map` are reliably rejected
+- When entities list is all junk, scan raw HTML for quoted `domain.slug` literals to recover real entity_ids
+
+## 4.1.7 — Smart context battery synonyms + entity pre-filter + Companion App auth
+- `intent.py`: IT→EN keyword synonyms + `device_class` search (batterie→battery, temperatura→temperature, umidità→humidity, etc.) — finds all relevant entities, not just those with Italian names
+- `tools.py`: pre-filter non-HA strings (JS expressions) from `entities[]` before HA validation
+- `tools.py`: `getTokenAsync()` supporting HA Companion App (`externalApp`/`webkit`) with `localStorage` fallback
+- `api.py`: improved OAuth provider logging at startup
+
 ## 4.1.6 — Fix messaging in chat UI + sort order
 - WhatsApp/Telegram sessions no longer appear in the main chat UI conversation list
 - Removed "Recent context: USER:..." prefix injected into WhatsApp messages (redundant, polluted saved conversations)
