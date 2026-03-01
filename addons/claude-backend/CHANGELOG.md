@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.2.3 — Fix SyntaxError in two-level AI selector
+- Fixed `SyntaxWarning: invalid escape sequence '\s'` in `chat_ui.py` that caused a `SyntaxError: unterminated string literal` at startup
+- `\s` inside JS regex embedded in Python f-string was mis-interpreted as a Python escape sequence; changed to `\\s`
+- Removed orphaned duplicate code block that appeared after `</html>"""` closing delimiter due to a botched previous edit
+
 ## 4.2.2 — Two-level AI selector: provider first, then model
 - Header now shows two separate dropdowns instead of one grouped dropdown
 - First select: choose provider (Anthropic, OpenAI, Google, GitHub Copilot…)

@@ -3353,7 +3353,7 @@ def get_chat_ui():
         let _modelsData = null;
 
         function _stripProviderPrefix(model) {{
-            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\s*/, '');
+            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
         }}
 
         // Populate the model <select> based on selected provider
@@ -4140,32 +4140,6 @@ def get_chat_ui():
                         if (_statusFailures >= 3) {{
                             clearInterval(_statusInterval);
                             _appendSystemRaw('⚠️ Server non raggiungibile. Ricarica la pagina per riconnetterti.');
-                        }}
-                    }}
-                }}, 10000);
-                // Poll session status every 30s for web providers so the banner reappears when token expires
-                setInterval(async () => {{
-                    if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
-                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
-                }}, 30000);
-            }} catch (e) {{
-                const msg = (e && e.message) ? e.message : String(e);
-                _appendSystemRaw('❌ UI boot error: ' + msg);
-            }}
-        }})();
-        
-        // Export global functions for onclick handlers
-        window.handleDocumentSelect = handleDocumentSelect;
-        window.removeDocument = removeDocument;
-        window.changeModel = changeModel;
-        window.handleButtonClick = handleButtonClick;
-        window.refreshModels = refreshModels;
-        }}
-        
-    </script>
-</body>
-</html>"""
-tterti.');
                         }}
                     }}
                 }}, 10000);
