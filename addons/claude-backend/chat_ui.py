@@ -155,6 +155,12 @@ def get_chat_ui():
             "tab_backups": "Backups",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Messaging",
+            "tab_files": "\U0001f4c1 Files",
+            "files_loading": "Loading...",
+            "files_empty": "Empty directory",
+            "files_error": "Error loading",
+            "files_close_panel": "Close file panel",
+            "files_context_label": "File context:",
             "messaging_no_chats": "No messaging chats yet",
             "messaging_user": "User",
             "messaging_messages": "Messages",
@@ -274,6 +280,12 @@ def get_chat_ui():
             "tab_backups": "Backup",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Messaggi",
+            "tab_files": "\U0001f4c1 File",
+            "files_loading": "Caricamento...",
+            "files_empty": "Cartella vuota",
+            "files_error": "Errore caricamento",
+            "files_close_panel": "Chiudi pannello file",
+            "files_context_label": "File di contesto:",
             "messaging_no_chats": "Nessuna chat di messaggi",
             "messaging_user": "Utente",
             "messaging_messages": "Messaggi",
@@ -393,6 +405,12 @@ def get_chat_ui():
             "tab_backups": "Copias",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Mensajes",
+            "tab_files": "\U0001f4c1 Archivos",
+            "files_loading": "Cargando...",
+            "files_empty": "Directorio vacío",
+            "files_error": "Error al cargar",
+            "files_close_panel": "Cerrar panel de archivo",
+            "files_context_label": "Archivo de contexto:",
             "messaging_no_chats": "Sin chats de mensajes",
             "messaging_user": "Usuario",
             "messaging_messages": "Mensajes",
@@ -512,6 +530,12 @@ def get_chat_ui():
             "tab_backups": "Sauvegardes",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Messages",
+            "tab_files": "\U0001f4c1 Fichiers",
+            "files_loading": "Chargement...",
+            "files_empty": "Dossier vide",
+            "files_error": "Erreur de chargement",
+            "files_close_panel": "Fermer le panneau",
+            "files_context_label": "Fichier de contexte:",
             "messaging_no_chats": "Pas de chats de messages",
             "messaging_user": "Utilisateur",
             "messaging_messages": "Messages",
@@ -933,6 +957,129 @@ def get_chat_ui():
             .header .badge {{ display: none; }}
         }}
 
+        /* ===== FILE EXPLORER (sidebar tree) ===== */
+        .file-tree {{ padding: 0; overflow-y: auto; flex: 1; }}
+        .file-tree-item {{
+            display: flex; align-items: center; gap: 6px;
+            padding: 7px 12px; font-size: 12px; cursor: pointer;
+            border-bottom: 1px solid #f0f0f0; color: #333;
+            transition: background 0.15s; user-select: none;
+        }}
+        .file-tree-item:hover {{ background: #f5f5f5; }}
+        .file-tree-item.file-active {{ background: #e8f0fe; color: #1967d2; font-weight: 500; }}
+        .file-tree-item .file-icon {{ font-size: 14px; flex-shrink: 0; }}
+        .file-tree-item .file-name {{ flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        .file-tree-item .file-size {{ font-size: 10px; color: #999; flex-shrink: 0; }}
+        .file-tree-breadcrumb {{
+            padding: 6px 12px; font-size: 11px; color: #667eea;
+            cursor: pointer; border-bottom: 1px solid #e0e0e0;
+            background: #f8f9fa; display: flex; align-items: center; gap: 4px;
+        }}
+        .file-tree-breadcrumb:hover {{ background: #eff0ff; }}
+        .file-tree-status {{ padding: 16px 12px; font-size: 12px; color: #999; text-align: center; }}
+
+        /* ===== FILE PREVIEW PANEL (middle column) ===== */
+        .file-panel {{
+            width: 0; min-width: 0; max-width: 600px;
+            background: #fafafa; border-right: 1px solid #e0e0e0;
+            display: flex; flex-direction: column; overflow: hidden;
+            transition: width 0.22s ease; flex-shrink: 0;
+        }}
+        .file-panel.open {{ width: 320px; min-width: 180px; }}
+        .file-panel-header {{
+            display: flex; align-items: center;
+            background: #f0f0f0; border-bottom: 1px solid #ddd;
+            flex-shrink: 0; min-width: 0;
+        }}
+        .file-panel-tabs {{
+            display: flex; flex: 1; overflow-x: auto; min-width: 0;
+            scrollbar-width: none;
+        }}
+        .file-panel-tabs::-webkit-scrollbar {{ display: none; }}
+        .file-panel-tab {{
+            display: flex; align-items: center; gap: 4px;
+            padding: 6px 8px; font-size: 11px; cursor: pointer;
+            border: none; background: transparent; color: #666;
+            white-space: nowrap; border-bottom: 2px solid transparent;
+            flex-shrink: 0; max-width: 150px; min-width: 0;
+        }}
+        .file-panel-tab.active {{
+            color: #667eea; border-bottom-color: #667eea;
+            background: #fafafa; font-weight: 500;
+        }}
+        .file-panel-tab .tab-name {{
+            max-width: 100px; overflow: hidden; text-overflow: ellipsis;
+        }}
+        .file-panel-tab .tab-close {{
+            font-size: 14px; line-height: 1; color: #bbb;
+            padding: 0 2px; border-radius: 3px;
+            transition: color 0.15s, background 0.15s; flex-shrink: 0;
+        }}
+        .file-panel-tab .tab-close:hover {{ color: #e53e3e; background: #fde8e8; }}
+        .file-panel-close-all {{
+            padding: 4px 8px; font-size: 16px; color: #999;
+            cursor: pointer; border: none; background: none; flex-shrink: 0;
+        }}
+        .file-panel-close-all:hover {{ color: #333; }}
+        .file-panel-content {{
+            flex: 1; overflow-y: auto; overflow-x: auto;
+        }}
+        .file-panel-loading {{
+            padding: 24px 12px; text-align: center; color: #999; font-size: 13px;
+        }}
+        .file-panel-error {{
+            padding: 16px 12px; color: #c0392b; font-size: 12px;
+        }}
+        .file-panel-truncated {{
+            padding: 4px 12px; font-size: 10px; color: #e07042;
+            background: #fff8f5; border-bottom: 1px solid #fdd; flex-shrink: 0;
+        }}
+
+        /* YAML syntax highlight */
+        .yaml-viewer {{
+            font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 11.5px; line-height: 1.6; padding: 10px 14px;
+            white-space: pre; overflow-x: auto; min-width: 0;
+            color: #333;
+        }}
+        .yaml-key {{ color: #7c3aed; }}
+        .yaml-string {{ color: #059669; }}
+        .yaml-number {{ color: #d97706; }}
+        .yaml-bool {{ color: #0369a1; font-weight: 600; }}
+        .yaml-comment {{ color: #9ca3af; font-style: italic; }}
+
+        /* File panel splitter */
+        .file-splitter {{
+            width: 8px; flex: 0 0 8px; cursor: col-resize;
+            background: transparent; display: none;
+        }}
+        .file-splitter.visible {{ display: block; }}
+        .file-splitter:hover {{ background: rgba(0,0,0,0.08); }}
+        @media (pointer: coarse) {{
+            .file-splitter {{ width: 14px; flex: 0 0 14px; background: rgba(0,0,0,0.04); }}
+            .file-splitter:active {{ background: rgba(0,0,0,0.12); }}
+        }}
+
+        /* File context bar (above input) */
+        .file-context-bar {{
+            display: none; padding: 5px 12px;
+            background: #eff6ff; border-top: 1px solid #bfdbfe;
+            font-size: 11px; color: #1e40af;
+            gap: 6px; align-items: center; flex-wrap: wrap;
+        }}
+        .file-context-bar.visible {{ display: flex; }}
+        .file-context-chip {{
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #dbeafe; border-radius: 10px;
+            padding: 2px 8px; font-size: 10px; color: #1e40af;
+        }}
+
+        /* Mobile: hide file panel */
+        @media (max-width: 599px) {{
+            .file-panel {{ display: none !important; }}
+            .file-splitter {{ display: none !important; }}
+        }}
+
         /* Dark Mode Styles */
         body.dark-mode {{
             background: #1a1a1a;
@@ -1022,6 +1169,31 @@ def get_chat_ui():
         body.dark-mode .splitter:hover {{
             background: rgba(255,255,255,0.08);
         }}
+
+        body.dark-mode .file-panel {{
+            background: #1e1e1e; border-right-color: #3a3a3a;
+        }}
+        body.dark-mode .file-panel-header {{ background: #252525; border-bottom-color: #3a3a3a; }}
+        body.dark-mode .file-panel-tab {{ color: #a0a0a0; }}
+        body.dark-mode .file-panel-tab.active {{
+            color: #8ab4f8; background: #1e1e1e; border-bottom-color: #8ab4f8;
+        }}
+        body.dark-mode .file-panel-close-all {{ color: #666; }}
+        body.dark-mode .file-panel-close-all:hover {{ color: #ccc; }}
+        body.dark-mode .file-tree-item {{ color: #d0d0d0; border-bottom-color: #2a2a2a; }}
+        body.dark-mode .file-tree-item:hover {{ background: #2a2a2a; }}
+        body.dark-mode .file-tree-item.file-active {{ background: #1e3a8a; color: #8ab4f8; }}
+        body.dark-mode .file-tree-breadcrumb {{ background: #1a1a1a; color: #8ab4f8; border-bottom-color: #3a3a3a; }}
+        body.dark-mode .file-tree-breadcrumb:hover {{ background: #222; }}
+        body.dark-mode .yaml-viewer {{ color: #d0d0d0; }}
+        body.dark-mode .yaml-key {{ color: #c084fc; }}
+        body.dark-mode .yaml-string {{ color: #34d399; }}
+        body.dark-mode .yaml-number {{ color: #fbbf24; }}
+        body.dark-mode .yaml-bool {{ color: #38bdf8; }}
+        body.dark-mode .yaml-comment {{ color: #6b7280; }}
+        body.dark-mode .file-splitter:hover {{ background: rgba(255,255,255,0.08); }}
+        body.dark-mode .file-context-bar {{ background: #1e3a5f; border-top-color: #2563eb; color: #93c5fd; }}
+        body.dark-mode .file-context-chip {{ background: #1e3a8a; color: #93c5fd; }}
 
         body.dark-mode .message.assistant {{
             background: #2a2a2a;
@@ -1412,6 +1584,7 @@ def get_chat_ui():
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
                 <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">⚙️ {ui_js['tab_devices']}</button>
                 <button class="sidebar-tab" data-tab="messaging" onclick="switchSidebarTab('messaging')">{ui_js['tab_messaging']}</button>
+                <button class="sidebar-tab" data-tab="files" onclick="switchSidebarTab('files')">{ui_js['tab_files']}</button>
             </div>
             <div class="sidebar-content active" id="tabChat">
                 <div class="chat-list" id="chatList"></div>
@@ -1428,8 +1601,19 @@ def get_chat_ui():
             <div class="sidebar-content" id="tabMessaging">
                 <div class="messaging-list" id="messagingList"></div>
             </div>
+            <div class="sidebar-content" id="tabFiles">
+                <div class="file-tree" id="fileTree"></div>
+            </div>
         </div>
         <div class="splitter" id="sidebarSplitter" title="{ui_js['drag_resize']}"></div>
+        <div class="file-panel" id="filePanel">
+            <div class="file-panel-header">
+                <div class="file-panel-tabs" id="filePanelTabs"></div>
+                <button class="file-panel-close-all" id="filePanelCloseAll" title="{ui_js['files_close_panel']}">&#x2715;</button>
+            </div>
+            <div class="file-panel-content" id="filePanelContent"></div>
+        </div>
+        <div class="file-splitter" id="fileSplitter"></div>
         <div class="main-content">
             <div class="chat-container" id="chat">
         <div class="message system">
@@ -1450,6 +1634,10 @@ def get_chat_ui():
     </div>
 
     <div class="input-area">
+        <div class="file-context-bar" id="fileContextBar">
+            <span id="fileContextLabel">{ui_js['files_context_label']}</span>
+            <span id="fileContextChips"></span>
+        </div>
         <div id="imagePreviewContainer" class="image-preview-container">
             <img id="imagePreview" class="image-preview" />
             <button class="remove-image-btn" title="{ui_js['remove_image']}">×</button>
@@ -1500,6 +1688,20 @@ def get_chat_ui():
         const imagePreviewContainer = document.getElementById('imagePreviewContainer');
         const sidebarEl = document.querySelector('.sidebar');
         const splitterEl = document.getElementById('sidebarSplitter');
+
+        // ---- File Explorer state ----
+        const filePanelEl       = document.getElementById('filePanel');
+        const fileSplitterEl    = document.getElementById('fileSplitter');
+        const fileTreeEl        = document.getElementById('fileTree');
+        const filePanelTabsEl   = document.getElementById('filePanelTabs');
+        const filePanelContentEl= document.getElementById('filePanelContent');
+        const filePanelCloseAllEl = document.getElementById('filePanelCloseAll');
+        const fileContextBarEl  = document.getElementById('fileContextBar');
+        const fileContextChipsEl= document.getElementById('fileContextChips');
+        let fileCurrentPath = '';
+        let fileOpenTabs    = [];   // [{{path, name, content, truncated, loading, error}}]
+        let fileActiveTabIdx= -1;
+
         let sending = false;
         let currentReader = null;
         function safeLocalStorageGet(key) {{
@@ -1616,6 +1818,278 @@ def get_chat_ui():
                 if (dragging && e.touches.length === 1) moveDrag(e.touches[0].clientX);
             }}, {{ passive: true }});
             window.addEventListener('touchend', endDrag);
+        }}
+
+        // ===== FILE PANEL RESIZE (mirrors initSidebarResize) =====
+        function initFilePanelResize() {{
+            if (!filePanelEl || !fileSplitterEl) return;
+            if (window.matchMedia('(max-width: 599px)').matches) return;
+
+            const minW = 180, maxW = 600;
+            const storageKey = 'chatFilePanelWidth';
+
+            let dragging = false, startX = 0, startWidth = 0;
+
+            function startDrag(x) {{
+                dragging = true; startX = x;
+                startWidth = filePanelEl.getBoundingClientRect().width;
+                document.body.classList.add('resizing');
+            }}
+            function moveDrag(x) {{
+                if (!dragging) return;
+                const next = Math.max(minW, Math.min(maxW, startWidth + (x - startX)));
+                filePanelEl.style.width = next + 'px';
+            }}
+            function endDrag() {{
+                if (!dragging) return;
+                dragging = false;
+                document.body.classList.remove('resizing');
+                safeLocalStorageSet(storageKey, String(Math.round(filePanelEl.getBoundingClientRect().width)));
+            }}
+
+            fileSplitterEl.addEventListener('mousedown', (e) => {{ startDrag(e.clientX); e.preventDefault(); }});
+            window.addEventListener('mousemove', (e) => moveDrag(e.clientX));
+            window.addEventListener('mouseup', endDrag);
+            fileSplitterEl.addEventListener('touchstart', (e) => {{
+                if (e.touches.length === 1) {{ startDrag(e.touches[0].clientX); e.preventDefault(); }}
+            }}, {{ passive: false }});
+            window.addEventListener('touchmove', (e) => {{
+                if (dragging && e.touches.length === 1) moveDrag(e.touches[0].clientX);
+            }}, {{ passive: true }});
+            window.addEventListener('touchend', endDrag);
+        }}
+
+        // ===== FILE EXPLORER — directory tree =====
+        async function loadFileTree(path) {{
+            path = path || '';
+            fileCurrentPath = path;
+            if (!fileTreeEl) return;
+            fileTreeEl.innerHTML = '<div class="file-tree-status">' + (T.files_loading || 'Loading...') + '</div>';
+            try {{
+                const url = apiUrl('api/files/list') + (path ? '?path=' + encodeURIComponent(path) : '');
+                const resp = await fetch(url, {{credentials:'same-origin'}});
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                renderFileTree(data.entries || [], path);
+            }} catch(e) {{
+                fileTreeEl.innerHTML = '<div class="file-tree-status">' + (T.files_error || 'Error') + ': ' + (e.message || '') + '</div>';
+            }}
+        }}
+
+        function renderFileTree(entries, curPath) {{
+            fileTreeEl.innerHTML = '';
+            if (curPath) {{
+                const parts = curPath.split('/').filter(Boolean);
+                const back = document.createElement('div');
+                back.className = 'file-tree-breadcrumb';
+                back.innerHTML = '\u2190 ' + parts.join(' / ');
+                back.title = 'Back to parent';
+                back.onclick = () => loadFileTree(parts.slice(0, -1).join('/'));
+                fileTreeEl.appendChild(back);
+            }}
+            if (!entries.length) {{
+                const em = document.createElement('div');
+                em.className = 'file-tree-status';
+                em.textContent = T.files_empty || 'Empty';
+                fileTreeEl.appendChild(em);
+                return;
+            }}
+            const dirs  = entries.filter(e => e.type === 'directory');
+            const files = entries.filter(e => e.type === 'file');
+            [...dirs, ...files].forEach(entry => {{
+                const item = document.createElement('div');
+                item.className = 'file-tree-item';
+                if (!entry.type || entry.type === 'file') {{
+                    if (fileOpenTabs.some(t => t.path === entry.path)) item.classList.add('file-active');
+                }}
+                const icon = document.createElement('span');
+                icon.className = 'file-icon';
+                icon.textContent = entry.type === 'directory' ? '\U0001f4c1' : getFileIcon(entry.name);
+                const name = document.createElement('span');
+                name.className = 'file-name';
+                name.textContent = entry.name;
+                item.appendChild(icon);
+                item.appendChild(name);
+                if (entry.type !== 'directory' && entry.size !== undefined) {{
+                    const sz = document.createElement('span');
+                    sz.className = 'file-size';
+                    sz.textContent = formatFileSize(entry.size);
+                    item.appendChild(sz);
+                }}
+                item.onclick = () => entry.type === 'directory'
+                    ? loadFileTree(entry.path)
+                    : openFileInPanel(entry.path, entry.name);
+                fileTreeEl.appendChild(item);
+            }});
+        }}
+
+        function getFileIcon(name) {{
+            if (!name) return '\U0001f4c4';
+            const ext = name.split('.').pop().toLowerCase();
+            if (ext === 'yaml' || ext === 'yml') return '\U0001f4c4';
+            if (ext === 'json') return '\U0001f4cb';
+            if (ext === 'py')   return '\U0001f40d';
+            if (ext === 'sh')   return '\u26a1';
+            if (ext === 'txt' || ext === 'md') return '\U0001f4dd';
+            return '\U0001f4c4';
+        }}
+
+        function formatFileSize(bytes) {{
+            if (!bytes) return '';
+            if (bytes < 1024) return bytes + 'B';
+            if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + 'KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+        }}
+
+        // ===== FILE PANEL — open / close / tabs =====
+        async function openFileInPanel(path, name) {{
+            if (window.matchMedia('(max-width: 599px)').matches) return; // mobile: skip
+            const existing = fileOpenTabs.findIndex(t => t.path === path);
+            if (existing !== -1) {{ setActivePanelTab(existing); openFilePanel(); return; }}
+            if (fileOpenTabs.length >= 3) {{
+                fileOpenTabs.shift();
+                if (fileActiveTabIdx > 0) fileActiveTabIdx--;
+            }}
+            fileOpenTabs.push({{ path, name, content: null, loading: true }});
+            const newIdx = fileOpenTabs.length - 1;
+            setActivePanelTab(newIdx);
+            openFilePanel();
+            renderPanelTabs();
+            filePanelContentEl.innerHTML = '<div class="file-panel-loading">Loading...</div>';
+            try {{
+                const resp = await fetch(apiUrl('api/files/read') + '?file=' + encodeURIComponent(path), {{credentials:'same-origin'}});
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                const data = await resp.json();
+                if (data.error) throw new Error(data.error);
+                fileOpenTabs[newIdx].content   = data.content;
+                fileOpenTabs[newIdx].truncated = data.truncated;
+                fileOpenTabs[newIdx].loading   = false;
+            }} catch(e) {{
+                fileOpenTabs[newIdx].error   = e.message || 'Error';
+                fileOpenTabs[newIdx].loading = false;
+            }}
+            renderPanelTabs();
+            renderActivePanelContent();
+            updateFileContextBar();
+            if (fileTreeEl.children.length > 0) loadFileTree(fileCurrentPath);
+        }}
+
+        function openFilePanel() {{
+            if (!filePanelEl || !fileSplitterEl) return;
+            filePanelEl.classList.add('open');
+            fileSplitterEl.classList.add('visible');
+            const saved = parseInt(safeLocalStorageGet('chatFilePanelWidth') || '', 10);
+            if (!Number.isNaN(saved) && saved >= 180) filePanelEl.style.width = Math.min(600, saved) + 'px';
+        }}
+
+        function closeFilePanel() {{
+            if (!filePanelEl || !fileSplitterEl) return;
+            fileOpenTabs = []; fileActiveTabIdx = -1;
+            filePanelEl.classList.remove('open');
+            fileSplitterEl.classList.remove('visible');
+            filePanelEl.style.width = '0';
+            if (filePanelTabsEl)   filePanelTabsEl.innerHTML = '';
+            if (filePanelContentEl) filePanelContentEl.innerHTML = '';
+            updateFileContextBar();
+            if (fileTreeEl.children.length > 0) loadFileTree(fileCurrentPath);
+        }}
+
+        function closeFilePanelTab(idx) {{
+            fileOpenTabs.splice(idx, 1);
+            if (fileOpenTabs.length === 0) {{ closeFilePanel(); return; }}
+            if (fileActiveTabIdx >= fileOpenTabs.length) fileActiveTabIdx = fileOpenTabs.length - 1;
+            renderPanelTabs();
+            renderActivePanelContent();
+            updateFileContextBar();
+        }}
+
+        function setActivePanelTab(idx) {{
+            fileActiveTabIdx = idx;
+            renderPanelTabs();
+            renderActivePanelContent();
+        }}
+
+        function renderPanelTabs() {{
+            if (!filePanelTabsEl) return;
+            filePanelTabsEl.innerHTML = '';
+            fileOpenTabs.forEach((tab, idx) => {{
+                const tabEl = document.createElement('button');
+                tabEl.className = 'file-panel-tab' + (idx === fileActiveTabIdx ? ' active' : '');
+                const nm = document.createElement('span'); nm.className = 'tab-name'; nm.textContent = tab.name; nm.title = tab.path;
+                const cl = document.createElement('span'); cl.className = 'tab-close'; cl.textContent = '\u00d7'; cl.title = 'Close';
+                cl.onclick = (e) => {{ e.stopPropagation(); closeFilePanelTab(idx); }};
+                tabEl.appendChild(nm); tabEl.appendChild(cl);
+                tabEl.onclick = () => setActivePanelTab(idx);
+                filePanelTabsEl.appendChild(tabEl);
+            }});
+        }}
+
+        function renderActivePanelContent() {{
+            if (!filePanelContentEl) return;
+            if (fileActiveTabIdx < 0 || fileActiveTabIdx >= fileOpenTabs.length) {{
+                filePanelContentEl.innerHTML = ''; return;
+            }}
+            const tab = fileOpenTabs[fileActiveTabIdx];
+            if (tab.loading) {{ filePanelContentEl.innerHTML = '<div class="file-panel-loading">Loading...</div>'; return; }}
+            if (tab.error)   {{ filePanelContentEl.innerHTML = '<div class="file-panel-error">Error: ' + tab.error + '</div>'; return; }}
+            filePanelContentEl.innerHTML = '';
+            if (tab.truncated) {{
+                const notice = document.createElement('div');
+                notice.className = 'file-panel-truncated';
+                notice.textContent = '\u26a0 File truncated at 15,000 chars';
+                filePanelContentEl.appendChild(notice);
+            }}
+            const viewer = document.createElement('div');
+            viewer.className = 'yaml-viewer';
+            viewer.innerHTML = syntaxHighlightYaml(tab.content || '');
+            filePanelContentEl.appendChild(viewer);
+        }}
+
+        // ===== YAML SYNTAX HIGHLIGHT (lightweight, line-by-line) =====
+        function syntaxHighlightYaml(text) {{
+            if (!text) return '';
+            return text.split('\\n').map(line => {{
+                const esc = line.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                if (/^\\s*#/.test(line)) return '<span class="yaml-comment">' + esc + '</span>';
+                const m = esc.match(/^(\\s*)([^#:][^:]*)(:\\s*)(.*)$/);
+                if (m) {{
+                    const [, indent, key, colon, val] = m;
+                    let v = val;
+                    if (/^(true|false|yes|no|on|off)$/i.test(val.trim())) v = '<span class="yaml-bool">' + val + '</span>';
+                    else if (/^-?[0-9]+(\\.[0-9]+)?$/.test(val.trim())) v = '<span class="yaml-number">' + val + '</span>';
+                    else if (val.trim()) v = '<span class="yaml-string">' + val + '</span>';
+                    return indent + '<span class="yaml-key">' + key + '</span>' + colon + v;
+                }}
+                return esc;
+            }}).join('\\n');
+        }}
+
+        // ===== FILE CONTEXT BAR =====
+        function updateFileContextBar() {{
+            if (!fileContextBarEl || !fileContextChipsEl) return;
+            if (fileOpenTabs.length === 0) {{
+                fileContextBarEl.classList.remove('visible');
+                fileContextChipsEl.innerHTML = '';
+                return;
+            }}
+            fileContextBarEl.classList.add('visible');
+            fileContextChipsEl.innerHTML = fileOpenTabs
+                .map(t => '<span class="file-context-chip">\U0001f4c4 ' + t.name + '</span>')
+                .join('');
+        }}
+
+        // ===== BUILD FILE CONTEXT STRING for sendMessage =====
+        function buildFileContext() {{
+            if (fileOpenTabs.length === 0) return '';
+            const MAX = 3000;
+            return fileOpenTabs
+                .filter(t => t.content)
+                .map(t => {{
+                    const c = t.content.length > MAX ? t.content.slice(0, MAX) + '\\n... [TRUNCATED]' : t.content;
+                    return '[FILE: ' + t.path + ']\\n' + c + '\\n[/FILE]';
+                }})
+                .join('\\n\\n');
         }}
 
         function isMobileLayout() {{
@@ -2252,6 +2726,8 @@ def get_chat_ui():
         function stripContextInjections(text) {{
             if (!text || typeof text !== 'string') return text;
             let t = text;
+            // 0. Strip [FILE: path]...content...[/FILE] blocks injected by file explorer
+            t = t.replace(/\\[FILE:[^\\]]*\\][\\s\\S]*?\\[\\/FILE\\]\\n?/g, '');
             // 1. Strip [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML] (may be very large)
             t = t.replace(/\\[CURRENT_DASHBOARD_HTML\\][\\s\\S]*?\\[\\/CURRENT_DASHBOARD_HTML\\]\\n?/g, '');
             // 2. Strip [CONTEXT: ... ] blocks — content ends at first ] not inside nested brackets
@@ -2568,8 +3044,11 @@ def get_chat_ui():
                     }} catch (e) {{}}
                 }}, 8000);
 
+                // Prepend file context blocks if any files are open
+                const fileCtx = buildFileContext();
+                const _baseMsg = text || `[${{T.document_uploaded || 'Document uploaded'}}: ${{docToSend ? docToSend.name : ''}}]`;
                 const payload = {{
-                    message: text || `[${{T.document_uploaded || 'Document uploaded'}}: ${{docToSend ? docToSend.name : ''}}]`,
+                    message: fileCtx ? fileCtx + '\\n\\n' + _baseMsg : _baseMsg,
                     session_id: currentSessionId,
                     read_only: readOnlyMode
                 }};
@@ -2754,6 +3233,9 @@ def get_chat_ui():
             }} else if (tabName === 'messaging') {{
                 document.getElementById('tabMessaging').classList.add('active');
                 loadMessagingList();
+            }} else if (tabName === 'files') {{
+                document.getElementById('tabFiles').classList.add('active');
+                loadFileTree(fileCurrentPath);
             }}
         }}
 
@@ -4130,6 +4612,8 @@ def get_chat_ui():
                 bindCspSafeHandlers();
 
                 initSidebarResize();
+                initFilePanelResize();
+                if (filePanelCloseAllEl) filePanelCloseAllEl.onclick = () => closeFilePanel();
                 loadModels();
                 loadChatList();
                 loadHistory();
@@ -4182,6 +4666,11 @@ def get_chat_ui():
         window.changeModel = changeModel;
         window.handleButtonClick = handleButtonClick;
         window.refreshModels = refreshModels;
+        // File explorer exports
+        window.loadFileTree = loadFileTree;
+        window.openFileInPanel = openFileInPanel;
+        window.closeFilePanelTab = closeFilePanelTab;
+        window.closeFilePanel = closeFilePanel;
         }}
         
     </script>

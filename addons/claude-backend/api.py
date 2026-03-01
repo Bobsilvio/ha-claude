@@ -6684,6 +6684,81 @@ def api_ha_logs():
         return jsonify({"error": str(e)}), 500
 
 
+
+# ===== FILE EXPLORER API =====
+# Direct REST endpoints for the chat UI file explorer panel.
+# These browse /config (HA_CONFIG_DIR) without going through the AI tool layer,
+# so navigation is instant regardless of which AI provider is selected.
+# Security: path traversal blocked (no "..", no absolute paths) — same as tools.py.
+
+@app.route('/api/files/list', methods=['GET'])
+def api_files_list():
+    """List files and directories in the HA config dir (or a subdirectory).
+
+    Query param: path (optional) — relative subpath, e.g. 'packages'
+    Returns: {path, entries: [{name, type, path, size?}], count}
+    """
+    subpath = request.args.get('path', '').strip()
+    if '..' in subpath or (subpath and subpath.startswith('/')):
+        return jsonify({"error": "Invalid path."}), 400
+    dirpath = os.path.join(HA_CONFIG_DIR, subpath) if subpath else HA_CONFIG_DIR
+    if not os.path.isdir(dirpath):
+        return jsonify({"error": f"Directory '{subpath}' not found."}), 404
+    try:
+        entries = []
+        for entry in sorted(os.listdir(dirpath)):
+            if entry.startswith('.'):
+                continue
+            full = os.path.join(dirpath, entry)
+            rel = os.path.join(subpath, entry).replace('\\', '/') if subpath else entry
+            if os.path.isdir(full):
+                entries.append({"name": entry, "type": "directory", "path": rel})
+            else:
+                try:
+                    size = os.path.getsize(full)
+                except OSError:
+                    size = 0
+                entries.append({"name": entry, "type": "file", "path": rel, "size": size})
+        entries = entries[:100]
+        return jsonify({"path": subpath or "/", "entries": entries, "count": len(entries)})
+    except Exception as e:
+        logger.error(f"api_files_list error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/files/read', methods=['GET'])
+def api_files_read():
+    """Read a file from the HA config dir.
+
+    Query param: file — relative path, e.g. 'packages/lights.yaml'
+    Returns: {filename, content, size, truncated}
+    Content truncated at 15000 chars (same limit as read_config_file tool).
+    """
+    filename = request.args.get('file', '').strip()
+    if not filename:
+        return jsonify({"error": "file parameter is required."}), 400
+    if '..' in filename or filename.startswith('/'):
+        return jsonify({"error": "Invalid filename. Use relative paths only."}), 400
+    filepath = os.path.join(HA_CONFIG_DIR, filename)
+    if not os.path.isfile(filepath):
+        return jsonify({"error": f"File '{filename}' not found."}), 404
+    try:
+        with open(filepath, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+        truncated = len(content) > 15000
+        if truncated:
+            content = content[:15000]
+        return jsonify({
+            "filename": filename,
+            "content": content,
+            "size": os.path.getsize(filepath),
+            "truncated": truncated,
+        })
+    except Exception as e:
+        logger.error(f"api_files_read error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ===== DASHBOARD API PROXY =====
 # These endpoints proxy HA API calls using the SUPERVISOR_TOKEN so that
 # dashboard iframes don't need browser-side authentication tokens.

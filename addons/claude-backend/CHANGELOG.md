@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.3.1 — Split-view file explorer
+- **New sidebar tab "Files"** (📁): browse `/config` directory tree directly from the chat UI — shows dirs and files with icons, size, and breadcrumb navigation
+- **File preview panel**: clicking a file opens a resizable middle panel (default 320px, drag splitter to resize, min 180px / max 600px) with tabbed view — up to 3 files open at once
+- **YAML syntax highlight**: key–value pairs, strings, booleans, numbers, and comments are colour-coded without any external library
+- **File context injection**: open files are automatically prepended to the AI payload as `[FILE: path]\ncontent\n[/FILE]` blocks — context bar above the input shows which files are active
+- **Context bar stripping**: `[FILE:...]` blocks never appear in the chat history visible to the user (stripped by `stripContextInjections`)
+- **New REST endpoints**: `GET /api/files/list?path=` and `GET /api/files/read?file=` — path-traversal protection, 15 000-char read limit with truncation notice
+- **Responsive**: file panel and its splitter are hidden on mobile (`max-width: 599px`) — the tab still shows the tree for reference
+- **Dark-mode** styles for all new elements
+
 ## 4.3.0 — Four bug fixes: Copilot tool round 2, bubble thinking label, log quick actions i18n, chatgpt_web warning
 - **GitHub Copilot HTTP 400 on tool round 2**: after `flatten_tool_messages()` the conversation ended with an `assistant` turn (tool result merged in), which Copilot rejects — now injects a `user` continuation prompt when the last message is an assistant turn
 - **`flatten_tool_messages` null content fix**: assistant messages with `content: None` now get a non-null placeholder so strict providers don't reject with 400
