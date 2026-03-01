@@ -1,9 +1,9 @@
 # Home Assistant Add-on configuration
-name: Amira Ai Assistant
-version: "4.1.0"
+name: BoBot
+version: "4.1.1"
 slug: claude-backend
 description: >-
-  Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
+  BoBot - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
   NVIDIA NIM and GitHub Models (40+ AI models) + Telegram & WhatsApp
 url: https://github.com/Bobsilvio/ha-claude
 init: false
@@ -18,14 +18,14 @@ ingress: true
 ingress_port: 5010
 ingress_entry: /
 panel_icon: mdi:robot
-panel_title: Amira
+panel_title: BoBot
 homeassistant_api: true
 map:
   - config:rw
 ports:
   5010/tcp: 5010
 ports_description:
-  5010/tcp: "Amira API & WhatsApp webhook (Twilio)"
+  5010/tcp: "BoBot API & WhatsApp webhook (Twilio)"
 environment:
   DEBUG_MODE: "False"
   API_PORT: "5010"
@@ -67,7 +67,7 @@ options:
   max_snapshots_per_file: 5
   max_conversations: 10
   cost_currency: USD
-  mcp_config_file: /config/amira/mcp_config.json
+  mcp_config_file: /config/bobot/mcp_config.json
   telegram_bot_token: ""
   twilio_account_sid: ""
   twilio_auth_token: ""
