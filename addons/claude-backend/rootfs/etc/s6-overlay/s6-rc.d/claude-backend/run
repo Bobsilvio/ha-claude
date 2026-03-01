@@ -60,16 +60,22 @@ TWILIO_AUTH_TOKEN=$(bashio::config 'twilio_auth_token')
 TWILIO_WHATSAPP_FROM=$(bashio::config 'twilio_whatsapp_from')
 
 # MCP (Model Context Protocol) configuration
-MCP_CONFIG_FILE=$(bashio::config 'mcp_config_file' 2>/dev/null || echo "/config/amira/mcp_config.json")
-if [ "${MCP_CONFIG_FILE}" = "null" ] || [ -z "${MCP_CONFIG_FILE}" ]; then
-  MCP_CONFIG_FILE="/config/amira/mcp_config.json"
-fi
-if [ -f "${MCP_CONFIG_FILE}" ]; then
-  MCP_SERVERS=$(cat "${MCP_CONFIG_FILE}")
-  bashio::log.info "MCP config loaded from: ${MCP_CONFIG_FILE}"
+ENABLE_MCP=$(bashio::config 'enable_mcp' 2>/dev/null || echo "false")
+if [ "${ENABLE_MCP}" = "true" ]; then
+  MCP_CONFIG_FILE=$(bashio::config 'mcp_config_file' 2>/dev/null || echo "/config/amira/mcp_config.json")
+  if [ "${MCP_CONFIG_FILE}" = "null" ] || [ -z "${MCP_CONFIG_FILE}" ]; then
+    MCP_CONFIG_FILE="/config/amira/mcp_config.json"
+  fi
+  if [ -f "${MCP_CONFIG_FILE}" ]; then
+    MCP_SERVERS=$(cat "${MCP_CONFIG_FILE}")
+    bashio::log.info "MCP config loaded from: ${MCP_CONFIG_FILE}"
+  else
+    MCP_SERVERS="{}"
+    bashio::log.info "MCP config file not found. Create ${MCP_CONFIG_FILE} to enable MCP servers"
+  fi
 else
   MCP_SERVERS="{}"
-  bashio::log.info "MCP config file not found. Create ${MCP_CONFIG_FILE} to enable MCP servers"
+  bashio::log.info "MCP disabled (enable_mcp: false)"
 fi
 
 # SUPERVISOR_TOKEN: injected by HA Supervisor, fallback via bashio
@@ -110,6 +116,7 @@ export TWILIO_ACCOUNT_SID
 export TWILIO_AUTH_TOKEN
 export TWILIO_WHATSAPP_FROM
 export MCP_SERVERS
+export ENABLE_MCP
 
 export GROQ_API_KEY
 export MISTRAL_API_KEY

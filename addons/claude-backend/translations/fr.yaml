@@ -101,6 +101,9 @@ configuration:
   enable_chat_bubble:
     name: Bulle de Chat
     description: "Afficher une bulle de chat IA flottante sur chaque page Home Assistant. Détecte le contexte (automatisations, scripts, tableaux de bord). Inclut saisie vocale, rendu markdown et changement d'agent en direct. Masquée sur mobile."
+  enable_mcp:
+    name: Activer MCP
+    description: "Activer le support MCP (Model Context Protocol). Si désactivé, Amira ne tentera pas de se connecter aux serveurs MCP au démarrage, supprimant les erreurs inutiles dans les journaux."
 
   timeout:
     name: Délai d'Attente

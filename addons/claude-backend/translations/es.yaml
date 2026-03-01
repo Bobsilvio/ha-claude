@@ -101,6 +101,9 @@ configuration:
   enable_chat_bubble:
     name: Burbuja de Chat
     description: "Mostrar una burbuja de chat AI flotante en cada página de Home Assistant. Detecta el contexto (automatizaciones, scripts, paneles). Incluye entrada de voz, renderizado markdown y cambio de agente en vivo. Oculta en dispositivos móviles."
+  enable_mcp:
+    name: Habilitar MCP
+    description: "Habilitar el soporte MCP (Model Context Protocol). Si está desactivado, Amira no intentará conectarse a los servidores MCP al inicio, eliminando errores innecesarios de los registros."
 
   timeout:
     name: Tiempo de Espera

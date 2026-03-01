@@ -6987,6 +6987,11 @@ def initialize_mcp() -> None:
         logger.debug("MCP support not available")
         return
 
+    # Skip entirely if MCP is disabled via config toggle
+    if os.getenv("ENABLE_MCP", "true").lower() in ("false", "0", ""):
+        logger.info("🔌 MCP disabled (enable_mcp: false in addon config)")
+        return
+
     try:
         mcp_config = None
 

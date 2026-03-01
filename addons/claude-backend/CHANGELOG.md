@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.1.4 — Add enable_mcp toggle
+- Added `enable_mcp` option (default `false`) to disable MCP at startup
+- When disabled, MCP servers are never contacted and no connection errors appear in logs
+- New toggle visible in Home Assistant addon config UI (all 4 languages: IT, EN, FR, ES)
+
 ## 4.1.3 — Complete BoBot → Amira rename
 - **CHANGE**: Renamed all remaining `BoBot`/`bobot` references to `Amira`/`amira` in `config.yaml` (panel title, port description, MCP config path)
 
