@@ -7,45 +7,45 @@
 - **FIX**: Removed duplicate `COPY memory.py` instruction in Dockerfile
 
 ## 4.1.0 — Complete provider architecture rewrite + dashboard intelligence
-> **Breaking change from v3.x** — provider system completamente riscritto
+> **Breaking change from v3.x** — provider system completely rewritten
 
 ### Provider system
-- Sostituito il sistema monolitico `providers_anthropic/google/openai.py` con il pacchetto modulare `providers/`
-- 22 provider class: OpenAI, Anthropic, Google, Groq, Mistral, NVIDIA, DeepSeek, OpenRouter, Ollama, GitHub, GitHub Copilot, ChatGPT Web, OpenAI Codex, Zhipu, SiliconFlow, Moonshot, MiniMax, AiHubMix, VolcEngine, DashScope, Perplexity, Custom
-- Provider manager con interfaccia di streaming unificata e gestione errori migliorata
-- Lista modelli dinamica: `PROVIDER_MODELS` costruita da `get_available_models()` di ogni provider all'avvio — unica fonte di verità
-- `model_fetcher.py`: aggiornamento live dei modelli dalle API ufficiali con cache su disco
-- `rate_limiter.py`, `error_handler.py`, `tool_simulator.py`: utility condivise tra provider
+- Replaced monolithic `providers_anthropic/google/openai.py` with the modular `providers/` package
+- 22 provider classes: OpenAI, Anthropic, Google, Groq, Mistral, NVIDIA, DeepSeek, OpenRouter, Ollama, GitHub, GitHub Copilot, ChatGPT Web, OpenAI Codex, Zhipu, SiliconFlow, Moonshot, MiniMax, AiHubMix, VolcEngine, DashScope, Perplexity, Custom
+- Provider manager with unified streaming interface and enhanced error handling
+- Dynamic model list: `PROVIDER_MODELS` built from each provider's `get_available_models()` at startup — single source of truth
+- `model_fetcher.py`: live model refresh from official APIs with on-disk cache
+- `rate_limiter.py`, `error_handler.py`, `tool_simulator.py`: shared utilities across providers
 
 ### OpenAI Codex provider
-- Flusso OAuth PKCE: token salvato in `/data/oauth_codex.json` con auto-refresh
-- Lista modelli corretta (solo gpt-5.x-codex)
-- Banner connessione in UI con ID account, scadenza e pulsante disconnetti
-- Endpoint `/api/oauth/codex/revoke`
+- OAuth PKCE flow: token stored at `/data/oauth_codex.json` with auto-refresh
+- Correct model list (gpt-5.x-codex only)
+- Connected banner in UI showing account ID, expiry and disconnect button
+- `/api/oauth/codex/revoke` endpoint
 
-### Dashboard HTML
-- **Smart context split**: `[CURRENT_DASHBOARD_HTML]` iniettato come turno separato nella conversazione per evitare token overflow mantenendo il contesto entità completo (cap 10KB)
-- **Intent detection**: lookup filesystem in `www/dashboards/` per routing corretto verso `create_html_dashboard`
-- `openMoreInfo()` con evento `hass-more-info` nativo + modal fallback
-- Redirect autenticazione: se token assente, redirect a `/?redirect=...`
-- Titolo sidebar sempre prefissato `Amira — <titolo>` (enforced in `tools.py`)
+### HTML Dashboard
+- **Smart context split**: `[CURRENT_DASHBOARD_HTML]` injected as a separate conversation turn to avoid token overflow while keeping the full entity context (10KB cap)
+- **Intent detection**: filesystem lookup in `www/dashboards/` to correctly route requests to `create_html_dashboard`
+- `openMoreInfo()` with native `hass-more-info` event + custom modal fallback
+- Auth redirect: if token is missing, redirect to `/?redirect=...`
+- Sidebar title always prefixed with `Amira — <title>` (enforced in `tools.py`)
 
-### Chat UI e bubble
-- `stripContextInjections()`: nasconde blocchi `[CONTEXT:...]` e `[CURRENT_DASHBOARD_HTML]` dalla cronologia visualizzata
-- Artifact delle tool call nascosti dalla cronologia (`api_conversation_get`)
-- Drag della bubble corretto con Pointer Events API + `setPointerCapture()`
-- Rimossi i testi obsoleti "Novità v3.0" in tutte e 4 le lingue
+### Chat UI & bubble
+- `stripContextInjections()`: hides `[CONTEXT:...]` and `[CURRENT_DASHBOARD_HTML]` blocks from the displayed conversation history without affecting stored data
+- Tool call artifacts hidden from conversation history (`api_conversation_get`)
+- Bubble drag fixed with Pointer Events API + `setPointerCapture()`
+- Removed outdated "Novita v3.0" vision feature strings across all 4 languages
 
-### Nuove funzionalità
-- **MCP**: supporto server Model Context Protocol
-- **Telegram & WhatsApp**: integrazione bot
-- **Voice transcription**: supporto Whisper (STT) e TTS
-- **Semantic cache**: riduzione chiamate API con cache semantica
-- **RAG**: Retrieval-Augmented Generation su file locali
-- **File upload**: caricamento file nelle conversazioni
-- **Memory**: sistema memoria con `MEMORY.md` (long-term) e `HISTORY.md` (log sessioni)
-- **Scheduled tasks**: task scheduler con agente autonomo
-- **Quality metrics**: metriche qualità risposte
-- **Prompt caching**: caching prompt per ridurre costi Anthropic
-- **Image support**: analisi immagini multi-provider
-- **GitHub Copilot**: provider OAuth dedicato
+### New features
+- **MCP**: Model Context Protocol server support
+- **Telegram & WhatsApp**: bot integration
+- **Voice transcription**: Whisper STT and TTS support
+- **Semantic cache**: reduces API calls via semantic response caching
+- **RAG**: Retrieval-Augmented Generation on local files
+- **File upload**: attach files to conversations
+- **Memory**: two-layer memory system with `MEMORY.md` (long-term facts) and `HISTORY.md` (session log)
+- **Scheduled tasks**: task scheduler with autonomous agent
+- **Quality metrics**: response quality scoring
+- **Prompt caching**: prompt caching to reduce Anthropic API costs
+- **Image support**: multi-provider image analysis
+- **GitHub Copilot**: dedicated OAuth provider
