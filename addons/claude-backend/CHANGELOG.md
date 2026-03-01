@@ -1,10 +1,21 @@
 # Changelog
 
-## 4.1.15 — Fix keyword synonym 'bat' matching 'sabato' + entity fallback filter
-- `intent.py`: removed too-short synonym `bat` from battery keyword expansion — was matching `sabato` in entity_ids, pulling in all `sabato_elettrodomestici_*` consumption entities as battery sensors
-- `intent.py`: `bat` → `batter` (5 chars minimum, avoids false positives)
-- `tools.py` `_inject_entity_filter_fallback()`: now extracts the target `device_class` from the HTML filter and only injects entities whose entity_id contains related keywords (e.g. for `battery`: `batter`, `soc`, `charge`, `carica`)
-- Prevents unrelated entities (consumption, cost, schedule) from appearing in device_class-specific dashboards
+## 4.2.0 — Entity discovery: use real HA device_class instead of keyword matching
+**Breaking change in entity matching logic — eliminates false positives entirely.**
+
+### Problem
+Previous approach used keyword/substring matching on entity_ids to find entities (e.g. searching for "battery" by matching "bat" inside entity names). This caused false positives: "bat" matched "sabato", pulling in unrelated consumption entities. Every new device_class would require a new keyword dictionary — fragile and unscalable.
+
+### Solution
+- `intent.py`: **Two-mode entity discovery:**
+  - **Device-class mode** (battery, temperature, humidity, etc.): filters ONLY by the REAL `device_class` attribute from Home Assistant state — zero false positives, no substring matching needed
+  - **Keyword mode** (fallback): for brands, room names, or custom terms that have no device_class mapping — still searches entity_id/friendly_name
+- `intent.py`: removed `_keyword_synonyms` dictionary entirely — no longer needed since device_class filtering doesn't require synonym expansion
+- `intent.py`: expanded `_device_class_aliases` to cover both IT and EN terms (batterie, battery, temperatura, temperature, etc.)
+- `tools.py`: `_inject_entity_filter_fallback()` simplified — trusts the backend entity list as authoritative, removed all `_dc_keywords` dictionaries and keyword-based re-filtering
+
+### Result
+Works for any device_class (battery, temperature, motion, humidity, etc.) without maintaining keyword vocabularies. New device types work automatically.
 
 ## 4.1.14 — Fix iOS Companion App infinite loading + dashboard showing only 5 sensors
 - `_fix_auth_redirect()`: entry-point regex now uses **prefix matching** (`load\w*` catches `loadBatteries()`, `loadSensors()`, etc.) — previously only matched exact names like `load()`, so `tok` stayed empty on iOS

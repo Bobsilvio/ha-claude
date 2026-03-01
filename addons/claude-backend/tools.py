@@ -807,12 +807,18 @@ def _fix_auth_redirect(html: str) -> str:
 def _inject_entity_filter_fallback(html: str, entities: list) -> str:
     """Inject pre-filtered entity list into AI-generated HTML.
 
-    AI models often filter /api/states by device_class which misses many entities.
-    The backend pre-filters entities by keyword matching (80+ results), but the
-    AI HTML may use device_class === 'battery' (only 5 results).
+    The backend (intent.py) pre-filters entities using REAL HA device_class
+    attributes -- this list is authoritative.  AI models often generate HTML
+    that filters /api/states by device_class, which may return fewer entities
+    than the backend found.
 
-    This injects the backend's entity list as a JS fallback filter so all matching
-    entities are shown regardless of device_class.
+    This function:
+    1. Injects the backend list as window._HA_ENTITIES
+    2. Patches any .filter(s => s.attributes.device_class === '...') to also
+       include entities from _HA_ENTITIES -- so ALL backend-matched entities
+       are shown, not just those matching the AI's hardcoded filter.
+
+    No keyword/substring heuristics -- the entity list is trusted as-is.
     """
     import re as _re
 
@@ -830,36 +836,7 @@ def _inject_entity_filter_fallback(html: str, entities: list) -> str:
     if not has_api_fetch or not has_device_class_filter:
         return html
 
-    # Extract the device_class value from the HTML filter (e.g. 'battery', 'temperature')
-    _dc_match = _re.search(r"device_class\s*={2,3}\s*['\"](\w+)['\"]", html)
-    _target_dc = _dc_match.group(1) if _dc_match else None
-
-    # If we know the target device_class, filter the entity list to only include
-    # entities whose entity_id is plausibly related.
-    # This prevents injecting unrelated entities (e.g. 'sabato_consumo' for a battery dashboard).
-    if _target_dc and _target_dc in ("battery", "temperature", "humidity", "power", "energy", "voltage", "current", "illuminance", "pressure", "motion"):
-        _dc_keywords = {
-            "battery": ["batter", "soc", "charge", "battery_level", "battery_state", "carica"],
-            "temperature": ["temperature", "temperatura", "temp_"],
-            "humidity": ["humidity", "umidita", "humid"],
-            "power": ["power", "potenza", "watt"],
-            "energy": ["energy", "energia", "consumo", "kwh"],
-            "voltage": ["voltage", "tensione", "volt"],
-            "current": ["current", "corrente", "ampere"],
-            "illuminance": ["illuminance", "lux", "luminosit"],
-            "pressure": ["pressure", "pressione"],
-            "motion": ["motion", "movimento", "occupancy"],
-        }
-        _kw_list = _dc_keywords.get(_target_dc, [_target_dc])
-        filtered = [e for e in entities if any(kw in e.lower() for kw in _kw_list)]
-        if filtered:
-            _dropped = len(entities) - len(filtered)
-            if _dropped > 0:
-                logger.info(f"\U0001f4cb Entity fallback: filtered {_dropped}/{len(entities)} unrelated entities for device_class='{_target_dc}'")
-            entities = filtered
-        # else: keep all \u2014 better to show too many than zero
-
-        entities_json = json.dumps(entities, ensure_ascii=False)
+    entities_json = json.dumps(entities, ensure_ascii=False)
 
     # Inject entity list as a global constant before the first <script>
     injection_script = (
@@ -886,7 +863,6 @@ def _inject_entity_filter_fallback(html: str, entities: list) -> str:
 
     logger.info(f"Injected pre-filtered entity list ({len(entities)} entities) as fallback filter")
     return html
-
 
 def _stamp_description(description: str, action: str = "create") -> str:
     """Add Amira watermark to a description field.

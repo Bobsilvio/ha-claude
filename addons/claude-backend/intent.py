@@ -1015,64 +1015,77 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
 
         # Try to find integration-specific entities if user mentions a device/brand
         _integration_matches = []
-        # IT→EN keyword synonyms + device_class aliases for smarter entity matching
-        _keyword_synonyms = {
-            "batterie": ["battery", "batterie", "batter"],
-            "batteria": ["battery", "batteria", "batter"],
-            "temperatura": ["temperature", "temperatura"],
-            "umidità": ["humidity", "umidita", "humid"],
-            "consumo": ["consumption", "energy", "power", "consumo"],
-            "potenza": ["power", "potenza", "watt"],
-            "tensione": ["voltage", "tensione", "volt"],
-            "corrente": ["current", "corrente", "ampere"],
-            "luminosità": ["illuminance", "lux", "luminosity"],
-            "pressione": ["pressure", "pressione"],
-            "velocità": ["speed", "velocity", "velocita"],
-            "movimento": ["motion", "movimento"],
-        }
-        # device_class aliases: IT keyword → device_class values to match
+        # device_class aliases: IT/EN keyword → HA device_class attribute values.
+        # When a keyword maps to a device_class, we filter ONLY by real HA
+        # attribute (not by substring in entity_id) — this is 100% accurate
+        # and avoids false positives (e.g. "bat" matching "sabato").
         _device_class_aliases = {
             "batterie": ["battery"],
             "batteria": ["battery"],
+            "battery": ["battery"],
             "temperatura": ["temperature"],
+            "temperature": ["temperature"],
             "umidità": ["humidity"],
+            "humidity": ["humidity"],
             "consumo": ["energy", "power"],
+            "consumption": ["energy", "power"],
+            "energia": ["energy"],
+            "energy": ["energy"],
             "potenza": ["power"],
+            "power": ["power"],
             "tensione": ["voltage"],
+            "voltage": ["voltage"],
             "corrente": ["current"],
+            "current": ["current"],
             "luminosità": ["illuminance"],
+            "illuminance": ["illuminance"],
             "pressione": ["pressure"],
+            "pressure": ["pressure"],
+            "velocità": ["speed"],
+            "speed": ["speed"],
             "movimento": ["motion", "occupancy"],
+            "motion": ["motion", "occupancy"],
+            "presenza": ["motion", "occupancy", "presence"],
+            "occupancy": ["occupancy"],
         }
         if _msg_words and (intent == "create_html_dashboard" or any(k in msg_lower for k in entity_keywords)):
             try:
                 all_states = api.get_all_states()
                 for keyword in _msg_words:
-                    # Expand keyword to synonyms (includes original)
-                    _search_terms = list(dict.fromkeys(
-                        [keyword] + _keyword_synonyms.get(keyword, [])
-                    ))
                     _device_classes = _device_class_aliases.get(keyword, [])
-                    matched = [
-                        {"entity_id": s.get("entity_id"),
-                         "state": s.get("state"),
-                         "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
-                         "unit": s.get("attributes", {}).get("unit_of_measurement", ""),
-                         "device_class": s.get("attributes", {}).get("device_class", "")}
-                        for s in all_states
-                        if any(
-                            term in s.get("entity_id", "").lower()
-                            or term in s.get("attributes", {}).get("friendly_name", "").lower()
-                            for term in _search_terms
-                        )
-                        or (
-                            _device_classes
-                            and s.get("attributes", {}).get("device_class", "") in _device_classes
-                        )
-                    ]
-                    if matched:
-                        _integration_matches.extend(matched)
-                        logger.info(f"Smart context: found {len(matched)} entities matching keyword '{keyword}' (terms: {_search_terms})")
+                    if _device_classes:
+                        # ---- DEVICE CLASS MODE ----
+                        # Keyword maps to a known device_class → filter ONLY by
+                        # the real HA attribute.  Zero false positives.
+                        matched = [
+                            {"entity_id": s.get("entity_id"),
+                             "state": s.get("state"),
+                             "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                             "unit": s.get("attributes", {}).get("unit_of_measurement", ""),
+                             "device_class": s.get("attributes", {}).get("device_class", "")}
+                            for s in all_states
+                            if s.get("attributes", {}).get("device_class", "") in _device_classes
+                        ]
+                        if matched:
+                            _integration_matches.extend(matched)
+                            logger.info(f"Smart context: found {len(matched)} entities with device_class in {_device_classes} (keyword '{keyword}')")
+                    else:
+                        # ---- KEYWORD MODE (fallback) ----
+                        # No device_class mapping → search entity_id / friendly_name.
+                        # Used for brands, room names, custom terms, etc.
+                        matched = [
+                            {"entity_id": s.get("entity_id"),
+                             "state": s.get("state"),
+                             "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
+                             "unit": s.get("attributes", {}).get("unit_of_measurement", ""),
+                             "device_class": s.get("attributes", {}).get("device_class", "")}
+                            for s in all_states
+                            if keyword in s.get("entity_id", "").lower()
+                            or keyword in s.get("attributes", {}).get("friendly_name", "").lower()
+                        ]
+                        if matched:
+                            _integration_matches.extend(matched)
+                            logger.info(f"Smart context: found {len(matched)} entities matching keyword '{keyword}' in entity_id/name")
 
                 # Deduplicate by entity_id
                 _seen = set()
