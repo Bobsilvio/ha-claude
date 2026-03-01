@@ -1,9 +1,9 @@
 # Home Assistant Add-on configuration
-name: BoBot
-version: "4.1.1"
+name: Amira
+version: "4.1.2"
 slug: claude-backend
 description: >-
-  BoBot - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
+  Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
   NVIDIA NIM and GitHub Models (40+ AI models) + Telegram & WhatsApp
 url: https://github.com/Bobsilvio/ha-claude
 init: false

@@ -1,5 +1,8 @@
 # Changelog
 
+## 4.1.2 — Rename addon to Amira
+- **CHANGE**: Addon renamed from `BoBot` to `Amira` in Home Assistant addon store (`name` and `description` in `config.yaml`)
+
 ## 4.1.1 — Dockerfile fixes + new modules
 - **FIX**: Corrected Dockerfile `COPY` instructions — removed non-existent `memory_system.py` reference
 - **NEW**: Added `scheduled_tasks.py` to the Docker image (task scheduler module)
