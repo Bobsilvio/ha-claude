@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.1.13 — Fix AI using device_class filter instead of pre-loaded entity list
+- `intent.py`: add `device_class` field to entity objects injected in smart context (was missing — AI couldn't see it)
+- `tools.py`: tool description now explicitly instructs AI to copy entity_ids from ## ENTITÀ TROVATE and use `__ENTITIES_JSON__`, never filter `/api/states` by `device_class`
+- System prompts updated with same instruction
+
 ## 4.1.12 — Rewrite auth patch: fix stale headers + entry-point wrapping
 - `_fix_auth_redirect()` completely rewritten to operate per `<script>` block
 - Also removes stale `const headers = {Authorization: 'Bearer '+tok}` built before token resolved

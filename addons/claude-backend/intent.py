@@ -1057,7 +1057,8 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
                         {"entity_id": s.get("entity_id"),
                          "state": s.get("state"),
                          "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
-                         "unit": s.get("attributes", {}).get("unit_of_measurement", "")}
+                         "unit": s.get("attributes", {}).get("unit_of_measurement", ""),
+                         "device_class": s.get("attributes", {}).get("device_class", "")}
                         for s in all_states
                         if any(
                             term in s.get("entity_id", "").lower()
@@ -1111,6 +1112,7 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
                                     or r.get("name") or r.get("original_name") or ""
                                 ),
                                 "unit": state.get("attributes", {}).get("unit_of_measurement", ""),
+                                "device_class": state.get("attributes", {}).get("device_class", ""),
                             })
                         if reg_matches:
                             logger.info(f"Smart context: registry search found {len(reg_matches)} entities for platform '{keyword}'")
