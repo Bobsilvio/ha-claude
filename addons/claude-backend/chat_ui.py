@@ -3351,6 +3351,8 @@ def get_chat_ui():
         // Load models and populate dropdown with ALL providers
         // Stores full models data for use by populateModelSelect()
         let _modelsData = null;
+        // Prevent loadModels() from resetting dropdowns while user has one open
+        let _selectOpen = false;
 
         function _stripProviderPrefix(model) {{
             return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
@@ -3409,6 +3411,13 @@ def get_chat_ui():
                 const data = await response.json();
                 _modelsData = data;
                 console.log('[loadModels] API response:', data);
+
+                // If a select is currently open (user is browsing options), skip all DOM
+                // manipulation to avoid closing/resetting the dropdown mid-interaction.
+                if (_selectOpen) {{
+                    console.log('[loadModels] select open — skipping DOM update');
+                    return;
+                }}
 
                 const providerSel = document.getElementById('providerSelect');
                 const currentProvider = data.current_provider;
@@ -3949,6 +3958,21 @@ def get_chat_ui():
 
                 // Provider select: repopulate model select, then apply change
                 const providerSelect = document.getElementById('providerSelect');
+                const modelSelect = document.getElementById('modelSelect');
+
+                // Track open/closed state so loadModels() skips DOM reset while user browses
+                [providerSelect, modelSelect].forEach(sel => {{
+                    if (!sel) return;
+                    sel.addEventListener('mousedown', () => {{ _selectOpen = true; }});
+                    sel.addEventListener('focus',     () => {{ _selectOpen = true; }});
+                    sel.addEventListener('blur',      () => {{ _selectOpen = false; }});
+                    sel.addEventListener('change',    () => {{ _selectOpen = false; }});
+                    sel.addEventListener('keydown', (e) => {{
+                        // Escape or Tab closes without selecting — clear flag
+                        if (e.key === 'Escape' || e.key === 'Tab') _selectOpen = false;
+                    }});
+                }});
+
                 if (providerSelect) providerSelect.addEventListener('change', (e) => {{
                     const pid = e.target.value;
                     // Repopulate models for this provider, pre-select first
@@ -3957,12 +3981,10 @@ def get_chat_ui():
                         populateModelSelect(pid, models[0] || '');
                     }}
                     // Auto-apply: switch to first model of selected provider
-                    const modelSel = document.getElementById('modelSelect');
-                    if (modelSel && modelSel.value) changeModel(modelSel.value);
+                    if (modelSelect && modelSelect.value) changeModel(modelSelect.value);
                 }});
 
                 // Model select: apply change on selection
-                const modelSelect = document.getElementById('modelSelect');
                 if (modelSelect) modelSelect.addEventListener('change', (e) => changeModel(e.target.value));
 
                 const testBtn = document.getElementById('testNvidiaBtn');

@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.2.4 — Fix dropdown reset on hover while browsing options
+- `loadModels()` no longer rebuilds the DOM while a `<select>` is open
+- Added `_selectOpen` flag: set to `true` on `mousedown`/`focus`, cleared on `blur`/`change`/`Escape`/`Tab`
+- Both `providerSelect` and `modelSelect` tracked: prevents poll (every 10s) and post-`changeModel` reload from closing the dropdown and jumping back to the previous selection while the user is scrolling through options
+
 ## 4.2.3 — Fix SyntaxError in two-level AI selector
 - Fixed `SyntaxWarning: invalid escape sequence '\s'` in `chat_ui.py` that caused a `SyntaxError: unterminated string literal` at startup
 - `\s` inside JS regex embedded in Python f-string was mis-interpreted as a Python escape sequence; changed to `\\s`
