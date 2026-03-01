@@ -1235,18 +1235,22 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (!t) return;
       if (_thinkingSteps.length && _thinkingSteps[_thinkingSteps.length - 1] === t) return;
       _thinkingSteps.push(t);
-      if (_thinkingSteps.length > 4) _thinkingSteps = _thinkingSteps.slice(-4);
+      if (_thinkingSteps.length > 6) _thinkingSteps = _thinkingSteps.slice(-6);
       const stepsEl = thinkingEl.querySelector('.thinking-steps');
       if (stepsEl) stepsEl.innerHTML = _thinkingSteps.map(s => '<div>\\u2022 ' + s.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</div>').join('');
       messagesEl.scrollTop = messagesEl.scrollHeight;
     }}
 
     function _updateThinkingBase(text) {{
+      // Keep elapsed timer and steps while updating the status line
       const elapsedEl = thinkingEl.querySelector('.thinking-elapsed');
       const elapsed = elapsedEl ? elapsedEl.outerHTML : '';
       const stepsEl = thinkingEl.querySelector('.thinking-steps');
-      const steps = stepsEl ? stepsEl.outerHTML : '';
-      thinkingEl.innerHTML = text + ' ' + elapsed + '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>' + steps;
+      // Preserve steps HTML — re-read from current steps array for reliability
+      const stepsHtml = _thinkingSteps.length
+        ? '<div class="thinking-steps">' + _thinkingSteps.map(s => '<div>\\u2022 ' + s.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</div>').join('') + '</div>'
+        : '<div class="thinking-steps"></div>';
+      thinkingEl.innerHTML = text + ' ' + elapsed + '<span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span>' + stepsHtml;
     }}
 
     function _removeThinking() {{
@@ -1279,7 +1283,23 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
       while (true) {{
         const {{ done, value }} = await reader.read();
-        if (done) break;
+        // Flush any remaining buffer data on stream close
+        if (done) {{
+          if (buffer.trim()) {{
+            for (const line of buffer.split('\\n')) {{
+              if (!line.startsWith('data: ')) continue;
+              try {{
+                const evt = JSON.parse(line.slice(6));
+                if (evt.type === 'token') {{ assistantText += evt.content || ''; }}
+                else if (evt.type === 'done' && evt.full_text) {{ assistantText = evt.full_text; }}
+              }} catch(e) {{}}
+            }}
+            if (assistantText) {{
+              assistantEl.innerHTML = renderMarkdown(assistantText);
+            }}
+          }}
+          break;
+        }}
 
         buffer += decoder.decode(value, {{ stream: true }});
         const lines = buffer.split('\\n');
@@ -1387,14 +1407,38 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
                 assistantEl.appendChild(wrapper);
               }}
             }} else if (evt.type === 'status') {{
-              const msg = evt.message || '';
-              _updateThinkingBase('\\u23f3 ' + msg);
+              const msg = evt.message || evt.content || '';
+              // Use wrench for tool-related steps, hourglass for generic status
+              const icon = msg.startsWith('\\U0001f527') ? '' : '\\u23f3 ';
+              _updateThinkingBase(icon + msg);
               _addThinkingStep(msg);
+              // Also show tool badge for 🔧 status messages (these are tool executions)
+              if (msg.startsWith('\\U0001f527') && !firstToken) {{
+                // Tool ran and we're already showing the response — add a badge
+              }} else if (msg.startsWith('\\U0001f527')) {{
+                const toolName = msg.replace(/^\\U0001f527\\s*/, '').replace(/\\.\\.\\..*$/, '').trim();
+                if (toolName) {{
+                  if (!toolBadgesEl) {{
+                    toolBadgesEl = document.createElement('div');
+                    toolBadgesEl.className = 'tool-badges';
+                    messagesEl.insertBefore(toolBadgesEl, assistantEl);
+                  }}
+                  const badge = document.createElement('span');
+                  badge.className = 'tool-badge';
+                  badge.textContent = toolName;
+                  toolBadgesEl.appendChild(badge);
+                  messagesEl.scrollTop = messagesEl.scrollHeight;
+                }}
+              }}
             }}
           }} catch (parseErr) {{}}
         }}
       }}
 
+      // Guaranteed cleanup: remove thinking indicator and show the response bubble
+      // even if the stream closed without sending a 'done' event or any tokens.
+      _removeThinking();
+      assistantEl.style.display = '';
       if (!assistantText && assistantEl.className.indexOf('error') === -1) {{
         assistantEl.textContent = '...';
       }}

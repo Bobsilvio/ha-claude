@@ -1,5 +1,13 @@
 # Changelog
 
+## 4.2.5 — Bubble: real-time step progress matching chat UI
+- Bubble now shows tool step bullets and status updates in real time during elaboration (same as chat UI)
+- Tool badges (colored chips) appear for `🔧` status events — shows which HA tools are being called
+- Fixed `_updateThinkingBase`: now reliably preserves all step bullets when updating the status line
+- Increased max visible steps from 4 → 6 in the thinking bubble
+- Fixed SSE buffer drain on stream close: leftover data in buffer is processed before breaking
+- Guaranteed cleanup after stream end: `_removeThinking()` and `assistantEl.style.display=''`  always called even if server closes without a `done` event
+
 ## 4.2.4 — Fix dropdown reset on hover while browsing options
 - `loadModels()` no longer rebuilds the DOM while a `<select>` is open
 - Added `_selectOpen` flag: set to `true` on `mousedown`/`focus`, cleared on `blur`/`change`/`Escape`/`Tab`
