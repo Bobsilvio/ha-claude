@@ -1136,6 +1136,9 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
                 f"## ENTITÀ TROVATE (keyword: {', '.join(_msg_words[:5])}, totale: {len(_integration_matches)}){_extra}\n"
                 + _ent_json
             )
+            # Save entity_ids for tools.py to use as authoritative fallback
+            # when the AI passes garbage in the entities[] tool argument
+            api._last_smart_context_entity_ids = [e["entity_id"] for e in _capped if e.get("entity_id")]
         elif matched_domains:
             # Fallback: generic domain entities (for non-integration requests)
             states = api.get_all_states()

@@ -2699,6 +2699,15 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 except Exception as _ex:
                     logger.warning(f"Entity extraction from HTML failed: {_ex}")
 
+            # Last-resort fallback: use the entity_ids pre-loaded by smart context
+            # (intent.py saves them on api._last_smart_context_entity_ids).
+            # This kicks in when the AI passed only JS garbage and the HTML scan found nothing.
+            if not entities:
+                _ctx_eids = getattr(api, "_last_smart_context_entity_ids", None)
+                if _ctx_eids:
+                    entities = list(_ctx_eids)
+                    logger.info(f"🔄 Using {len(entities)} entity_ids from smart context pre-load as fallback")
+
             # Validate entities: only keep those that exist and are not unknown/unavailable
             original_count = len(entities)
             valid_entities = []
