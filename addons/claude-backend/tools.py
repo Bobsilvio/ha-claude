@@ -934,6 +934,7 @@ TOOL_DESCRIPTIONS = {
     "manage_helpers": "Gestisco helper",
     "get_repairs": "Carico riparazioni",
     "dismiss_repair": "Ignoro riparazione",
+    "get_ha_logs": "Leggo log di sistema",
 }
 
 
@@ -1534,6 +1535,35 @@ HA_TOOLS_DESCRIPTION = [
                 }
             },
             "required": ["issue_id", "domain"]
+        }
+    },
+    {
+        "name": "get_ha_logs",
+        "description": (
+            "Get Home Assistant system logs and error messages. "
+            "Returns recent log entries (errors, warnings, info) from the HA error log. "
+            "Use this when the user reports an error in the logs, wants to diagnose a problem, "
+            "or asks to fix a warning/deprecation shown in the HA log page. "
+            "Pass 'log_text' with the specific error message to filter/analyze it."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "type": "string",
+                    "enum": ["error", "warning", "info", "all"],
+                    "description": "Filter by log level. Default: 'warning' (includes errors)."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max number of log entries to return (default 50, max 200)."
+                },
+                "log_text": {
+                    "type": "string",
+                    "description": "Optional: specific log message or keyword to search for in the logs."
+                }
+            },
+            "required": []
         }
     }
 ]
@@ -4013,6 +4043,51 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             if isinstance(error_msg, dict):
                 error_msg = error_msg.get("message", str(error_msg))
             return json.dumps({"error": f"Failed to dismiss: {error_msg}"}, default=str)
+
+        elif tool_name == "get_ha_logs":
+            level_filter = tool_input.get("level", "warning")
+            limit = min(int(tool_input.get("limit", 50)), 200)
+            log_text_filter = (tool_input.get("log_text") or "").strip().lower()
+
+            try:
+                import requests as _req
+                resp = _req.get(
+                    f"{api.HA_URL}/api/error_log",
+                    headers=api.get_ha_headers(),
+                    timeout=15
+                )
+                if not resp.ok:
+                    return json.dumps({"error": f"HA error_log returned HTTP {resp.status_code}"})
+
+                raw_log = resp.text or ""
+                lines = [l for l in raw_log.splitlines() if l.strip()]
+
+                # Filter by level
+                level_map = {
+                    "error": ["ERROR", "CRITICAL"],
+                    "warning": ["ERROR", "CRITICAL", "WARNING"],
+                    "info": ["ERROR", "CRITICAL", "WARNING", "INFO"],
+                    "all": [],
+                }
+                allowed_levels = level_map.get(level_filter, [])
+                if allowed_levels:
+                    lines = [l for l in lines if any(lvl in l for lvl in allowed_levels)]
+
+                # Filter by keyword if provided
+                if log_text_filter:
+                    lines = [l for l in lines if log_text_filter in l.lower()]
+
+                # Limit and return
+                lines = lines[-limit:]
+                return json.dumps({
+                    "total_lines": len(lines),
+                    "level_filter": level_filter,
+                    "keyword_filter": log_text_filter or None,
+                    "logs": lines
+                }, ensure_ascii=False)
+
+            except Exception as log_err:
+                return json.dumps({"error": f"Could not fetch HA logs: {log_err}"})
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:

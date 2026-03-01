@@ -42,6 +42,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "context_entity": "Entity",
             "context_dashboard": "Dashboard",
             "context_settings": "Settings",
+            "context_logs": "System Logs",
             "thinking": "Thinking",
             "new_chat": "New chat",
             "error_connection": "Connection error. Retrying...",
@@ -57,6 +58,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Fix errors",
             "qa_add_entities": "Add entities",
             "qa_describe": "Describe dashboard",
+            "qa_explain_log": "Explain this error",
+            "qa_fix_log": "How to fix this?",
+            "qa_show_errors": "Show all errors",
             "confirm_yes": "Yes, confirm",
             "confirm_no": "No, cancel",
             "confirm_yes_value": "yes",
@@ -72,6 +76,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "context_entity": "Entità",
             "context_dashboard": "Dashboard",
             "context_settings": "Impostazioni",
+            "context_logs": "Log di sistema",
             "thinking": "Sto pensando",
             "new_chat": "Nuova chat",
             "error_connection": "Errore di connessione. Riprovo...",
@@ -87,6 +92,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Correggi errori",
             "qa_add_entities": "Aggiungi entità",
             "qa_describe": "Descrivi dashboard",
+            "qa_explain_log": "Spiega questo errore",
+            "qa_fix_log": "Come si risolve?",
+            "qa_show_errors": "Mostra tutti gli errori",
             "confirm_yes": "Sì, conferma",
             "confirm_no": "No, annulla",
             "confirm_yes_value": "si",
@@ -102,6 +110,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "context_entity": "Entidad",
             "context_dashboard": "Panel",
             "context_settings": "Configuración",
+            "context_logs": "Registros del sistema",
             "thinking": "Pensando",
             "new_chat": "Nuevo chat",
             "error_connection": "Error de conexión. Reintentando...",
@@ -117,6 +126,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Corregir errores",
             "qa_add_entities": "Añadir entidades",
             "qa_describe": "Describir panel",
+            "qa_explain_log": "Explica este error",
+            "qa_fix_log": "¿Cómo solucionarlo?",
+            "qa_show_errors": "Ver todos los errores",
             "confirm_yes": "Sí, confirma",
             "confirm_no": "No, cancela",
             "confirm_yes_value": "si",
@@ -132,6 +144,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "context_entity": "Entité",
             "context_dashboard": "Tableau de bord",
             "context_settings": "Paramètres",
+            "context_logs": "Journaux système",
             "thinking": "Réflexion",
             "new_chat": "Nouveau chat",
             "error_connection": "Erreur de connexion. Réessai...",
@@ -147,6 +160,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "qa_fix": "Corriger erreurs",
             "qa_add_entities": "Ajouter entités",
             "qa_describe": "Décrire tableau",
+            "qa_explain_log": "Expliquer cette erreur",
+            "qa_fix_log": "Comment corriger?",
+            "qa_show_errors": "Voir toutes les erreurs",
             "confirm_yes": "Oui, confirme",
             "confirm_no": "Non, annule",
             "confirm_yes_value": "oui",
@@ -331,8 +347,62 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       return ctx;
     }}
 
+    // Detect logs/system log page
+    if (path.includes('/config/logs') || path.includes('/config/log')) {{
+      ctx.type = 'logs';
+      ctx.label = T.context_logs;
+      // Try to extract the currently visible log entry from the HA dialog/details panel
+      ctx.logEntry = extractVisibleLogEntry();
+      return ctx;
+    }}
+
     if (path.startsWith('/config')) {{ ctx.type = 'settings'; ctx.label = T.context_settings; return ctx; }}
     return ctx;
+  }}
+
+  // Walk shadow DOM to extract visible log entry text from HA log dialog
+  function extractVisibleLogEntry() {{
+    try {{
+      // HA renders log details in a dialog or ha-logbook-renderer inside shadow roots
+      // Walk all shadow roots looking for text that looks like a log entry
+      function walkShadow(root, depth) {{
+        if (depth > 10) return null;
+        // Look for ha-dialog, dialog, or elements containing log text
+        const selectors = [
+          'ha-dialog', 'ha-alert', 'ha-logbook-renderer',
+          '[slot="content"]', '.mdc-dialog__content',
+          'ha-markdown', 'ha-expansion-panel'
+        ];
+        for (const sel of selectors) {{
+          const els = root.querySelectorAll ? root.querySelectorAll(sel) : [];
+          for (const el of els) {{
+            const text = el.innerText || el.textContent || '';
+            if (text.length > 20 && (
+              text.includes('WARNING') || text.includes('ERROR') ||
+              text.includes('deprecated') || text.includes('CRITICAL') ||
+              text.includes('occurrences') || text.includes('Registratore') ||
+              text.includes('Logger') || text.includes('Source') || text.includes('Fonte')
+            )) {{
+              return text.trim().substring(0, 2000);
+            }}
+            if (el.shadowRoot) {{
+              const found = walkShadow(el.shadowRoot, depth + 1);
+              if (found) return found;
+            }}
+          }}
+        }}
+        // Recurse into all shadow roots
+        const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
+        for (const el of allEls) {{
+          if (el.shadowRoot) {{
+            const found = walkShadow(el.shadowRoot, depth + 1);
+            if (found) return found;
+          }}
+        }}
+        return null;
+      }}
+      return walkShadow(document, 0);
+    }} catch(e) {{ return null; }}
   }}
 
   function extractDashboardEntities() {{
@@ -385,6 +455,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       }}
       return p + '] ';
     }}
+    if (ctx.type === 'logs') {{
+      let p = '[CONTEXT: User is on the Home Assistant system logs page. '
+            + 'Use get_ha_logs to fetch recent errors and warnings. ';
+      if (ctx.logEntry) {{
+        p += 'The user has the following log entry open/visible:\\n---\\n' + ctx.logEntry + '\\n---\\n'
+           + 'Analyze this specific entry and help fix it if possible.';
+      }}
+      p += ']';
+      return p + ' ';
+    }}
     return '';
   }}
 
@@ -411,6 +491,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (ctx.type === 'device') return [
       {{ label: T.qa_analyze, text: 'Show me all entities for this device and their current states' }},
     ];
+    if (ctx.type === 'logs') {{
+      const ctx2 = detectContext();
+      const hasEntry = !!(ctx2 && ctx2.logEntry);
+      const actions = [];
+      if (hasEntry) {{
+        actions.push({{ label: T.qa_explain_log, text: 'Explain this log error and tell me what causes it' }});
+        actions.push({{ label: T.qa_fix_log, text: 'How can I fix this log error? Give me step-by-step instructions' }});
+      }}
+      actions.push({{ label: T.qa_show_errors, text: 'Show me all current errors and warnings from the HA logs' }});
+      actions.push({{ label: T.qa_fix, text: 'What are the most critical issues in the logs and how to fix them?' }});
+      return actions;
+    }}
     return [];
   }}
 
@@ -996,6 +1088,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (ctx.label) {{
       let text = ctx.label;
       if (ctx.entities && ctx.entities.length > 0) text += ' (' + ctx.entities.length + ' entities)';
+      if (ctx.type === 'logs' && ctx.logEntry) text += ' \u2022 log aperto';
       contextBar.style.display = 'block'; contextBar.textContent = text;
       btn.classList.add('has-context');
     }} else {{
@@ -1024,10 +1117,25 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
   // SPA navigation detection
   let lastPath = window.location.pathname;
+  let lastLogEntry = null;
   setInterval(() => {{
-    if (window.location.pathname !== lastPath) {{
-      lastPath = window.location.pathname;
+    const curPath = window.location.pathname;
+    if (curPath !== lastPath) {{
+      lastPath = curPath;
+      lastLogEntry = null;
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
+    }}
+    // On logs page, also re-check if a log entry dialog was opened/closed
+    // (the URL doesn't change when a dialog opens in HA)
+    if (isOpen && curPath.includes('/config/log')) {{
+      const ctx = detectContext();
+      const entry = ctx.logEntry || null;
+      const entryKey = entry ? entry.substring(0, 80) : null;
+      if (entryKey !== lastLogEntry) {{
+        lastLogEntry = entryKey;
+        updateContextBar();
+        updateQuickActions();
+      }}
     }}
   }}, 1000);
 

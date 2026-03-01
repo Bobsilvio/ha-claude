@@ -6600,6 +6600,45 @@ def rag_search():
         return jsonify({"error": str(e)}), 500
 
 
+# ===== HA LOGS PROXY =====
+
+@app.route('/api/ha_logs')
+def api_ha_logs():
+    """Proxy GET /api/error_log from Home Assistant — used by the bubble for log context."""
+    level_filter = request.args.get('level', 'warning')
+    limit = min(int(request.args.get('limit', 100)), 500)
+    keyword = request.args.get('keyword', '').strip().lower()
+
+    try:
+        resp = requests.get(
+            f"{HA_URL}/api/error_log",
+            headers=get_ha_headers(),
+            timeout=15
+        )
+        if not resp.ok:
+            return jsonify({"error": f"HA returned {resp.status_code}"}), resp.status_code
+
+        lines = [l for l in (resp.text or "").splitlines() if l.strip()]
+
+        level_map = {
+            "error":   ["ERROR", "CRITICAL"],
+            "warning": ["ERROR", "CRITICAL", "WARNING"],
+            "info":    ["ERROR", "CRITICAL", "WARNING", "INFO"],
+            "all":     [],
+        }
+        allowed = level_map.get(level_filter, [])
+        if allowed:
+            lines = [l for l in lines if any(lv in l for lv in allowed)]
+        if keyword:
+            lines = [l for l in lines if keyword in l.lower()]
+
+        lines = lines[-limit:]
+        return jsonify({"logs": lines, "total": len(lines)})
+    except Exception as e:
+        logger.error(f"ha_logs proxy error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ===== DASHBOARD API PROXY =====
 # These endpoints proxy HA API calls using the SUPERVISOR_TOKEN so that
 # dashboard iframes don't need browser-side authentication tokens.

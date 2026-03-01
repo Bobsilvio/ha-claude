@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.2.7 — Bubble: HA log page context-awareness + get_ha_logs tool
+- **Bubble detects `/config/logs` page**: shows "Log di sistema" in context bar, pulse animation on bubble
+- **Log entry extraction**: walks HA shadow DOM to find open log dialog text; if found, context bar shows "• log aperto" and quick actions are tailored to that specific entry
+- **Quick actions on log page**: "Spiega questo errore", "Come si risolve?", "Mostra tutti gli errori", "Problemi critici"
+- **Live re-detection**: poll every 1s checks if a log dialog was opened/closed (URL doesn't change in HA) and refreshes context bar + quick actions
+- **New tool `get_ha_logs`**: fetches `/api/error_log` from HA, filters by level (error/warning/info/all) and optional keyword, returns up to 200 entries
+- **New endpoint `/api/ha_logs`**: server-side proxy to HA error_log (used by bubble for direct log fetching)
+- **System prompt** updated: AI can now call `get_ha_logs` to fetch and diagnose HA errors
+
 ## 4.2.6 — Fix dashboard HTML edit via bubble with no-tool providers (openai_codex)
 - Fixed synthetic assistant turn injected between dashboard HTML context and user request:
   changed "Dimmi cosa vuoi modificare" → "Procedo con la modifica richiesta" to prevent
