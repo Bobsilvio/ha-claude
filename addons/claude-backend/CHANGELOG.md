@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.2.6 — Fix dashboard HTML edit via bubble with no-tool providers (openai_codex)
+- Fixed synthetic assistant turn injected between dashboard HTML context and user request:
+  changed "Dimmi cosa vuoi modificare" → "Procedo con la modifica richiesta" to prevent
+  the AI from repeating the waiting message instead of executing the edit
+- Added explicit HTML-output instruction to `api_content` for no-tool providers even when
+  there is no smart context, so the model always knows to return full HTML not conversational text
+
 ## 4.2.5 — Bubble: real-time step progress matching chat UI
 - Bubble now shows tool step bullets and status updates in real time during elaboration (same as chat UI)
 - Tool badges (colored chips) appear for `🔧` status events — shows which HA tools are being called

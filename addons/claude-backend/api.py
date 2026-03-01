@@ -3248,7 +3248,16 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
             yield {"type": "status", "message": tr("status_context_preloaded")}
         else:
-            api_content = clean_user_message
+            # No smart context — but if this is a dashboard HTML edit from a no-tool provider,
+            # still add the imperative instruction to output HTML (not conversational text).
+            if _dashboard_html_block and intent_name in ("create_html_dashboard", "modify_dashboard"):
+                api_content = (
+                    f"{clean_user_message}\n\n"
+                    "Output ONLY the complete modified <!DOCTYPE html>…</html> page. "
+                    "Do NOT ask questions or add explanations — just return the full HTML."
+                )
+            else:
+                api_content = clean_user_message
 
     # Create a copy of messages for API with enriched last user message.
     # If [CURRENT_DASHBOARD_HTML] was present, inject the HTML as a synthetic earlier turn:
@@ -3262,9 +3271,11 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             f"(This is the current HTML of dashboard{_name_label}. "
             f"Keep all existing sections intact unless explicitly asked to remove them.)"
         )
+        # Synthetic assistant turn: acknowledge HTML receipt with a brief, neutral phrase.
+        # IMPORTANT: do NOT use "Dimmi cosa vuoi modificare" — that invites the AI to ask
+        # follow-up questions instead of executing the next user request immediately.
         _html_turn_assistant = (
-            f"Ho letto la dashboard corrente{_name_label}. "
-            "Dimmi cosa vuoi modificare o aggiungere."
+            f"Ho il codice HTML della dashboard{_name_label}. Procedo con la modifica richiesta."
         )
         messages = (
             conversations[session_id][:-1]
