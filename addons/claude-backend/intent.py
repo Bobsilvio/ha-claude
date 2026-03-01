@@ -733,7 +733,7 @@ def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
 
 # ---- Smart context builder ----
 
-MAX_SMART_CONTEXT = 10000  # Max chars to inject — keeps tokens under control
+MAX_SMART_CONTEXT = 25000  # Max chars to inject — keeps tokens under control
 
 
 def build_smart_context(user_message: str, intent: str = None, max_chars: int = None) -> str:
@@ -1085,9 +1085,15 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
                 logger.warning(f"Smart context: entity registry search failed: {_e}")
 
         if _integration_matches:
+            # Cap to 80 entities to avoid bloating context; use compact JSON when list is large
+            _capped = _integration_matches[:80]
+            _ent_json = (json.dumps(_capped, ensure_ascii=False, separators=(',', ':'))
+                         if len(_capped) > 20
+                         else json.dumps(_capped, ensure_ascii=False, indent=1))
+            _extra = f" [mostrando prime {len(_capped)}]" if len(_integration_matches) > 80 else ""
             context_parts.append(
-                f"## ENTITÀ TROVATE (keyword: {', '.join(_msg_words[:5])})\n"
-                + json.dumps(_integration_matches, ensure_ascii=False, indent=1)
+                f"## ENTITÀ TROVATE (keyword: {', '.join(_msg_words[:5])}, totale: {len(_integration_matches)}){_extra}\n"
+                + _ent_json
             )
         elif matched_domains:
             # Fallback: generic domain entities (for non-integration requests)
