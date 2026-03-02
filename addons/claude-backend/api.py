@@ -3411,6 +3411,20 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             "get_integration_entities",
         }
 
+        # Helper: is this tool call read-only? (used for UI suppression + write detection)
+        def _is_read_only_call(tc):
+            name = tc.get("name", "")
+            if name in _read_only_tools:
+                return True
+            # manage_statistics(action=validate) is read-only
+            if name == "manage_statistics":
+                try:
+                    args = json.loads(tc.get("arguments", "{}") or "{}")
+                except Exception:
+                    args = {}
+                return args.get("action") == "validate"
+            return False
+
         while _tool_round < _MAX_TOOL_ROUNDS:
             _tool_round += 1
 
@@ -3500,18 +3514,6 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                 # For read-only tool calls, suppress the introductory text:
                                 # the model will respond properly once it sees the tool results.
                                 # For write tool calls, show the confirmation text to the user.
-                                def _is_read_only_call(tc):
-                                    name = tc.get("name", "")
-                                    if name in _read_only_tools:
-                                        return True
-                                    # manage_statistics(action=validate) is read-only
-                                    if name == "manage_statistics":
-                                        try:
-                                            args = json.loads(tc.get("arguments", "{}") or "{}")
-                                        except Exception:
-                                            args = {}
-                                        return args.get("action") == "validate"
-                                    return False
                                 _all_read_only = all(
                                     _is_read_only_call(tc)
                                     for tc in _sim_calls
@@ -3769,6 +3771,20 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     "name": fn_name,
                     "content": result,
                 })
+
+            # ── After executing a WRITE tool, disable ToolSimulator extraction
+            # ── for the next round so the model MUST produce text (not another
+            # ── <tool_call> block).  No-tool providers (Copilot) tend to re-call
+            # ── the same tool after getting the write result instead of reporting.
+            if _is_no_tool_provider:
+                _any_write = False
+                for tc in _pending_tool_calls:
+                    if not _is_read_only_call(tc):
+                        _any_write = True
+                        break
+                if _any_write:
+                    _skip_tool_extraction = True
+                    logger.info("Write tool executed — disabling ToolSimulator for next round")
 
         # Sync new assistant messages to conversation history.
         # New-path providers (Mistral, Groq, openai_compatible, etc.) stream text as

@@ -807,6 +807,12 @@ def get_chat_ui():
         .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 0; font-size: 13px; }}
         .message.assistant code {{ background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }}
         .message.assistant pre code {{ background: none; padding: 0; }}
+        /* Collapsible details blocks */
+        .message.assistant details {{ margin: 8px 0; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }}
+        .message.assistant details summary {{ cursor: pointer; padding: 8px 12px; font-weight: 600; font-size: 14px; background: #f5f5f5; user-select: none; }}
+        .message.assistant details summary:hover {{ background: #667eea; color: #fff; }}
+        .message.assistant details > div {{ max-height: 200px; overflow-y: auto; padding: 8px 12px; font-size: 13px; line-height: 1.6; }}
+        .message.assistant details code {{ background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 12px; }}
         .diff-side {{ overflow-x: auto; margin: 10px 0; border-radius: 8px; border: 1px solid #e1e4e8; }}
         .diff-table {{ width: 100%; border-collapse: collapse; font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 11px; table-layout: fixed; }}
         .diff-table th {{ padding: 6px 10px; background: #f6f8fa; border-bottom: 1px solid #e1e4e8; text-align: left; font-size: 11px; font-weight: 600; width: 50%; }}
@@ -1239,6 +1245,26 @@ def get_chat_ui():
         body.dark-mode .message.assistant pre code {{
             background: none;
             color: #e0e0e0;
+        }}
+
+        body.dark-mode .message.assistant details {{
+            border-color: #444;
+        }}
+        body.dark-mode .message.assistant details summary {{
+            background: #2a2a2a;
+            color: #e0e0e0;
+        }}
+        body.dark-mode .message.assistant details summary:hover {{
+            background: #667eea;
+            color: #fff;
+        }}
+        body.dark-mode .message.assistant details > div {{
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }}
+        body.dark-mode .message.assistant details code {{
+            background: rgba(255,255,255,0.1);
+            color: #8ab4f8;
         }}
 
         body.dark-mode .message.assistant strong,
@@ -2869,6 +2895,15 @@ def get_chat_ui():
                 return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
             }});
 
+            // 1b. Extract <details> blocks before markdown escaping
+            var detailsBlocks = [];
+            text = text.replace(/<details[^>]*>[\\s\\S]*?<\\/details>/gi, function(m) {{
+                var safe = m.replace(/<script[\\s\\S]*?<\\/script>/gi, '')
+                            .replace(/\\bon\\w+\\s*=\\s*["'][^"']*["']/gi, '');
+                detailsBlocks.push(safe);
+                return '%%DETAILS_' + (detailsBlocks.length - 1) + '%%';
+            }});
+
             // 1b. Auto-detect Home Assistant YAML blocks that arrive without ``` fences.
             // Some models return YAML as plain text; wrap the first YAML-looking block
             // so it renders as a code block with the existing copy button.
@@ -2905,6 +2940,10 @@ def get_chat_ui():
             // 4. Restore diff HTML blocks (untouched by markdown transforms)
             for (var i = 0; i < diffBlocks.length; i++) {{
                 text = text.replace('%%DIFF_' + i + '%%', diffBlocks[i]);
+            }}
+            // 4b. Restore <details> blocks
+            for (var i = 0; i < detailsBlocks.length; i++) {{
+                text = text.replace('%%DETAILS_' + i + '%%', detailsBlocks[i]);
             }}
             return text;
         }}

@@ -386,9 +386,11 @@ STEPS:
 6. If the user confirms with 'si', 'yes', 'ok', 'sì', 'procedi', 'fallo', 'vai': execute the
    action you proposed. Do NOT re-validate. Call the appropriate write action directly.
 7. If the user wants to remove specific statistics: call action='clear' with the statistic_ids list.
-8. After each action, ALWAYS list the specific entity_ids that were affected — do NOT summarize
-   without showing which entities were removed or fixed. Quote the 'removed' or 'fixed' list
-   from the tool result.
+8. After each action, ALWAYS list the specific entity_ids that were affected.
+   Use a collapsible HTML block so the list doesn't take too much space:
+   <details><summary>📊 N entità rimosse (click per espandere)</summary><div>
+   <code>sensor.xxx</code><br><code>sensor.yyy</code><br>...</div></details>
+   Replace the summary text with the user's language. Always include ALL IDs from the tool result.
 9. Respond in the user's language.
 - The ONLY tool you should use is manage_statistics. Do NOT call any other tool.
 - NEVER call manage_statistics more than once per message/turn.

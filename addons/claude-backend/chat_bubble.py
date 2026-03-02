@@ -319,6 +319,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       return '%%DIFF_' + (diffBlocks.length - 1) + '%%';
     }});
     
+    // 1b. Extract <details>...</details> blocks before escaping
+    // The AI uses these for collapsible entity lists.  We render them as-is
+    // but still sanitise the inner text (strip script tags, on* attrs).
+    var detailsBlocks = [];
+    text = text.replace(/<details[^>]*>[\\s\\S]*?<\\/details>/gi, function(m) {{
+      // Minimal sanitise: remove script tags and event handlers
+      var safe = m.replace(/<script[\\s\\S]*?<\\/script>/gi, '')
+                  .replace(/\\bon\\w+\\s*=\\s*["'][^"']*["']/gi, '');
+      detailsBlocks.push(safe);
+      return '%%DETAILS_' + (detailsBlocks.length - 1) + '%%';
+    }});
+    
     let html = text
       // Escape HTML
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -359,6 +371,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     // 2. Restore diff HTML blocks (untouched by markdown transforms)
     for (var i = 0; i < diffBlocks.length; i++) {{
       html = html.replace('%%DIFF_' + i + '%%', diffBlocks[i]);
+    }}
+    // 2b. Restore <details> blocks
+    for (var i = 0; i < detailsBlocks.length; i++) {{
+      html = html.replace('%%DETAILS_' + i + '%%', detailsBlocks[i]);
     }}
     return html;
   }}
@@ -952,6 +968,12 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
     #ha-claude-bubble .msg.assistant .md-li {{ padding: 1px 0; }}
     #ha-claude-bubble .msg.assistant a {{ color: var(--primary-color, #03a9f4); text-decoration: underline; }}
+    /* Collapsible details blocks for entity lists */
+    #ha-claude-bubble .msg.assistant details {{ margin: 6px 0; border: 1px solid var(--divider-color, #e0e0e0); border-radius: 6px; overflow: hidden; }}
+    #ha-claude-bubble .msg.assistant details summary {{ cursor: pointer; padding: 6px 10px; font-weight: 600; font-size: 13px; background: var(--secondary-background-color, #f5f5f5); user-select: none; }}
+    #ha-claude-bubble .msg.assistant details summary:hover {{ background: var(--primary-color, #03a9f4); color: #fff; }}
+    #ha-claude-bubble .msg.assistant details > div {{ max-height: 180px; overflow-y: auto; padding: 6px 10px; font-size: 12px; line-height: 1.5; }}
+    #ha-claude-bubble .msg.assistant details code {{ background: rgba(0,0,0,0.06); padding: 1px 3px; border-radius: 3px; font-size: 11px; }}
     /* Diff styles for colored code changes */
     #ha-claude-bubble .diff-side {{ overflow-x: auto; margin: 8px 0; border-radius: 6px; border: 1px solid var(--divider-color, #e1e4e8); }}
     #ha-claude-bubble .diff-table {{ width: 100%; border-collapse: collapse; font-family: monospace; font-size: 11px; table-layout: fixed; }}
