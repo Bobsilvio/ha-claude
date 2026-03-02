@@ -2199,12 +2199,15 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       agentData = await resp.json();
       if (!agentData.success) return;
 
-      // Populate provider select
+      // Populate provider select — web providers always last with warning label
       providerSelect.innerHTML = '';
-      (agentData.available_providers || []).forEach(p => {{
+      const allProv = agentData.available_providers || [];
+      const normalProv = allProv.filter(p => !p.web);
+      const webProv = allProv.filter(p => p.web);
+      normalProv.concat(webProv).forEach(p => {{
         const opt = document.createElement('option');
         opt.value = p.id;
-        opt.textContent = p.name;
+        opt.textContent = p.web ? '\u26a0\ufe0f ' + p.name + ' (Web)' : p.name;
         if (p.id === agentData.current_provider) opt.selected = true;
         providerSelect.appendChild(opt);
       }});

@@ -3876,10 +3876,10 @@ def get_chat_ui():
             'dashscope': '☁️ DashScope (Qwen)',
             'moonshot': '🌙 Moonshot (Kimi)',
             'zhipu': '🧬 Zhipu (GLM)',
-            'github_copilot': '🤖 GitHub Copilot',
-            'openai_codex': '⌨️ OpenAI Codex',
-            'claude_web': '🌐 Claude.ai Web ⚠️',
-            'chatgpt_web': '🌐 ChatGPT Web ⚠️'
+            'github_copilot': '⚠️ GitHub Copilot (Web)',
+            'openai_codex': '⚠️ OpenAI Codex (Web)',
+            'claude_web': '⚠️ Claude.ai (Web)',
+            'chatgpt_web': '⚠️ ChatGPT (Web)'
         }};
 
         // Build the welcome provider/model line dynamically (always reflects current selection)
@@ -4026,10 +4026,11 @@ def get_chat_ui():
 
                 const providerOrder = [
                     'anthropic', 'openai', 'google', 'nvidia', 'github',
-                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web',
                     'groq', 'mistral', 'ollama', 'openrouter',
                     'deepseek', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
-                    'dashscope', 'moonshot', 'zhipu'
+                    'dashscope', 'moonshot', 'zhipu',
+                    // --- Web providers (always last) ---
+                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web'
                 ];
                 for (const p of availableProviders) {{
                     if (!providerOrder.includes(p)) providerOrder.push(p);

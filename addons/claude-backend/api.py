@@ -5782,11 +5782,11 @@ def api_get_models():
         if OLLAMA_BASE_URL:
             available_providers.append({"id": "ollama", "name": "Ollama (Local)"})
         # GitHub Copilot: sempre visibile nel selettore; il banner OAuth guida l'autenticazione
-        available_providers.append({"id": "github_copilot", "name": "GitHub Copilot"})
+        available_providers.append({"id": "github_copilot", "name": "GitHub Copilot", "web": True})
         # OpenAI Codex: sempre visibile nel selettore; il banner OAuth guida l'autenticazione
-        available_providers.append({"id": "openai_codex", "name": "OpenAI Codex"})
+        available_providers.append({"id": "openai_codex", "name": "OpenAI Codex", "web": True})
         # Provider web non ufficiali — sempre visibili; il token di sessione guida l'autenticazione
-        available_providers.append({"id": "claude_web", "name": "Claude.ai Web [UNSTABLE]"})
+        available_providers.append({"id": "claude_web", "name": "Claude.ai Web", "web": True})
         # chatgpt_web: in standby — Cloudflare blocca le richieste da server nel 2026
         # available_providers.append({"id": "chatgpt_web", "name": "ChatGPT Web [UNSTABLE]"})
 
