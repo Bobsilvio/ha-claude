@@ -2519,7 +2519,7 @@ def get_chat_ui():
             if (div.querySelector('.entity-picker') || div.querySelector('.entity-manual')) return;
             // Do not activate picker if the response is primarily a code answer
             // (contains fenced code blocks with YAML/Jinja content)
-            if (/```[\\s\\S]*?```/.test(fullText)) return;
+            if (new RegExp('```[\\s\\S]*?```').test(fullText)) return;
 
             const numbered = extractNumberedEntityOptions(fullText);
             const entityIds = extractEntityIds(fullText);
