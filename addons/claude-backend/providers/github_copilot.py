@@ -353,7 +353,8 @@ class GitHubCopilotProvider(EnhancedProvider):
             # so after flattening we inject a continuation prompt if the last
             # message is an assistant turn (i.e. after a tool result round).
             from providers.tool_simulator import flatten_tool_messages
-            messages = flatten_tool_messages(messages)
+            # Use a smaller result limit to keep payloads manageable for Copilot
+            messages = flatten_tool_messages(messages, max_result_chars=2000)
             if messages and messages[-1].get("role") == "assistant":
                 messages = list(messages) + [{
                     "role": "user",
@@ -426,7 +427,10 @@ class GitHubCopilotProvider(EnhancedProvider):
         if not resolved_model.startswith(_REASONING_MODEL_PREFIXES):
             body["temperature"] = 0.1
             body["top_p"] = 1
-        _timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
+        _timeout = httpx.Timeout(connect=15.0, read=180.0, write=15.0, pool=10.0)
+        # Log approximate payload size for debugging timeout issues
+        _payload_chars = sum(len(m.get("content", "") or "") for m in messages)
+        logger.debug(f"Copilot payload: {len(messages)} msgs, ~{_payload_chars} chars, model={resolved_model}")
         with httpx.stream(
             "POST", _COPILOT_CHAT_URL, headers=headers, json=body, timeout=_timeout
         ) as response:
