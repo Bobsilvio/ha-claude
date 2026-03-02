@@ -917,6 +917,7 @@ TOOL_DESCRIPTIONS = {
     "manage_areas": "Gestisco stanze",
     "get_history": "Carico storico",
     "get_statistics": "Carico statistiche",
+    "manage_statistics": "Gestisco statistiche",
     "send_notification": "Invio notifica",
     "read_config_file": "Leggo file config",
     "write_config_file": "Salvo file config",
@@ -1274,6 +1275,21 @@ HA_TOOLS_DESCRIPTION = [
         "name": "get_devices",
         "description": "Get all devices registered in Home Assistant with manufacturer, model, and area.",
         "parameters": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "manage_statistics",
+        "description": "Validate and fix recorder statistics in Home Assistant Developer Tools > Statistics. Use action='validate' to find orphaned entities and unit mismatches, 'clear_orphaned' to remove statistics for deleted entities, 'fix_units' to correct unit mismatches.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["validate", "clear_orphaned", "fix_units"],
+                    "description": "Action: 'validate' lists all issues (read-only), 'clear_orphaned' deletes stats for non-existent entities, 'fix_units' fixes unit mismatches."
+                }
+            },
+            "required": ["action"]
+        }
     },
     {
         "name": "get_statistics",
@@ -4110,6 +4126,101 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             except Exception as log_err:
                 return json.dumps({"error": f"Could not fetch HA logs: {log_err}"})
+
+        # ===== MANAGE STATISTICS (recorder WebSocket) =====
+        elif tool_name == "manage_statistics":
+            action = tool_input.get("action", "validate")
+
+            # Step 1: validate — always run first (or when action == validate)
+            validate_result = api.call_ha_websocket("recorder/validate_statistics")
+            issues_raw = validate_result.get("result", {}) if validate_result.get("success") else {}
+
+            orphaned = []   # stats for entities that no longer exist
+            unit_issues = []  # stats with unit mismatches
+
+            for stat_id, stat_issues in issues_raw.items():
+                for issue in (stat_issues if isinstance(stat_issues, list) else []):
+                    issue_type = issue.get("type", "")
+                    if issue_type == "no_state":
+                        orphaned.append(stat_id)
+                    elif issue_type in ("units_changed", "unsupported_unit"):
+                        unit_issues.append({
+                            "statistic_id": stat_id,
+                            "issue_type": issue_type,
+                            "metadata_unit": issue.get("metadata_unit"),
+                            "state_unit": issue.get("state_unit"),
+                        })
+
+            # Deduplicate
+            orphaned = list(dict.fromkeys(orphaned))
+
+            if action == "validate":
+                return json.dumps({
+                    "action": "validate",
+                    "orphaned_count": len(orphaned),
+                    "orphaned": orphaned,
+                    "unit_issues_count": len(unit_issues),
+                    "unit_issues": unit_issues,
+                }, ensure_ascii=False, default=str)
+
+            elif action == "clear_orphaned":
+                if not orphaned:
+                    return json.dumps({
+                        "action": "clear_orphaned",
+                        "status": "nothing_to_do",
+                        "message": "No orphaned statistics found.",
+                        "orphaned_count": 0,
+                    }, ensure_ascii=False)
+                clear_result = api.call_ha_websocket(
+                    "recorder/clear_statistics",
+                    statistic_ids=orphaned
+                )
+                if clear_result.get("success"):
+                    return json.dumps({
+                        "action": "clear_orphaned",
+                        "status": "success",
+                        "removed_count": len(orphaned),
+                        "removed": orphaned,
+                    }, ensure_ascii=False, default=str)
+                err = clear_result.get("error", {})
+                if isinstance(err, dict):
+                    err = err.get("message", str(err))
+                return json.dumps({"error": f"clear_statistics failed: {err}"}, default=str)
+
+            elif action == "fix_units":
+                if not unit_issues:
+                    return json.dumps({
+                        "action": "fix_units",
+                        "status": "nothing_to_do",
+                        "message": "No unit issues found.",
+                        "unit_issues_count": 0,
+                    }, ensure_ascii=False)
+                fixed = []
+                errors = []
+                for ui in unit_issues:
+                    stat_id = ui["statistic_id"]
+                    new_unit = ui.get("state_unit") or ui.get("metadata_unit")
+                    fix_result = api.call_ha_websocket(
+                        "recorder/update_statistics_metadata",
+                        statistic_id=stat_id,
+                        unit_of_measurement=new_unit
+                    )
+                    if fix_result.get("success"):
+                        fixed.append(stat_id)
+                    else:
+                        err = fix_result.get("error", {})
+                        if isinstance(err, dict):
+                            err = err.get("message", str(err))
+                        errors.append({"statistic_id": stat_id, "error": err})
+                return json.dumps({
+                    "action": "fix_units",
+                    "status": "success" if not errors else "partial",
+                    "fixed_count": len(fixed),
+                    "fixed": fixed,
+                    "errors": errors,
+                }, ensure_ascii=False, default=str)
+
+            return json.dumps({"error": f"Unknown manage_statistics action: {action}"})
 
         return json.dumps({"error": f"Unknown tool: {tool_name}"})
     except Exception as e:

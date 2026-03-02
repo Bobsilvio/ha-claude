@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.6 — manage_statistics: tool implementation added
+- **Fix `manage_statistics` Unknown tool error**: tool was referenced in the intent system and prompt but never implemented in `execute_tool` — every call returned `{"error": "Unknown tool: manage_statistics"}`; added full implementation with `recorder/validate_statistics`, `recorder/clear_statistics`, `recorder/update_statistics_metadata` WebSocket calls
+- **Tool definition added to `HA_TOOLS_DESCRIPTION`**: `manage_statistics` now has a proper JSON schema with `action` enum (`validate`, `clear_orphaned`, `fix_units`) so all providers can see and call it correctly
+- **Progress message added**: `"manage_statistics": "Gestisco statistiche"` added to the tool progress label map
+
 ## 4.3.5 — ToolSimulator: filter hallucinated tools + manage_statistics auto-fix
 - **ToolSimulator intent filter**: no-tool providers (github_copilot, openai_codex) may hallucinate tool names not in the current intent (e.g. `get_repairs` inside a `manage_statistics` intent) — extracted tool calls are now filtered against the intent tool set; dropped calls are logged as warnings
 - **manage_statistics auto-proceed**: if the user explicitly asks to fix/correct/remove (e.g. "correggi", "elimina", "fix everything"), the model now calls `fix_units` / `clear_orphaned` immediately after validate without asking confirmation again — previously it always asked, wasting a round
