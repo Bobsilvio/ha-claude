@@ -1363,46 +1363,47 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
       if (cardOpen) {{
         _cardBtnInjected = false;
-        reparentBubbleToDialog();   // move bubble+panel inside the top-layer dialog
+        disableDialogBackdrop();
         injectCardEditorButton();
       }} else {{
         removeCardEditorButton();
         _cardBtnInjected = false;
-        reparentBubbleToBody();     // restore bubble to document.body
+        restoreDialogBackdrop();
       }}
     }}
-    // Re-inject if editor open but button disappeared (HA re-rendered the dialog)
+    // Re-inject button if editor open but button disappeared (HA re-rendered)
     if (cardOpen && (!_cardBtnInjected || !_cardBtnExists())) {{
       _cardBtnInjected = false;
-      reparentBubbleToDialog();
       injectCardEditorButton();
     }}
   }}, 1000);
 
-  // ---- Bubble reparenting for HA card editor top-layer ----
-  // When the HA card editor <dialog> is open it sits in the browser top-layer.
-  // Any element outside the top-layer (even z-index:max) is behind the backdrop
-  // and receives no pointer events. Solution: move the whole bubble root node
-  // inside the <dialog> while the editor is open, then restore it to body.
+  // ---- Backdrop disable/restore for HA card editor ----
+  // The native <dialog> backdrop sits in the top-layer and blocks all pointer
+  // events to elements outside it (including our bubble).
+  // We inject a <style> that sets pointer-events:none on the backdrop while
+  // the card editor is open — this lets our bubble (in document.body) receive
+  // clicks normally without any DOM reparenting.
+  let _backdropStyle = null;
 
-  function reparentBubbleToDialog() {{
-    const dlg = getCardEditorDialog();
-    if (!dlg || dlg.contains(root)) return;
-    // Make root a zero-size fixed anchor so it doesn't affect dialog layout.
-    // Its children (panel, btn) keep their own position:fixed and render
-    // relative to the viewport as normal — but now they're IN the top-layer
-    // so they receive pointer events above the dialog backdrop.
-    root.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:visible;';
-    // Ensure panel and btn keep their own pointer-events
-    if (panel) panel.style.pointerEvents = 'auto';
-    if (btn)   btn.style.pointerEvents   = 'auto';
-    dlg.appendChild(root);
+  function disableDialogBackdrop() {{
+    if (_backdropStyle) return;
+    _backdropStyle = document.createElement('style');
+    _backdropStyle.id = 'amira-backdrop-disable';
+    // Target both native <dialog>::backdrop and HA's mwc-dialog / ha-dialog overlays
+    _backdropStyle.textContent = [
+      'dialog::backdrop {{ pointer-events: none !important; }}',
+      '.mdc-dialog__scrim {{ pointer-events: none !important; }}',
+      '.mdc-dialog-scroll-lock {{ overflow: visible !important; }}',
+    ].join(' ');
+    document.head.appendChild(_backdropStyle);
   }}
 
-  function reparentBubbleToBody() {{
-    if (root.parentNode === document.body) return;
-    root.style.cssText = '';  // restore normal styles (position:fixed is on the element itself via stylesheet)
-    document.body.appendChild(root);
+  function restoreDialogBackdrop() {{
+    if (_backdropStyle) {{
+      _backdropStyle.remove();
+      _backdropStyle = null;
+    }}
   }}
 
   // ---- Card editor button injection ----
