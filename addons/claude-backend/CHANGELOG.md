@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.3.5 — ToolSimulator: filter hallucinated tools + manage_statistics auto-fix
+- **ToolSimulator intent filter**: no-tool providers (github_copilot, openai_codex) may hallucinate tool names not in the current intent (e.g. `get_repairs` inside a `manage_statistics` intent) — extracted tool calls are now filtered against the intent tool set; dropped calls are logged as warnings
+- **manage_statistics auto-proceed**: if the user explicitly asks to fix/correct/remove (e.g. "correggi", "elimina", "fix everything"), the model now calls `fix_units` / `clear_orphaned` immediately after validate without asking confirmation again — previously it always asked, wasting a round
+- **Prompt hardening**: added "The ONLY tool you should use is manage_statistics. Do NOT call any other tool." to prevent the model from hallucinating unrelated tool calls
+
+## 4.3.4 — manage_statistics: timeout, compaction, 4 bug fixes, dedup loop breaker
+- **manage_statistics timeout fix**: Copilot 2min timeout caused by large validate result — compact format now uses flat ID lists (max 30 orphaned, 15 unit issues), payload size logged
+- **Higher read timeout**: github_copilot read timeout raised 120→180s for heavy tool results
+- **Copilot token compaction**: `flatten_tool_messages` max_result_chars reduced 3000→2000 for Copilot to stay under context limits
+- **4 bugs in statistics flow** fixed: (a) text buffer not flushed when `_skip_tool_extraction=True` → user saw `...`; (b) duplicate tool calls within single response (model emits same call twice); (c) model re-validates after user says "sì" because prompt said "ALWAYS validate FIRST"; (d) raw `<tool_call>` XML saved in conversation history — now cleaned via `clean_display_text`
+- **manage_statistics broken**: `recorder/validate_statistics` returns a dict `{stat_id: [issues]}` not a list — code assumed list, silently dropping all issues; fixed with dual dict/list parser + `_ws_error_msg()` helper for robust error handling
+- **ToolSimulator rule update**: `manage_statistics(validate)` classified as read-only to prevent confirmation prompt on validate
+- **Dedup loop breaker for no-tool providers**: `_duplicate_count` + `_skip_tool_extraction` mechanism — 1st duplicate disables ToolSimulator next round, 2nd duplicate force-breaks with text emission
+- **Custom card YAML rules**: card_editor prompt now includes YAML syntax rules for mini-graph-card, mushroom, custom:button-card, etc.
+- **Statistics page context**: bubble detects Developer Tools > Statistics page, shows context bar and quick actions (Valida, Pulisci orfani, Correggi unità)
+- **New `manage_statistics` tool**: validate, fix_units, clear_orphaned, clear actions — bulk statistics cleanup via recorder WebSocket API
+
 ## 4.3.3 — Card editor panel: width, selectors, smarter YAML analysis
 - **Panel width fix**: opening the Amira chat in the card editor no longer expands the dialog — the panel now locks to the original `surface.offsetWidth` and resets it on close
 - **Agent selector wider**: provider dropdown max-width raised from 90px→150px, model from 110px→200px — labels are now fully readable

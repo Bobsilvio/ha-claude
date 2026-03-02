@@ -369,23 +369,28 @@ Respond in the user's language.""",
 The user wants to clean up, fix, or manage recorder statistics (the data shown in Settings > Developer Tools > Statistics).
 
 CRITICAL: The validate action is READ-ONLY — call it IMMEDIATELY without asking confirmation.
-Only ask for confirmation before destructive actions (clear_orphaned, fix_units, clear).
 
 STEPS:
 1. Check the conversation history: if a previous [TOOL RESULT: manage_statistics] with validate
    data already exists, DO NOT call validate again. Skip directly to the appropriate action.
 2. If no previous validate results exist: IMMEDIATELY call manage_statistics with action='validate'.
    Do NOT write any introductory text. Just call the tool directly.
-3. Report the findings clearly: how many orphaned entities (no longer exist), how many unit mismatches, etc.
-4. If the user explicitly asked to remove orphaned statistics AND the validate results confirm
-   orphaned entities exist: call manage_statistics with action='clear_orphaned' directly.
-   The user already gave permission in their request — do NOT ask again.
-5. If the user confirms with 'si', 'yes', 'ok', 'sì', 'procedi', 'fallo', 'vai': execute the
+3. After getting validate results, check the ORIGINAL user request:
+   - If the user explicitly asked to FIX / CORRECT / REPAIR unit issues (e.g. 'correggi', 'fix',
+     'sistema', 'ripara', 'aggiusta'): call manage_statistics with action='fix_units' IMMEDIATELY.
+     The user already gave permission — do NOT ask confirmation again.
+   - If the user explicitly asked to REMOVE / CLEAN / DELETE orphaned statistics (e.g. 'rimuovi',
+     'elimina', 'pulisci', 'cancella'): call manage_statistics with action='clear_orphaned' IMMEDIATELY.
+     The user already gave permission — do NOT ask confirmation again.
+   - If the user asked both (e.g. 'trova e correggi tutto', 'fix everything'): execute ALL relevant
+     actions in sequence (fix_units, then clear_orphaned) without asking.
+   - Otherwise: report findings and ask which action to take.
+4. If the user confirms with 'si', 'yes', 'ok', 'sì', 'procedi', 'fallo', 'vai': execute the
    action you proposed. Do NOT re-validate. Call the appropriate write action directly.
-6. If the user wants to fix unit mismatches: call manage_statistics with action='fix_units'.
-7. If the user wants to remove specific statistics: call manage_statistics with action='clear' with the statistic_ids list.
-8. After each action, report what was done (how many removed/fixed, which entity_ids).
-9. Respond in the user's language.
+5. If the user wants to remove specific statistics: call manage_statistics with action='clear' with the statistic_ids list.
+6. After each action, report what was done (how many removed/fixed, which entity_ids).
+7. Respond in the user's language.
+- The ONLY tool you should use is manage_statistics. Do NOT call any other tool.
 - NEVER call validate twice in the same conversation.
 - NEVER say the tool is not available. If the tool returns an error, quote the error message.
 - NEVER output raw JSON, [TOOL RESULT] blocks, or tool call XML to the user.""",

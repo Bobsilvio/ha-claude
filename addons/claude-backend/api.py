@@ -3448,6 +3448,22 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             from providers.tool_simulator import extract_tool_calls, clean_response_text
                             _sim_calls = extract_tool_calls(full_buf)
                             if _sim_calls:
+                                # ── Filter against intent tool set ──
+                                # No-tool providers may hallucinate tool names
+                                # not in the current intent (e.g. get_repairs
+                                # inside a manage_statistics intent).  Drop them.
+                                _intent_tools = (intent_info or {}).get("tools")
+                                if _intent_tools:
+                                    _allowed = set(_intent_tools)
+                                    _filtered = [tc for tc in _sim_calls if tc.get("name", "") in _allowed]
+                                    _dropped = len(_sim_calls) - len(_filtered)
+                                    if _dropped:
+                                        logger.warning(
+                                            f"ToolSimulator: dropped {_dropped} call(s) not in intent tool set "
+                                            f"{_intent_tools}: {[tc.get('name') for tc in _sim_calls if tc.get('name', '') not in _allowed]}"
+                                        )
+                                    _sim_calls = _filtered
+                            if _sim_calls:
                                 # Deduplicate tool calls within the same response
                                 # (model sometimes emits the same call twice in one turn)
                                 _seen_sigs = set()
