@@ -1363,12 +1363,12 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
       if (cardOpen) {{
         _cardBtnInjected = false;
-        disableDialogBackdrop();
+        liftBubbleToTopLayer();
         injectCardEditorButton();
       }} else {{
         removeCardEditorButton();
         _cardBtnInjected = false;
-        restoreDialogBackdrop();
+        lowerBubbleFromTopLayer();
       }}
     }}
     // Re-inject button if editor open but button disappeared (HA re-rendered)
@@ -1378,32 +1378,45 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
   }}, 1000);
 
-  // ---- Backdrop disable/restore for HA card editor ----
-  // The native <dialog> backdrop sits in the top-layer and blocks all pointer
-  // events to elements outside it (including our bubble).
-  // We inject a <style> that sets pointer-events:none on the backdrop while
-  // the card editor is open — this lets our bubble (in document.body) receive
-  // clicks normally without any DOM reparenting.
-  let _backdropStyle = null;
+  // ---- Top-layer lift for HA card editor ----
+  // A non-modal <dialog> opened with .show() (not .showModal()) sits in the
+  // browser top-layer alongside the HA card editor dialog, but has NO backdrop
+  // and does NOT capture clicks from outside itself.
+  // We move the bubble root into this wrapper so it's in the top-layer and
+  // receives pointer events — without closing the HA dialog on click.
+  let _topLayerWrapper = null;
 
-  function disableDialogBackdrop() {{
-    if (_backdropStyle) return;
-    _backdropStyle = document.createElement('style');
-    _backdropStyle.id = 'amira-backdrop-disable';
-    // Target both native <dialog>::backdrop and HA's mwc-dialog / ha-dialog overlays
-    _backdropStyle.textContent = [
-      'dialog::backdrop {{ pointer-events: none !important; }}',
-      '.mdc-dialog__scrim {{ pointer-events: none !important; }}',
-      '.mdc-dialog-scroll-lock {{ overflow: visible !important; }}',
-    ].join(' ');
-    document.head.appendChild(_backdropStyle);
+  function liftBubbleToTopLayer() {{
+    if (_topLayerWrapper) return;  // already lifted
+    const dlg = document.createElement('dialog');
+    dlg.id = 'amira-toplayer-wrapper';
+    dlg.style.cssText = [
+      'position:fixed', 'inset:0', 'width:0', 'height:0',
+      'padding:0', 'margin:0', 'border:none', 'background:none',
+      'overflow:visible', 'pointer-events:none',
+      'outline:none', 'box-shadow:none',
+    ].join(';');
+    // Children must re-enable pointer events themselves
+    const childStyle = document.createElement('style');
+    childStyle.textContent = '#amira-toplayer-wrapper > * {{ pointer-events: auto !important; }}';
+    dlg.appendChild(childStyle);
+    dlg.appendChild(root);
+    document.body.appendChild(dlg);
+    dlg.show();  // non-modal: top-layer, no backdrop, no click capture
+    _topLayerWrapper = dlg;
   }}
 
-  function restoreDialogBackdrop() {{
-    if (_backdropStyle) {{
-      _backdropStyle.remove();
-      _backdropStyle = null;
+  function lowerBubbleFromTopLayer() {{
+    if (!_topLayerWrapper) return;
+    // Close the panel cleanly before moving back
+    if (isOpen) {{
+      isOpen = false;
+      panel.classList.remove('open');
     }}
+    document.body.appendChild(root);  // move bubble back to body
+    _topLayerWrapper.close();
+    _topLayerWrapper.remove();
+    _topLayerWrapper = null;
   }}
 
   // ---- Card editor button injection ----
