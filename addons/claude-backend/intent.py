@@ -21,6 +21,7 @@ INTENT_TOOL_SETS = {
     "modify_script": ["update_script"],
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
+    "card_editor": ["search_entities", "get_integration_entities"],
     "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
     "create_html_dashboard": ["read_html_dashboard", "create_html_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
@@ -181,6 +182,17 @@ WORKFLOW:
 3. If modifying: show what will change, ask confirmation, then call manage_helpers with action="update".
 4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
 - ALWAYS respond in the user's language. Be concise.""",
+
+    "card_editor": """You are a Home Assistant Lovelace card expert.
+The user is editing a card in the HA visual editor and wants you to check/fix the YAML.
+The [CONTEXT] block contains the current card YAML and entity validation results.
+- Entities marked CONFIRMED exist — do not re-verify.
+- Entities marked UNCONFIRMED may or may not exist — call get_integration_entities to verify before marking as errors.
+- ALWAYS respond with the complete corrected YAML in a ```yaml code block.
+- If all entities are valid and YAML is correct, say so and suggest optional improvements only.
+- Do NOT call create_dashboard, update_dashboard, or write_config_file — the user pastes YAML manually.
+- NEVER output raw JSON, [TOOL RESULT] blocks, or tool call XML to the user.
+- Respond in the user's language.""",
 
     "create_dashboard": """You are a Home Assistant Lovelace dashboard builder. The user wants a NEW dashboard with cards.
 MANDATORY STEPS - follow this EXACT order:
@@ -431,14 +443,25 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
     # Ensure dynamic prompts are initialized
     _init_dynamic_prompts()
 
+    # --- CARD EDITOR CONTEXT (from bubble) ---
+    # The bubble injects [CONTEXT: User is editing a Lovelace card...] prefix.
+    # Route immediately to the dedicated card_editor intent.
+    if "[CONTEXT: User is editing a Lovelace card" in user_message:
+        logger.info("Card editor context detected — routing to card_editor intent")
+        return {"intent": "card_editor", "tools": INTENT_TOOL_SETS["card_editor"],
+                "prompt": INTENT_PROMPTS.get("card_editor"), "specific_target": True}
+
     # Strip bubble context prefix and embedded HTML before keyword matching
     clean_msg = user_message
     # Remove [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML] block
     if "[CURRENT_DASHBOARD_HTML]" in clean_msg:
         clean_msg = re.sub(r'\[CURRENT_DASHBOARD_HTML\][\s\S]*?\[/CURRENT_DASHBOARD_HTML\]', '', clean_msg)
-    # Remove [CONTEXT: ...] prefix
+    # Remove [CONTEXT: ...] prefix — use rfind to handle nested brackets
+    # (e.g. [TOOL RESULT] inside the context text)
     if clean_msg.startswith("[CONTEXT:"):
-        bracket_end = clean_msg.find("]")
+        bracket_end = clean_msg.rfind("] ")
+        if bracket_end == -1:
+            bracket_end = clean_msg.rfind("]")
         if bracket_end != -1:
             clean_msg = clean_msg[bracket_end + 1:]
     msg = clean_msg.strip().lower()
@@ -995,7 +1018,14 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
         # These are words that don't match stop-words and likely refer to an integration or device name.
         # IMPORTANT: strip [CONTEXT:...] and [CURRENT_DASHBOARD_HTML]...[/CURRENT_DASHBOARD_HTML] blocks
         # BEFORE keyword extraction — these contain HTML/CSS that would generate thousands of false matches.
-        _clean_user_msg = re.sub(r'\[CONTEXT:[^\]]*\]', '', user_message, flags=re.IGNORECASE)
+        # The CONTEXT block may contain nested brackets (e.g. [TOOL RESULT]) so we find the last '] '
+        _clean_user_msg = user_message
+        if _clean_user_msg.startswith("[CONTEXT:"):
+            _ctx_end = _clean_user_msg.rfind("] ")
+            if _ctx_end == -1:
+                _ctx_end = _clean_user_msg.rfind("]")
+            if _ctx_end != -1:
+                _clean_user_msg = _clean_user_msg[_ctx_end + 1:]
         _clean_user_msg = re.sub(
             r'\[CURRENT_DASHBOARD_HTML\][\s\S]*?\[/CURRENT_DASHBOARD_HTML\]', '',
             _clean_user_msg, flags=re.IGNORECASE
