@@ -1331,81 +1331,45 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   const CARD_BTN_ID = 'amira-card-editor-btn';
 
   function injectCardEditorButton() {{
-    // Guard: check both the flag and the actual node (handles HA re-renders)
-    if (_cardBtnInjected && _cardBtnParent && _cardBtnParent.querySelector('#' + CARD_BTN_ID)) return;
-    // Find the card editor dialog footer or toolbar in the shadow DOM
-    function findEditorFooter(root, depth) {{
-      if (!root || depth > 15) return null;
-      // HA 2024+: hui-dialog-edit-card → shadowRoot → div.buttons or mwc-button row
-      const targets = [
-        'hui-dialog-edit-card',
-        'ha-dialog',
-      ];
-      for (const sel of targets) {{
-        const els = root.querySelectorAll ? root.querySelectorAll(sel) : [];
-        for (const el of els) {{
-          if (el.shadowRoot) {{
-            // Look for the button row inside
-            const btnRow = el.shadowRoot.querySelector('.buttons, [slot="primaryAction"], ha-dialog-header, div.header, .card-actions');
-            if (btnRow) return btnRow;
-            // Deeper search
-            const inner = findEditorFooter(el.shadowRoot, depth + 1);
-            if (inner) return inner;
-          }}
-        }}
-      }}
-      // General shadow root walk
-      const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
-      for (const el of allEls) {{
-        if (el.shadowRoot) {{
-          const found = findEditorFooter(el.shadowRoot, depth + 1);
-          if (found) return found;
-        }}
-      }}
-      return null;
-    }}
+    // Guard: already injected and still in DOM
+    if (_cardBtnInjected && document.getElementById(CARD_BTN_ID)) return;
 
-    const footer = findEditorFooter(document, 0);
-    if (!footer) return;
-
-    // Remove any stale copy that may still be in this footer
-    const stale = footer.querySelector('#' + CARD_BTN_ID);
-    if (stale) stale.remove();
-
+    // The button lives directly in document.body — outside HA's shadow DOM.
+    // This avoids any pointer-events or event-capture interference from HA dialogs.
     const btn = document.createElement('button');
     btn.id = CARD_BTN_ID;
     btn.textContent = T.card_editor_btn || '🤖 Ask AI';
     btn.style.cssText = [
-      'margin-right:8px', 'padding:6px 14px', 'font-size:13px', 'font-weight:500',
-      'cursor:pointer', 'border:none', 'border-radius:18px',
+      'position:fixed',
+      // Place it in the bottom-left area of the dialog (roughly centered, above taskbar)
+      'bottom:80px', 'left:50%', 'transform:translateX(-50%)',
+      'padding:8px 18px', 'font-size:13px', 'font-weight:600',
+      'cursor:pointer', 'border:none', 'border-radius:20px',
       'background:linear-gradient(135deg,#667eea,#764ba2)', 'color:#fff',
-      'box-shadow:0 2px 6px rgba(102,126,234,0.4)', 'transition:opacity 0.2s',
-      'vertical-align:middle', 'z-index:9999', 'position:relative',
+      'box-shadow:0 4px 14px rgba(102,126,234,0.55)',
+      'transition:opacity 0.2s, transform 0.15s',
+      'z-index:99999',
+      'pointer-events:auto',
+      'user-select:none',
+      'white-space:nowrap',
     ].join(';');
-    btn.onmouseenter = () => {{ btn.style.opacity = '0.85'; }};
-    btn.onmouseleave = () => {{ btn.style.opacity = '1'; }};
-    btn.onclick = (e) => {{
+    btn.onmouseenter = () => {{ btn.style.opacity = '0.88'; btn.style.transform = 'translateX(-50%) scale(1.04)'; }};
+    btn.onmouseleave = () => {{ btn.style.opacity = '1'; btn.style.transform = 'translateX(-50%) scale(1)'; }};
+    btn.addEventListener('click', (e) => {{
       e.stopPropagation();
-      // Open bubble panel with card YAML pre-loaded in context
+      e.preventDefault();
       if (!isOpen) togglePanel();
-      // Update context bar immediately
-      updateContextBar(); updateQuickActions();
-    }};
-    // Prepend so it appears before the HA buttons
-    footer.insertBefore(btn, footer.firstChild);
-    _cardBtnParent = footer;
+      updateContextBar();
+      updateQuickActions();
+    }});
+    document.body.appendChild(btn);
+    _cardBtnParent = document.body;
     _cardBtnInjected = true;
   }}
 
   function removeCardEditorButton() {{
-    // Search in the known parent first (shadow DOM safe), then fallback
-    if (_cardBtnParent) {{
-      const existing = _cardBtnParent.querySelector('#' + CARD_BTN_ID);
-      if (existing) existing.remove();
-    }}
-    // Also sweep document in case it ended up in a non-shadow slot
-    const fallback = document.getElementById(CARD_BTN_ID);
-    if (fallback) fallback.remove();
+    const existing = document.getElementById(CARD_BTN_ID);
+    if (existing) existing.remove();
     _cardBtnInjected = false;
     _cardBtnParent = null;
   }}
