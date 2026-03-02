@@ -38,7 +38,9 @@
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:polyformproject.org)",
       "Bash(curl:*)",
-      "WebFetch(domain:ai.google.dev)"
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(bash addons/claude-backend/validate.sh:*)",
+      "Bash(bash:*)"
     ]
   }
 }

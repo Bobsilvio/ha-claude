@@ -620,7 +620,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
               if (st) {{
                 checks.push(eid + ': VALID (state=' + st.state + ')');
               }} else {{
-                checks.push(eid + ': INVALID — NOT in hass.states, card WILL show error. Find the correct entity_id.');
+                checks.push(eid + ': NOT FOUND in hass.states — card will show error. Could be wrong id, disabled, or hidden. Verify ONCE via get_integration_entities.');
                 hasNotFound = true;
               }}
             }}
@@ -633,14 +633,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         p += ' The current card YAML is:\\n```yaml\\n' + ctx.cardYaml + '\\n```\\n'
            + entityReport
            + 'IMPORTANT RULES for card editing:\\n'
-           + '1. TRUST the validation above completely. hass.states is the ONLY source that matters for Lovelace cards. If an entity is INVALID here, the card WILL show an error — period.\\n'
-           + '2. For INVALID entities: call get_integration_entities to find the correct entity_id from the same integration. The correct entity may have a different name (e.g. sensor.epcube_today_consumption instead of sensor.epcube_consumo_oggi). Compare the list and pick the one with matching device_class/unit.\\n'
-           + '3. Entities marked VALID exist and work — no need to re-verify.\\n'
-           + '4. When suggesting a modification, ALWAYS show the complete corrected YAML in a ```yaml code block with a brief explanation of what changed.\\n'
-           + '5. Do NOT suggest changes based on guesses about entity names. Only replace an entity if you found a valid alternative via get_integration_entities or search_entities.\\n'
-           + '6. If all entities are VALID and the YAML has no structural issues, say so clearly and suggest only optional improvements (like adding graph: line).\\n'
-           + '7. The user will paste the YAML manually in the editor — do NOT use write_config_file or update_dashboard.\\n'
-           + '8. NEVER show [TOOL RESULT] blocks or raw JSON data to the user — only show the final human-readable answer.';
+           + '1. Entities marked VALID exist and work in cards — no need to re-verify.\\n'
+           + '2. For NOT FOUND entities: call get_integration_entities ONCE to check the integration. Call it only ONCE — do NOT repeat.\\n'
+           + '3. If get_integration_entities confirms the entity EXISTS with a valid state but hass.states does not have it: report that the entity exists in HA but is not available to cards (may be disabled or hidden). Suggest the user try enabling it in Settings > Entities or restart HA. Do NOT keep searching.\\n'
+           + '4. If get_integration_entities does NOT find the entity: look for a similar entity_id with matching device_class/unit and suggest the replacement.\\n'
+           + '5. When suggesting a modification, ALWAYS show the complete corrected YAML in a ```yaml code block with a brief explanation.\\n'
+           + '6. Do NOT suggest changes based on guesses about entity names. Only replace an entity if you found a valid alternative.\\n'
+           + '7. If all entities are VALID and the YAML has no structural issues, say so clearly and suggest only optional improvements.\\n'
+           + '8. The user will paste the YAML manually in the editor — do NOT use write_config_file or update_dashboard.\\n'
+           + '9. NEVER show [TOOL RESULT] blocks or raw JSON data to the user — only show the final human-readable answer.\\n'
+           + '10. After receiving tool results, produce your FINAL answer immediately. Do NOT call the same tool again.';
       }}
       p += ']';
       return p + ' ';

@@ -187,9 +187,16 @@ WORKFLOW:
 The user is editing a card in the HA visual editor and wants you to check/fix the YAML.
 The [CONTEXT] block contains the current card YAML and entity validation results.
 - Entities marked VALID exist in hass.states and work in cards — do not re-verify.
-- Entities marked INVALID are NOT in hass.states — cards WILL show an error for these.
-  For INVALID entities, call get_integration_entities to find the correct entity_id.
-  The correct entity may have a slightly different name. Compare by device_class and unit.
+- Entities marked NOT FOUND are not in hass.states (frontend). This can mean:
+  a) The entity_id is wrong — call get_integration_entities ONCE to find the correct one.
+  b) The entity exists in HA backend but is disabled/hidden — the tool will confirm this.
+  c) The integration is not installed — the tool will return no results.
+- CRITICAL: call get_integration_entities AT MOST ONCE per integration. After receiving the
+  tool result, produce your final answer IMMEDIATELY. Do NOT call the same tool again.
+- If the tool confirms the entity EXISTS with a valid state: tell the user the entity exists
+  in HA but is not visible to cards (possibly disabled/hidden). Suggest enabling it or restarting HA.
+- If the tool does NOT find the entity: look for a similar entity with matching device_class/unit
+  and suggest it as a replacement.
 - ALWAYS respond with the complete corrected YAML in a ```yaml code block.
 - If all entities are VALID and YAML is correct, say so and suggest optional improvements only.
 - Do NOT call create_dashboard, update_dashboard, or write_config_file — the user pastes YAML manually.

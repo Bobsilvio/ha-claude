@@ -3400,6 +3400,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _MAX_TOOL_ROUNDS = 8
         _tool_round = 0
         _tool_cache: dict = {}
+        _tool_call_history: set = set()  # tracks all (name, args_json) to detect loops
         _read_only_tools = {
             "get_automations", "get_scripts", "get_dashboards",
             "get_dashboard_config", "read_config_file",
@@ -3557,6 +3558,57 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             if _is_no_tool_provider and text_so_far:
                 from providers.tool_simulator import clean_response_text as _crt
                 text_so_far = _crt(text_so_far)
+
+            # ── Dedup / loop breaker: detect repeated tool calls ──────────
+            # If ALL pending tool calls have already been made with identical
+            # arguments in a previous round, the model is stuck in a loop.
+            # Inject a synthetic tool result telling it to stop and answer.
+            _all_dupes = True
+            for tc in _pending_tool_calls:
+                _sig_dedup = f"{tc.get('name', '')}:{tc.get('arguments', '{}')}"
+                if _sig_dedup not in _tool_call_history:
+                    _all_dupes = False
+                    break
+            if _all_dupes and _pending_tool_calls:
+                logger.warning(
+                    f"Tool loop detected (round {_tool_round}): all {len(_pending_tool_calls)} "
+                    f"call(s) are duplicates — forcing final answer"
+                )
+                # Append assistant message so the conversation stays well-formed
+                messages.append({
+                    "role": "assistant",
+                    "content": text_so_far or None,
+                    "tool_calls": [
+                        {
+                            "id": tc.get("id", f"call_{i}"),
+                            "type": "function",
+                            "function": {
+                                "name": tc.get("name", ""),
+                                "arguments": tc.get("arguments", "{}"),
+                            },
+                        }
+                        for i, tc in enumerate(_pending_tool_calls)
+                    ],
+                })
+                # Append synthetic tool results telling the model to stop
+                for tc in _pending_tool_calls:
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tc.get("id", f"call_{tc.get('name', '')}"),
+                        "name": tc.get("name", ""),
+                        "content": (
+                            "[DUPLICATE] You already called this tool with the same arguments. "
+                            "Use the results you already received. Do NOT call this tool again. "
+                            "Produce your final answer NOW based on the data you already have."
+                        ),
+                    })
+                # Let the loop continue so the model sees the synthetic result
+                # and produces a final answer (no tool calls).
+                continue
+
+            # Record all current tool calls in history
+            for tc in _pending_tool_calls:
+                _tool_call_history.add(f"{tc.get('name', '')}:{tc.get('arguments', '{}')}")
 
             # Append assistant message with tool_calls (OpenAI format)
             messages.append({
