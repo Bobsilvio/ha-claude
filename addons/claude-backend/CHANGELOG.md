@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.8 — Log: hide [CONTEXT] instructions, show only YAML + user message
+- **Cleaner logs**: `Stream [provider]: [CONTEXT: ...]` messages no longer dump the full instruction block — the regex strips the `[CONTEXT: ...]` prefix and keeps only the embedded YAML block (if present) and the user text that follows
+- **Format**: log now shows `[YAML]\n```yaml\n...\n```\n<user message>` instead of hundreds of lines of rules
+- **Applies to both** `/api/chat` and `/api/chat/stream` endpoints
+
 ## 4.3.7 — Card editor: warning when in GUI mode (no YAML readable)
 - **GUI mode warning**: when the HA card editor is open in visual/GUI mode, the bubble context bar now shows a yellow warning `⚠️ Editor card — passa alla modalità codice per leggere lo YAML` (translated for all 4 languages) instead of the normal green label
 - **Quick actions hidden in GUI mode**: the card quick-action chips (Explain, Improve, Add feature, Fix) are hidden when no YAML is readable — they are useless without the card code
