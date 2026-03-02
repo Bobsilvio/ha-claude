@@ -605,7 +605,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         p += ' The current card YAML is:\\n```yaml\\n' + ctx.cardYaml + '\\n```\\n'
            + 'IMPORTANT RULES for card editing:\\n'
            + '1. Use search_entities to VERIFY that ALL entity IDs in the YAML actually exist. Do NOT ask the user to check — verify yourself.\\n'
-           + '2. If an entity does NOT exist, immediately use search_entities with keywords from its name (e.g. "tigo production", "epcube consumo") to FIND the correct entity_id. Replace the wrong entity with the correct one you found.\\n'
+           + '2. If an entity does NOT exist, use BOTH search_entities (with keywords from its name, e.g. "tigo production") AND get_integration_entities (with the integration name, e.g. "tigo" or "epcube") to find the correct entity_id from the custom component. Replace the wrong entity with the correct one you found.\\n'
            + '3. When suggesting a modification, ALWAYS show the complete corrected YAML in a ```yaml code block with a brief explanation of what changed.\\n'
            + '4. Keep your response concise: list only real problems found (not hypothetical ones), show the corrected YAML, done.\\n'
            + '5. Do NOT suggest changes based on guesses about entity names. Only flag an entity if search_entities confirms it does not exist, and only replace it if you found a valid alternative via search.\\n'

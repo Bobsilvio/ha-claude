@@ -21,7 +21,7 @@ INTENT_TOOL_SETS = {
     "modify_script": ["update_script"],
     "create_automation": ["create_automation", "search_entities", "get_entity_state"],
     "create_script": ["create_script", "search_entities", "get_entity_state"],
-    "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_frontend_resources"],
+    "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
     "create_html_dashboard": ["read_html_dashboard", "create_html_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
     "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
     "control_device": ["call_service", "search_entities", "get_entity_state"],
