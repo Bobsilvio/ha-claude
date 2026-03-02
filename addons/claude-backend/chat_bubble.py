@@ -1390,7 +1390,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   function _renderInlineMd(text) {{
     return text
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+      .replace(/[*][*](.+?)[*][*]/g,'<b>$1</b>')
       .replace(/`([^`]+)`/g,'<code style="background:rgba(0,0,0,0.08);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>')
       .replace(/\n/g,'<br>');
   }}
