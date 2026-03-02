@@ -1,5 +1,10 @@
 # Changelog
 
+## 4.3.9 — Log: fix [CONTEXT] stripping (robust regex)
+- **Fix broken log stripping**: previous regex `[CONTEXT:.*?]` stopped at the first `]` in the text (e.g. inside the YAML or entity validation block), leaking partial instructions into the log
+- **New `_strip_context_for_log()` helper**: scans for the YAML block with ```` ```yaml...``` ```` and the user text after the last `]\n` — reliably extracts both regardless of `]` characters inside the context body
+- **Log format**: `[YAML]\n```yaml\n...\n```\n<user message>` — no instructions, no entity validation rules
+
 ## 4.3.8 — Log: hide [CONTEXT] instructions, show only YAML + user message
 - **Cleaner logs**: `Stream [provider]: [CONTEXT: ...]` messages no longer dump the full instruction block — the regex strips the `[CONTEXT: ...]` prefix and keeps only the embedded YAML block (if present) and the user text that follows
 - **Format**: log now shows `[YAML]\n```yaml\n...\n```\n<user message>` instead of hundreds of lines of rules

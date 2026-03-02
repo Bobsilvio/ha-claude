@@ -1917,6 +1917,36 @@ def get_ha_headers() -> dict:
     }
 
 
+def _strip_context_for_log(message: str, max_len: int = 500) -> str:
+    """Strip [CONTEXT: ...] instruction block from a message for cleaner log output.
+
+    Keeps only the YAML block embedded in the context (if present) and the user
+    text that follows. Strategy: the context block always starts with '[CONTEXT:'
+    and ends with the LAST ']' before the user message. We find the closing bracket
+    by scanning from the end of the first YAML block, or by finding the last ']'
+    followed by whitespace+text (the user message).
+    """
+    if not message.startswith("[CONTEXT:"):
+        out = message
+    else:
+        # Find the YAML block first (```yaml ... ```)
+        yaml_match = re.search(r'```yaml\n(.*?)```', message, re.DOTALL)
+        # Find the user text: everything after the last '] \n' or '] ' near the end
+        # The context block closes with ']' followed by optional whitespace + user text.
+        # We find the closing bracket by looking for the pattern:
+        #   ...last occurrence of '] \n' or ']\n' followed by non-empty text
+        closing = re.search(r'\]\s*\n([\s\S]+)$', message)
+        user_text = closing.group(1).strip() if closing else ""
+        if yaml_match:
+            yaml_content = yaml_match.group(1).strip()
+            out = f"[YAML]\n```yaml\n{yaml_content}\n```"
+            if user_text:
+                out += f"\n{user_text}"
+        else:
+            out = user_text or message
+    return out if len(out) <= max_len else out[:max_len // 2] + f"... [{len(out)} chars] ..." + out[-80:]
+
+
 # Cache for addon ingress URL (doesn't change at runtime)
 _ingress_url_cache: Optional[str] = None
 
@@ -4733,15 +4763,7 @@ def api_chat():
     session_id = data.get("session_id", "default")
     if not message:
         return jsonify({"error": "Empty message"}), 400
-    import re as _re2
-    _log2 = message
-    _ctx2 = _re2.match(r'^\[CONTEXT:.*?\]\s*', message, _re2.DOTALL)
-    if _ctx2:
-        _yaml2 = _re2.search(r'```yaml\n(.*?)```', _ctx2.group(0), _re2.DOTALL)
-        _user2 = message[_ctx2.end():].strip()
-        _log2 = (f"[YAML]\n```yaml\n{_yaml2.group(1).strip()}\n```\n{_user2}".strip() if _yaml2 else _user2) or message
-    _log2 = _log2 if len(_log2) <= 500 else _log2[:250] + f"... [{len(_log2)} chars] ..." + _log2[-100:]
-    logger.info(f"Chat [{AI_PROVIDER}]: {_log2}")
+    logger.info(f"Chat [{AI_PROVIDER}]: {_strip_context_for_log(message)}")
     response_text = chat_with_ai(message, session_id)
     return jsonify({"response": response_text}), 200
 
@@ -4765,21 +4787,7 @@ def api_chat_stream():
     if image_data:
         logger.info(f"Stream [{AI_PROVIDER}] with image: {message[:50]}...")
     else:
-        # Strip [CONTEXT: ...] prefix from log: keep only the YAML block (if any)
-        # and the user text that follows, to avoid cluttering logs with instructions.
-        import re as _re
-        _log_msg = message
-        _ctx_match = _re.match(r'^\[CONTEXT:.*?\]\s*', message, _re.DOTALL)
-        if _ctx_match:
-            _ctx_block = _ctx_match.group(0)
-            _user_text = message[_ctx_match.end():]
-            # Extract YAML block from context if present
-            _yaml_match = _re.search(r'```yaml\n(.*?)```', _ctx_block, _re.DOTALL)
-            if _yaml_match:
-                _log_msg = f"[YAML]\n```yaml\n{_yaml_match.group(1).strip()}\n```\n{_user_text}".strip()
-            else:
-                _log_msg = _user_text.strip() or _log_msg
-        log_msg = _log_msg if len(_log_msg) <= 500 else _log_msg[:250] + f"... [{len(_log_msg)} chars] ..." + _log_msg[-100:]
+        log_msg = _strip_context_for_log(message)
         logger.info(f"Stream [{AI_PROVIDER}]: {log_msg}")
     if read_only:
         logger.info(f"Read-only mode active for session {session_id}")
