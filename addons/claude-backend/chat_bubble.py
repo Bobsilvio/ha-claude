@@ -1341,15 +1341,40 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (cardOpen !== _lastCardEditorOpen) {{
       _lastCardEditorOpen = cardOpen;
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
-      if (cardOpen) {{ _cardBtnInjected = false; injectCardEditorButton(); }}
-      else {{ removeCardEditorButton(); _cardBtnInjected = false; }}
+      if (cardOpen) {{
+        _cardBtnInjected = false;
+        reparentBubbleToDialog();   // move bubble+panel inside the top-layer dialog
+        injectCardEditorButton();
+      }} else {{
+        removeCardEditorButton();
+        _cardBtnInjected = false;
+        reparentBubbleToBody();     // restore bubble to document.body
+      }}
     }}
     // Re-inject if editor open but button disappeared (HA re-rendered the dialog)
     if (cardOpen && (!_cardBtnInjected || !_cardBtnExists())) {{
       _cardBtnInjected = false;
+      reparentBubbleToDialog();
       injectCardEditorButton();
     }}
   }}, 1000);
+
+  // ---- Bubble reparenting for HA card editor top-layer ----
+  // When the HA card editor <dialog> is open it sits in the browser top-layer.
+  // Any element outside the top-layer (even z-index:max) is behind the backdrop
+  // and receives no pointer events. Solution: move the whole bubble root node
+  // inside the <dialog> while the editor is open, then restore it to body.
+
+  function reparentBubbleToDialog() {{
+    const dlg = getCardEditorDialog();
+    if (!dlg || dlg.contains(root)) return;  // already inside or not found
+    dlg.appendChild(root);
+  }}
+
+  function reparentBubbleToBody() {{
+    if (root.parentNode === document.body) return;  // already in body
+    document.body.appendChild(root);
+  }}
 
   // ---- Card editor button injection ----
   let _lastCardEditorOpen = false;
