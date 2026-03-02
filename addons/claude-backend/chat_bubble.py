@@ -1409,9 +1409,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   }}
 
   function _renderInlineMd(text) {{
-    // Fenced code blocks: ```lang\ncontent\n``` -> styled <pre> with copy button
+    // Fenced code blocks: ```lang + newline + content + ``` -> styled pre with copy button
     const codeBlocks = [];
-    text = text.replace(/```(\w*)\\n([\\s\\S]*?)```/g, function(m, lang, code) {{
+    text = text.replace(/```(\\w*)\\n([\\s\\S]*?)```/g, function(m, lang, code) {{
       const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const placeholder = '___CODEBLOCK_' + codeBlocks.length + '___';
       codeBlocks.push('<div style="position:relative;margin:6px 0;">'
