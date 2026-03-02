@@ -372,16 +372,21 @@ CRITICAL: The validate action is READ-ONLY — call it IMMEDIATELY without askin
 Only ask for confirmation before destructive actions (clear_orphaned, fix_units, clear).
 
 STEPS:
-1. IMMEDIATELY call manage_statistics with action='validate' FIRST to discover all issues.
+1. Check the conversation history: if a previous [TOOL RESULT: manage_statistics] with validate
+   data already exists, DO NOT call validate again. Skip directly to the appropriate action.
+2. If no previous validate results exist: IMMEDIATELY call manage_statistics with action='validate'.
    Do NOT write any introductory text. Just call the tool directly.
-2. Report the findings clearly: how many orphaned entities (no longer exist), how many unit mismatches, etc.
-3. If the user explicitly asked to remove orphaned statistics AND the validate results confirm
+3. Report the findings clearly: how many orphaned entities (no longer exist), how many unit mismatches, etc.
+4. If the user explicitly asked to remove orphaned statistics AND the validate results confirm
    orphaned entities exist: call manage_statistics with action='clear_orphaned' directly.
-   The user already gave permission in their request.
-4. If the user wants to fix unit mismatches: call manage_statistics with action='fix_units'.
-5. If the user wants to remove specific statistics: call manage_statistics with action='clear' with the statistic_ids list.
-6. After each action, report what was done (how many removed/fixed, which entity_ids).
-7. Respond in the user's language.
+   The user already gave permission in their request — do NOT ask again.
+5. If the user confirms with 'si', 'yes', 'ok', 'sì', 'procedi', 'fallo', 'vai': execute the
+   action you proposed. Do NOT re-validate. Call the appropriate write action directly.
+6. If the user wants to fix unit mismatches: call manage_statistics with action='fix_units'.
+7. If the user wants to remove specific statistics: call manage_statistics with action='clear' with the statistic_ids list.
+8. After each action, report what was done (how many removed/fixed, which entity_ids).
+9. Respond in the user's language.
+- NEVER call validate twice in the same conversation.
 - NEVER say the tool is not available. If the tool returns an error, quote the error message.
 - NEVER output raw JSON, [TOOL RESULT] blocks, or tool call XML to the user.""",
 

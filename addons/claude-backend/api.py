@@ -3448,6 +3448,18 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             from providers.tool_simulator import extract_tool_calls, clean_response_text
                             _sim_calls = extract_tool_calls(full_buf)
                             if _sim_calls:
+                                # Deduplicate tool calls within the same response
+                                # (model sometimes emits the same call twice in one turn)
+                                _seen_sigs = set()
+                                _deduped_calls = []
+                                for tc in _sim_calls:
+                                    _tc_sig = f"{tc.get('name', '')}:{tc.get('arguments', '{}')}"
+                                    if _tc_sig not in _seen_sigs:
+                                        _seen_sigs.add(_tc_sig)
+                                        _deduped_calls.append(tc)
+                                    else:
+                                        logger.debug(f"ToolSimulator: skipping duplicate call in same response: {tc.get('name', '')}")
+                                _sim_calls = _deduped_calls
                                 # Inject as pending tool calls — the normal loop below handles them
                                 _pending_tool_calls = _sim_calls
                                 # For read-only tool calls, suppress the introductory text:
@@ -3483,6 +3495,16 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                 _display = clean_display_text(full_buf)
                                 if _display:
                                     yield {"type": "token", "content": _display}
+                            _text_buffer = []
+
+                        # No-tool provider with _skip_tool_extraction: flush text
+                        # as plain response, stripping any <tool_call> XML the model
+                        # may have emitted despite the [DUPLICATE] warning.
+                        elif _is_no_tool_provider and full_buf and _skip_tool_extraction:
+                            from providers.tool_simulator import clean_display_text as _cdt_skip
+                            _display_skip = _cdt_skip(full_buf)
+                            if _display_skip:
+                                yield {"type": "token", "content": _display_skip}
                             _text_buffer = []
 
                         # Flush buffer for html dashboard (no tool call → clarifying question)
@@ -3735,6 +3757,10 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         elif _streamed_text_parts:
             # New-path: assemble streamed tokens and save as assistant message
             assembled = "".join(_streamed_text_parts).strip()
+            # Clean any raw <tool_call> XML or [TOOL RESULT] blocks from history
+            if _is_no_tool_provider and assembled:
+                from providers.tool_simulator import clean_display_text as _cdt_hist
+                assembled = _cdt_hist(assembled)
             if assembled:
                 assistant_msg: dict = {
                     "role": "assistant",
