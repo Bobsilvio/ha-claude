@@ -413,52 +413,41 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }} catch(e) {{ return ''; }}
   }}
 
-  // Check if the HA card editor dialog is currently open in the DOM
-  // Returns the native <dialog> element used by the HA card editor, or null.
-  // HA keeps hui-dialog-edit-card in the DOM even when closed, so we check
-  // for an *open* <dialog> element inside its shadow root.
-  function getCardEditorDialog() {{
+  // Navigate the exact shadow DOM path of the HA card editor dialog and
+  // return the footer#actions element where action buttons live.
+  // Path: hui-dialog-edit-card → shadowRoot → ha-dialog → shadowRoot → footer#actions
+  // Returns null if the editor is closed or the path cannot be resolved.
+  function getCardEditorFooter() {{
     try {{
-      function findOpenDialog(root, depth) {{
-        if (!root || depth > 12) return null;
-        // Native <dialog open> is the definitive signal the modal is visible
-        const dialogs = root.querySelectorAll ? root.querySelectorAll('dialog[open]') : [];
-        for (const d of dialogs) return d;
-        // Also accept ha-dialog with open attribute (MWC wrapper)
-        const haDialogs = root.querySelectorAll ? root.querySelectorAll('ha-dialog[open]') : [];
-        for (const d of haDialogs) return d;
+      // 1. Find hui-dialog-edit-card anywhere in the document
+      function findEditCardEl(root, depth) {{
+        if (!root || depth > 8) return null;
+        const direct = root.querySelector ? root.querySelector('hui-dialog-edit-card') : null;
+        if (direct) return direct;
         const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
         for (const el of allEls) {{
           if (el.shadowRoot) {{
-            const found = findOpenDialog(el.shadowRoot, depth + 1);
+            const found = findEditCardEl(el.shadowRoot, depth + 1);
             if (found) return found;
           }}
         }}
         return null;
       }}
-      // Check that the open dialog belongs to the card editor
-      // by verifying hui-dialog-edit-card or hui-card-editor is also in the tree
-      function hasCardEditor(root, depth) {{
-        if (!root || depth > 8) return false;
-        const editorSelectors = ['hui-dialog-edit-card', 'hui-card-editor', 'ha-yaml-editor'];
-        for (const sel of editorSelectors) {{
-          const els = root.querySelectorAll ? root.querySelectorAll(sel) : [];
-          if (els.length > 0) return true;
-        }}
-        const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
-        for (const el of allEls) {{
-          if (el.shadowRoot && hasCardEditor(el.shadowRoot, depth + 1)) return true;
-        }}
-        return false;
-      }}
-      const dlg = findOpenDialog(document, 0);
-      if (dlg && hasCardEditor(document, 0)) return dlg;
-      return null;
+      const editCardEl = findEditCardEl(document, 0);
+      if (!editCardEl || !editCardEl.shadowRoot) return null;
+
+      // 2. Inside its shadowRoot, find ha-dialog[open]
+      const haDialog = editCardEl.shadowRoot.querySelector('ha-dialog[open]');
+      if (!haDialog || !haDialog.shadowRoot) return null;
+
+      // 3. Inside ha-dialog's shadowRoot, find footer#actions
+      const footer = haDialog.shadowRoot.querySelector('footer#actions');
+      return footer || null;
     }} catch(e) {{ return null; }}
   }}
 
   function isCardEditorOpen() {{
-    return getCardEditorDialog() !== null;
+    return getCardEditorFooter() !== null;
   }}
 
   function detectContext() {{
@@ -1363,12 +1352,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
       if (cardOpen) {{
         _cardBtnInjected = false;
-        liftBubbleToTopLayer();
         injectCardEditorButton();
       }} else {{
         removeCardEditorButton();
         _cardBtnInjected = false;
-        lowerBubbleFromTopLayer();
       }}
     }}
     // Re-inject button if editor open but button disappeared (HA re-rendered)
@@ -1378,108 +1365,97 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
   }}, 1000);
 
-  // ---- Top-layer lift for HA card editor ----
-  // A non-modal <dialog> opened with .show() (not .showModal()) sits in the
-  // browser top-layer alongside the HA card editor dialog, but has NO backdrop
-  // and does NOT capture clicks from outside itself.
-  // We move the bubble root into this wrapper so it's in the top-layer and
-  // receives pointer events — without closing the HA dialog on click.
-  let _topLayerWrapper = null;
-
-  function liftBubbleToTopLayer() {{
-    if (_topLayerWrapper) return;  // already lifted
-    const dlg = document.createElement('dialog');
-    dlg.id = 'amira-toplayer-wrapper';
-    dlg.style.cssText = [
-      'position:fixed', 'inset:0', 'width:0', 'height:0',
-      'padding:0', 'margin:0', 'border:none', 'background:none',
-      'overflow:visible', 'pointer-events:none',
-      'outline:none', 'box-shadow:none',
-    ].join(';');
-    // Children must re-enable pointer events themselves
-    const childStyle = document.createElement('style');
-    childStyle.textContent = '#amira-toplayer-wrapper > * {{ pointer-events: auto !important; }}';
-    dlg.appendChild(childStyle);
-    dlg.appendChild(root);
-    document.body.appendChild(dlg);
-    dlg.show();  // non-modal: top-layer, no backdrop, no click capture
-    _topLayerWrapper = dlg;
-  }}
-
-  function lowerBubbleFromTopLayer() {{
-    if (!_topLayerWrapper) return;
-    // Close the panel cleanly before moving back
-    if (isOpen) {{
-      isOpen = false;
-      panel.classList.remove('open');
-    }}
-    document.body.appendChild(root);  // move bubble back to body
-    _topLayerWrapper.close();
-    _topLayerWrapper.remove();
-    _topLayerWrapper = null;
-  }}
-
   // ---- Card editor button injection ----
+  // Strategy: inject the "Ask AI" button directly into the footer#actions element
+  // of the HA card editor dialog. That footer is already inside the browser
+  // top-layer (because it lives inside the native <dialog> opened by HA), so
+  // our button is naturally interactive — no z-index tricks needed.
+  // The bubble panel itself stays in document.body and opens normally on click.
   let _lastCardEditorOpen = false;
   let _cardBtnInjected = false;       // flag: true once button is in the DOM
-  let _cardBtnParent = null;          // reference to the node we inserted into
+  let _cardBtnParent = null;          // reference to footer#actions we inserted into
   const CARD_BTN_ID = 'amira-card-editor-btn';
 
   function _cardBtnExists() {{
     if (_cardBtnParent && _cardBtnParent.querySelector) {{
       return !!_cardBtnParent.querySelector('#' + CARD_BTN_ID);
     }}
-    return !!document.getElementById(CARD_BTN_ID);
+    // Fallback: scan shadow DOM for the button
+    function findBtn(root, depth) {{
+      if (!root || depth > 12) return false;
+      if (root.querySelector && root.querySelector('#' + CARD_BTN_ID)) return true;
+      const els = root.querySelectorAll ? root.querySelectorAll('*') : [];
+      for (const el of els) {{
+        if (el.shadowRoot && findBtn(el.shadowRoot, depth + 1)) return true;
+      }}
+      return false;
+    }}
+    return findBtn(document, 0);
   }}
 
   function injectCardEditorButton() {{
     // Guard: already injected and still in DOM
     if (_cardBtnInjected && _cardBtnExists()) return;
 
-    // The button MUST be inside the native <dialog> element (browser top-layer).
-    // Any element outside the top-layer is painted below the dialog backdrop,
-    // making it unclickable regardless of z-index.
-    const dlg = getCardEditorDialog();
-    if (!dlg) return;  // dialog not found or not open yet — will retry next tick
+    // Navigate to footer#actions inside the card editor dialog shadow DOM.
+    // Since footer#actions is part of the native top-layer <dialog>, anything
+    // appended there is automatically above the backdrop and fully clickable.
+    const footer = getCardEditorFooter();
+    if (!footer) return;  // editor not open yet — will retry next tick
 
-    const btn = document.createElement('button');
+    // Use a <span> with mwc-button-like styling to blend with HA's Annulla/Salva buttons
+    const btn = document.createElement('span');
     btn.id = CARD_BTN_ID;
+    btn.setAttribute('role', 'button');
+    btn.setAttribute('tabindex', '0');
     btn.textContent = T.card_editor_btn || '🤖 Ask AI';
     btn.style.cssText = [
-      'position:fixed',
-      'bottom:20px', 'left:50%', 'transform:translateX(-50%)',
-      'padding:8px 20px', 'font-size:13px', 'font-weight:600',
-      'cursor:pointer', 'border:none', 'border-radius:20px',
+      'display:inline-flex', 'align-items:center', 'justify-content:center',
+      'padding:0 16px', 'height:36px', 'min-width:64px',
+      'font-size:13px', 'font-weight:600', 'letter-spacing:0.05em',
+      'cursor:pointer', 'border:none', 'border-radius:4px',
       'background:linear-gradient(135deg,#667eea,#764ba2)', 'color:#fff',
-      'box-shadow:0 4px 14px rgba(102,126,234,0.55)',
-      'transition:opacity 0.2s, transform 0.15s',
-      'z-index:2147483647',  // max int, inside the top-layer
-      'pointer-events:auto',
-      'user-select:none',
-      'white-space:nowrap',
+      'box-shadow:0 2px 8px rgba(102,126,234,0.45)',
+      'transition:opacity 0.15s, transform 0.1s',
+      'user-select:none', 'white-space:nowrap',
+      'margin-left:8px',  // spacing from the existing Annulla/Salva buttons
+      'vertical-align:middle',
     ].join(';');
-    btn.onmouseenter = () => {{ btn.style.opacity = '0.88'; btn.style.transform = 'translateX(-50%) scale(1.04)'; }};
-    btn.onmouseleave = () => {{ btn.style.opacity = '1'; btn.style.transform = 'translateX(-50%) scale(1)'; }};
-    btn.addEventListener('click', (e) => {{
+    btn.onmouseenter = () => {{ btn.style.opacity = '0.85'; btn.style.transform = 'scale(1.03)'; }};
+    btn.onmouseleave = () => {{ btn.style.opacity = '1'; btn.style.transform = 'scale(1)'; }};
+    const openBubble = (e) => {{
       e.stopPropagation();
       e.preventDefault();
       if (!isOpen) togglePanel();
       updateContextBar();
       updateQuickActions();
-    }});
-    dlg.appendChild(btn);
-    _cardBtnParent = dlg;
+    }};
+    btn.addEventListener('click', openBubble);
+    btn.addEventListener('keydown', (e) => {{ if (e.key === 'Enter' || e.key === ' ') openBubble(e); }});
+    footer.appendChild(btn);
+    _cardBtnParent = footer;
     _cardBtnInjected = true;
   }}
 
   function removeCardEditorButton() {{
-    // Search in known parent (the <dialog>) first, then fallback to full DOM
+    // footer#actions is in the shadow DOM — use the stored reference first
     if (_cardBtnParent) {{
-      const inParent = _cardBtnParent.querySelector('#' + CARD_BTN_ID);
+      const inParent = _cardBtnParent.querySelector && _cardBtnParent.querySelector('#' + CARD_BTN_ID);
       if (inParent) inParent.remove();
     }}
-    const fallback = document.getElementById(CARD_BTN_ID);
-    if (fallback) fallback.remove();
+    // Also scan shadow DOM as fallback
+    function removeFromShadow(root, depth) {{
+      if (!root || depth > 12) return;
+      if (root.querySelector) {{
+        const el = root.querySelector('#' + CARD_BTN_ID);
+        if (el) {{ el.remove(); return; }}
+      }}
+      const els = root.querySelectorAll ? root.querySelectorAll('*') : [];
+      for (const el of els) {{
+        if (el.shadowRoot) removeFromShadow(el.shadowRoot, depth + 1);
+      }}
+    }}
+    removeFromShadow(document, 0);
     _cardBtnInjected = false;
     _cardBtnParent = null;
   }}
