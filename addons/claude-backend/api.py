@@ -3403,6 +3403,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _tool_call_history: set = set()  # tracks all (name, args_json) to detect loops
         _duplicate_count = 0             # how many consecutive duplicate rounds
         _skip_tool_extraction = False    # after dedup, skip ToolSimulator next round
+        _last_write_result = None        # last WRITE tool result (for fallback display)
         _read_only_tools = {
             "get_automations", "get_scripts", "get_dashboards",
             "get_dashboard_config", "read_config_file",
@@ -3542,6 +3543,47 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             _display_skip = _cdt_skip(full_buf)
                             if _display_skip:
                                 yield {"type": "token", "content": _display_skip}
+                            else:
+                                # Model generated ONLY <tool_call> XML → empty after stripping.
+                                # Build a fallback summary from the last tool result.
+                                logger.warning("skip_tool_extraction: cleaned text is empty — generating fallback from tool result")
+                                if _last_write_result:
+                                    try:
+                                        _fb_obj = json.loads(_last_write_result)
+                                        if isinstance(_fb_obj, dict):
+                                            _fb_status = _fb_obj.get("status", "done")
+                                            _fb_msg = _fb_obj.get("message", "")
+                                            _fb_removed = _fb_obj.get("removed", [])
+                                            _fb_fixed = _fb_obj.get("fixed", [])
+                                            _fb_parts = []
+                                            if _fb_msg:
+                                                _fb_parts.append(f"✅ {_fb_msg}")
+                                            elif _fb_status == "success":
+                                                _fb_parts.append("✅ Operazione completata con successo.")
+                                            if _fb_removed:
+                                                _ids = [r if isinstance(r, str) else r.get('statistic_id', str(r)) for r in _fb_removed]
+                                                _fb_parts.append(
+                                                    f'<details><summary>📊 {len(_ids)} entità rimosse (click per espandere)</summary><div>'
+                                                    + '<br>'.join(f'<code>{eid}</code>' for eid in _ids)
+                                                    + '</div></details>'
+                                                )
+                                            if _fb_fixed:
+                                                _fids = [f.get('statistic_id', str(f)) if isinstance(f, dict) else str(f) for f in _fb_fixed]
+                                                _fb_parts.append(
+                                                    f'<details><summary>🔧 {len(_fids)} entità corrette (click per espandere)</summary><div>'
+                                                    + '<br>'.join(f'<code>{eid}</code>' for eid in _fids)
+                                                    + '</div></details>'
+                                                )
+                                            if _fb_parts:
+                                                yield {"type": "token", "content": '\n'.join(_fb_parts)}
+                                            else:
+                                                yield {"type": "token", "content": f"✅ Operazione completata. Risultato: {_last_write_result[:500]}"}
+                                        else:
+                                            yield {"type": "token", "content": f"✅ {_last_write_result[:500]}"}
+                                    except Exception:
+                                        yield {"type": "token", "content": f"✅ {_last_write_result[:500]}"}
+                                else:
+                                    yield {"type": "token", "content": "✅ Operazione completata con successo."}
                             _text_buffer = []
 
                         # Flush buffer for html dashboard (no tool call → clarifying question)
@@ -3781,10 +3823,27 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 for tc in _pending_tool_calls:
                     if not _is_read_only_call(tc):
                         _any_write = True
+                        # Capture the last tool result for fallback display
+                        for m in reversed(messages):
+                            if m.get("role") == "tool":
+                                _last_write_result = m.get("content", "")
+                                break
                         break
                 if _any_write:
                     _skip_tool_extraction = True
                     logger.info("Write tool executed — disabling ToolSimulator for next round")
+                    # Inject a user message forcing the model to produce plain text,
+                    # not another <tool_call>.  This is the most reliable way to stop
+                    # no-tool providers from re-calling the same tool in a loop.
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "[SYSTEM] The tool executed successfully. "
+                            "Now describe the results to the user in plain text. "
+                            "List all affected entity IDs. "
+                            "Do NOT call any tool. Do NOT use <tool_call>."
+                        ),
+                    })
 
         # Sync new assistant messages to conversation history.
         # New-path providers (Mistral, Groq, openai_compatible, etc.) stream text as
