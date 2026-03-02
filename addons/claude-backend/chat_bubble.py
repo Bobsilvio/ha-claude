@@ -602,14 +602,39 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (ctx.type === 'card_editor') {{
       let p = '[CONTEXT: User is editing a Lovelace card in the HA card editor.';
       if (ctx.cardYaml) {{
+        // Pre-validate entities against hass.states
+        let entityReport = '';
+        try {{
+          const haEl = document.querySelector('home-assistant');
+          const hass = haEl && haEl.hass;
+          if (hass && hass.states) {{
+            const entityRe = /entity:\s+([\w]+\.[\w]+)/g;
+            let em;
+            const checks = [];
+            while ((em = entityRe.exec(ctx.cardYaml)) !== null) {{
+              const eid = em[1];
+              const st = hass.states[eid];
+              if (st) {{
+                checks.push(eid + ': VALID (state=' + st.state + ')');
+              }} else {{
+                checks.push(eid + ': NOT FOUND — does NOT exist in Home Assistant!');
+              }}
+            }}
+            if (checks.length > 0) {{
+              entityReport = '\\nPRE-VALIDATION (checked against live hass.states):\\n' + checks.join('\\n') + '\\n';
+            }}
+          }}
+        }} catch(e) {{}}
+
         p += ' The current card YAML is:\\n```yaml\\n' + ctx.cardYaml + '\\n```\\n'
+           + entityReport
            + 'IMPORTANT RULES for card editing:\\n'
-           + '1. Use search_entities to VERIFY that ALL entity IDs in the YAML actually exist. Do NOT ask the user to check — verify yourself.\\n'
-           + '2. If an entity does NOT exist, use BOTH search_entities (with keywords from its name, e.g. "tigo production") AND get_integration_entities (with the integration name, e.g. "tigo" or "epcube") to find the correct entity_id from the custom component. Replace the wrong entity with the correct one you found.\\n'
+           + '1. TRUST the PRE-VALIDATION results above. Entities marked NOT FOUND do NOT exist — do not second-guess this. Use get_integration_entities (e.g. "tigo", "epcube") to find the correct entity_id from the custom component and replace the invalid one.\\n'
+           + '2. If an entity is marked VALID, it exists — no need to re-verify with search_entities.\\n'
            + '3. When suggesting a modification, ALWAYS show the complete corrected YAML in a ```yaml code block with a brief explanation of what changed.\\n'
            + '4. Keep your response concise: list only real problems found (not hypothetical ones), show the corrected YAML, done.\\n'
-           + '5. Do NOT suggest changes based on guesses about entity names. Only flag an entity if search_entities confirms it does not exist, and only replace it if you found a valid alternative via search.\\n'
-           + '6. If all entities are valid and the YAML has no structural issues, say so clearly and suggest only optional improvements (like adding graph: line).\\n'
+           + '5. Do NOT suggest changes based on guesses about entity names. Only replace an entity if you found a valid alternative via get_integration_entities or search_entities.\\n'
+           + '6. If all entities are VALID and the YAML has no structural issues, say so clearly and suggest only optional improvements (like adding graph: line).\\n'
            + '7. The user will paste the YAML manually in the editor — do NOT use write_config_file or update_dashboard.';
       }}
       p += ']';
