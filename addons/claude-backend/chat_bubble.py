@@ -1371,6 +1371,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   let _cardBtnInjected    = false;
   let _cardBtnParent      = null;
   let _cardPanelOpen      = false;
+  // Direct element references — getElementById doesn't cross shadow DOM
+  let _cardMsgsEl  = null;
+  let _cardInputEl = null;
+  let _cardPanelEl = null;
 
   function _cardBtnExists() {{
     return !!(_cardBtnParent && _cardBtnParent.querySelector('#' + CARD_BTN_ID));
@@ -1459,6 +1463,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     panel.appendChild(msgs);
     panel.appendChild(inputRow);
     surface.appendChild(panel);
+    // Save direct references — getElementById won't cross shadow DOM
+    _cardPanelEl = panel;
+    _cardMsgsEl  = msgs;
+    _cardInputEl = inp;
     _cardPanelOpen = true;
     setTimeout(() => inp.focus(), 50);
   }}
@@ -1471,30 +1479,30 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       surface.style.maxHeight = '';
       surface.style.overflow = '';
     }}
-    const panel = document.getElementById(CARD_PANEL_ID);
-    if (panel) panel.remove();
+    if (_cardPanelEl) _cardPanelEl.remove();
+    _cardPanelEl = null;
+    _cardMsgsEl  = null;
+    _cardInputEl = null;
     _cardPanelOpen = false;
   }}
 
   function _cardPanelAddMsg(role, text) {{
-    const msgs = document.getElementById(CARD_PANEL_ID + '-msgs');
-    if (!msgs) return null;
+    if (!_cardMsgsEl) return null;
     const d = document.createElement('div');
     d.style.cssText = role === 'user'
       ? 'align-self:flex-end;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:6px 10px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:85%;word-break:break-word;'
       : 'align-self:flex-start;background:var(--secondary-background-color,#f0f0f0);color:var(--primary-text-color,#212121);padding:6px 10px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.5;';
     if (role === 'user') d.textContent = text;
     else d.innerHTML = _renderInlineMd(text);
-    msgs.appendChild(d);
-    msgs.scrollTop = msgs.scrollHeight;
+    _cardMsgsEl.appendChild(d);
+    _cardMsgsEl.scrollTop = _cardMsgsEl.scrollHeight;
     return d;
   }}
 
   async function cardPanelSend(presetText) {{
-    const inp = document.getElementById(CARD_PANEL_ID + '-input');
-    const text = presetText || (inp ? inp.value.trim() : '');
+    const text = presetText || (_cardInputEl ? _cardInputEl.value.trim() : '');
     if (!text) return;
-    if (inp && !presetText) {{ inp.value = ''; inp.style.height = 'auto'; }}
+    if (_cardInputEl && !presetText) {{ _cardInputEl.value = ''; _cardInputEl.style.height = 'auto'; }}
     _cardPanelAddMsg('user', text);
     const thinkEl = _cardPanelAddMsg('assistant', T.thinking + '…');
     const ctx = detectContext();
@@ -1511,8 +1519,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }} catch(e) {{
       if (thinkEl) thinkEl.textContent = T.error_connection;
     }}
-    const msgs = document.getElementById(CARD_PANEL_ID + '-msgs');
-    if (msgs) msgs.scrollTop = msgs.scrollHeight;
+    if (_cardMsgsEl) _cardMsgsEl.scrollTop = _cardMsgsEl.scrollHeight;
   }}
 
   function injectCardEditorButton() {{
