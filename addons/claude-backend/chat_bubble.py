@@ -1315,20 +1315,24 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     if (cardOpen !== _lastCardEditorOpen) {{
       _lastCardEditorOpen = cardOpen;
       if (isOpen) {{ updateContextBar(); updateQuickActions(); }}
-      if (cardOpen) injectCardEditorButton(); else removeCardEditorButton();
+      if (cardOpen) {{ _cardBtnInjected = false; injectCardEditorButton(); }}
+      else {{ removeCardEditorButton(); _cardBtnInjected = false; }}
     }}
-    // Re-inject button if editor is open but button was removed (e.g. HA re-rendered)
-    if (cardOpen && !document.getElementById('amira-card-editor-btn')) {{
+    // Re-inject if editor open but button disappeared (HA re-rendered the dialog)
+    if (cardOpen && !_cardBtnInjected) {{
       injectCardEditorButton();
     }}
   }}, 1000);
 
   // ---- Card editor button injection ----
   let _lastCardEditorOpen = false;
+  let _cardBtnInjected = false;       // flag: true once button is in the DOM
+  let _cardBtnParent = null;          // reference to the node we inserted into
   const CARD_BTN_ID = 'amira-card-editor-btn';
 
   function injectCardEditorButton() {{
-    if (document.getElementById(CARD_BTN_ID)) return;
+    // Guard: check both the flag and the actual node (handles HA re-renders)
+    if (_cardBtnInjected && _cardBtnParent && _cardBtnParent.querySelector('#' + CARD_BTN_ID)) return;
     // Find the card editor dialog footer or toolbar in the shadow DOM
     function findEditorFooter(root, depth) {{
       if (!root || depth > 15) return null;
@@ -1364,6 +1368,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     const footer = findEditorFooter(document, 0);
     if (!footer) return;
 
+    // Remove any stale copy that may still be in this footer
+    const stale = footer.querySelector('#' + CARD_BTN_ID);
+    if (stale) stale.remove();
+
     const btn = document.createElement('button');
     btn.id = CARD_BTN_ID;
     btn.textContent = T.card_editor_btn || '🤖 Ask AI';
@@ -1385,11 +1393,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }};
     // Prepend so it appears before the HA buttons
     footer.insertBefore(btn, footer.firstChild);
+    _cardBtnParent = footer;
+    _cardBtnInjected = true;
   }}
 
   function removeCardEditorButton() {{
-    const existing = document.getElementById(CARD_BTN_ID);
-    if (existing) existing.remove();
+    // Search in the known parent first (shadow DOM safe), then fallback
+    if (_cardBtnParent) {{
+      const existing = _cardBtnParent.querySelector('#' + CARD_BTN_ID);
+      if (existing) existing.remove();
+    }}
+    // Also sweep document in case it ended up in a non-shadow slot
+    const fallback = document.getElementById(CARD_BTN_ID);
+    if (fallback) fallback.remove();
+    _cardBtnInjected = false;
+    _cardBtnParent = null;
   }}
 
   // ---- Auto-resize textarea ----
