@@ -1415,7 +1415,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       const placeholder = '___CODEBLOCK_' + codeBlocks.length + '___';
       codeBlocks.push('<div style="position:relative;margin:6px 0;">'
-        + '<button onclick="(function(b){{ var c=b.parentElement.querySelector(\'code\'); if(c)navigator.clipboard.writeText(c.textContent).then(function(){{ b.textContent=\'\u2713\'; setTimeout(function(){{ b.textContent=\'\ud83d\udccb\'; }},1500); }}); }})(this)" style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:var(--primary-text-color,#ccc);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">\ud83d\udccb</button>'
+        + '<button onclick="(function(b){{ var c=b.parentElement.querySelector(\'code\'); if(c)navigator.clipboard.writeText(c.textContent).then(function(){{ b.textContent=\'\\u2713\'; setTimeout(function(){{ b.textContent=\'\\ud83d\\udccb\'; }},1500); }}); }})(this)" style="position:absolute;top:4px;right:4px;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);color:var(--primary-text-color,#ccc);border-radius:4px;padding:2px 8px;font-size:10px;cursor:pointer;">\U0001F4CB</button>'
         + '<pre style="background:#1e293b;color:#e2e8f0;padding:8px 10px;border-radius:6px;font-size:12px;overflow-x:auto;margin:0;white-space:pre-wrap;word-break:break-word;"><code>' + escaped + '</code></pre></div>');
       return placeholder;
     }});
