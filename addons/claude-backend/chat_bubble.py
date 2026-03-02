@@ -394,25 +394,51 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   }}
 
   // Check if the HA card editor dialog is currently open in the DOM
-  function isCardEditorOpen() {{
+  // Returns the native <dialog> element used by the HA card editor, or null.
+  // HA keeps hui-dialog-edit-card in the DOM even when closed, so we check
+  // for an *open* <dialog> element inside its shadow root.
+  function getCardEditorDialog() {{
     try {{
-      function walkForEditor(root, depth) {{
-        if (!root || depth > 12) return false;
-        const editorSelectors = [
-          'hui-dialog-edit-card', 'hui-card-editor', 'ha-yaml-editor'
-        ];
+      function findOpenDialog(root, depth) {{
+        if (!root || depth > 12) return null;
+        // Native <dialog open> is the definitive signal the modal is visible
+        const dialogs = root.querySelectorAll ? root.querySelectorAll('dialog[open]') : [];
+        for (const d of dialogs) return d;
+        // Also accept ha-dialog with open attribute (MWC wrapper)
+        const haDialogs = root.querySelectorAll ? root.querySelectorAll('ha-dialog[open]') : [];
+        for (const d of haDialogs) return d;
+        const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
+        for (const el of allEls) {{
+          if (el.shadowRoot) {{
+            const found = findOpenDialog(el.shadowRoot, depth + 1);
+            if (found) return found;
+          }}
+        }}
+        return null;
+      }}
+      // Check that the open dialog belongs to the card editor
+      // by verifying hui-dialog-edit-card or hui-card-editor is also in the tree
+      function hasCardEditor(root, depth) {{
+        if (!root || depth > 8) return false;
+        const editorSelectors = ['hui-dialog-edit-card', 'hui-card-editor', 'ha-yaml-editor'];
         for (const sel of editorSelectors) {{
           const els = root.querySelectorAll ? root.querySelectorAll(sel) : [];
           if (els.length > 0) return true;
         }}
         const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
         for (const el of allEls) {{
-          if (el.shadowRoot && walkForEditor(el.shadowRoot, depth + 1)) return true;
+          if (el.shadowRoot && hasCardEditor(el.shadowRoot, depth + 1)) return true;
         }}
         return false;
       }}
-      return walkForEditor(document, 0);
-    }} catch(e) {{ return false; }}
+      const dlg = findOpenDialog(document, 0);
+      if (dlg && hasCardEditor(document, 0)) return dlg;
+      return null;
+    }} catch(e) {{ return null; }}
+  }}
+
+  function isCardEditorOpen() {{
+    return getCardEditorDialog() !== null;
   }}
 
   function detectContext() {{
@@ -1319,7 +1345,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       else {{ removeCardEditorButton(); _cardBtnInjected = false; }}
     }}
     // Re-inject if editor open but button disappeared (HA re-rendered the dialog)
-    if (cardOpen && !_cardBtnInjected) {{
+    if (cardOpen && (!_cardBtnInjected || !_cardBtnExists())) {{
+      _cardBtnInjected = false;
       injectCardEditorButton();
     }}
   }}, 1000);
@@ -1330,25 +1357,35 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   let _cardBtnParent = null;          // reference to the node we inserted into
   const CARD_BTN_ID = 'amira-card-editor-btn';
 
+  function _cardBtnExists() {{
+    if (_cardBtnParent && _cardBtnParent.querySelector) {{
+      return !!_cardBtnParent.querySelector('#' + CARD_BTN_ID);
+    }}
+    return !!document.getElementById(CARD_BTN_ID);
+  }}
+
   function injectCardEditorButton() {{
     // Guard: already injected and still in DOM
-    if (_cardBtnInjected && document.getElementById(CARD_BTN_ID)) return;
+    if (_cardBtnInjected && _cardBtnExists()) return;
 
-    // The button lives directly in document.body — outside HA's shadow DOM.
-    // This avoids any pointer-events or event-capture interference from HA dialogs.
+    // The button MUST be inside the native <dialog> element (browser top-layer).
+    // Any element outside the top-layer is painted below the dialog backdrop,
+    // making it unclickable regardless of z-index.
+    const dlg = getCardEditorDialog();
+    if (!dlg) return;  // dialog not found or not open yet — will retry next tick
+
     const btn = document.createElement('button');
     btn.id = CARD_BTN_ID;
     btn.textContent = T.card_editor_btn || '🤖 Ask AI';
     btn.style.cssText = [
       'position:fixed',
-      // Place it in the bottom-left area of the dialog (roughly centered, above taskbar)
-      'bottom:80px', 'left:50%', 'transform:translateX(-50%)',
-      'padding:8px 18px', 'font-size:13px', 'font-weight:600',
+      'bottom:20px', 'left:50%', 'transform:translateX(-50%)',
+      'padding:8px 20px', 'font-size:13px', 'font-weight:600',
       'cursor:pointer', 'border:none', 'border-radius:20px',
       'background:linear-gradient(135deg,#667eea,#764ba2)', 'color:#fff',
       'box-shadow:0 4px 14px rgba(102,126,234,0.55)',
       'transition:opacity 0.2s, transform 0.15s',
-      'z-index:99999',
+      'z-index:2147483647',  // max int, inside the top-layer
       'pointer-events:auto',
       'user-select:none',
       'white-space:nowrap',
@@ -1362,14 +1399,19 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       updateContextBar();
       updateQuickActions();
     }});
-    document.body.appendChild(btn);
-    _cardBtnParent = document.body;
+    dlg.appendChild(btn);
+    _cardBtnParent = dlg;
     _cardBtnInjected = true;
   }}
 
   function removeCardEditorButton() {{
-    const existing = document.getElementById(CARD_BTN_ID);
-    if (existing) existing.remove();
+    // Search in known parent (the <dialog>) first, then fallback to full DOM
+    if (_cardBtnParent) {{
+      const inParent = _cardBtnParent.querySelector('#' + CARD_BTN_ID);
+      if (inParent) inParent.remove();
+    }}
+    const fallback = document.getElementById(CARD_BTN_ID);
+    if (fallback) fallback.remove();
     _cardBtnInjected = false;
     _cardBtnParent = null;
   }}
