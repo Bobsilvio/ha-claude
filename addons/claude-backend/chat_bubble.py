@@ -1509,10 +1509,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       const ctx = detectContext();
       const prefix = buildContextPrefix(ctx);
       const fullMsg = prefix ? prefix + '\\n\\n' + text : text;
+      // Read provider/model from the bubble's select elements (always in DOM)
+      const _provider = document.getElementById('haProviderSelect')?.value || 'anthropic';
+      const _model    = document.getElementById('haModelSelect')?.value || '';
+      const _session  = getSessionId();
       const resp = await fetch(API_BASE + '/api/chat', {{
         method: 'POST',
         headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{ message: fullMsg, provider: currentProvider, model: currentModel, session_id: SESSION_ID, stream: false }})
+        body: JSON.stringify({{ message: fullMsg, provider: _provider, model: _model, session_id: _session, stream: false }})
       }});
       const data = await resp.json();
       if (thinkEl) thinkEl.innerHTML = _renderInlineMd(data.response || data.error || '?');
