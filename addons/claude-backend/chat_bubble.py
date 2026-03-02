@@ -1360,143 +1360,187 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }}
   }}, 1000);
 
-  // ---- Bubble top-layer lift (card editor mode) ----
-  // HA uses MWC (Material Web Components) — no native <dialog> element.
-  // The backdrop is div.mdc-dialog__scrim which uses pointer-events to block clicks,
-  // making the bubble panel (in document.body) unclickable when the editor is open.
-  // Fix: set pointer-events:none on the scrim when the bubble is active.
-  // The bubble stays in document.body. The problem is that home-assistant (a custom
-  // element covering the full page) intercepts all pointer events via its shadow DOM,
-  // so clicks never reach #ha-claude-bubble even though z-index is 99999.
-  // Fix: inject a <style> tag into document.head that sets pointer-events:none on
-  // home-assistant while the bubble panel is active. The bubble itself keeps
-  // pointer-events:auto so it still receives clicks.
-  // We also disable the MWC scrim for good measure.
-  let _scrimEl = null;
-  let _cardEditorStyleTag = null;
+  // ---- Card editor inline chat panel ----
+  // Instead of fighting with pointer-events / shadow DOM / top-layer, we inject
+  // a self-contained mini chat panel INSIDE the mdc-dialog__surface of the HA
+  // card editor. It is a native child of the dialog, so clicks always work.
+  // The Amira button in the footer toggles this panel open/closed.
+  const CARD_PANEL_ID = 'amira-card-chat';
+  const CARD_BTN_ID   = 'amira-card-editor-btn';
+  let _lastCardEditorOpen = false;
+  let _cardBtnInjected    = false;
+  let _cardBtnParent      = null;
+  let _cardPanelOpen      = false;
 
-  function _getScrim() {{
+  function _cardBtnExists() {{
+    return !!(_cardBtnParent && _cardBtnParent.querySelector('#' + CARD_BTN_ID));
+  }}
+
+  // Returns the mdc-dialog__surface element (the visible card panel of the dialog)
+  function _getCardSurface() {{
     try {{
       const editCardEl = _findEditCardEl();
       if (!editCardEl?.shadowRoot) return null;
       const haDialog = editCardEl.shadowRoot.querySelector('ha-dialog[open]');
       if (!haDialog?.shadowRoot) return null;
-      return haDialog.shadowRoot.querySelector('.mdc-dialog__scrim') || null;
+      return haDialog.shadowRoot.querySelector('.mdc-dialog__surface') || null;
     }} catch(e) {{ return null; }}
   }}
 
-  function disableScrim() {{
-    if (_cardEditorStyleTag) return;  // already active
-    // Disable pointer-events on home-assistant (covers full page via shadow DOM)
-    // while keeping the bubble itself interactive
-    const s = document.createElement('style');
-    s.id = 'amira-card-editor-pe';
-    s.textContent = 'home-assistant {{ pointer-events: none !important; }} #ha-claude-bubble {{ pointer-events: auto !important; }}';
-    document.head.appendChild(s);
-    _cardEditorStyleTag = s;
-    // Also disable the MWC scrim
-    _scrimEl = _getScrim();
-    if (_scrimEl) _scrimEl.style.pointerEvents = 'none';
-    // Hide the floating bubble button — footer Amira button is the trigger
-    btn.style.display = 'none';
+  function _renderInlineMd(text) {{
+    return text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')
+      .replace(/`([^`]+)`/g,'<code style="background:rgba(0,0,0,0.08);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>')
+      .replace(/\n/g,'<br>');
   }}
 
-  function restoreScrim() {{
-    if (_cardEditorStyleTag) {{ _cardEditorStyleTag.remove(); _cardEditorStyleTag = null; }}
-    if (_scrimEl) {{ _scrimEl.style.pointerEvents = ''; _scrimEl = null; }}
-    btn.style.display = '';
+  function openCardPanel() {{
+    if (_cardPanelOpen) return;
+    const surface = _getCardSurface();
+    if (!surface) return;
+
+    surface.style.cssText += ';display:flex !important;flex-direction:column !important;max-height:90vh !important;overflow:hidden !important;';
+
+    const panel = document.createElement('div');
+    panel.id = CARD_PANEL_ID;
+    panel.style.cssText = 'display:flex;flex-direction:column;border-top:2px solid #667eea;background:var(--card-background-color,#fff);flex-shrink:0;height:300px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;';
+
+    // Header
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;padding:8px 12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;flex-shrink:0;';
+    const hdrTitle = document.createElement('span');
+    hdrTitle.textContent = '🤖 Amira';
+    hdrTitle.style.cssText = 'font-weight:600;font-size:13px;flex:1;';
+    const hdrClose = document.createElement('button');
+    hdrClose.textContent = '✕';
+    hdrClose.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:0 4px;line-height:1;';
+    hdrClose.onclick = closeCardPanel;
+    hdr.appendChild(hdrTitle);
+    hdr.appendChild(hdrClose);
+
+    // Quick actions
+    const ctx = detectContext();
+    const actions = getQuickActions(ctx);
+    const qaRow = document.createElement('div');
+    qaRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;padding:6px 8px;flex-shrink:0;border-bottom:1px solid var(--divider-color,#e0e0e0);';
+    actions.forEach(a => {{
+      const chip = document.createElement('button');
+      chip.textContent = a.label;
+      chip.style.cssText = 'background:var(--secondary-background-color,#f5f5f5);border:1px solid var(--divider-color,#ddd);border-radius:12px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;color:var(--primary-text-color,#212121);';
+      chip.onclick = () => cardPanelSend(a.text);
+      qaRow.appendChild(chip);
+    }});
+
+    // Messages
+    const msgs = document.createElement('div');
+    msgs.id = CARD_PANEL_ID + '-msgs';
+    msgs.style.cssText = 'flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;min-height:0;';
+
+    // Input row
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;gap:6px;padding:8px;flex-shrink:0;border-top:1px solid var(--divider-color,#e0e0e0);';
+    const inp = document.createElement('textarea');
+    inp.id = CARD_PANEL_ID + '-input';
+    inp.placeholder = T.placeholder;
+    inp.rows = 1;
+    inp.style.cssText = 'flex:1;border:1px solid var(--divider-color,#ddd);border-radius:8px;padding:6px 10px;font-size:13px;resize:none;outline:none;background:var(--secondary-background-color,#f9f9f9);color:var(--primary-text-color,#212121);font-family:inherit;';
+    inp.addEventListener('input', () => {{ inp.style.height='auto'; inp.style.height=Math.min(inp.scrollHeight,80)+'px'; }});
+    inp.addEventListener('keydown', e => {{ if(e.key==='Enter'&&!e.shiftKey){{ e.preventDefault(); cardPanelSend(); }} }});
+    const sendB = document.createElement('button');
+    sendB.textContent = '▶';
+    sendB.style.cssText = 'background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:8px;padding:0 14px;cursor:pointer;font-size:16px;flex-shrink:0;';
+    sendB.onclick = () => cardPanelSend();
+    inputRow.appendChild(inp);
+    inputRow.appendChild(sendB);
+
+    panel.appendChild(hdr);
+    if (actions.length) panel.appendChild(qaRow);
+    panel.appendChild(msgs);
+    panel.appendChild(inputRow);
+    surface.appendChild(panel);
+    _cardPanelOpen = true;
+    setTimeout(() => inp.focus(), 50);
   }}
 
-  // ---- Card editor button injection ----
-  // The "Ask AI" button is injected into footer#actions (shadow DOM, inside MWC dialog).
-  // When clicked it disables the scrim pointer-events so the bubble panel is reachable.
-  let _lastCardEditorOpen = false;
-  let _cardBtnInjected = false;       // flag: true once button is in the DOM
-  let _cardBtnParent = null;          // reference to footer#actions we inserted into
-  const CARD_BTN_ID = 'amira-card-editor-btn';
+  function closeCardPanel() {{
+    const surface = _getCardSurface();
+    if (surface) {{
+      surface.style.display = '';
+      surface.style.flexDirection = '';
+      surface.style.maxHeight = '';
+      surface.style.overflow = '';
+    }}
+    const panel = document.getElementById(CARD_PANEL_ID);
+    if (panel) panel.remove();
+    _cardPanelOpen = false;
+  }}
 
-  function _cardBtnExists() {{
-    if (_cardBtnParent && _cardBtnParent.querySelector) {{
-      return !!_cardBtnParent.querySelector('#' + CARD_BTN_ID);
+  function _cardPanelAddMsg(role, text) {{
+    const msgs = document.getElementById(CARD_PANEL_ID + '-msgs');
+    if (!msgs) return null;
+    const d = document.createElement('div');
+    d.style.cssText = role === 'user'
+      ? 'align-self:flex-end;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:6px 10px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:85%;word-break:break-word;'
+      : 'align-self:flex-start;background:var(--secondary-background-color,#f0f0f0);color:var(--primary-text-color,#212121);padding:6px 10px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.5;';
+    if (role === 'user') d.textContent = text;
+    else d.innerHTML = _renderInlineMd(text);
+    msgs.appendChild(d);
+    msgs.scrollTop = msgs.scrollHeight;
+    return d;
+  }}
+
+  async function cardPanelSend(presetText) {{
+    const inp = document.getElementById(CARD_PANEL_ID + '-input');
+    const text = presetText || (inp ? inp.value.trim() : '');
+    if (!text) return;
+    if (inp && !presetText) {{ inp.value = ''; inp.style.height = 'auto'; }}
+    _cardPanelAddMsg('user', text);
+    const thinkEl = _cardPanelAddMsg('assistant', T.thinking + '…');
+    const ctx = detectContext();
+    const prefix = buildContextPrefix(ctx);
+    const fullMsg = prefix ? prefix + '\n\n' + text : text;
+    try {{
+      const resp = await fetch(API_BASE + '/api/chat', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify({{ message: fullMsg, provider: currentProvider, model: currentModel, session_id: SESSION_ID, stream: false }})
+      }});
+      const data = await resp.json();
+      if (thinkEl) thinkEl.innerHTML = _renderInlineMd(data.response || data.error || '?');
+    }} catch(e) {{
+      if (thinkEl) thinkEl.textContent = T.error_connection;
     }}
-    // Fallback: scan shadow DOM for the button
-    function findBtn(root, depth) {{
-      if (!root || depth > 12) return false;
-      if (root.querySelector && root.querySelector('#' + CARD_BTN_ID)) return true;
-      const els = root.querySelectorAll ? root.querySelectorAll('*') : [];
-      for (const el of els) {{
-        if (el.shadowRoot && findBtn(el.shadowRoot, depth + 1)) return true;
-      }}
-      return false;
-    }}
-    return findBtn(document, 0);
+    const msgs = document.getElementById(CARD_PANEL_ID + '-msgs');
+    if (msgs) msgs.scrollTop = msgs.scrollHeight;
   }}
 
   function injectCardEditorButton() {{
-    // Guard: already injected and still in DOM
     if (_cardBtnInjected && _cardBtnExists()) return;
-
-    // Navigate to footer#actions inside the card editor dialog shadow DOM.
-    // Since footer#actions is part of the native top-layer <dialog>, anything
-    // appended there is automatically above the backdrop and fully clickable.
     const footer = getCardEditorFooter();
-    if (!footer) return;  // editor not open yet — will retry next tick
-
-    // Use a <span> with mwc-button-like styling to blend with HA's Annulla/Salva buttons
+    if (!footer) return;
     const aiBtn = document.createElement('span');
     aiBtn.id = CARD_BTN_ID;
     aiBtn.setAttribute('role', 'button');
     aiBtn.setAttribute('tabindex', '0');
     aiBtn.textContent = '🤖 Amira';
-    aiBtn.style.cssText = [
-      'display:inline-flex', 'align-items:center', 'justify-content:center',
-      'padding:0 16px', 'height:36px', 'min-width:64px',
-      'font-size:13px', 'font-weight:600', 'letter-spacing:0.05em',
-      'cursor:pointer', 'border:none', 'border-radius:4px',
-      'background:linear-gradient(135deg,#667eea,#764ba2)', 'color:#fff',
-      'box-shadow:0 2px 8px rgba(102,126,234,0.45)',
-      'transition:opacity 0.15s, transform 0.1s',
-      'user-select:none', 'white-space:nowrap',
-      'margin-left:8px',  // spacing from the existing Annulla/Salva buttons
-      'vertical-align:middle',
-    ].join(';');
-    aiBtn.onmouseenter = () => {{ aiBtn.style.opacity = '0.85'; aiBtn.style.transform = 'scale(1.03)'; }};
-    aiBtn.onmouseleave = () => {{ aiBtn.style.opacity = '1'; aiBtn.style.transform = 'scale(1)'; }};
-    const openBubble = (e) => {{
-      e.stopPropagation();
-      e.preventDefault();
-      // Disable the MWC scrim so it stops absorbing pointer events
-      disableScrim();
-      if (!isOpen) togglePanel();
-      updateContextBar();
-      updateQuickActions();
-    }};
-    aiBtn.addEventListener('click', openBubble);
-    aiBtn.addEventListener('keydown', (e) => {{ if (e.key === 'Enter' || e.key === ' ') openBubble(e); }});
+    aiBtn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;padding:0 16px;height:36px;min-width:64px;font-size:13px;font-weight:600;cursor:pointer;border:none;border-radius:4px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;box-shadow:0 2px 8px rgba(102,126,234,0.45);user-select:none;white-space:nowrap;margin-left:8px;transition:opacity 0.15s;';
+    aiBtn.onmouseenter = () => {{ aiBtn.style.opacity='0.85'; }};
+    aiBtn.onmouseleave = () => {{ aiBtn.style.opacity='1'; }};
+    const toggle = (e) => {{ e.stopPropagation(); e.preventDefault(); _cardPanelOpen ? closeCardPanel() : openCardPanel(); }};
+    aiBtn.addEventListener('click', toggle);
+    aiBtn.addEventListener('keydown', e => {{ if(e.key==='Enter'||e.key===' ') toggle(e); }});
     footer.appendChild(aiBtn);
     _cardBtnParent = footer;
     _cardBtnInjected = true;
   }}
 
   function removeCardEditorButton() {{
-    // footer#actions is in the shadow DOM — use the stored reference first
+    closeCardPanel();
     if (_cardBtnParent) {{
-      const inParent = _cardBtnParent.querySelector && _cardBtnParent.querySelector('#' + CARD_BTN_ID);
-      if (inParent) inParent.remove();
+      const b = _cardBtnParent.querySelector('#' + CARD_BTN_ID);
+      if (b) b.remove();
     }}
-    // Also scan shadow DOM as fallback
-    function removeFromShadow(root, depth) {{
-      if (!root || depth > 12) return;
-      if (root.querySelector) {{
-        const el = root.querySelector('#' + CARD_BTN_ID);
-        if (el) {{ el.remove(); return; }}
-      }}
-      const els = root.querySelectorAll ? root.querySelectorAll('*') : [];
-      for (const el of els) {{
-        if (el.shadowRoot) removeFromShadow(el.shadowRoot, depth + 1);
-      }}
-    }}
-    removeFromShadow(document, 0);
     _cardBtnInjected = false;
     _cardBtnParent = null;
   }}
