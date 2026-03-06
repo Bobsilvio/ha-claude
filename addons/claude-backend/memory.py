@@ -229,8 +229,8 @@ def get_long_term_memory() -> str:
     try:
         if os.path.exists(MEMORY_FILE):
             content = open(MEMORY_FILE, encoding='utf-8').read().strip()
-            # Return content only if it has substantive data (> 150 chars filters out empty templates)
-            if content and len(content) > 150:
+            # Return content only if it has substantive data (> 10 chars filters out blank/whitespace-only files)
+            if content and len(content) > 10:
                 return content
     except Exception as e:
         logger.warning(f"Could not read MEMORY.md: {e}")

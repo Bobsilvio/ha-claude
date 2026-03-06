@@ -3502,6 +3502,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         intent_name = intent_info["intent"]
     else:
         smart_context = ""
+        # Inject memory even for chat intent (no tools, but memory is still relevant)
+        if ENABLE_MEMORY and MEMORY_AVAILABLE:
+            memory_context = memory.get_memory_context()
+            if memory_context:
+                logger.info(f"Memory context (MEMORY.md) injected for chat session {session_id}")
+                smart_context = memory_context
 
     # Store this intent for next message's confirmation continuity
     session_last_intent[session_id] = intent_name

@@ -16,6 +16,8 @@
 - **Fix `[object Object]` nella card agente**: con `include_disabled=true` l'API restituisce `model` come oggetto `{primary, fallbacks}` anziché stringa — la card e il form ora estraggono correttamente `model.primary`
 - **Fix TypeError `model.split` nel form agente**: `agentData.model.split('/')` crashava quando `model` era un oggetto — ora viene normalizzato a stringa prima dello split
 - **Fix icona cestino card agente**: anche il bottone delete sulle card agente usava il carattere Unicode U+1F5D1 non renderizzato — sostituito con SVG come nella lista conversazioni
+- **Fix MEMORY.md ignorato con contenuti brevi**: il filtro `len > 150` in `get_long_term_memory()` scartava silenziosamente memorie brevi ma significative (es. "Mi chiamo Silvio") — abbassata la soglia a 10 caratteri
+- **Fix memoria non iniettata in intent `chat`**: quando la domanda veniva classificata come `chat` (nessun tool), il blocco `else: smart_context = ""` saltava completamente l'iniezione di MEMORY.md — ora la memoria viene comunque caricata e iniettata nel contesto
 
 ## 4.5.0 — Architettura OpenClaw: catalogo modelli, cost tracking, multi-agent, safety guards
 
