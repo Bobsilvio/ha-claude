@@ -94,16 +94,20 @@ class AnthropicProvider(EnhancedProvider):
         system, conv_msgs = self._split_system(messages)
 
         # Convert OpenAI tool schema format → Anthropic format
+        # If tools are already in Anthropic format (from ToolRegistry), use directly.
         tool_schemas = self._get_intent_tools(intent_info)
-        anthropic_tools = [
-            {
-                "name": t["function"]["name"],
-                "description": t["function"].get("description", ""),
-                "input_schema": t["function"].get("parameters", {"type": "object", "properties": {}}),
-            }
-            for t in tool_schemas
-            if "function" in t
-        ]
+        anthropic_tools = []
+        for t in tool_schemas:
+            if "function" in t:
+                # OpenAI format → convert to Anthropic
+                anthropic_tools.append({
+                    "name": t["function"]["name"],
+                    "description": t["function"].get("description", ""),
+                    "input_schema": t["function"].get("parameters", {"type": "object", "properties": {}}),
+                })
+            elif "name" in t and "input_schema" in t:
+                # Already Anthropic format (from ToolRegistry AnthropicAdapter)
+                anthropic_tools.append(t)
 
         kwargs: Dict[str, Any] = {"model": model, "messages": conv_msgs, "max_tokens": 8192}
         if system:
@@ -126,6 +130,8 @@ class AnthropicProvider(EnhancedProvider):
             done_event["usage"] = {
                 "input_tokens": final.usage.input_tokens,
                 "output_tokens": final.usage.output_tokens,
+                "cache_read_input_tokens": getattr(final.usage, "cache_read_input_tokens", 0) or 0,
+                "cache_creation_input_tokens": getattr(final.usage, "cache_creation_input_tokens", 0) or 0,
             }
 
         # Surface tool_use blocks as tool_calls for the api.py tool loop

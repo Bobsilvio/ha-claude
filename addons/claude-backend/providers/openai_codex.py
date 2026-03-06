@@ -448,6 +448,7 @@ class OpenAICodexProvider(EnhancedProvider):
                     error_text = response.read().decode("utf-8", errors="ignore")
                     raise RuntimeError(f"HTTP {response.status_code}: {error_text}")
                 
+                captured_usage = None
                 content = ""
                 finish_reason = "stop"
                 
@@ -473,8 +474,16 @@ class OpenAICodexProvider(EnhancedProvider):
                                 }
                         
                         elif event_type == "response.completed":
-                            status = (event.get("response") or {}).get("status")
+                            resp_obj = event.get("response") or {}
+                            status = resp_obj.get("status")
                             finish_reason = self._map_finish_reason(status)
+                            # Capture usage from the completed response if available
+                            usage_obj = resp_obj.get("usage")
+                            if usage_obj:
+                                captured_usage = {
+                                    "input_tokens": usage_obj.get("input_tokens", 0) or 0,
+                                    "output_tokens": usage_obj.get("output_tokens", 0) or 0,
+                                }
                         
                         elif event_type in {"error", "response.failed"}:
                             raise RuntimeError("Codex response failed")
@@ -482,10 +491,13 @@ class OpenAICodexProvider(EnhancedProvider):
                     except json.JSONDecodeError:
                         continue
                 
-                yield {
+                done_event: dict = {
                     "type": "done",
                     "finish_reason": finish_reason,
                 }
+                if captured_usage:
+                    done_event["usage"] = captured_usage
+                yield done_event
         
         except Exception as e:
             logger.error(f"Codex streaming error: {e}")

@@ -13,7 +13,45 @@ import logging
 import time
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
+from .error_handler import ErrorTranslator
+
 logger = logging.getLogger(__name__)
+
+# Maps provider name → env-var that holds its API key.
+# Used by _build_fallback_chain() to detect which providers are configured.
+_PROVIDER_KEY_ENV: Dict[str, str] = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY",
+    "github": "GITHUB_TOKEN",
+    "nvidia": "NVIDIA_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY",
+    "perplexity": "PERPLEXITY_API_KEY",
+}
+# Preferred fallback order (higher-quality providers first).
+_FALLBACK_PRIORITY = [
+    "anthropic", "openai", "google", "deepseek", "github",
+    "groq", "mistral", "openrouter", "nvidia", "perplexity",
+]
+
+
+def _build_fallback_chain(primary: str) -> List[str]:
+    """Auto-detect configured providers and return a fallback chain.
+
+    Only providers that have an API key set in the environment are included.
+    The primary provider is excluded from the chain.
+    """
+    chain: List[str] = []
+    for prov in _FALLBACK_PRIORITY:
+        if prov == primary:
+            continue
+        env_var = _PROVIDER_KEY_ENV.get(prov, "")
+        if env_var and os.getenv(env_var, ""):
+            chain.append(prov)
+    return chain
 
 
 class ProviderManager:
@@ -181,14 +219,14 @@ class ProviderManager:
         self.last_error = error_msg
         self.last_error_time = time.time()
 
-        # Sanitize: if the error message still contains raw JSON, clean it up
-        display_msg = self._sanitize_error_for_user(error_msg)
+        # Sanitize via centralized ErrorTranslator
+        failed_prov = providers_to_try[-1] if providers_to_try else "generic"
+        display_msg = self._sanitize_error_for_user(error_msg, provider=failed_prov)
 
         # Forward the last provider error event if available, else craft one
         if last_error_event:
-            # Sanitize the event message too
             last_error_event["message"] = self._sanitize_error_for_user(
-                last_error_event.get("message", display_msg)
+                last_error_event.get("message", display_msg), provider=failed_prov
             )
             yield last_error_event
         else:
@@ -198,85 +236,36 @@ class ProviderManager:
             }
 
     @staticmethod
-    def _sanitize_error_for_user(msg: str) -> str:
-        """Strip raw JSON, HTTP bodies, and technical noise from error messages.
-        Returns a clean, user-friendly message."""
+    def _sanitize_error_for_user(msg: str, provider: str = "generic") -> str:
+        """Translate raw error to a user-friendly message via ErrorTranslator.
+
+        Strips JSON noise, classifies the error, and returns a localised
+        string using the centralized ErrorTranslator (error_handler.py).
+        """
         if not msg:
-            return "Si è verificato un errore. Riprova."
+            return ErrorTranslator.translate_error("", provider=provider)
 
         import re
         import json as _json
 
-        # Early detection of quota/billing exhaustion keywords in the RAW
-        # message.  Must run BEFORE stripping JSON blobs (which removes the
-        # keywords — especially when the blob uses Python single-quotes and
-        # json.loads() fails).
-        _low = msg.lower()
-        if (
-            "insufficient_quota" in _low
-            or "exceeded your current quota" in _low
-            or "run out of credits" in _low
-        ):
-            return "❌ Quota esaurita. Il tuo account ha esaurito i crediti. Controlla il piano e la fatturazione del provider."
+        # Try to extract a cleaner message from embedded JSON blobs
+        clean_msg = msg
+        if "{" in msg:
+            json_match = re.search(r'\{.*\}', msg, re.DOTALL)
+            if json_match:
+                try:
+                    parsed = _json.loads(json_match.group())
+                    error_obj = parsed.get("error", parsed)
+                    if isinstance(error_obj, dict):
+                        inner = error_obj.get("message") or error_obj.get("type") or ""
+                        if inner:
+                            clean_msg = inner
+                except (ValueError, TypeError):
+                    pass
 
-        # If the message is already clean (no JSON blobs), return as-is
-        if '{' not in msg and 'HTTP' not in msg:
-            return msg
-
-        # Try to detect and parse a JSON blob embedded in the message
-        json_match = re.search(r'\{.*\}', msg, re.DOTALL)
-        if json_match:
-            try:
-                parsed = _json.loads(json_match.group())
-                # Common patterns: {"error": {"message": "..."}} or {"error": {"type": "..."}}
-                error_obj = parsed.get("error", parsed)
-                if isinstance(error_obj, dict):
-                    inner_msg = error_obj.get("message", "")
-                    error_type = error_obj.get("type", "")
-                    # inner_msg might itself be JSON
-                    try:
-                        inner_parsed = _json.loads(inner_msg)
-                        if isinstance(inner_parsed, dict) and "type" in inner_parsed:
-                            error_type = inner_parsed.get("type", error_type)
-                    except (ValueError, TypeError):
-                        pass
-
-                    # Map known error types to readable messages
-                    # Quota / billing errors  (must come BEFORE rate_limit check)
-                    if "insufficient_quota" in error_type or "quota" in error_type.lower():
-                        return "Quota esaurita. Il tuo account ha esaurito i crediti. Controlla il piano/fatturazione del provider."
-                    if "rate_limit" in error_type or "exceeded_limit" in error_type:
-                        return "Limite di utilizzo superato. Riprova più tardi o usa un altro provider."
-                    if "auth" in error_type.lower():
-                        return "Errore di autenticazione. Controlla le credenziali."
-                    if "overloaded" in error_type.lower():
-                        return "Il provider è sovraccarico. Riprova tra qualche minuto."
-            except (ValueError, TypeError):
-                pass
-
-        # If it still has raw JSON, strip it
-        cleaned = re.sub(r'\{[^{}]*(\{[^{}]*\}[^{}]*)*\}', '', msg).strip()
-        # Remove "HTTP XXX:" prefixes from the cleaned message
-        cleaned = re.sub(r'HTTP \d{3}:\s*', '', cleaned).strip()
-        # Remove trailing/leading punctuation artifacts
-        cleaned = cleaned.strip(' :;,-')
-
-        if cleaned and len(cleaned) > 10:
-            return cleaned
-
-        # Fallback: return a generic clean message
-        low_msg = msg.lower()
-        # Quota/billing errors (check BEFORE generic 429)
-        if "insufficient_quota" in low_msg or "exceeded your current quota" in low_msg or "run out of credits" in low_msg:
-            return "Quota esaurita. Il tuo account ha esaurito i crediti. Controlla il piano/fatturazione del provider."
-        if "429" in msg or "rate_limit" in low_msg:
-            return "Limite di utilizzo superato. Riprova più tardi o usa un altro provider."
-        if "401" in msg or "auth" in msg.lower():
-            return "Errore di autenticazione. Controlla le credenziali."
-        if "500" in msg or "502" in msg or "503" in msg:
-            return "Errore del server del provider. Riprova tra qualche minuto."
-
-        return "Si è verificato un errore. Riprova."
+        # Read language from env (same as api.py LANGUAGE)
+        language = os.getenv("LANGUAGE", "en").lower()
+        return ErrorTranslator.translate_error(clean_msg, provider=provider, language=language)
 
     def _stream_with_provider(
         self,
@@ -428,14 +417,25 @@ def stream_chat(
     fallback_chain: Optional[List[str]] = None,
     model: Optional[str] = None,
 ) -> Generator[Dict[str, Any], None, None]:
-    """Convenience function: stream chat with automatic fallback.
-    
+    """Convenience function: stream chat with rate-aware fallback.
+
+    If *fallback_chain* is not provided, it is auto-built from the environment:
+    every provider that has a configured API key becomes a fallback candidate.
+
+    Routes through the enhanced (rate-aware) manager when available.
+
     Usage:
         for event in stream_chat("anthropic", messages, model="claude-opus-4-6"):
             process_event(event)
     """
+    if fallback_chain is None:
+        fallback_chain = _build_fallback_chain(provider)
+        if fallback_chain:
+            logger.info(f"Auto-fallback chain: {provider} → {' → '.join(fallback_chain)}")
+
     manager = get_manager()
-    yield from manager.stream_chat_unified(provider, messages, intent_info, fallback_chain, model=model)
+    # Prefer rate-aware enhanced path; falls back to legacy internally
+    yield from manager.stream_chat_enhanced(provider, messages, intent_info, fallback_chain, model=model)
 
 
 def get_manager_stats() -> Dict[str, Any]:

@@ -170,13 +170,23 @@ class GroqProvider(EnhancedProvider):
         """Convert Groq API error to user-friendly message."""
         error_msg = str(error).lower()
 
+        # Token / payload too large (413, TPM exceeded, or max_tokens constraint)
+        # MUST come before _is_rate_limit_error because Groq sends
+        # "rate_limit_exceeded" for TPM overages too.
+        if ("413" in error_msg
+                or "payload too large" in error_msg
+                or "request too large" in error_msg
+                or "tokens_limit_reached" in error_msg):
+            return "Groq: token_limit (request too large)"
+        if "max_tokens" in error_msg and "must be less than" in error_msg:
+            return "Groq: token_limit (max_tokens exceeds model limit)"
         if self._is_auth_error(error_msg):
             return "Groq: API key invalid or missing. Check your Groq API key in the add-on settings."
         if self._is_rate_limit_error(error_msg):
             return "Groq: Rate limit exceeded. Please retry in a moment."
         if "model_decommissioned" in error_msg or "decommissioned" in error_msg:
             return "Groq: This model has been decommissioned. Please select a different Groq model in the add-on settings."
-        if "model" in error_msg:
+        if "model" in error_msg and ("not found" in error_msg or "not available" in error_msg or "does not exist" in error_msg):
             return "Groq: Model not found or not available."
 
         return f"Groq error: {error}"

@@ -19,6 +19,8 @@ class ErrorType(Enum):
     RATE_LIMIT = "rate_limit"
     AUTH_ERROR = "auth_error"
     QUOTA_EXCEEDED = "quota_exceeded"
+    TOKEN_LIMIT = "token_limit"  # request too large for model context
+    BUDGET_EXHAUSTED = "budget_exhausted"  # account spending cap reached
     INVALID_REQUEST = "invalid_request"
     SERVER_ERROR = "server_error"
     NETWORK_ERROR = "network_error"
@@ -93,6 +95,18 @@ class ErrorTranslator:
             "es": "Error de red. Verifica tu conexión e intenta de nuevo.",
             "fr": "Erreur réseau. Vérifiez votre connexion et réessayez.",
         },
+        ErrorType.TOKEN_LIMIT: {
+            "en": "Request too large for this model. Try a model with a bigger context window, or reduce conversation length.",
+            "it": "Richiesta troppo grande per questo modello. Prova un modello con contesto più ampio, o riduci la lunghezza della conversazione.",
+            "es": "Solicitud demasiado grande para este modelo. Prueba un modelo con más contexto, o reduce la conversación.",
+            "fr": "Requête trop volumineuse pour ce modèle. Essayez un modèle avec un contexte plus large, ou réduisez la conversation.",
+        },
+        ErrorType.BUDGET_EXHAUSTED: {
+            "en": "Account budget/spending limit reached. Wait for the limit to reset or upgrade your plan.",
+            "it": "Budget/limite di spesa dell'account raggiunto. Attendi il reset del limite o aggiorna il tuo piano.",
+            "es": "Límite de presupuesto/gasto de la cuenta alcanzado. Espera a que se restablezca o actualiza tu plan.",
+            "fr": "Budget/limite de dépenses du compte atteint. Attendez la réinitialisation ou mettez à niveau votre plan.",
+        },
         ErrorType.UNKNOWN: {
             "en": "An error occurred. Please try again.",
             "it": "Si è verificato un errore. Riprova.",
@@ -132,23 +146,50 @@ class ErrorTranslator:
             if pattern.lower() in msg_lower:
                 return error_type
 
-        # Fallback to generic patterns - order matters!
-        # Check RATE_LIMIT first (more specific than LIMIT)
+        # ── Fallback to generic patterns — ORDER MATTERS ──
+
+        # 1. TOKEN / PAYLOAD LIMIT — must come FIRST because the body may
+        #    also contain "rate_limit_exceeded" (Groq sends that code for TPM)
+        if ("tokens_limit_reached" in msg_lower
+                or "payload too large" in msg_lower
+                or "request body too large" in msg_lower
+                or "request too large" in msg_lower
+                or "413" in msg_lower
+                or "max_tokens" in msg_lower and "must be less than" in msg_lower):
+            return ErrorType.TOKEN_LIMIT
+
+        # 2. BUDGET / SPENDING CAP (not a transient rate-limit)
+        if ("budget limit" in msg_lower
+                or "reached its budget" in msg_lower
+                or "spending limit" in msg_lower
+                or "budget_exceeded" in msg_lower):
+            return ErrorType.BUDGET_EXHAUSTED
+
+        # 3. RATE_LIMIT (transient 429 / TPM / RPM)
         if "429" in msg_lower or "too many requests" in msg_lower or "rate limit" in msg_lower or "ratelimit" in msg_lower:
             return ErrorType.RATE_LIMIT
-        # Check AUTH before other codes/messages
-        if "401" in msg_lower or "403" in msg_lower or "unauthorized" in msg_lower or "invalid api key" in msg_lower or "authentication failed" in msg_lower:
+
+        # 4. AUTH — exclude budget errors that also carry 403
+        if ("401" in msg_lower or "unauthorized" in msg_lower
+                or "invalid api key" in msg_lower or "authentication failed" in msg_lower):
             return ErrorType.AUTH_ERROR
-        # Check SERVER errors
+        # 403 without budget keywords → auth error
+        if "403" in msg_lower:
+            return ErrorType.AUTH_ERROR
+
+        # 5. SERVER errors
         if "500" in msg_lower or "502" in msg_lower or "503" in msg_lower or "internal server error" in msg_lower or "bad gateway" in msg_lower or "service unavailable" in msg_lower:
             return ErrorType.SERVER_ERROR
-        # Check NETWORK errors
+
+        # 6. NETWORK errors
         if "timeout" in msg_lower or "connection" in msg_lower:
             return ErrorType.NETWORK_ERROR
-        # Check QUOTA (more specific patterns after generic ones)
-        if "quota" in msg_lower or "usage limit" in msg_lower or "monthly limit" in msg_lower:
+
+        # 7. QUOTA (permanent billing / credits)
+        if "quota" in msg_lower or "usage limit" in msg_lower or "monthly limit" in msg_lower or "insufficient_quota" in msg_lower or "insufficient credits" in msg_lower:
             return ErrorType.QUOTA_EXCEEDED
-        # Generic INVALID_REQUEST
+
+        # 8. Generic INVALID_REQUEST
         if "400" in msg_lower or "invalid" in msg_lower:
             return ErrorType.INVALID_REQUEST
 
@@ -247,6 +288,8 @@ class ErrorRecoveryStrategy:
             ErrorType.NETWORK_ERROR: 2,
             ErrorType.AUTH_ERROR: 0,        # Don't retry auth errors
             ErrorType.QUOTA_EXCEEDED: 0,    # Don't retry quota errors
+            ErrorType.BUDGET_EXHAUSTED: 0,  # Don't retry budget errors
+            ErrorType.TOKEN_LIMIT: 0,       # Don't retry token limit errors
             ErrorType.INVALID_REQUEST: 0,   # Don't retry invalid requests
             ErrorType.UNKNOWN: 1,
         }.get(error_type, 1)

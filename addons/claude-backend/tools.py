@@ -1006,15 +1006,15 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_automation",
-        "description": "Create a new Home Assistant automation with triggers, conditions, and actions.",
+        "description": "Create a NEW Home Assistant automation. IMPORTANT: you MUST include trigger and action arrays with the full content (platform, service, entity_id, etc). Do NOT create empty automations. If an automation with a similar name already exists, use update_automation instead.",
         "parameters": {
             "type": "object",
             "properties": {
                 "alias": {"type": "string", "description": "Name for the automation."},
                 "description": {"type": "string", "description": "Description of the automation."},
-                "trigger": {"type": "array", "description": "List of triggers.", "items": {"type": "object"}},
+                "trigger": {"type": "array", "description": "REQUIRED. List of trigger objects, e.g. [{'platform': 'time', 'at': '20:00'}].", "items": {"type": "object"}},
                 "condition": {"type": "array", "description": "Optional conditions.", "items": {"type": "object"}},
-                "action": {"type": "array", "description": "List of actions.", "items": {"type": "object"}},
+                "action": {"type": "array", "description": "REQUIRED. List of action objects, e.g. [{'service': 'light.turn_on', 'target': {'entity_id': 'light.xxx'}}].", "items": {"type": "object"}},
                 "mode": {"type": "string", "enum": ["single", "restart", "queued", "parallel"]}
             },
             "required": ["alias", "trigger", "action"]
@@ -2010,13 +2010,53 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             import time as _time
             # Accept both singular and plural keys from the model
             alias = tool_input.get("alias", "New Automation")
+            triggers = tool_input.get("triggers") or tool_input.get("trigger", [])
+            actions = tool_input.get("actions") or tool_input.get("action", [])
+            conditions = tool_input.get("conditions") or tool_input.get("condition", [])
+
+            # ---- GUARD: reject empty automations ----
+            if not triggers and not actions:
+                return json.dumps({
+                    "status": "error",
+                    "message": "Cannot create an automation with empty triggers AND empty actions. "
+                               "You MUST pass 'trigger' (array of trigger objects) and 'action' (array of action objects) with the actual content. "
+                               "Do NOT pass only alias/description/mode — include the full automation definition.",
+                    "hint": "If you want to MODIFY an existing automation, use update_automation instead.",
+                }, ensure_ascii=False)
+
+            # ---- GUARD: detect duplicate alias → suggest update_automation ----
+            _auto_yaml_path = api.get_config_file_path("automation", "automations.yaml")
+            if _auto_yaml_path and os.path.isfile(_auto_yaml_path):
+                try:
+                    with open(_auto_yaml_path, "r", encoding="utf-8") as _af:
+                        _existing = yaml.safe_load(_af) or []
+                    if isinstance(_existing, list):
+                        alias_lower = alias.lower().strip()
+                        for _ea in _existing:
+                            if isinstance(_ea, dict):
+                                ea_alias = (_ea.get("alias") or "").lower().strip()
+                                # Exact or very similar match
+                                if ea_alias == alias_lower or (
+                                    len(alias_lower) > 10
+                                    and (ea_alias in alias_lower or alias_lower in ea_alias)
+                                ):
+                                    return json.dumps({
+                                        "status": "error",
+                                        "message": f"An automation with a similar name already exists: '{_ea.get('alias')}' (id: {_ea.get('id')}). "
+                                                   f"Use update_automation with automation_id='{_ea.get('id')}' instead of creating a duplicate.",
+                                        "existing_id": str(_ea.get("id")),
+                                        "existing_alias": _ea.get("alias"),
+                                    }, ensure_ascii=False)
+                except Exception:
+                    pass  # non-critical, proceed with creation
+
             config = {
                 "id": str(int(_time.time() * 1000)),  # unique ID like HA UI generates
                 "alias": alias,
                 "description": _stamp_description(tool_input.get("description", ""), "create"),
-                "triggers": tool_input.get("triggers") or tool_input.get("trigger", []),
-                "conditions": tool_input.get("conditions") or tool_input.get("condition", []),
-                "actions": tool_input.get("actions") or tool_input.get("action", []),
+                "triggers": triggers,
+                "conditions": conditions,
+                "actions": actions,
                 "mode": tool_input.get("mode", "single"),
             }
 
@@ -2490,8 +2530,17 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             for s in states:
                 eid = s.get("entity_id", "").lower()
                 fname = s.get("attributes", {}).get("friendly_name", "").lower()
+                entity_state = s.get("state", "")
+
+                # Skip entities that are unavailable — they are broken/disconnected
+                if entity_state == "unavailable":
+                    continue
 
                 score = 0
+
+                # Penalize unknown entities (exist but no data yet)
+                if entity_state == "unknown":
+                    score -= 40
 
                 # Strong signals: exact substring match
                 if query and query in eid:
@@ -2559,16 +2608,21 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     else:
                         quality = "low"
 
-                    search_results.append({
+                    result_item = {
                         "entity_id": s.get("entity_id"),
-                        "state": s.get("state"),
+                        "state": entity_state,
                         "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
                         "match_quality": quality,
                         "token_coverage": round(coverage, 3),
                         "matched_tokens": sorted(list(matched))[:20],
                         "missing_tokens": missing[:20],
                         "score": score,
-                    })
+                    }
+                    # Add unit if present (useful for sensors)
+                    unit = s.get("attributes", {}).get("unit_of_measurement")
+                    if unit:
+                        result_item["unit"] = unit
+                    search_results.append(result_item)
 
             # Sort by score (descending) and take top results
             search_results.sort(key=lambda x: (-x["score"], x["entity_id"]))
@@ -4589,6 +4643,9 @@ This helps the user understand and verify the changes. Keep the diff focused on 
 - When context is pre-loaded in the user message, ALL that data is already available. NEVER re-fetch it.
 - PRE-LOADED DATA = do NOT call: get_automations, get_scripts, get_dashboards, read_config_file, list_config_files, search_entities, get_entity_state for data already present.
 - For modifying automations: call update_automation ONCE with automation_id + changes. That's IT. ONE call total.
+- NEVER use create_automation to modify an existing automation — always use update_automation with the existing automation_id.
+- When the user asks to change an automation (time, entity, trigger, action), find the existing automation_id and use update_automation.
+- create_automation is ONLY for brand-new automations that don't already exist. Always include trigger AND action arrays with full content.
 - For modifying scripts: call update_script ONCE with script_id + changes. That's IT. ONE call total.
 - After update_automation or update_script succeeds: STOP. Show the diff to the user. Do NOT call any verification tools.
 - NEVER verify changes by calling get_automations or read_config_file after an update - the tool already returns old/new YAML.
@@ -4696,7 +4753,7 @@ HA_TOOLS_COMPACT = [
     },
     {
         "name": "create_automation",
-        "description": "Create HA automation with alias, trigger, action.",
+        "description": "Create NEW HA automation. MUST include trigger and action arrays with full content. If similar automation exists, use update_automation instead.",
         "parameters": {"type": "object", "properties": {
             "alias": {"type": "string"}, "trigger": {"type": "array", "items": {"type": "object"}},
             "action": {"type": "array", "items": {"type": "object"}}
@@ -4754,6 +4811,34 @@ HA_TOOLS_EXTENDED = HA_TOOLS_COMPACT + [
         "parameters": {"type": "object", "properties": {}, "required": []}
     },
 ]
+
+
+def _get_tool_tier() -> str:
+    """Determine tool tier based on provider and model token constraints.
+
+    Returns 'compact' (6 tools), 'extended' (12 tools), or 'full' (all tools).
+    Providers/models with tight request-size or TPM limits get fewer tools
+    to avoid 413 / token_limit errors.
+
+    Tiers:
+      compact  — 6 core tools, compact system prompt  (~1800 tokens)
+      extended — 12 tools (compact + config/listing),  (~3600 tokens)
+      full     — all 51 tools, full system prompt       (~15000 tokens)
+    """
+    provider = api.AI_PROVIDER
+    model = (api.get_active_model() or "").lower()
+
+    # Providers with known tight request-size / TPM limits
+    _TIGHT_PROVIDERS = {"github", "groq"}
+
+    if provider in _TIGHT_PROVIDERS:
+        return "extended" if api.ENABLE_FILE_ACCESS else "compact"
+
+    # Small models on any provider (nano = typically 8k input context)
+    if "nano" in model:
+        return "extended" if api.ENABLE_FILE_ACCESS else "compact"
+
+    return "full"
 
 
 def get_system_prompt() -> str:
@@ -4866,15 +4951,15 @@ Always create visually appealing layouts using grids and stacks:
 
     """
 
-    if api.AI_PROVIDER == "github":
-        # GitHub has 8k token limit - use minimal prompt with only includes mapping
+    tier = _get_tool_tier()
+    if tier in ("compact", "extended"):
+        # Tight-context provider/model — use minimal prompt to save tokens
         compact_prompt = get_compact_prompt_with_files() if api.ENABLE_FILE_ACCESS else get_compact_prompt()
-        # Only include file mapping if file access is enabled, skip verbose config structure
         if api.ENABLE_FILE_ACCESS and api.CONFIG_INCLUDES:
             includes_compact = "Config files: " + ", ".join([f"{k}={v}" for k, v in list(api.CONFIG_INCLUDES.items())[:5]]) + "\n"
             return includes_compact + compact_prompt
         return compact_prompt
-    # For other providers, add language instruction and critical rules to base prompt
+    # For other providers (full tier), add language instruction and critical rules to base prompt
     lang_instruction = api.get_lang_text("respond_instruction")
     show_yaml_rule = api.get_lang_text("show_yaml_rule")
     confirm_entity_rule = api.get_lang_text("confirm_entity_rule")
@@ -4884,12 +4969,153 @@ Always create visually appealing layouts using grids and stacks:
 
 
 def get_openai_tools_for_provider():
-    """Get OpenAI-format tools appropriate for current provider."""
-    if api.AI_PROVIDER == "github":
-        # GitHub Models has 8k token limit - use extended set if file access enabled, otherwise compact
-        tool_set = HA_TOOLS_EXTENDED if api.ENABLE_FILE_ACCESS else HA_TOOLS_COMPACT
-        return [
-            {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
-            for t in tool_set
-        ]
-    return get_openai_tools()
+    """Get OpenAI-format tools appropriate for current provider.
+
+    Uses _get_tool_tier() to select the right tool set:
+      compact  → 6 core tools  (github, groq, nano models)
+      extended → 12 tools       (same providers + file_access)
+      full     → all 51 tools   (anthropic, openai, google, etc.)
+    """
+    tier = _get_tool_tier()
+
+    if tier == "compact":
+        tool_set = HA_TOOLS_COMPACT
+    elif tier == "extended":
+        tool_set = HA_TOOLS_EXTENDED
+    else:
+        return get_openai_tools()  # full set
+
+    return [
+        {"type": "function", "function": {"name": t["name"], "description": t["description"], "parameters": t["parameters"]}}
+        for t in tool_set
+    ]
+
+
+# ============================================================================
+# TOOL REGISTRY INTEGRATION (OpenClaw-style centralized tool pipeline)
+# ============================================================================
+
+def _init_tool_registry():
+    """Initialize the centralized ToolRegistry from legacy tool definitions.
+
+    This bridges the existing HA_TOOLS_DESCRIPTION + execute_tool system into
+    the new OpenClaw-inspired ToolRegistry architecture, providing:
+    - Centralized tool management with ToolDefinition (schema + executor)
+    - Policy-based filtering (file_access, tier, intent, category)
+    - Provider-specific schema normalization (Anthropic, OpenAI, Gemini)
+    - Before/after hooks (read-only, dedup, logging, entity validation)
+
+    Called lazily on first access to the registry.
+    """
+    try:
+        from tool_registry import initialize_from_legacy
+        registry = initialize_from_legacy()
+        logger.info(f"ToolRegistry initialized: {registry.tool_count} tools")
+        return registry
+    except Exception as e:
+        logger.error(f"Failed to initialize ToolRegistry: {e}")
+        return None
+
+
+# Lazy singleton — initialized on first call to get_tool_registry()
+_tool_registry_instance = None
+
+
+def get_tool_registry():
+    """Get the global ToolRegistry instance (lazy init).
+
+    Returns the ToolRegistry or None if initialization failed.
+    """
+    global _tool_registry_instance
+    if _tool_registry_instance is None:
+        _tool_registry_instance = _init_tool_registry()
+    return _tool_registry_instance
+
+
+# ---- Registry-aware tool functions (new API, backward-compatible) ----
+
+def get_tools_for_provider_via_registry(
+    provider: str,
+    intent_tools=None,
+    tier: str = "full",
+    model: str = "",
+    agent_id: str = "",
+):
+    """Get tools formatted for a specific provider using the ToolRegistry.
+
+    This is the NEW preferred way to get tools. Falls back to legacy functions
+    if the registry isn't available.
+
+    Args:
+        provider: Provider name ("anthropic", "openai", "google", etc.)
+        intent_tools: None (all tools), [] (no tools), or list of tool names
+        tier: "compact", "extended", or "full"
+        model: Model ID (used for xAI/Grok detection behind gateways)
+        agent_id: Active agent ID (for per-agent tool allow/block filtering)
+
+    Returns:
+        List of tool dicts in provider-specific format
+    """
+    registry = get_tool_registry()
+    if registry is None:
+        # Fallback to legacy
+        if provider == "anthropic":
+            return get_anthropic_tools()
+        elif provider == "google":
+            return get_gemini_tools()
+        else:
+            return get_openai_tools_for_provider()
+
+    context = {
+        "tier": tier,
+        "intent_tools": intent_tools,
+        "enable_file_access": getattr(api, "ENABLE_FILE_ACCESS", False),
+    }
+    if agent_id:
+        context["agent_id"] = agent_id
+
+    if provider == "google":
+        return registry.format_for_gemini(context)
+
+    return registry.format_for_provider(provider, context, model=model)
+
+
+def execute_tool_via_registry(
+    tool_name: str,
+    tool_input: dict,
+    session_id: str = "default",
+    read_only: bool = False,
+    round_number: int = 0,
+    call_history: set = None,
+) -> str:
+    """Execute a tool using the ToolRegistry with hooks.
+
+    This is the NEW preferred way to execute tools. Falls back to legacy
+    execute_tool() if the registry isn't available.
+
+    Args:
+        tool_name: Name of the tool to execute
+        tool_input: Arguments dict
+        session_id: Session ID for read-only state
+        read_only: Whether session is in read-only mode
+        round_number: Current tool loop round (for metrics)
+        call_history: Set of previous call signatures (for dedup)
+
+    Returns:
+        Result string (JSON)
+    """
+    from tool_registry import ToolCallContext
+
+    registry = get_tool_registry()
+    if registry is None:
+        return execute_tool(tool_name, tool_input)
+
+    ctx = ToolCallContext(
+        tool_name=tool_name,
+        arguments=tool_input,
+        session_id=session_id,
+        read_only=read_only,
+        round_number=round_number,
+        call_history=call_history or set(),
+    )
+    return registry.execute(tool_name, tool_input, context=ctx)

@@ -65,6 +65,11 @@ COPY voice_transcription.py .
 COPY prompt_caching.py .
 COPY image_support.py .
 COPY scheduler_agent.py .
+COPY tool_registry.py .
+COPY model_catalog.py .
+COPY agent_config.py .
+COPY model_fallback.py .
+COPY usage_tracker.py .
 
 # Copy new providers module (v3.17.12+)
 COPY providers /app/providers

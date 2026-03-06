@@ -4,10 +4,7 @@ import os
 import json
 import re
 import logging
-import time
 from typing import Dict, List, Optional
-
-import httpx
 
 import api
 
@@ -72,580 +69,96 @@ TOOL_DESCRIPTIONS: Dict[str, str] = {
     "get_ha_logs": "Get HA system logs and error messages",
 }
 
-# All valid tool names (used to validate AI classifier output)
-_VALID_TOOL_NAMES = set(TOOL_DESCRIPTIONS.keys())
-
-
-# ---------------------------------------------------------------------------
-# AI-based tool classification
-# ---------------------------------------------------------------------------
-
-# Provider base-URLs for OpenAI-compatible classification call
-_PROVIDER_BASE_URLS: Dict[str, str] = {
-    "openai": "https://api.openai.com/v1",
-    "anthropic": "https://api.anthropic.com/v1",
-    "github": "https://models.inference.ai.azure.com",
-    "nvidia": "https://integrate.api.nvidia.com/v1",
-    "groq": "https://api.groq.com/openai/v1",
-    "mistral": "https://api.mistral.ai/v1",
-    "openrouter": "https://openrouter.ai/api/v1",
-    "deepseek": "https://api.deepseek.com/v1",
-    "minimax": "https://api.minimax.chat/v1",
-    "aihubmix": "https://aihubmix.com/v1",
-    "siliconflow": "https://api.siliconflow.cn/v1",
-    "perplexity": "https://api.perplexity.ai",
-    "moonshot": "https://api.moonshot.cn/v1",
-    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
-}
-
-# Classification system prompt — compact, ~500 tokens
-_CLASSIFY_SYSTEM_PROMPT = """You are a tool selector for a Home Assistant AI assistant.
-Given the user's request, decide which tools are needed to fulfill it.
-
-Available tools:
-{tool_list}
-
-Rules:
-- Return ONLY a JSON array of tool name strings, nothing else.
-- Pick only the tools strictly necessary (typically 1-6).
-- The user may write in ANY language (Italian, English, Spanish, French, etc.). Understand the intent regardless of language.
-- If the request is a greeting, chitchat, or general knowledge question with NO Home Assistant action, return [].
-- For device control: include call_service + search_entities.
-- For queries about state: include get_entity_state and/or search_entities.
-- For history/trends/summaries ("what happened", "history", "last N hours"): ALWAYS include get_history + search_entities. Include get_statistics if they ask for min/max/average.
-- For automations: include the relevant automation tools (get_automations, create_automation, update_automation).
-- For scripts: include the relevant script tools.
-- For dashboard work: include the relevant dashboard tools.
-- For config file editing: include read_config_file, write_config_file, check_config.
-- For system diagnostics/logs: include get_error_log, get_ha_logs, get_repairs.
-- For shopping list: include shopping_list.
-- For areas/rooms: include get_areas.
-- When unsure, include search_entities — it helps find the right entity.
-Example output: ["call_service", "search_entities"]"""
-
-
-def _build_tool_list_text() -> str:
-    """Build compact tool list for classification prompt."""
-    lines = []
-    for name, desc in TOOL_DESCRIPTIONS.items():
-        lines.append(f"- {name}: {desc}")
-    return "\n".join(lines)
-
-
-def _get_provider_api_key(provider: str) -> str:
-    """Get API key for the given provider from env."""
-    _key_map = {
-        "openai": "OPENAI_API_KEY",
-        "anthropic": "ANTHROPIC_API_KEY",
-        "github": "GITHUB_TOKEN",
-        "nvidia": "NVIDIA_API_KEY",
-        "groq": "GROQ_API_KEY",
-        "mistral": "MISTRAL_API_KEY",
-        "openrouter": "OPENROUTER_API_KEY",
-        "deepseek": "DEEPSEEK_API_KEY",
-        "minimax": "MINIMAX_API_KEY",
-        "aihubmix": "AIHUBMIX_API_KEY",
-        "siliconflow": "SILICONFLOW_API_KEY",
-        "perplexity": "PERPLEXITY_API_KEY",
-        "moonshot": "MOONSHOT_API_KEY",
-        "zhipu": "ZHIPU_API_KEY",
-        "ollama": "",
-    }
-    env_var = _key_map.get(provider)
-    if env_var is None:
-        # Generic fallback
-        env_var = f"{provider.upper()}_API_KEY"
-    if not env_var:
-        return ""
-    # Anthropic special case: fallback to CLAUDE_API_KEY
-    if provider == "anthropic":
-        return os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
-    if provider == "github":
-        return os.getenv("GITHUB_TOKEN", "") or os.getenv("GITHUB_API_KEY", "")
-    return os.getenv(env_var, "")
-
-
-def _get_provider_base_url(provider: str) -> str:
-    """Get base URL for the given provider."""
-    if provider == "ollama":
-        return os.getenv("OLLAMA_BASE_URL", "http://localhost:11434") + "/v1"
-    if provider == "custom":
-        return os.getenv("CUSTOM_API_BASE", "")
-    return _PROVIDER_BASE_URLS.get(provider, "")
-
-
-# Providers that don't expose a standard REST API for classification
-# but CAN classify via their streaming interface (providers.stream_chat)
-_WEB_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web", "github_copilot"}
-
-# Fallback REST providers to try if primary has no base URL AND streaming fails
-_CLASSIFY_FALLBACK_ORDER = [
-    ("groq", "llama-3.3-70b-versatile"),
-    ("github", "gpt-4o-mini"),
-    ("openai", "gpt-4o-mini"),
-    ("deepseek", "deepseek-chat"),
-    ("mistral", "mistral-small-latest"),
-    ("openrouter", "meta-llama/llama-3.3-70b-instruct"),
-    ("anthropic", "claude-sonnet-4-20250514"),
-    ("google", "gemini-2.0-flash"),
-    ("nvidia", "meta/llama-3.1-8b-instruct"),
-    ("perplexity", "sonar"),
-    ("ollama", ""),  # uses whatever model is loaded
-]
-
-
-def _find_rest_classify_provider(primary_provider: str, primary_model: str):
-    """Find a REST-compatible provider+model for the direct httpx classification call.
-
-    Returns (provider, model, base_url, api_key) or (None, ...) if nothing works.
-    """
-    # Try primary first (if it has a REST base URL)
-    if primary_provider not in _WEB_PROVIDERS:
-        base_url = _get_provider_base_url(primary_provider)
-        api_key = _get_provider_api_key(primary_provider)
-        if base_url and (api_key or primary_provider == "ollama"):
-            return primary_provider, primary_model, base_url, api_key
-
-    # Primary can't do REST → try fallbacks
-    for fb_provider, fb_model in _CLASSIFY_FALLBACK_ORDER:
-        if fb_provider == primary_provider:
-            continue
-        api_key = _get_provider_api_key(fb_provider)
-        if not api_key and fb_provider != "ollama":
-            continue
-        base_url = _get_provider_base_url(fb_provider)
-        if not base_url:
-            continue
-        if fb_provider == "ollama" and not api_key:
-            api_key = ""
-        logger.info(f"AI classify: REST fallback → '{fb_provider}' (model={fb_model})")
-        return fb_provider, fb_model, base_url, api_key
-
-    return None, None, None, None
-
-
-def _classify_via_streaming(
-    user_message: str,
-    provider: str,
-    model: str,
-) -> Optional[str]:
-    """Classify using the provider's streaming interface (works with ALL providers).
-
-    Uses providers.stream_chat() — the same mechanism as the main chat.
-    Returns the raw text response, or None on error.
-    """
-    from providers import stream_chat as _stream_chat
-
-    tool_list_text = _build_tool_list_text()
-    system_prompt = _CLASSIFY_SYSTEM_PROMPT.format(tool_list=tool_list_text)
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_message},
-    ]
-    # No tools in the classification call — we just want a text answer
-    classify_intent = {"intent": "chat", "tools": [], "tool_schemas": [], "prompt": None}
-
-    t0 = time.time()
-    text_parts: list = []
-    try:
-        for event in _stream_chat(provider, messages, intent_info=classify_intent, model=model):
-            etype = event.get("type", "")
-            if etype in ("text", "content", "delta"):
-                text_parts.append(event.get("text", "") or event.get("content", ""))
-            elif etype == "error":
-                elapsed_ms = int((time.time() - t0) * 1000)
-                logger.warning(
-                    f"AI classify (stream): error in {elapsed_ms}ms — {event.get('message', '')}"
-                )
-                return None
-            elif etype == "done":
-                break
-
-        raw_text = "".join(text_parts).strip()
-        elapsed_ms = int((time.time() - t0) * 1000)
-        if raw_text:
-            logger.info(f"AI classify (stream): got {len(raw_text)} chars in {elapsed_ms}ms via {provider}")
-            return raw_text
-        else:
-            logger.warning(f"AI classify (stream): empty response in {elapsed_ms}ms")
-            return None
-
-    except Exception as e:
-        elapsed_ms = int((time.time() - t0) * 1000)
-        logger.warning(f"AI classify (stream): error in {elapsed_ms}ms — {e}")
-        return None
-
-
-def _parse_classify_response(raw_text: str) -> Optional[List[str]]:
-    """Parse a classify response into a validated list of tool names."""
-    raw_text = raw_text.strip()
-    # Strip markdown code fences if present
-    if raw_text.startswith("```"):
-        raw_text = re.sub(r"^```\w*\n?", "", raw_text)
-        raw_text = re.sub(r"\n?```$", "", raw_text)
-        raw_text = raw_text.strip()
-
-    try:
-        tool_names = json.loads(raw_text)
-    except json.JSONDecodeError:
-        # Try to extract a JSON array from the text (model might add extra text)
-        m = re.search(r'\[.*?\]', raw_text, re.DOTALL)
-        if m:
-            try:
-                tool_names = json.loads(m.group(0))
-            except json.JSONDecodeError:
-                logger.warning(f"AI classify: cannot parse JSON: {raw_text[:120]}")
-                return None
-        else:
-            logger.warning(f"AI classify: no JSON array found: {raw_text[:120]}")
-            return None
-
-    if not isinstance(tool_names, list):
-        logger.warning(f"AI classify: response is not a list: {raw_text[:100]}")
-        return None
-
-    # Validate tool names — keep only valid ones
-    valid_tools = [t for t in tool_names if isinstance(t, str) and t in _VALID_TOOL_NAMES]
-
-    if len(valid_tools) != len(tool_names):
-        invalid = [t for t in tool_names if t not in _VALID_TOOL_NAMES]
-        logger.warning(f"AI classify: removed invalid tool names: {invalid}")
-
-    return valid_tools
-
-
-def ai_classify_tools(
-    user_message: str,
-    provider: str,
-    model: str,
-) -> Optional[List[str]]:
-    """Use a quick AI call to classify which tools are needed for a user message.
-
-    Strategy:
-    1. Try direct REST call (httpx POST) — fastest, works with OpenAI-compatible APIs.
-    2. If primary is a web provider (openai_codex, claude_web, etc.), use the
-       streaming interface (providers.stream_chat) — same mechanism as the main chat.
-    3. If both fail, try REST fallback providers.
-
-    Returns:
-        - list of tool name strings (may be empty for chat)
-        - None on error (caller should fall back to generic tool set)
-    """
-    t0 = time.time()
-
-    # --- Strategy 1: Direct REST call (preferred, fastest) ---
-    if provider not in _WEB_PROVIDERS:
-        result = _classify_via_rest(user_message, provider, model)
-        if result is not None:
-            return result
-        # REST failed for primary, will try fallbacks below
-
-    # --- Strategy 2: REST fallback providers (fast, ~300-500ms) ---
-    # For web providers this is the FIRST attempt (skip slow streaming).
-    # For REST providers this is a retry with a different provider.
-    cls_provider, cls_model, base_url, api_key = _find_rest_classify_provider(provider, model)
-    if base_url:
-        result = _classify_via_rest_direct(user_message, cls_provider, cls_model, base_url, api_key, provider)
-        if result is not None:
-            return result
-
-    # --- Strategy 3: Stream through the web provider as last resort ---
-    # Only if no REST fallback is available (e.g. no API keys configured)
-    if provider in _WEB_PROVIDERS:
-        logger.info(f"AI classify: no REST fallback available, trying streaming via '{provider}'")
-        raw_text = _classify_via_streaming(user_message, provider, model)
-        if raw_text is not None:
-            valid_tools = _parse_classify_response(raw_text)
-            if valid_tools is not None:
-                elapsed_ms = int((time.time() - t0) * 1000)
-                logger.info(
-                    f"AI classify: {len(valid_tools)} tools in {elapsed_ms}ms via {provider} (stream) → {valid_tools}"
-                )
-                return valid_tools
-
-    logger.warning(f"AI classify: all strategies failed for provider='{provider}'")
-    return None
-
-
-def _classify_via_rest(
-    user_message: str,
-    provider: str,
-    model: str,
-) -> Optional[List[str]]:
-    """Try direct REST classification with the primary provider."""
-    base_url = _get_provider_base_url(provider)
-    api_key = _get_provider_api_key(provider)
-    if not base_url or (not api_key and provider != "ollama"):
-        return None
-    return _classify_via_rest_direct(user_message, provider, model, base_url, api_key, provider)
-
-
-def _classify_via_rest_direct(
-    user_message: str,
-    cls_provider: str,
-    cls_model: str,
-    base_url: str,
-    api_key: str,
-    original_provider: str,
-) -> Optional[List[str]]:
-    """Execute the REST classification call."""
-    is_anthropic = (cls_provider == "anthropic")
-
-    tool_list_text = _build_tool_list_text()
-    system_prompt = _CLASSIFY_SYSTEM_PROMPT.format(tool_list=tool_list_text)
-
-    headers: Dict[str, str] = {"Content-Type": "application/json"}
-
-    if is_anthropic:
-        headers["x-api-key"] = api_key
-        headers["anthropic-version"] = "2023-06-01"
-        url = base_url.rstrip("/") + "/messages"
-        body = {
-            "model": cls_model,
-            "max_tokens": 150,
-            "system": system_prompt,
-            "messages": [{"role": "user", "content": user_message}],
-        }
-    else:
-        headers["Authorization"] = f"Bearer {api_key}"
-        url = base_url.rstrip("/") + "/chat/completions"
-        body = {
-            "model": cls_model,
-            "max_tokens": 150,
-            "temperature": 0,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-        }
-
-    t0 = time.time()
-    try:
-        _timeout = httpx.Timeout(connect=5.0, read=15.0, write=5.0, pool=5.0)
-        resp = httpx.post(url, headers=headers, json=body, timeout=_timeout)
-        elapsed_ms = int((time.time() - t0) * 1000)
-
-        if resp.status_code != 200:
-            logger.warning(f"AI classify (REST): HTTP {resp.status_code} in {elapsed_ms}ms — {resp.text[:200]}")
-            return None
-
-        data = resp.json()
-
-        # Extract text from response
-        if is_anthropic:
-            content_blocks = data.get("content", [])
-            raw_text = ""
-            for block in content_blocks:
-                if block.get("type") == "text":
-                    raw_text = block.get("text", "")
-                    break
-        else:
-            choices = data.get("choices", [])
-            raw_text = choices[0]["message"]["content"] if choices else ""
-
-        valid_tools = _parse_classify_response(raw_text)
-        if valid_tools is None:
-            return None
-
-        _via = f" via {cls_provider}/{cls_model}" if cls_provider != original_provider else ""
-        logger.info(
-            f"AI classify: {len(valid_tools)} tools in {elapsed_ms}ms{_via} → {valid_tools}"
-        )
-        return valid_tools
-
-    except httpx.TimeoutException:
-        elapsed_ms = int((time.time() - t0) * 1000)
-        logger.warning(f"AI classify (REST): timeout after {elapsed_ms}ms (provider={cls_provider})")
-        return None
-    except Exception as e:
-        elapsed_ms = int((time.time() - t0) * 1000)
-        logger.warning(f"AI classify (REST): error in {elapsed_ms}ms (provider={cls_provider}) — {e}")
-        return None
-
 
 # ---- Intent tool sets and prompts ----
 
 # Tool sets by intent category
+# NOTE: With the LLM-first approach (OpenClaw style), most intents use tools=None
+# which means ALL tools are sent to the LLM and it decides autonomously.
+# Only special cases restrict the tool set.
 INTENT_TOOL_SETS = {
     "chat": [],  # No tools needed for greetings/chitchat
-    "find_automation": ["get_automations"],
-    "modify_automation": ["get_automations", "update_automation"],
-    "modify_script": ["update_script"],
-    "create_automation": ["create_automation", "search_entities", "get_entity_state"],
-    "create_script": ["create_script", "search_entities", "get_entity_state"],
     "card_editor": ["search_entities", "get_integration_entities"],
-    "create_dashboard": ["create_dashboard", "update_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
     "create_html_dashboard": ["read_html_dashboard", "create_html_dashboard", "search_entities", "get_integration_entities", "get_frontend_resources"],
-    "modify_dashboard": ["get_dashboard_config", "update_dashboard", "get_frontend_resources"],
-    "control_device": ["call_service", "search_entities", "get_entity_state"],
-    "query_state": ["get_entities", "get_entity_state", "search_entities"],
-    "query_history": ["get_history", "get_statistics", "search_entities"],
-    "delete": ["delete_automation", "delete_script", "delete_dashboard"],
-    "config_edit": ["read_config_file", "write_config_file", "check_config", "list_config_files",
-                     "list_snapshots", "restore_snapshot"],
-    "areas": ["manage_areas", "manage_entity", "get_areas", "get_devices"],
-    "notifications": ["send_notification", "search_entities"],
-    "helpers": ["manage_helpers", "search_entities"],
-    "query_repairs": ["get_repairs", "dismiss_repair"],
     "manage_statistics": ["manage_statistics"],
-    "system_debug": ["get_error_log", "get_logged_users", "get_repairs", "fire_event",
-                      "read_config_file", "get_dashboard_config", "search_entities"],
-    # Generic fallback — a sensible default set that covers most common needs
-    # without blowing up the token count (12 tools instead of 48)
-    "generic": [
-        "search_entities", "get_entity_state", "get_entities",
-        "call_service", "get_history", "get_statistics",
-        "get_automations", "get_scripts", "get_dashboards",
-        "send_notification", "get_areas", "get_scenes",
-    ],
+    # LLM-first: all tools available, model decides
+    "auto": None,
+    # Follow-up intents (carried forward from previous_intent): all get full tool set
+    "create_dashboard": None,
+    "config_edit": None,
+    "modify_automation": None,
+    "modify_script": None,
+    "modify_dashboard": None,
+    "system_debug": None,
 }
 
-# Compact focused prompts by intent
+# ---------------------------------------------------------------------------
+# Unified system guidance prompt (OpenClaw-style: LLM decides, no pre-routing)
+# This replaces ALL per-intent focused prompts. The LLM receives ALL tools
+# and this guidance helps it decide which ones to use.
+# ---------------------------------------------------------------------------
+HA_SYSTEM_GUIDANCE = """You are a Home Assistant AI assistant with full tool access.
+You decide which tools to call based on the user's request. Be autonomous and efficient.
+
+TOOL USAGE GUIDE:
+— DEVICE CONTROL: call_service + search_entities (find the entity first, then act)
+  • switch.* → switch.turn_on/off, light.* → light.turn_on/off, cover.* → cover.open/close, climate.* → climate.set_temperature
+  • Action format: {"service": "domain.action", "target": {"entity_id": "..."}}
+
+— QUERY CURRENT STATE: get_entity_state, search_entities, get_entities
+  • search_entities to find the entity, get_entity_state to read it
+
+— HISTORY / PAST DATA (e.g. "what was the temperature this morning", "yesterday", "3 hours ago"):
+  • ALWAYS use get_history + search_entities. Include get_statistics for min/max/average.
+  • Never answer history questions without calling get_history.
+
+— AUTOMATIONS:
+  • Find: get_automations (search by keyword)
+  • Create: search_entities first (find correct entity_ids), then create_automation with COMPLETE config
+  • Modify: get_automations to find it, show YAML diff, ASK CONFIRMATION, then update_automation
+  • Delete: identify it, ASK EXPLICIT CONFIRMATION, then delete_automation
+
+— SCRIPTS:
+  • Same pattern as automations: search → show YAML → confirm → create_script/update_script/delete_script
+
+— DASHBOARDS (Lovelace):
+  • Create: search_entities first, then create_dashboard with complete views array
+  • Modify: get_dashboard_config, then update_dashboard
+  • Delete: ASK CONFIRMATION, then delete_dashboard
+
+— CONFIG FILES (YAML editing):
+  • Read: read_config_file (call IMMEDIATELY, no announcements)
+  • Show the COMPLETE corrected file in ```yaml, then ASK CONFIRMATION
+  • Write: write_config_file (ENTIRE file content) → check_config to validate
+  • Snapshots: list_snapshots, restore_snapshot
+
+— HELPERS: manage_helpers (create/update/delete input_boolean, input_number, input_select, etc.)
+— AREAS/ROOMS: manage_areas, manage_entity, get_areas, get_devices
+— NOTIFICATIONS: send_notification + search_entities
+— SCENES: get_scenes, activate_scene
+— SHOPPING LIST: shopping_list
+— SYSTEM DIAGNOSTICS:
+  • Error logs: get_error_log() for summary, get_error_log(entry_index=N) for details
+  • System health: get_repairs, dismiss_repair
+  • Users: get_logged_users
+  • Events: fire_event
+— STATISTICS MANAGEMENT: manage_statistics (validate/fix_units/clear_orphaned/clear)
+  • Call EXACTLY ONE action per turn. validate is read-only, fix_units/clear_orphaned validate internally.
+
+GENERAL RULES:
+- For WRITE operations (create/modify/delete automations, scripts, dashboards, config files):
+  ALWAYS show what will change and ASK FOR CONFIRMATION before executing. Never auto-confirm.
+- Use search_entities when you need to find an entity_id. NEVER guess entity_ids.
+- Be concise. Go straight to the answer — no preambles like "ecco i risultati".
+- Respond in the user's language.
+- If the request is just a greeting or chitchat, reply briefly without calling any tools."""
+
+# Compact focused prompts by intent (only for special contexts that need very specific instructions)
+# Most intents use HA_SYSTEM_GUIDANCE (unified prompt). Only override here for
+# contexts that need highly specific instructions the LLM can't infer from tool descriptions.
 INTENT_PROMPTS = {
     "chat": """You are a friendly Home Assistant assistant. The user is simply greeting or chatting.
 Reply briefly and warmly. Do NOT call any tools. ALWAYS respond in the user's language.""",
-
-    "find_automation": """You are a Home Assistant automation finder.
-The user is asking whether an automation already exists.
-CRITICAL: Do NOT guess.
-You MUST call get_automations ONCE with a short query extracted from the user message (room/device name, entity_id fragment, alias keywords).
-Then answer:
-- If you find matches: list the best 1-5 matches (id + alias) and ask which one they mean.
-- If you find none: say you couldn't find it and propose next step (search by entity names or create a new automation).
-Be concise and respond in the user's language.""",
-
-    "modify_automation": """You are a Home Assistant automation editor. The user wants to modify an automation.
-The automation config MAY be provided in the DATA section of the user's message.
-
-CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
-1. If the automation is NOT clearly provided in DATA, FIRST call get_automations ONCE with a short query extracted from the user message.
-   - If you find multiple matches: list the best 1-5 (id + alias) and ask which one they mean.
-   - If you find none: say you couldn't find it and ask for the automation name/room/device.
-2. Once you know WHICH automation, briefly confirm which one you found (name + id).
-3. Describe WHAT EXACTLY will change in simple language.
-4. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it.
-5. ASK FOR EXPLICIT CONFIRMATION before applying. Wait for the user to confirm.
-6. DO NOT call update_automation until the user explicitly confirms.
-7. If you modify the trigger/time: ALWAYS include a NEW description in the changes that reflects the new trigger times/conditions. 
-   - Example: if changing time from 21:00 to 22:00, MUST update description to "Accende automaticamente la luce alle 22:00"
-   - If you don't have a good description, set description to "" so the user can update it.
-8. Only AFTER confirmation, call update_automation ONCE with the changes.
-9. Show a before/after diff of what changed.
-
-- ALWAYS respond in the user's language. Be concise.
-- Never modify the wrong automation.""",
-
-    "modify_script": """You are a Home Assistant script editor. The user wants to modify a script.
-The script config is provided in the DATA section.
-CRITICAL RULE - ALWAYS ASK FOR CONFIRMATION BEFORE MODIFYING:
-1. FIRST, briefly confirm which script you found (name + id).
-2. Describe WHAT EXACTLY will change in simple language.
-3. Show the COMPLETE YAML of the proposed changes in a ```yaml code block so the user can review it.
-4. ASK FOR EXPLICIT CONFIRMATION before applying. Wait for the user to confirm.
-5. DO NOT call update_script until the user explicitly confirms.
-6. Only AFTER confirmation, call update_script ONCE with the changes.
-7. Show a before/after diff of what changed.
-- ALWAYS respond in the user's language. Be concise.
-- NEVER call get_scripts or read_config_file — the data is already provided.
-- If the script doesn't match what the user asked for, tell them. Do NOT modify the wrong one.""",
-
-    "config_edit": """You are a Home Assistant YAML config file editor.
-The user wants to modify a YAML configuration file (sensors.yaml, automations.yaml, etc.).
-
-CRITICAL TOOL-CALL RULE: Do NOT generate any text before you have called read_config_file and received its content. Your first action MUST be a tool call — not text. Do NOT announce "I will read the file" — just call the tool immediately.
-
-WORKFLOW:
-1. Call read_config_file immediately (no text before it).
-2. After reading, identify EXACTLY what needs to change.
-3. Output the COMPLETE corrected file in a ```yaml code block — no exceptions. Never just describe the changes in words.
-4. Add 1-3 lines explaining what changed and why.
-5. *** MANDATORY: Ask for confirmation with a clear question ***
-   - In Italian: "Vuoi che applichi questa modifica?" or "La applico?"
-   - In English: "Should I apply this change?" or "Applico?"
-   - MUST include a question mark (?)
-   - NEVER skip this step. It's not optional.
-6. DO NOT call write_config_file until the user says yes / ok / confirm / sì / si.
-7. After confirmation, call write_config_file with the ENTIRE corrected file content.
-8. After writing, call check_config to validate.
-
-IMPORTANT:
-- NEVER respond with only a description of the problem. Always show the corrected YAML.
-- NEVER say "I will read the file" or "proceeding to read" — just call the tool.
-- A backup snapshot is automatically created on every write. Mention this to reassure the user.
-- Include the ENTIRE file content when writing (not just the changed part).
-- ALWAYS respond in the user's language.
-- If you're unsure about the exact syntax change (e.g., when removing a dash '-' from YAML), explain the reason clearly in your confirmation question.""",
-
-    "create_automation": """You are a Home Assistant automation builder. The user wants to create a NEW automation.
-CRITICAL WORKFLOW - follow these steps IN ORDER:
-1. FIRST call search_entities to find the correct entity_id for the device the user mentioned.
-   - A light could be a light.* OR a switch.* entity — you MUST search, never guess the domain.
-   - Use keywords from the user's message (room name, device type).
-    - If results include match_quality/token_coverage: ONLY treat as a sure match when token_coverage is 1.0 (no missing_tokens) or match_quality is "high".
-    - If all results are low confidence, DO NOT guess: ask the user to choose the correct entity_id from a short numbered list.
-2. If unsure about the entity type, call get_entity_state to verify the domain and attributes.
-3. Build the automation with COMPLETE and CORRECT trigger/condition/action:
-   - For time-based triggers use: {"platform": "time", "at": "HH:MM:SS"}
-   - For state triggers use: {"platform": "state", "entity_id": "...", "to": "on"}
-   - For actions use the CORRECT service for the entity domain:
-     * switch.* entities → service: switch.turn_on / switch.turn_off
-     * light.* entities → service: light.turn_on / light.turn_off
-     * cover.* entities → service: cover.open_cover / cover.close_cover
-     * climate.* entities → service: climate.set_temperature
-   - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
-4. BEFORE creating, show the user the COMPLETE YAML of the automation in a ```yaml code block.
-    Verify the entity_ids are correct.
-    - If you are NOT 100% sure which entity is the right one, ask the user to pick from a numbered list.
-    - Only when the entity_id is clearly confirmed, ask for confirmation to create.
-5. WAIT FOR USER TO CONFIRM - DO NOT call create_automation until user confirms.
-6. Only AFTER confirmation, call create_automation ONCE with the complete config (alias, trigger, action, condition, mode).
-NEVER create an automation with empty trigger or action arrays.
-ALWAYS respond in the user's language. Be concise.""",
-
-    "create_script": """You are a Home Assistant script builder. The user wants to create a NEW script.
-CRITICAL WORKFLOW:
-1. FIRST call search_entities to find the correct entity_id(s) for the device(s) mentioned.
-2. Build the script with a COMPLETE sequence of actions using correct services for each entity domain:
-   - switch.* → switch.turn_on/off, light.* → light.turn_on/off, etc.
-   - Action format: {"service": "domain.action", "target": {"entity_id": "domain.entity_name"}}
-3. BEFORE creating, show the user the COMPLETE YAML of the script in a ```yaml code block.
-    Verify the entity_ids are correct.
-    - If you are NOT 100% sure which entity is correct (low-confidence search results), ask the user to pick the entity_id first.
-    - Only when confirmed, ask for confirmation to create the script.
-4. WAIT FOR USER TO CONFIRM - DO NOT call create_script until user confirms.
-5. Only AFTER confirmation, call create_script ONCE with script_id, alias, sequence, and mode.
-NEVER create a script with empty sequence.
-ALWAYS respond in the user's language. Be concise.""",
-
-    "control_device": """You are a Home Assistant device controller. Help the user control their devices.
-Use search_entities to find entities if needed, then call_service to control them.
-ALWAYS respond in the user's language. Be concise. Maximum 2 tool calls.""",
-
-    "query_state": None,  # Will be generated dynamically with language instruction
-
-    "delete": """You are a Home Assistant deletion assistant. User wants to delete an automation, script, or dashboard.
-CRITICAL DESTRUCTION RULE - ALWAYS ASK FOR EXPLICIT CONFIRMATION:
-1. FIRST, identify what will be deleted: name, id, and warn that this action is IRREVERSIBLE.
-2. ASK FOR EXPLICIT CONFIRMATION: ask the user to type a confirmation word to proceed.
-3. WAIT FOR CONFIRMATION - DO NOT call delete_automation/delete_script/delete_dashboard until user explicitly confirms.
-4. Only AFTER explicit confirmation, call the appropriate delete tool.
-- ALWAYS respond in the user's language. Be concise.
-- NEVER auto-confirm deletions. Deletions are IRREVERSIBLE.""",
-
-    "helpers": """You are a Home Assistant helper manager. The user wants to create, modify, delete, or list helpers.
-Helper types: input_boolean (on/off toggle), input_number (numeric value), input_select (dropdown), input_text (text field), input_datetime (date/time picker).
-WORKFLOW:
-1. If the user wants to list helpers, call manage_helpers with action="list" and the appropriate helper_type.
-2. If creating a new helper:
-   a. Use search_entities if needed to check if a similar helper already exists.
-   b. Build the helper config (name, icon, type-specific fields).
-   c. Show the user the complete YAML/config BEFORE creating.
-   d. ASK FOR CONFIRMATION before creating. Wait for the user to confirm.
-   e. Only AFTER confirmation, call manage_helpers with action="create".
-3. If modifying: show what will change, ask confirmation, then call manage_helpers with action="update".
-4. If deleting: identify the helper, ask explicit confirmation, then call manage_helpers with action="delete".
-- ALWAYS respond in the user's language. Be concise.""",
 
     "card_editor": """You are a Home Assistant Lovelace card expert.
 The user is editing a card in the HA visual editor and wants you to check/fix the YAML.
@@ -681,27 +194,52 @@ When suggesting custom cards, always use the correct field names and list struct
 - NEVER output raw JSON, [TOOL RESULT] blocks, or tool call XML to the user.
 - Respond in the user's language.""",
 
-    "create_dashboard": """You are a Home Assistant Lovelace dashboard builder. The user wants a NEW dashboard with cards.
-MANDATORY STEPS - follow this EXACT order:
-1. Call search_entities to find the correct entity_ids for devices the user mentioned. NEVER guess entity_ids.
-2. Build a COMPLETE views array in memory. Each view MUST have: title, path, icon, and a 'cards' array.
-   Card types to use:
-   - gauge: percentages, battery, SOC, humidity
-   - history-graph: power trends, temperature over time
-   - thermostat: climate entities
-   - entities: groups of related sensors/switches
-   - button: scripts, scenes, switches
-   - glance: quick overview of multiple entities
-   - sensor: single important values
-   - energy-distribution: energy flow
-   Group entities logically into views by function (e.g. "Produzione", "Consumo", "Batteria").
-3. Call create_dashboard with ALL parameters: title, url_path, icon, AND the complete views array.
-   The views parameter is MANDATORY - the tool will REJECT calls without views.
-   Example structure: views=[{"title":"Overview","path":"overview","icon":"mdi:home","cards":[{"type":"gauge","entity":"sensor.battery_soc","name":"Battery"}]}]
-NEVER call create_dashboard without the views array. NEVER create empty views without cards.
-Respond in the user's language.""",
+    "manage_statistics": """You are a Home Assistant statistics maintenance assistant.
+The user wants to clean up, fix, or manage recorder statistics (the data shown in Settings > Developer Tools > Statistics).
 
-    "create_html_dashboard": """You are a creative Home Assistant HTML dashboard designer.
+CRITICAL RULES:
+- Call EXACTLY ONE manage_statistics action per tool turn. NEVER call manage_statistics twice in one message.
+- The validate action is READ-ONLY — call it without asking confirmation.
+- fix_units and clear_orphaned already validate INTERNALLY — do NOT call validate first if you will call them.
+
+STEPS:
+1. Check the conversation history: if a previous [TOOL RESULT: manage_statistics] already exists,
+   DO NOT call validate again. Skip directly to the appropriate action.
+2. If the user explicitly asked to FIX / CORRECT units (e.g. 'correggi', 'fix', 'sistema', 'ripara')
+   → call manage_statistics with action='fix_units' ONLY. It validates internally. ONE call.
+3. If the user explicitly asked to REMOVE / CLEAN orphaned (e.g. 'rimuovi', 'elimina', 'pulisci', 'cancella')
+   → call manage_statistics with action='clear_orphaned' ONLY. It validates internally. ONE call.
+4. If the user asked both (e.g. 'trova e correggi tutto'): call clear_orphaned first, WAIT for the result,
+   then call fix_units in the NEXT turn. One action per turn.
+5. If the user just wants to see issues without fixing: call action='validate' ONLY.
+6. If the user confirms with 'si', 'yes', 'ok', 'sì', 'procedi', 'fallo', 'vai': execute the
+   action you proposed. Do NOT re-validate. Call the appropriate write action directly.
+7. If the user wants to remove specific statistics: call action='clear' with the statistic_ids list.
+8. After each action, ALWAYS list the specific entity_ids that were affected.
+   Use a collapsible HTML block so the list doesn't take too much space:
+   <details><summary>N entities affected (click to expand)</summary><div>
+   <code>sensor.xxx</code><br><code>sensor.yyy</code><br>...</div></details>
+9. Respond in the user's language.
+- The ONLY tool you should use is manage_statistics. Do NOT call any other tool.
+- NEVER call manage_statistics more than once per message/turn.""",
+
+    # create_html_dashboard prompt is set separately due to its size (see INTENT_PROMPTS update below)
+    "create_html_dashboard": None,  # Placeholder — set after dict definition
+
+    # All other intents use the unified HA_SYSTEM_GUIDANCE prompt
+    # (the LLM sees all tools and decides autonomously)
+    "auto": HA_SYSTEM_GUIDANCE,
+    # Follow-up intents (carried forward from previous_intent)
+    "create_dashboard": HA_SYSTEM_GUIDANCE,
+    "config_edit": HA_SYSTEM_GUIDANCE,
+    "modify_automation": HA_SYSTEM_GUIDANCE,
+    "modify_script": HA_SYSTEM_GUIDANCE,
+    "modify_dashboard": HA_SYSTEM_GUIDANCE,
+    "system_debug": HA_SYSTEM_GUIDANCE,
+}
+
+# ---- Set create_html_dashboard prompt separately (very long) ----
+INTENT_PROMPTS["create_html_dashboard"] = """You are a creative Home Assistant HTML dashboard designer.
 The user wants a UNIQUE, beautiful HTML dashboard page with real Home Assistant entities.
 
 ⚠️ CRITICAL OUTPUT RULE — READ FIRST:
@@ -775,45 +313,29 @@ JS DATA CONNECTION:
 - Service calls: POST /api/services/{domain}/{service} with Bearer token
 - History: GET /api/history/period/{ISO_start}?filter_entity_id=...&end_time={ISO_end}&minimal_response&no_attributes
 
-FETCHING ALL ENTITIES BY CATEGORY — use this pattern when the user asks for "all batteries", "all lights", "all temperatures", etc.:
+FETCHING ALL ENTITIES BY CATEGORY — use this pattern when the user asks for "all batteries", "all lights", etc.:
   const all = await fetch('/api/states', {headers:{Authorization:'Bearer '+tok}}).then(r=>r.json());
   // Battery sensors:  all.filter(s => s.attributes?.device_class === 'battery')
-  // Motion sensors:   all.filter(s => s.attributes?.device_class === 'motion')
   // Temperature:      all.filter(s => s.attributes?.device_class === 'temperature')
   // Lights:           all.filter(s => s.entity_id.startsWith('light.'))
-  // Switches:         all.filter(s => s.entity_id.startsWith('switch.'))
-  // Any domain:       all.filter(s => s.entity_id.startsWith('DOMAIN.'))
-  NEVER hardcode a fixed list of entity_ids when the user asks for "all" of a category — always fetch /api/states and filter dynamically so the dashboard stays up to date as new devices are added.
+  NEVER hardcode a fixed list of entity_ids when the user asks for "all" of a category.
 
 UI RULES:
-- Do NOT show debug/technical info (connection status pills, token values, accent color hex, series counts, entity_id strings)
+- Do NOT show debug/technical info (connection status pills, token values, accent color hex, entity_id strings)
 - The dashboard is for END USERS, not developers — show only useful data: entity values, labels, charts, status indicators
-- A small colored dot (green=live, grey=offline) in the header is OK, but do NOT label it "WebSocket"/"REST" — just use "Live"/"Offline"
-- Do NOT show raw entity_ids in badges — use friendly names or short labels
+- A small colored dot (green=live, grey=offline) in the header is OK, but do NOT label it "WebSocket"/"REST"
 
 ENTITY CLICK — MORE INFO DIALOG:
 When the user clicks on a sensor/entity card, show a detail popup with history chart.
-Use this pattern (works when the page is inside HA, e.g. as a sidebar iframe):
+Use this pattern:
   function openMoreInfo(entityId) {
-    // Try native HA More Info dialog first (works inside HA iframe/sidebar)
-    const haEl = document.querySelector('home-assistant') ||
-                 parent?.document?.querySelector('home-assistant');
+    const haEl = document.querySelector('home-assistant') || parent?.document?.querySelector('home-assistant');
     if (haEl) {
       haEl.dispatchEvent(new CustomEvent('hass-more-info',
         { detail: { entityId }, bubbles: true, composed: true }));
       return;
     }
-    // Fallback: custom modal with history chart from /api/history
     showHistoryModal(entityId);
-  }
-Custom modal fallback (always implement this alongside the native attempt):
-  async function showHistoryModal(entityId) {
-    const end = new Date().toISOString();
-    const start = new Date(Date.now() - 24*3600*1000).toISOString();
-    const url = `/api/history/period/${start}?filter_entity_id=${entityId}&end_time=${end}&minimal_response`;
-    const data = await fetch(url, {headers:{Authorization:'Bearer '+tok}}).then(r=>r.json());
-    // data[0] is array of {state, last_changed} — render in a modal with Chart.js
-    // Show: entity name, current value, unit, mini line chart of last 24h, last_changed timestamp
   }
 Add cursor:pointer to all entity cards and call openMoreInfo(entityId) on click.
 
@@ -824,163 +346,17 @@ DESIGN FREEDOM — be creative! Vary these across dashboards:
 - Typography: large stat numbers, condensed labels, accent fonts via Google Fonts
 - Animations: smooth transitions, subtle pulse on live values, hover effects
 - Dark/light: use @media(prefers-color-scheme) or hardcode based on theme parameter
-- Background: solid, gradient, subtle patterns, mesh gradients
 
-Respond in the user's language.""",
-
-    "manage_statistics": """You are a Home Assistant statistics maintenance assistant.
-The user wants to clean up, fix, or manage recorder statistics (the data shown in Settings > Developer Tools > Statistics).
-
-CRITICAL RULES:
-- Call EXACTLY ONE manage_statistics action per tool turn. NEVER call manage_statistics twice in one message.
-- The validate action is READ-ONLY — call it without asking confirmation.
-- fix_units and clear_orphaned already validate INTERNALLY — do NOT call validate first if you will call them.
-
-STEPS:
-1. Check the conversation history: if a previous [TOOL RESULT: manage_statistics] already exists,
-   DO NOT call validate again. Skip directly to the appropriate action.
-2. If the user explicitly asked to FIX / CORRECT units (e.g. 'correggi', 'fix', 'sistema', 'ripara')
-   → call manage_statistics with action='fix_units' ONLY. It validates internally. ONE call.
-3. If the user explicitly asked to REMOVE / CLEAN orphaned (e.g. 'rimuovi', 'elimina', 'pulisci', 'cancella')
-   → call manage_statistics with action='clear_orphaned' ONLY. It validates internally. ONE call.
-4. If the user asked both (e.g. 'trova e correggi tutto'): call clear_orphaned first, WAIT for the result,
-   then call fix_units in the NEXT turn. One action per turn.
-5. If the user just wants to see issues without fixing: call action='validate' ONLY.
-6. If the user confirms with 'si', 'yes', 'ok', 'sì', 'procedi', 'fallo', 'vai': execute the
-   action you proposed. Do NOT re-validate. Call the appropriate write action directly.
-7. If the user wants to remove specific statistics: call action='clear' with the statistic_ids list.
-8. After each action, ALWAYS list the specific entity_ids that were affected.
-   Use a collapsible HTML block so the list doesn't take too much space:
-   <details><summary>📊 N entità rimosse (click per espandere)</summary><div>
-   <code>sensor.xxx</code><br><code>sensor.yyy</code><br>...</div></details>
-   Replace the summary text with the user's language. Always include ALL IDs from the tool result.
-9. Respond in the user's language.
-- The ONLY tool you should use is manage_statistics. Do NOT call any other tool.
-- NEVER call manage_statistics more than once per message/turn.
-- NEVER say the tool is not available. If the tool returns an error, quote the error message.
-- NEVER output raw JSON, [TOOL RESULT] blocks, or tool call XML to the user.""",
-
-    "query_repairs": """You are a Home Assistant diagnostics assistant. The user wants to check system issues and repairs.
-WORKFLOW:
-1. Call get_repairs to get the current list of issues and system health status.
-2. Present the issues clearly: severity (error/warning), integration/domain, description, whether it's auto-fixable.
-3. For each issue, suggest a concrete fix if possible (reload integration, update config, install update, etc.).
-4. Show system health info: any unsupported or unhealthy components.
-5. If the user wants to dismiss an issue, call dismiss_repair with the issue_id and domain.
-6. NEVER dismiss issues automatically - always ask for user confirmation first.
-Respond in the user's language. Be concise.""",
-
-    "system_debug": """You are a Home Assistant debug and diagnostics assistant.
-
-WORKFLOW FOR ERROR LOG:
-1. FIRST call get_error_log() WITHOUT entry_index to get the SUMMARY list of errors.
-2. Present the numbered list to the user clearly: [index] severity - message summary.
-3. WAIT for the user to choose which error to investigate. Do NOT analyze errors from the summary.
-4. When the user picks an error, call get_error_log(entry_index=N) to get FULL details.
-5. Analyze the full error: explain cause, identify the component/integration involved.
-6. Trace the error to its source:
-   - If it's a dashboard/card error → call get_dashboard_config to inspect the dashboard
-   - If it's a config error → call read_config_file to read the relevant YAML file
-   - If it's an integration error → suggest reloading, reconfiguring, or checking the integration settings
-7. Propose a concrete fix and ask for confirmation before applying changes.
-
-FOR BROWSER CONSOLE ERRORS:
-- Use get_error_log(source="browser") to see frontend/JavaScript errors captured from the UI.
-- These help diagnose card rendering issues, custom component problems, and frontend bugs.
-
-FOR USERS:
-- Use get_logged_users to list all HA user accounts.
-
-FOR EVENTS:
-- Use fire_event to fire custom events on the HA event bus.
-
-IMPORTANT:
-- NEVER dump raw log text to the user. Always present structured, readable summaries.
-- ALWAYS let the user choose which entry to investigate.
-- Respond in the user's language. Be concise but thorough when analyzing errors.""",
-}
+Respond in the user's language."""
 
 
 def _init_dynamic_prompts():
     """Initialize prompts that depend on api.get_lang_text (called after api module is loaded)."""
-    if INTENT_PROMPTS["query_state"] is None:
-        INTENT_PROMPTS["query_state"] = (
-            """You are a Home Assistant status assistant. Help the user check device states.
-Use search_entities or get_entity_state to find and report states.
-Respond in the user's language. Be concise.
-IMPORTANT: Do not ask the user to repeat what they want. Use the tools and answer."""
-            + "\n" + api.get_lang_text("respond_instruction")
-        )
-    # Also add language instruction to chat prompt
+    # Add language instruction to chat prompt
     lang_instr = api.get_lang_text("respond_instruction")
     if lang_instr and lang_instr not in INTENT_PROMPTS["chat"]:
         INTENT_PROMPTS["chat"] += "\n\n" + lang_instr
 
-
-# ---- Scoring helpers for query_state auto-stop ----
-
-def _score_query_state_candidate(user_message: str, entity_id: str, friendly_name: str) -> int:
-    msg = (user_message or "").lower()
-    eid = (entity_id or "").lower()
-    name = (friendly_name or "").lower()
-
-    score = 0
-
-    # Strong signals for "today production"
-    if "produzione_giornal" in eid or "today_production" in eid or "day_production" in eid:
-        score += 80
-    if "giornal" in eid or "oggi" in eid or "today" in eid:
-        score += 10
-
-    # PV / solar / production keywords
-    keywords = ["fotovolta", "solare", "solar", "pv", "produzione", "production", "energia", "energy"]
-    for k in keywords:
-        if k in msg and (k in eid or k in name):
-            score += 8
-        elif k in eid or k in name:
-            score += 2
-
-    # Prefer energy/production sensors
-    if eid.startswith("sensor."):
-        score += 3
-    if "power" in eid or "kw" in eid:
-        score += 2
-    if "energy" in eid or "kwh" in eid:
-        score += 6
-
-    # De-prioritize obvious false positives
-    if "ipv4" in eid or "ipv6" in eid or "address" in eid:
-        score -= 50
-    if eid.startswith("binary_sensor."):
-        score -= 10
-    if eid.startswith("button.") or eid.startswith("switch."):
-        score -= 8
-
-    return score
-
-
-def _format_query_state_answer(entity_id: str, state_data: dict) -> str:
-    state = state_data.get("state")
-    attrs = state_data.get("attributes") or {}
-    friendly_name = attrs.get("friendly_name") or entity_id
-    unit = attrs.get("unit_of_measurement") or ""
-
-    if state in (None, "unknown", "unavailable"):
-        if api.LANGUAGE == "it":
-            return f"Non riesco a leggere un valore disponibile per '{friendly_name}' ({entity_id})."
-        return f"I can't read an available value for '{friendly_name}' ({entity_id})."
-
-    value = f"{state}{(' ' + unit) if unit else ''}"
-    if api.LANGUAGE == "it":
-        return f"Oggi la produzione risulta: {value} (sensore: {friendly_name})."
-    if api.LANGUAGE == "es":
-        return f"La producción de hoy es: {value} (sensor: {friendly_name})."
-    if api.LANGUAGE == "fr":
-        return f"La production d'aujourd'hui est : {value} (capteur : {friendly_name})."
-    return f"Today's production is: {value} (sensor: {friendly_name})."
-
-
-# ---- Intent detection ----
 
 def detect_intent(user_message: str, smart_context: str, previous_intent: str | None = None) -> dict:
     """Detect user intent locally from the message and available context.
@@ -1068,228 +444,93 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
             return {"intent": previous_intent, "tools": INTENT_TOOL_SETS[previous_intent],
                     "prompt": INTENT_PROMPTS.get(previous_intent), "specific_target": False}
 
-    # --- HTML DASHBOARD CONTEXT (from bubble) ---
-    # If the original message contains embedded HTML dashboard context, route to html dashboard intent
-    if "[CURRENT_DASHBOARD_HTML]" in user_message or "html dashboard" in user_message.lower():
-        logger.info("HTML dashboard context detected in message — routing to create_html_dashboard")
+    # --- HTML DASHBOARD CONTEXT (from bubble or keywords) ---
+    # The bubble injects [CURRENT_DASHBOARD_HTML] when editing an existing HTML dashboard.
+    if "[CURRENT_DASHBOARD_HTML]" in user_message:
+        logger.info("HTML dashboard context detected (embedded HTML) — routing to create_html_dashboard")
         return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
                 "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": True}
 
     # Get keywords for current language, fallback to English if not available
     lang_keywords = api.KEYWORDS.get(api.LANGUAGE, api.KEYWORDS.get("en", {}))
 
-    # --- CHAT (greetings, chitchat) --- NEW: detect before any other intent
+    # --- CHAT (greetings, chitchat) --- short messages that don't need tools
     chat_kw = lang_keywords.get("chat", [])
     words = msg.strip().rstrip("!?.,").split()
     if len(words) <= 5 and any(k in msg for k in chat_kw):
         return {"intent": "chat", "tools": INTENT_TOOL_SETS["chat"],
                 "prompt": INTENT_PROMPTS["chat"], "specific_target": False, "max_rounds": 1}
 
-    # Extract keywords for different categories
-    create_kw = lang_keywords.get("create", [])
-    modify_kw = lang_keywords.get("modify", [])
-    auto_kw = lang_keywords.get("automation", [])
-    script_kw = lang_keywords.get("script", [])
+    # --- HTML DASHBOARD CREATION/MODIFICATION (kept for specialized prompt) ---
+    # The create_html_dashboard prompt is very specific (~100 lines of CSS/JS/Vue guidance)
+    # so we keep keyword detection for it rather than relying on the LLM alone.
+    html_keywords = ["html", "vue", "javascript", "js", "react", "svelte",
+                     "interattiv", "realtime", "responsive", "custom css",
+                     "custom design", "pannello web", "pagina web", "pagina live",
+                     "pannello live", "plancia", "bento"]
     dash_kw = lang_keywords.get("dashboard", [])
-    control_kw = lang_keywords.get("control", [])
-    query_kw = lang_keywords.get("query", [])
-    history_kw = lang_keywords.get("history", [])
-    delete_kw = lang_keywords.get("delete", [])
-    config_kw = lang_keywords.get("config", [])
-
-    # --- MODIFY AUTOMATION (most common case) ---
-    has_modify = any(k in msg for k in modify_kw)
-    has_auto = any(k in msg for k in auto_kw)
-    # Also detect if smart context found a specific automation
-    has_specific_auto = "## AUTOMAZIONE" in smart_context if smart_context else False
-
-    # Heuristic: schedule/time change requests often mean automation edits even if the user
-    # doesn't say "automazione" explicitly (e.g. "modifica l'orario, accendi alle 22").
-    # This needs to run BEFORE device control so we can preload automation context.
-    looks_like_schedule_change = False
-    if has_modify:
-        if ("orario" in msg) or re.search(r"\balle\s*([01]?\d|2[0-3])([:.][0-5]\d)?\b", msg):
-            looks_like_schedule_change = True
-
-    if has_modify and (has_auto or has_specific_auto or looks_like_schedule_change):
-        return {"intent": "modify_automation", "tools": INTENT_TOOL_SETS["modify_automation"],
-                "prompt": INTENT_PROMPTS["modify_automation"], "specific_target": has_specific_auto}
-
-    # --- MODIFY SCRIPT ---
-    has_script = any(k in msg for k in script_kw)
-    has_specific_script = "## SCRIPT" in smart_context if smart_context else False
-
-    if has_modify and (has_script or has_specific_script):
-        return {"intent": "modify_script", "tools": INTENT_TOOL_SETS["modify_script"],
-                "prompt": INTENT_PROMPTS["modify_script"], "specific_target": has_specific_script}
-
-    # --- CREATE AUTOMATION ---
-    has_create = any(k in msg for k in create_kw)
-
-    # --- FIND AUTOMATION (existence check) ---
-    # Common in Italian: "c'è un'automazione che..." is NOT a create request.
-    # Keep this heuristic simple and conservative.
-    if has_auto and not has_create:
-        if ("c'e" in msg) or ("c’è" in msg) or ("c'è" in msg) or ("esiste" in msg) or ("ci sono" in msg):
-            return {
-                "intent": "find_automation",
-                "tools": INTENT_TOOL_SETS["find_automation"],
-                "prompt": INTENT_PROMPTS["find_automation"],
-                "specific_target": False,
-                "max_rounds": 2,
-            }
-
-    if has_create and has_auto:
-        return {"intent": "create_automation", "tools": INTENT_TOOL_SETS["create_automation"],
-                "prompt": INTENT_PROMPTS["create_automation"], "specific_target": False}
-
-    # --- CREATE SCRIPT ---
-    if has_create and has_script:
-        return {"intent": "create_script", "tools": INTENT_TOOL_SETS["create_script"],
-                "prompt": INTENT_PROMPTS["create_script"], "specific_target": False}
-
-    # --- DASHBOARD ---
+    has_html_kw = any(k in msg for k in html_keywords)
     has_dash = any(k in msg for k in dash_kw)
-
-    # If smart_context references an HTML dashboard and user has modify intent,
-    # treat as HTML dashboard update even without explicit dashboard keyword
-    if not has_dash and has_modify and smart_context:
-        if "/local/dashboards" in smart_context or ".html" in smart_context:
-            has_dash = True
-    # Check for HTML/Vue/Web dashboard keywords
-    html_keywords = ["html", "vue", "web", "javascript", "js", "react", "svelte",
-                     "interattiv", "realtime", "live", "responsive", "app", "custom css",
-                     "custom design", "framework", "personal", "creativ",
-                     "pannello web", "pagina web", "pagina live", "pannello live",
-                     "plancia", "bento", "chart", "grafic", "torta", "pie chart",
-                     "bar chart", "line chart", "donut", "gauge"]
-    has_html_dash = any(k in msg for k in html_keywords)
-
-    # Also detect references to existing HTML dashboards by name or path
-    html_dash_ref_keywords = ["energia-live", "energia live", "/local/dashboards", ".html"]
-    has_html_dash_ref = any(k in msg for k in html_dash_ref_keywords)
-    if not has_html_dash_ref and smart_context:
-        has_html_dash_ref = "/local/dashboards" in smart_context or ".html" in smart_context
-    # Check if any word/slug in the message matches an existing HTML dashboard file on disk.
-    # This handles "aggiungi le temperature alla dashboard tutti-batterie" even without
-    # an explicit ".html" or "/local/dashboards" mention.
-    if not has_html_dash_ref or (not has_dash and has_modify):
+    has_html_ref = any(k in msg for k in ["/local/dashboards", ".html"])
+    if not has_html_ref and smart_context:
+        has_html_ref = "/local/dashboards" in smart_context or ".html" in smart_context
+    if not has_html_ref:
         try:
             _dash_dir = os.path.join(api.HA_CONFIG_DIR, "www", "dashboards")
             if os.path.isdir(_dash_dir):
-                _existing_html = {
-                    f[:-5].lower()  # strip .html, lowercase
-                    for f in os.listdir(_dash_dir)
-                    if f.endswith(".html")
-                }
-                _msg_words = set(re.findall(r"[\w-]+", msg))
-                _matched = _existing_html & _msg_words
-                if _matched:
-                    has_html_dash_ref = True
-                    has_dash = True  # treat as dashboard op even without "dashboard" keyword
-                    logger.debug(f"Intent: HTML dashboard detected via filesystem match: {_matched}")
+                _existing_html = {f[:-5].lower() for f in os.listdir(_dash_dir) if f.endswith(".html")}
+                if _existing_html & set(re.findall(r"[\w-]+", msg)):
+                    has_html_ref = True
+                    has_dash = True
         except Exception:
             pass
-
-    # "crea una pagina html", "crea un pannello web" ecc. — non richiedono la parola "dashboard"
-    if has_create and has_html_dash:
+    if has_html_kw or has_html_ref or (has_dash and has_html_kw):
+        logger.info("HTML dashboard keywords detected — routing to create_html_dashboard")
         return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
                 "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
 
-    if has_dash and has_create:
-        if has_html_dash or has_html_dash_ref:
-            return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
-                    "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
-        return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
-                "prompt": INTENT_PROMPTS.get("create_dashboard"), "specific_target": False}
-    if has_dash and has_modify:
-        # Route HTML dashboard modifications to the HTML dashboard intent (same tool, overwrites file)
-        if has_html_dash or has_html_dash_ref:
-            return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
-                    "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
-        return {"intent": "modify_dashboard", "tools": INTENT_TOOL_SETS["modify_dashboard"],
-                "prompt": None, "specific_target": False}
-    # Fallback: "dashboard" without explicit create/modify/delete → assume creation
-    if has_dash and not any(k in msg for k in delete_kw):
-        if has_html_dash or has_html_dash_ref:
-            return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
-                    "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
-        return {"intent": "create_dashboard", "tools": INTENT_TOOL_SETS["create_dashboard"],
-                "prompt": INTENT_PROMPTS.get("create_dashboard"), "specific_target": False}
-
-    # --- DEVICE CONTROL ---
-    if any(k in msg for k in control_kw):
-        return {"intent": "control_device", "tools": INTENT_TOOL_SETS["control_device"],
-                "prompt": INTENT_PROMPTS["control_device"], "specific_target": False}
-
-    # --- DELETE --- (must come BEFORE query_state since it's more specific)
-    if any(k in msg for k in delete_kw) and (has_auto or has_script or has_dash):
-        return {"intent": "delete", "tools": INTENT_TOOL_SETS["delete"],
-                "prompt": None, "specific_target": False}
-
-    # --- STATISTICS MANAGEMENT --- (must come BEFORE history: "statistiche elimina" is management, not query)
-    # Detect when user wants to clean/fix/manage recorder statistics (not just query them)
+    # --- STATISTICS MANAGEMENT (kept for specialized one-call-per-turn prompt) ---
     statistics_manage_kw = lang_keywords.get("statistics_manage", [])
     has_stats_word = any(k in msg for k in ["statistich", "statistic", "estadístic", "statistique"])
+    delete_kw = lang_keywords.get("delete", [])
+    modify_kw = lang_keywords.get("modify", [])
     has_manage_signal = any(k in msg for k in delete_kw + modify_kw) or any(
         k in msg for k in ["non esist", "orfan", "orphan", "obsolet", "puliz", "clean", "purge",
-                           "correggi", "fix", "converti", "convert", "valuta", "unità", "unit"]
-    )
+                           "correggi", "fix", "converti", "convert", "valuta", "unità", "unit"])
     if any(k in msg for k in statistics_manage_kw) or (has_stats_word and has_manage_signal):
         return {"intent": "manage_statistics", "tools": INTENT_TOOL_SETS["manage_statistics"],
                 "prompt": INTENT_PROMPTS["manage_statistics"], "specific_target": False}
 
-    # --- HISTORY --- (must come BEFORE query_state: "storico temperatura" should be history, not state)
-    if any(k in msg for k in history_kw):
-        return {"intent": "query_history", "tools": INTENT_TOOL_SETS["query_history"],
-                "prompt": None, "specific_target": False}
-
-    # --- QUERY STATE ---
-    if any(k in msg for k in query_kw):
-        return {"intent": "query_state", "tools": INTENT_TOOL_SETS["query_state"],
-                "prompt": INTENT_PROMPTS["query_state"], "specific_target": False}
-
-    # --- CONFIG EDIT ---
-    if any(k in msg for k in config_kw):
-        return {"intent": "config_edit", "tools": INTENT_TOOL_SETS["config_edit"],
-                "prompt": INTENT_PROMPTS.get("config_edit"), "specific_target": False}
-
-    # --- HELPERS ---
-    helper_kw = lang_keywords.get("helper", [])
-    if any(k in msg for k in helper_kw):
-        return {"intent": "helpers", "tools": INTENT_TOOL_SETS["helpers"],
-                "prompt": INTENT_PROMPTS["helpers"], "specific_target": False}
-
-    # --- REPAIRS / DIAGNOSTICS ---
-    repair_kw = lang_keywords.get("repair", [])
-    if any(k in msg for k in repair_kw):
-        return {"intent": "query_repairs", "tools": INTENT_TOOL_SETS["query_repairs"],
-                "prompt": INTENT_PROMPTS["query_repairs"], "specific_target": False}
-
-    # --- SYSTEM DEBUG / ERROR LOG / USERS ---
-    debug_kw = lang_keywords.get("debug", [])
-    if any(k in msg for k in debug_kw):
-        return {"intent": "system_debug", "tools": INTENT_TOOL_SETS["system_debug"],
-                "prompt": INTENT_PROMPTS["system_debug"], "specific_target": False}
-
-    # --- GENERIC (full mode) ---
-    return {"intent": "generic", "tools": INTENT_TOOL_SETS["generic"], "prompt": None, "specific_target": False}
-
+    # --- LLM-FIRST: all other requests get ALL tools + unified guidance ---
+    # The LLM sees every available tool and decides autonomously what to call.
+    # No keyword-based intent routing — the model chooses the right tools natively.
+    logger.info("LLM-first mode — all tools available, LLM decides autonomously")
+    return {"intent": "auto", "tools": INTENT_TOOL_SETS.get("auto"),
+            "prompt": HA_SYSTEM_GUIDANCE, "specific_target": False}
 
 def get_tools_for_intent(intent_info: dict, provider: str = "anthropic") -> list:
-    """Get tool definitions filtered by intent. Returns full tools if intent is generic."""
+    """Get tool definitions filtered by intent.
+    tools=None → all tools (LLM-first mode / auto intent)
+    tools=[]  → no tools (chat intent)
+    tools=[...] → filtered subset (card_editor, manage_statistics, etc.)
+    """
     import tools as _tools
 
     tool_names = intent_info.get("tools")
-    if tool_names is None or len(tool_names) == 0:
-        # Generic or chat: return all tools (legacy path for providers that need the full set)
+
+    # tools=None → LLM-first mode: return ALL tools
+    if tool_names is None:
         if provider == "anthropic":
             return _tools.get_anthropic_tools()
         elif provider in ("openai", "github", "nvidia"):
             return _tools.get_openai_tools_for_provider()
         return _tools.get_anthropic_tools()
 
-    # Filter to only relevant tools (empty list → empty result for chat intent)
+    # tools=[] → chat intent: no tools needed
+    if len(tool_names) == 0:
+        return []
+
+    # tools=[...] → filter to specified subset
     filtered = [t for t in _tools.HA_TOOLS_DESCRIPTION if t["name"] in tool_names]
 
     if provider == "anthropic":
@@ -1318,11 +559,14 @@ def get_prompt_for_intent(intent_info: dict) -> str:
 
 def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
     """Trim conversation history, preserving tool_call/tool response pairs."""
-    limit = 6 if api.AI_PROVIDER == "github" else max_messages
-    # GitHub o4-mini has a very small request size limit (~4000 tokens).
-    # Keep fewer turns to reduce the prompt size.
+    # Tight-context providers/models need shorter history to stay within token limits
+    _TIGHT_PROVIDERS = {"github", "groq"}
+    model = (api.get_active_model() or "").lower()
+    is_tight = api.AI_PROVIDER in _TIGHT_PROVIDERS or "nano" in model
+    limit = 6 if is_tight else max_messages
+    # Extra-small models: keep even fewer turns
     try:
-        if api.AI_PROVIDER == "github" and "o4-mini" in (api.get_active_model() or "").lower():
+        if is_tight and any(tag in model for tag in ("o4-mini", "nano", "mini")):
             limit = 4
     except Exception:
         pass
@@ -1337,7 +581,20 @@ def trim_messages(messages: List[Dict], max_messages: int = 20) -> List[Dict]:
         # Check if next message is a matching tool response
         if len(trimmed) < 2 or trimmed[1].get("role") != "tool":
             trimmed = trimmed[1:]
-    return trimmed
+    # Final safety: remove any orphaned tool messages (tool without preceding
+    # assistant+tool_calls or another tool) that survived trimming.
+    validated = []
+    for m in trimmed:
+        if m.get("role") == "tool":
+            if not validated:
+                continue
+            prev = validated[-1]
+            if prev.get("role") == "tool" or (prev.get("role") == "assistant" and prev.get("tool_calls")):
+                validated.append(m)
+            # else: orphaned — skip
+        else:
+            validated.append(m)
+    return validated
 
 
 # ---- Smart context builder ----
@@ -1348,10 +605,8 @@ MAX_SMART_CONTEXT = 25000  # Max chars to inject — keeps tokens under control
 def build_smart_context(user_message: str, intent: str = None, max_chars: int = None) -> str:
     """Pre-load relevant context based on user's message intent.
     Works like VS Code: gathers all needed data BEFORE sending to AI,
-    so Claude can respond with a single action instead of multiple tool rounds.
+    so the LLM can respond with fewer tool rounds.
     IMPORTANT: Context must be compact to avoid rate limits.
-    CRITICAL: If intent is 'create_automation' or 'create_script', skip fuzzy matching
-    to avoid incorrectly injecting an existing automation/script to be modified.
 
     Args:
         max_chars: Override the default MAX_SMART_CONTEXT cap. Useful when the message
@@ -1361,14 +616,11 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
     msg_lower = user_message.lower()
     context_parts = []
 
-    # Skip automation/script fuzzy matching if user is CREATING new (not modifying)
-    skip_automation_matching = (intent in ("create_automation", "create_script"))
-
     try:
         # --- AUTOMATION CONTEXT ---
         auto_keywords = ["automazione", "automation", "automazion", "trigger", "condizione", "condition"]
-        force_automation_context = intent in ("modify_automation", "find_automation")
-        if (force_automation_context or any(k in msg_lower for k in auto_keywords)) and not skip_automation_matching:
+        force_automation_context = intent == "modify_automation"
+        if force_automation_context or any(k in msg_lower for k in auto_keywords):
             import yaml
             # Get automation list
             states = api.get_all_states()
@@ -1714,21 +966,41 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
             except Exception as _e:
                 logger.warning(f"Smart context: integration entity search failed: {_e}")
 
-        # For create_html_dashboard: ALWAYS also search entity registry by platform name.
+        # ALWAYS also search entity registry by platform name when keywords are present.
         # Keyword search may miss entities whose names don't contain the brand word
-        # (e.g. Tigo solar panels: "tigo" is in platform="tigo_energy" but not in entity names).
-        # We merge both results so the AI gets the full picture.
-        if _msg_words and intent == "create_html_dashboard":
+        # (e.g. Tigo solar panels: "tigo" is in platform="tigo_energy" but not in entity names,
+        #  EPCube: "epcube" is in platform but entity_ids may differ).
+        # This prevents the AI from hallucinating entity IDs when no matches are found.
+        # Previously this only ran for create_html_dashboard — now it runs for ALL intents
+        # that trigger entity search (any intent with entity_keywords or _msg_words).
+        if _msg_words and (intent == "create_html_dashboard" or any(k in msg_lower for k in entity_keywords)):
             try:
                 reg_result = api.call_ha_websocket("config/entity_registry/list")
                 registry = reg_result.get("result", []) if isinstance(reg_result, dict) else []
                 if registry:
                     all_states_reg = api.get_all_states()
                     state_map_reg = {s.get("entity_id"): s for s in all_states_reg}
+
+                    # Also resolve config_entry titles for broader matching
+                    # (e.g. user says "epcube" → config_entry title "EPCube" → match by entry_id)
+                    _matched_entry_ids: set = set()
+                    try:
+                        cfg_result = api.call_ha_websocket("config_entries/get_entries")
+                        cfg_entries = cfg_result.get("result", []) if isinstance(cfg_result, dict) else []
+                        for ce in cfg_entries:
+                            ce_domain = (ce.get("domain") or "").lower()
+                            ce_title = (ce.get("title") or "").lower()
+                            for keyword in _msg_words:
+                                if keyword in ce_domain or keyword in ce_title:
+                                    _matched_entry_ids.add(ce.get("entry_id", ""))
+                    except Exception:
+                        pass  # optional — platform match is enough
+
                     for keyword in _msg_words:
                         reg_matches = [
                             r for r in registry
                             if keyword in (r.get("platform") or "").lower()
+                            or (_matched_entry_ids and r.get("config_entry_id") in _matched_entry_ids)
                         ]
                         for r in reg_matches:
                             eid = r.get("entity_id", "")
@@ -1780,45 +1052,6 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
                                   for s in states if s.get("entity_id", "").startswith(f"{domain}.")][:30]
                 if domain_entities:
                     context_parts.append(f"## ENTITÀ {domain.upper()}\n{json.dumps(domain_entities, ensure_ascii=False, indent=1)}")
-
-        # --- HISTORY PRE-LOADING (for query_history intent) ---
-        # Pre-load history data so providers without tool-calling (Mistral, Groq, etc.) can answer directly.
-        if intent == "query_history":
-            from datetime import datetime as _dt, timedelta as _td
-            # Collect entity IDs to fetch history for (from already-matched entities)
-            _hist_eids = [e["entity_id"] for e in _integration_matches[:4]]
-            if not _hist_eids and matched_domains:
-                # Fall back to keyword+domain search
-                try:
-                    _all_s = api.get_all_states()
-                    for _s in _all_s:
-                        _eid = _s.get("entity_id", "")
-                        _fname = _s.get("attributes", {}).get("friendly_name", "").lower()
-                        if any(_eid.startswith(f"{d}.") for d in matched_domains):
-                            if any(kw in _eid.lower() or kw in _fname for kw in _msg_words):
-                                _hist_eids.append(_eid)
-                        if len(_hist_eids) >= 4:
-                            break
-                except Exception:
-                    pass
-            for _eid in _hist_eids[:4]:
-                try:
-                    _hours = 24
-                    _start = (_dt.utcnow() - _td(hours=_hours)).strftime("%Y-%m-%dT%H:%M:%S")
-                    _endpoint = f"history/period/{_start}?filter_entity_id={_eid}&significant_changes_only=1"
-                    _result = api.call_ha_api("GET", _endpoint)
-                    if isinstance(_result, list) and _result:
-                        _entries = _result[0] if isinstance(_result[0], list) else _result
-                        _summary = [{"state": _e.get("state"), "last_changed": _e.get("last_changed")}
-                                    for _e in _entries[-30:]]
-                        context_parts.append(
-                            f"## STORICO {_eid} (ultime {_hours}h, {len(_entries)} cambiamenti)\n"
-                            + json.dumps({"entity_id": _eid, "history": _summary},
-                                         ensure_ascii=False, indent=1)
-                        )
-                        logger.info(f"Smart context: pre-loaded history for {_eid} ({len(_entries)} entries)")
-                except Exception as _he:
-                    logger.warning(f"Smart context: history fetch for {_eid} failed: {_he}")
 
     except Exception as e:
         logger.warning(f"Smart context error: {e}")

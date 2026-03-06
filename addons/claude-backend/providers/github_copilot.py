@@ -468,26 +468,27 @@ class GitHubCopilotProvider(EnhancedProvider):
                 )
             if response.status_code != 200:
                 error_text = response.read().decode("utf-8", errors="ignore")
-                # Auto-blocklist models that return "model_not_supported"
                 if response.status_code == 400 and "model_not_supported" in error_text:
-                    try:
-                        from api import blocklist_model
-                        blocklist_model("github_copilot", resolved_model)
-                        logger.warning(f"GitHub Copilot: model '{resolved_model}' auto-blocklisted (not supported)")
-                    except Exception as _bl:
-                        logger.debug(f"Could not auto-blocklist: {_bl}")
+                    logger.warning(f"GitHub Copilot: model '{resolved_model}' not supported")
                 raise RuntimeError(f"HTTP {response.status_code}: {error_text[:400]}")
 
+            captured_usage = None
             for line in response.iter_lines():
                 if not line.startswith("data:"):
                     continue
                 data_str = line[5:].strip()
                 if not data_str or data_str == "[DONE]":
                     if data_str == "[DONE]":
-                        yield {"type": "done", "finish_reason": "stop"}
+                        done_event: dict = {"type": "done", "finish_reason": "stop"}
+                        if captured_usage:
+                            done_event["usage"] = captured_usage
+                        yield done_event
                     continue
                 try:
                     event = json.loads(data_str)
+                    # Capture usage if present (some Copilot models include it)
+                    if event.get("usage"):
+                        captured_usage = event["usage"]
                     choices = event.get("choices", [])
                     if not choices:
                         continue
@@ -498,7 +499,10 @@ class GitHubCopilotProvider(EnhancedProvider):
                         yield {"type": "text", "text": content}
                     finish = choice.get("finish_reason")
                     if finish:
-                        yield {"type": "done", "finish_reason": finish}
+                        done_event2: dict = {"type": "done", "finish_reason": finish}
+                        if captured_usage:
+                            done_event2["usage"] = captured_usage
+                        yield done_event2
                 except json.JSONDecodeError:
                     continue
 

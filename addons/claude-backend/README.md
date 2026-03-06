@@ -2,7 +2,9 @@
 
 Multi-provider AI assistant for Home Assistant. Control your smart home, create automations, and manage configurations with natural language.
 
-Supports **19 AI providers** and **40+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
+Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot, OpenAI Codex, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
+
+**New in v4.5.1**: Fix card/bubble conversation separation, trash icon rendering, silent agent save failure. See [CHANGELOG](CHANGELOG.md) for full details.
 
 ---
 
@@ -80,9 +82,128 @@ If you already pay for **ChatGPT Plus** ($20/mo) or **Pro** ($200/mo), you can u
 | `enable_file_upload` | `false` | Upload PDF / DOCX / TXT |
 | `enable_rag` | `false` | Semantic search in uploaded documents |
 | `max_conversations` | `10` | Chat history depth (1–100) |
-| `cost_currency` | `USD` | Cost display currency |
+| `cost_currency` | `USD` | Cost display currency (USD, EUR) |
 | `timeout` | `30` | Request timeout (seconds) |
 | `mcp_config_file` | `/config/amira/mcp_config.json` | Custom MCP tools |
+
+### 💰 Cost & Usage Tracking
+
+Every message shows real-time cost with cache token breakdown:
+- **Per-message**: `1.5k in / 300 out (500 cache↓) • $0.0084` with tooltip showing input/output/cache breakdown
+- **Session totals**: Running token and cost total for the current conversation
+- **Persistent tracking**: Daily, per-model, and per-provider aggregates saved to `/data/usage_stats.json`
+- **Cache-aware pricing**: Anthropic (90% read discount), OpenAI (50%), Google (75%), DeepSeek (90%)
+
+**API endpoints:**
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/usage_stats` | Full usage summary (last 30 days, by model, by provider) |
+| `GET /api/usage_stats/today` | Today's totals |
+| `POST /api/usage_stats/reset` | Reset all usage data |
+
+### 🤖 Multi-Agent System
+
+Agents let you create **specialised AI personalities**, each with its own model, tools, system prompt and fallback chain. Instead of one generic assistant, you can switch between tailored agents from the sidebar or the chat bubble.
+
+**Why use multiple agents?**
+- **Different tasks, different models** — a coding agent on Claude Opus, a quick-chat agent on Groq Llama (free & fast)
+- **Tool isolation** — only the "home" agent can control automations; the "coder" can only read/write files
+- **Cost optimisation** — route expensive reasoning to premium models, simple Q&A to free tiers
+- **Custom personality** — each agent has its own name, emoji, and optional system prompt
+
+#### Adding your first agent
+
+Create (or edit) `/config/amira/agents.json`. You can use any of these formats:
+
+**Recommended format (array):**
+
+```json
+{
+  "agents": [
+    {
+      "id": "home",
+      "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+      "model": { "primary": "anthropic/claude-sonnet-4-6", "fallbacks": ["google/gemini-2.0-flash"] },
+      "tools": ["create_automation", "update_automation", "call_service", "get_entity"],
+      "is_default": true
+    }
+  ]
+}
+```
+
+**Shorthand format (flat dict — agent ID as key):**
+
+```json
+{
+  "home": {
+    "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+    "model": "anthropic/claude-sonnet-4-6",
+    "is_default": true
+  }
+}
+```
+
+#### Adding a second agent
+
+Add another entry to the `agents` array:
+
+```json
+{
+  "agents": [
+    {
+      "id": "home",
+      "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+      "model": { "primary": "anthropic/claude-sonnet-4-6", "fallbacks": ["google/gemini-2.0-flash"] },
+      "is_default": true
+    },
+    {
+      "id": "coder",
+      "identity": { "name": "CodeBot", "emoji": "💻", "description": "Coding & config specialist" },
+      "model": { "primary": "anthropic/claude-opus-4-6", "fallbacks": ["openai/gpt-4o"] },
+      "tools": ["read_config_file", "write_config_file", "list_config_files"],
+      "system_prompt_override": "You are a coding expert. Always show code with comments.",
+      "temperature": 0.2
+    }
+  ]
+}
+```
+
+> **Tip:** You can also create and manage agents directly from the **Config** tab in the sidebar — no JSON editing required!
+
+After saving, the agent selector appears in the sidebar. Click an agent to switch — model, tools and prompt apply instantly (no restart needed, config is hot-reloaded).
+
+#### Field reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `identity.name` | string | Display name in UI |
+| `identity.emoji` | string | Icon shown in selector and messages |
+| `identity.description` | string | Tooltip text |
+| `model` | string | `provider/model` — the preferred model |
+| `fallback` | string[] | Ordered fallback models if primary fails |
+| `tools` | string[] \| null | Allowed tools (`null` = all tools) |
+| `tools_blocked` | string[] | Explicitly blocked tools |
+| `system_prompt_override` | string \| null | Custom system prompt (replaces default) |
+| `temperature` | number \| null | 0.0–2.0 (null = provider default) |
+| `max_tokens` | number \| null | Max response length |
+| `thinking_level` | string \| null | `off`, `low`, `medium`, `high`, `adaptive` |
+| `is_default` | bool | Mark one agent as the default |
+| `enabled` | bool | Set `false` to hide without deleting |
+| `tags` | string[] | Arbitrary tags for organisation |
+
+### 🧠 Dynamic Model Catalog
+
+All model metadata lives in a centralized catalog (`model_catalog.py`) — capabilities (vision, reasoning, code, tool use), context windows, max output tokens, and pricing tiers. The catalog is:
+1. Built from a rich static table (zero network calls)
+2. Enriched at runtime by `/v1/models` discovery (NVIDIA, Ollama, GitHub Copilot)
+3. Queried by the agent system, fallback engine, and UI
+
+### 🛡️ Automation Safety
+
+`create_automation` now includes safety guards:
+- **Rejects empty automations** — trigger and action arrays must contain actual content
+- **Detects duplicate aliases** — warns if a similar automation already exists, suggests `update_automation`
+- **Improved tool schemas** — examples in parameter descriptions prevent AI from omitting required fields
 
 ---
 
@@ -94,7 +215,8 @@ All persistent data lives in **`/config/amira/`** — one folder, easy to backup
 /config/amira/
 ├── conversations.json        # Chat history
 ├── runtime_selection.json    # Last selected model/provider
-├── model_blocklist.json      # Blocked/failed models
+├── model_blocklist.json      # NVIDIA blocked/tested models (auto-managed)
+├── agents.json               # Multi-agent config (name, model, tools, fallback)
 ├── bubble_devices.json       # Chat bubble per-device config
 ├── custom_system_prompt.txt  # Custom system prompt override
 ├── mcp_config.json           # MCP servers (create this manually)
@@ -105,6 +227,9 @@ All persistent data lives in **`/config/amira/`** — one folder, easy to backup
     ├── MEMORY.md             # Long-term facts (always in context)
     ├── HISTORY.md            # Session log (append-only)
     └── conversations.json    # Full conversation archive
+
+/data/
+└── usage_stats.json          # Persistent cost/usage tracking (daily, per-model, per-provider)
 ```
 
 > Files from older versions (`/config/.storage/claude_*`) are migrated automatically on first start.

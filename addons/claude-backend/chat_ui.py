@@ -207,6 +207,94 @@ def get_chat_ui():
             # Dark mode
             "dark_mode": "Dark mode",
             "light_mode": "Light mode",
+            # Costs tab
+            "tab_costs": "Costs",
+            "costs_today": "Today",
+            "costs_total_tokens": "Total tokens",
+            "costs_total_cost": "Total cost",
+            "costs_by_model": "By model",
+            "costs_by_provider": "By provider",
+            "costs_history": "Last 7 days",
+            "costs_no_data": "No usage data yet",
+            "costs_reset": "Reset",
+            "costs_reset_confirm": "Reset all usage statistics? This cannot be undone.",
+            "costs_reset_done": "Usage data cleared",
+            "costs_requests": "requests",
+            "costs_tokens": "tokens",
+            # Config tab
+            "tab_config": "\U0001f527 Config",
+            "config_loading": "Loading...",
+            "config_save": "Save",
+            "config_cancel": "Cancel",
+            "config_saved": "Saved!",
+            "config_save_error": "Save failed",
+            "config_invalid_json": "Invalid JSON",
+            "config_file_not_found": "File not found (will be created on save)",
+            "config_agents_title": "Agent Profiles",
+            "config_mcp_title": "MCP Configuration",
+            "config_prompt_title": "Custom System Prompt",
+            "config_memory_title": "Memory (MEMORY.md)",
+            # Agent form
+            "agent_add": "New Agent",
+            "agent_new": "\U0001f916 New Agent",
+            "agent_none": "No agents configured. Click \"New Agent\" to get started.",
+            "agent_back": "Back",
+            "agent_name": "Name",
+            "agent_desc": "Description",
+            "agent_tools": "Allowed Tools",
+            "agent_enabled": "Enabled",
+            "agent_id_label": "ID (unique)",
+            "agent_id_invalid": "ID must contain only lowercase letters, numbers, - and _",
+            "agent_sysprompt_label": "System Prompt Override",
+            "agent_sysprompt_hint": "Leave empty to use the default system prompt...",
+            "agent_delete_confirm": "Delete agent",
+            "agent_protected": "Protected (built-in)",
+            "agent_fallbacks": "Fallback Models",
+            "agent_temperature": "Temperature (0-2)",
+            "agent_thinking": "Thinking",
+            "agent_maxtokens": "Max Tokens",
+            "agent_default_flag": "Default",
+            "agent_tools_hint": "empty = all",
+            # Agent form tooltips
+            "tip_agent_id": "Unique identifier. Use lowercase, no spaces (e.g. home, coder, energy).",
+            "tip_agent_name": "Display name shown in the agent selector.",
+            "tip_agent_emoji": "Icon shown next to the agent name.",
+            "tip_agent_desc": "Short description of what this agent specializes in.",
+            "tip_agent_provider": "AI provider (e.g. Anthropic, OpenAI). Leave empty to use the default.",
+            "tip_agent_model": "Specific model to use. Leave empty to use the provider default.",
+            "tip_agent_fallbacks": "Comma-separated fallback models if the primary is unavailable.",
+            "tip_agent_temperature": "Controls randomness (0=deterministic, 2=creative). Default: 0.7.",
+            "tip_agent_thinking": "Reasoning depth: off, low, medium, high, or adaptive.",
+            "tip_agent_maxtokens": "Maximum tokens for each response. Default: 4096.",
+            "tip_agent_sysprompt": "Custom instructions that override the default system prompt.",
+            "tip_agent_tools": "Select which tools this agent can use. None selected = all tools available.",
+            "tip_agent_default": "The default agent is used when no specific agent is selected.",
+            "tip_agent_enabled": "Disabled agents are hidden from the agent selector.",
+            # MCP form
+            "mcp_add_server": "Add Server",
+            "mcp_server_name": "Server Name",
+            "mcp_command": "Command",
+            "mcp_args": "Arguments",
+            "mcp_env": "Environment Variables",
+            "mcp_no_servers": "No MCP servers configured. Click \"Add Server\" to connect external tools.",
+            "tip_mcp_name": "Unique name for this MCP server (e.g. filesystem, web_search).",
+            "tip_mcp_command": "Command to start the server (e.g. python, uvx, npx).",
+            "tip_mcp_args": "One argument per line. E.g. -m, mcp.server.stdio.",
+            "tip_mcp_env": "One per line: KEY=VALUE. Environment variables for the server.",
+            # System prompt form
+            "prompt_chars": "characters",
+            "prompt_reset": "Clear",
+            "prompt_hint": "Write custom instructions here. They will be added to the default system prompt sent to the AI...",
+            # Memory form
+            "memory_hint": "Markdown notes the AI will remember across conversations...",
+            "memory_lines": "lines",
+            # Channel association
+            "agent_channels": "Channel Assignment",
+            "agent_channel_telegram": "Telegram",
+            "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_none": "-- none --",
+            "tip_agent_channels": "Assign this agent to a messaging channel. Each channel can have one agent.",
+            "agent_channel_badge": "Channel",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -347,6 +435,94 @@ def get_chat_ui():
             # Dark mode
             "dark_mode": "Tema scuro",
             "light_mode": "Tema chiaro",
+            # Costs tab
+            "tab_costs": "Costi",
+            "costs_today": "Oggi",
+            "costs_total_tokens": "Token totali",
+            "costs_total_cost": "Costo totale",
+            "costs_by_model": "Per modello",
+            "costs_by_provider": "Per provider",
+            "costs_history": "Ultimi 7 giorni",
+            "costs_no_data": "Nessun dato di utilizzo",
+            "costs_reset": "Azzera",
+            "costs_reset_confirm": "Azzerare tutte le statistiche di utilizzo? Non si può annullare.",
+            "costs_reset_done": "Dati di utilizzo azzerati",
+            "costs_requests": "richieste",
+            "costs_tokens": "token",
+            # Config tab
+            "tab_config": "\U0001f527 Config",
+            "config_loading": "Caricamento...",
+            "config_save": "Salva",
+            "config_cancel": "Annulla",
+            "config_saved": "Salvato!",
+            "config_save_error": "Errore nel salvataggio",
+            "config_invalid_json": "JSON non valido",
+            "config_file_not_found": "File non trovato (verrà creato al salvataggio)",
+            "config_agents_title": "Profili Agente",
+            "config_mcp_title": "Configurazione MCP",
+            "config_prompt_title": "System Prompt Personalizzato",
+            "config_memory_title": "Memoria (MEMORY.md)",
+            # Agent form
+            "agent_add": "Nuovo Agent",
+            "agent_new": "\U0001f916 Nuovo Agent",
+            "agent_none": "Nessun agent configurato. Clicca \"Nuovo Agent\" per iniziare.",
+            "agent_back": "Indietro",
+            "agent_name": "Nome",
+            "agent_desc": "Descrizione",
+            "agent_tools": "Tools Consentiti",
+            "agent_enabled": "Abilitato",
+            "agent_id_label": "ID (univoco)",
+            "agent_id_invalid": "L'ID deve contenere solo lettere minuscole, numeri, - e _",
+            "agent_sysprompt_label": "System Prompt Personalizzato",
+            "agent_sysprompt_hint": "Lascia vuoto per usare il prompt di sistema predefinito...",
+            "agent_delete_confirm": "Eliminare agent",
+            "agent_protected": "Protetto (predefinito)",
+            "agent_fallbacks": "Modelli di Fallback",
+            "agent_temperature": "Temperatura (0-2)",
+            "agent_thinking": "Ragionamento",
+            "agent_maxtokens": "Max Token",
+            "agent_default_flag": "Predefinito",
+            "agent_tools_hint": "vuoto = tutti",
+            # Tooltips agente
+            "tip_agent_id": "Identificatore univoco. Usa minuscole, senza spazi (es. home, coder, energy).",
+            "tip_agent_name": "Nome visualizzato nel selettore agente.",
+            "tip_agent_emoji": "Icona mostrata accanto al nome dell'agente.",
+            "tip_agent_desc": "Breve descrizione della specializzazione dell'agente.",
+            "tip_agent_provider": "Provider AI (es. Anthropic, OpenAI). Lascia vuoto per usare quello predefinito.",
+            "tip_agent_model": "Modello specifico da usare. Lascia vuoto per usare il predefinito del provider.",
+            "tip_agent_fallbacks": "Modelli di riserva separati da virgola se il principale non \u00e8 disponibile.",
+            "tip_agent_temperature": "Controlla la casualit\u00e0 (0=deterministico, 2=creativo). Default: 0.7.",
+            "tip_agent_thinking": "Profondit\u00e0 del ragionamento: off, low, medium, high o adaptive.",
+            "tip_agent_maxtokens": "Numero massimo di token per ogni risposta. Default: 4096.",
+            "tip_agent_sysprompt": "Istruzioni personalizzate che sostituiscono il prompt di sistema predefinito.",
+            "tip_agent_tools": "Seleziona quali strumenti pu\u00f2 usare questo agente. Nessuno selezionato = tutti disponibili.",
+            "tip_agent_default": "L'agente predefinito viene usato quando non ne viene selezionato uno specifico.",
+            "tip_agent_enabled": "Gli agenti disabilitati sono nascosti dal selettore.",
+            # MCP form
+            "mcp_add_server": "Aggiungi Server",
+            "mcp_server_name": "Nome Server",
+            "mcp_command": "Comando",
+            "mcp_args": "Argomenti",
+            "mcp_env": "Variabili d'Ambiente",
+            "mcp_no_servers": "Nessun server MCP configurato. Clicca \"Aggiungi Server\" per connettere strumenti esterni.",
+            "tip_mcp_name": "Nome univoco per il server MCP (es. filesystem, web_search).",
+            "tip_mcp_command": "Comando per avviare il server (es. python, uvx, npx).",
+            "tip_mcp_args": "Un argomento per riga. Es. -m, mcp.server.stdio.",
+            "tip_mcp_env": "Uno per riga: CHIAVE=VALORE. Variabili d'ambiente per il server.",
+            # System prompt form
+            "prompt_chars": "caratteri",
+            "prompt_reset": "Cancella",
+            "prompt_hint": "Scrivi istruzioni personalizzate qui. Verranno aggiunte al prompt di sistema predefinito inviato all'AI...",
+            # Memory form
+            "memory_hint": "Note in formato Markdown che l'AI ricorder\u00e0 tra le conversazioni...",
+            "memory_lines": "righe",
+            # Channel association
+            "agent_channels": "Associazione Canali",
+            "agent_channel_telegram": "Telegram",
+            "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_none": "-- nessuno --",
+            "tip_agent_channels": "Associa questo agent a un canale di messaggistica. Ogni canale pu\u00f2 avere un solo agent.",
+            "agent_channel_badge": "Canale",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -487,6 +663,94 @@ def get_chat_ui():
             # Dark mode
             "dark_mode": "Tema oscuro",
             "light_mode": "Tema claro",
+            # Costs tab
+            "tab_costs": "Costes",
+            "costs_today": "Hoy",
+            "costs_total_tokens": "Tokens totales",
+            "costs_total_cost": "Coste total",
+            "costs_by_model": "Por modelo",
+            "costs_by_provider": "Por proveedor",
+            "costs_history": "Últimos 7 días",
+            "costs_no_data": "Sin datos de uso",
+            "costs_reset": "Restablecer",
+            "costs_reset_confirm": "¿Restablecer todas las estadísticas? No se puede deshacer.",
+            "costs_reset_done": "Datos de uso borrados",
+            "costs_requests": "solicitudes",
+            "costs_tokens": "tokens",
+            # Config tab
+            "tab_config": "\U0001f527 Config",
+            "config_loading": "Cargando...",
+            "config_save": "Guardar",
+            "config_cancel": "Cancelar",
+            "config_saved": "Guardado!",
+            "config_save_error": "Error al guardar",
+            "config_invalid_json": "JSON no válido",
+            "config_file_not_found": "Archivo no encontrado (se creará al guardar)",
+            "config_agents_title": "Perfiles de Agente",
+            "config_mcp_title": "Configuración MCP",
+            "config_prompt_title": "Prompt de Sistema",
+            "config_memory_title": "Memoria (MEMORY.md)",
+            # Agent form
+            "agent_add": "Nuevo Agente",
+            "agent_new": "\U0001f916 Nuevo Agente",
+            "agent_none": "No hay agentes configurados. Haz clic en \"Nuevo Agente\" para empezar.",
+            "agent_back": "Atrás",
+            "agent_name": "Nombre",
+            "agent_desc": "Descripción",
+            "agent_tools": "Herramientas Permitidas",
+            "agent_enabled": "Habilitado",
+            "agent_id_label": "ID (único)",
+            "agent_id_invalid": "El ID solo puede contener letras minúsculas, números, - y _",
+            "agent_sysprompt_label": "Prompt de Sistema Personalizado",
+            "agent_sysprompt_hint": "Dejar vacío para usar el prompt de sistema predeterminado...",
+            "agent_delete_confirm": "Eliminar agente",
+            "agent_protected": "Protegido (predeterminado)",
+            "agent_fallbacks": "Modelos de Respaldo",
+            "agent_temperature": "Temperatura (0-2)",
+            "agent_thinking": "Razonamiento",
+            "agent_maxtokens": "Max Tokens",
+            "agent_default_flag": "Predeterminado",
+            "agent_tools_hint": "vacío = todos",
+            # Tooltips
+            "tip_agent_id": "Identificador único. Usa minúsculas, sin espacios (ej. home, coder, energy).",
+            "tip_agent_name": "Nombre que se muestra en el selector de agentes.",
+            "tip_agent_emoji": "Icono junto al nombre del agente.",
+            "tip_agent_desc": "Breve descripción de la especialidad del agente.",
+            "tip_agent_provider": "Proveedor de IA (ej. Anthropic, OpenAI). Vacío = predeterminado.",
+            "tip_agent_model": "Modelo específico. Vacío = modelo predeterminado del proveedor.",
+            "tip_agent_fallbacks": "Modelos de respaldo separados por coma si el principal no está disponible.",
+            "tip_agent_temperature": "Controla la aleatoriedad (0=determinista, 2=creativo). Default: 0.7.",
+            "tip_agent_thinking": "Profundidad de razonamiento: off, low, medium, high o adaptive.",
+            "tip_agent_maxtokens": "Número máximo de tokens por respuesta. Default: 4096.",
+            "tip_agent_sysprompt": "Instrucciones personalizadas que reemplazan el prompt de sistema.",
+            "tip_agent_tools": "Selecciona las herramientas que puede usar. Ninguna = todas disponibles.",
+            "tip_agent_default": "El agente predeterminado se usa cuando no se selecciona otro.",
+            "tip_agent_enabled": "Los agentes deshabilitados se ocultan del selector.",
+            # MCP form
+            "mcp_add_server": "Añadir Servidor",
+            "mcp_server_name": "Nombre del Servidor",
+            "mcp_command": "Comando",
+            "mcp_args": "Argumentos",
+            "mcp_env": "Variables de Entorno",
+            "mcp_no_servers": "No hay servidores MCP. Haz clic en \"Añadir Servidor\" para conectar herramientas.",
+            "tip_mcp_name": "Nombre único para el servidor MCP (ej. filesystem, web_search).",
+            "tip_mcp_command": "Comando para iniciar el servidor (ej. python, uvx, npx).",
+            "tip_mcp_args": "Un argumento por línea. Ej. -m, mcp.server.stdio.",
+            "tip_mcp_env": "Uno por línea: CLAVE=VALOR. Variables de entorno del servidor.",
+            # System prompt form
+            "prompt_chars": "caracteres",
+            "prompt_reset": "Limpiar",
+            "prompt_hint": "Escribe instrucciones personalizadas aquí. Se añadirán al prompt de sistema enviado a la IA...",
+            # Memory form
+            "memory_hint": "Notas en Markdown que la IA recordará entre conversaciones...",
+            "memory_lines": "líneas",
+            # Channel association
+            "agent_channels": "Asignación de Canal",
+            "agent_channel_telegram": "Telegram",
+            "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_none": "-- ninguno --",
+            "tip_agent_channels": "Asigna este agente a un canal de mensajería. Cada canal puede tener un único agente.",
+            "agent_channel_badge": "Canal",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -624,6 +888,94 @@ def get_chat_ui():
             "confirm_delete_device": "Supprimer définitivement cet appareil ?",
             "device_deleted": "Appareil supprimé",
             "device_updated": "Appareil mis à jour",
+            # Costs tab
+            "tab_costs": "Coûts",
+            "costs_today": "Aujourd'hui",
+            "costs_total_tokens": "Tokens totaux",
+            "costs_total_cost": "Coût total",
+            "costs_by_model": "Par modèle",
+            "costs_by_provider": "Par fournisseur",
+            "costs_history": "7 derniers jours",
+            "costs_no_data": "Aucune donnée d'utilisation",
+            "costs_reset": "Réinitialiser",
+            "costs_reset_confirm": "Réinitialiser toutes les statistiques ? Cette action est irréversible.",
+            "costs_reset_done": "Données d'utilisation effacées",
+            "costs_requests": "requêtes",
+            "costs_tokens": "tokens",
+            # Config tab
+            "tab_config": "\U0001f527 Config",
+            "config_loading": "Chargement...",
+            "config_save": "Enregistrer",
+            "config_cancel": "Annuler",
+            "config_saved": "Enregistré !",
+            "config_save_error": "Erreur lors de l'enregistrement",
+            "config_invalid_json": "JSON invalide",
+            "config_file_not_found": "Fichier non trouvé (sera créé à l'enregistrement)",
+            "config_agents_title": "Profils d'Agent",
+            "config_mcp_title": "Configuration MCP",
+            "config_prompt_title": "Prompt Système Personnalisé",
+            "config_memory_title": "Mémoire (MEMORY.md)",
+            # Agent form
+            "agent_add": "Nouvel Agent",
+            "agent_new": "\U0001f916 Nouvel Agent",
+            "agent_none": "Aucun agent configuré. Cliquez sur \"Nouvel Agent\" pour commencer.",
+            "agent_back": "Retour",
+            "agent_name": "Nom",
+            "agent_desc": "Description",
+            "agent_tools": "Outils Autorisés",
+            "agent_enabled": "Activé",
+            "agent_id_label": "ID (unique)",
+            "agent_id_invalid": "L'ID ne doit contenir que des lettres minuscules, chiffres, - et _",
+            "agent_sysprompt_label": "Prompt Système Personnalisé",
+            "agent_sysprompt_hint": "Laisser vide pour utiliser le prompt système par défaut...",
+            "agent_delete_confirm": "Supprimer l'agent",
+            "agent_protected": "Protégé (intégré)",
+            "agent_fallbacks": "Modèles de Repli",
+            "agent_temperature": "Température (0-2)",
+            "agent_thinking": "Raisonnement",
+            "agent_maxtokens": "Max Tokens",
+            "agent_default_flag": "Par Défaut",
+            "agent_tools_hint": "vide = tous",
+            # Tooltips
+            "tip_agent_id": "Identifiant unique. Minuscules, sans espaces (ex. home, coder, energy).",
+            "tip_agent_name": "Nom affiché dans le sélecteur d'agent.",
+            "tip_agent_emoji": "Icône à côté du nom de l'agent.",
+            "tip_agent_desc": "Brève description de la spécialité de l'agent.",
+            "tip_agent_provider": "Fournisseur IA (ex. Anthropic, OpenAI). Vide = par défaut.",
+            "tip_agent_model": "Modèle spécifique. Vide = modèle par défaut du fournisseur.",
+            "tip_agent_fallbacks": "Modèles de secours séparés par des virgules si le principal est indisponible.",
+            "tip_agent_temperature": "Contrôle l'aléatoire (0=déterministe, 2=créatif). Défaut : 0.7.",
+            "tip_agent_thinking": "Profondeur de raisonnement : off, low, medium, high ou adaptive.",
+            "tip_agent_maxtokens": "Nombre max de tokens par réponse. Défaut : 4096.",
+            "tip_agent_sysprompt": "Instructions personnalisées qui remplacent le prompt système.",
+            "tip_agent_tools": "Sélectionnez les outils autorisés. Aucun = tous disponibles.",
+            "tip_agent_default": "L'agent par défaut est utilisé quand aucun n'est sélectionné.",
+            "tip_agent_enabled": "Les agents désactivés sont masqués du sélecteur.",
+            # MCP form
+            "mcp_add_server": "Ajouter Serveur",
+            "mcp_server_name": "Nom du Serveur",
+            "mcp_command": "Commande",
+            "mcp_args": "Arguments",
+            "mcp_env": "Variables d'Environnement",
+            "mcp_no_servers": "Aucun serveur MCP configuré. Cliquez sur \"Ajouter Serveur\" pour connecter des outils.",
+            "tip_mcp_name": "Nom unique pour le serveur MCP (ex. filesystem, web_search).",
+            "tip_mcp_command": "Commande pour démarrer le serveur (ex. python, uvx, npx).",
+            "tip_mcp_args": "Un argument par ligne. Ex. -m, mcp.server.stdio.",
+            "tip_mcp_env": "Un par ligne : CLÉ=VALEUR. Variables d'environnement du serveur.",
+            # System prompt form
+            "prompt_chars": "caractères",
+            "prompt_reset": "Effacer",
+            "prompt_hint": "Écrivez des instructions personnalisées ici. Elles seront ajoutées au prompt système envoyé à l'IA...",
+            # Memory form
+            "memory_hint": "Notes en Markdown que l'IA retiendra entre les conversations...",
+            "memory_lines": "lignes",
+            # Channel association
+            "agent_channels": "Attribution de Canal",
+            "agent_channel_telegram": "Telegram",
+            "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_none": "-- aucun --",
+            "tip_agent_channels": "Attribuez cet agent à un canal de messagerie. Chaque canal ne peut avoir qu'un seul agent.",
+            "agent_channel_badge": "Canal",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -634,6 +986,7 @@ def get_chat_ui():
     file_upload_display = "block" if file_upload_enabled else "none"
     voice_enabled = getattr(api, 'ENABLE_VOICE_INPUT', True)
     voice_display = "flex" if voice_enabled else "none"
+    cost_currency = getattr(api, 'COST_CURRENCY', 'USD')
 
     return f"""<!DOCTYPE html>
 <html>
@@ -718,11 +1071,11 @@ def get_chat_ui():
         #modelSelectWrap {{ display: flex; gap: 5px; align-items: center; min-width: 0; }}
         #providerSelect {{ max-width: 130px; }}
         #modelSelect {{ max-width: 160px; }}
-        #refreshModelsBtn {{ background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 4px 7px; border-radius: 14px; font-size: 13px; cursor: pointer; transition: background 0.2s; line-height: 1; display: inline-block; }}
-        #refreshModelsBtn:hover {{ background: rgba(255,255,255,0.3); }}
-        #refreshModelsBtn:disabled {{ opacity: 0.5; cursor: default; }}
-        @keyframes spin {{ 100% {{ transform: rotate(360deg); }} }}
-        #refreshModelsBtn.spinning {{ display: inline-block; animation: spin 0.8s linear infinite; }}
+        #agentSelect {{ max-width: 120px; background: rgba(255,255,255,0.25); border: 1px solid rgba(255,255,255,0.5); color: white; padding: 4px 8px; border-radius: 14px; font-size: 11px; cursor: pointer; transition: background 0.2s; min-width: 0; }}
+        #agentSelect:hover {{ background: rgba(255,255,255,0.4); }}
+        .agent-indicator {{ display: none; font-size: 13px; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,0.15); white-space: nowrap; }}
+        .agent-indicator.active {{ display: inline-block; }}
+
         .model-selector option {{ background: #2c3e50; color: white; }}
         .model-selector optgroup {{ background: #1a252f; color: #aaa; font-style: normal; font-weight: 600; padding: 4px 0; }}
         .header .status {{ margin-left: auto; font-size: 12px; display: flex; align-items: center; gap: 6px; }}
@@ -967,6 +1320,20 @@ def get_chat_ui():
         .status-badge {{ display: inline-block; background: #fef3c7; color: #92400e; padding: 3px 10px; border-radius: 12px; font-size: 12px; margin: 2px 4px; animation: fadeIn 0.3s ease; }}
         .message-usage {{ font-size: 11px; color: #999; text-align: right; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(150,150,150,0.15); }}
         .conversation-usage {{ font-size: 11px; color: #aaa; text-align: center; padding: 4px 8px; background: rgba(0,0,0,0.05); border-radius: 8px; margin: 4px 12px; }}
+        .costs-panel {{ padding: 12px; font-size: 12px; color: #555; }}
+        .costs-panel h3 {{ font-size: 13px; color: #333; margin: 0 0 8px; font-weight: 600; }}
+        .costs-panel .cost-card {{ background: #f8f9fa; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }}
+        .costs-panel .cost-card-title {{ font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }}
+        .costs-panel .cost-card-value {{ font-size: 20px; font-weight: 700; color: #333; }}
+        .costs-panel .cost-card-sub {{ font-size: 11px; color: #999; margin-top: 2px; }}
+        .costs-panel .cost-row {{ display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(0,0,0,0.05); }}
+        .costs-panel .cost-row:last-child {{ border-bottom: none; }}
+        .costs-panel .cost-row-name {{ font-size: 12px; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 60%; }}
+        .costs-panel .cost-row-value {{ font-size: 12px; color: #333; font-weight: 600; white-space: nowrap; }}
+        .costs-panel .cost-section {{ margin-top: 12px; }}
+        .costs-panel .cost-section-title {{ font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #eee; }}
+        .costs-panel .cost-reset-btn {{ display: block; width: 100%; margin-top: 16px; padding: 8px; background: #fee2e2; color: #991b1b; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; transition: background 0.2s; }}
+        .costs-panel .cost-reset-btn:hover {{ background: #fecaca; }}
         .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
         .undo-button:hover {{ opacity: 0.9; }}
         .undo-button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
@@ -1077,6 +1444,183 @@ def get_chat_ui():
         }}
         .file-tree-breadcrumb:hover {{ background: #eff0ff; }}
         .file-tree-status {{ padding: 16px 12px; font-size: 12px; color: #999; text-align: center; }}
+
+        /* ===== CONFIG EDITOR (sidebar list + file panel editor) ===== */
+        .config-list {{ padding: 8px; overflow-y: auto; flex: 1; }}
+        .config-item {{
+            padding: 10px 12px; margin-bottom: 6px; background: #f8f9fa;
+            border-radius: 8px; cursor: pointer; transition: background 0.15s;
+            display: flex; align-items: center; gap: 8px;
+        }}
+        .config-item:hover {{ background: #eef0f4; }}
+        .config-item.active {{ background: #e8ebff; border-left: 3px solid #667eea; }}
+        .config-item-icon {{ font-size: 18px; flex-shrink: 0; }}
+        .config-item-info {{ flex: 1; min-width: 0; }}
+        .config-item-title {{ font-size: 13px; font-weight: 600; color: #333; }}
+        .config-item-desc {{ font-size: 11px; color: #888; margin-top: 2px; }}
+        .config-editor {{ display: flex; flex-direction: column; height: 100%; }}
+        .config-editor-header {{
+            padding: 10px 14px; border-bottom: 1px solid #e0e0e0;
+            display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }}
+        .config-editor-title {{ font-size: 14px; font-weight: 600; }}
+        .config-editor-body {{ flex: 1; display: flex; flex-direction: column; min-height: 0; }}
+        .config-editor-body textarea {{
+            width: 100%; flex: 1; border: none; resize: none; padding: 12px;
+            font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 12px; line-height: 1.5;
+            background: #f8f9fa; color: #1e1e2e; outline: none;
+            box-sizing: border-box;
+        }}
+        .config-editor-footer {{
+            padding: 8px 14px; border-top: 1px solid #e0e0e0;
+            display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-shrink: 0;
+        }}
+        .config-editor-footer button {{
+            padding: 6px 16px; border-radius: 6px; border: none;
+            cursor: pointer; font-size: 12px; font-weight: 500;
+        }}
+        .config-save-btn {{ background: #667eea; color: white; }}
+        .config-save-btn:hover {{ background: #5a6fd6; }}
+        .config-cancel-btn {{ background: #e0e0e0; color: #333; }}
+        .config-cancel-btn:hover {{ background: #d0d0d0; }}
+        .config-status {{ font-size: 11px; padding: 4px 8px; border-radius: 4px; transition: opacity 0.3s; }}
+        .config-status.success {{ background: #dcfce7; color: #166534; }}
+        .config-status.error {{ background: #fce8e8; color: #991b1b; }}
+
+        /* ===== AGENT FORM ===== */
+        .agent-list-header {{
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; border-bottom: 1px solid #e0e0e0;
+        }}
+        .agent-list-header h3 {{ margin: 0; font-size: 14px; font-weight: 600; }}
+        .agent-add-btn {{
+            background: #667eea; color: white; border: none; border-radius: 6px;
+            padding: 5px 12px; font-size: 12px; cursor: pointer; font-weight: 500;
+        }}
+        .agent-add-btn:hover {{ background: #5a6fd6; }}
+        .agent-card {{
+            padding: 10px 14px; border-bottom: 1px solid #f0f0f0; cursor: pointer;
+            display: flex; align-items: center; gap: 10px; transition: background 0.15s;
+        }}
+        .agent-card:hover {{ background: #f5f5ff; }}
+        .agent-card.active {{ background: #e8ebff; border-left: 3px solid #667eea; }}
+        .agent-card-emoji {{ font-size: 22px; flex-shrink: 0; }}
+        .agent-card-info {{ flex: 1; min-width: 0; }}
+        .agent-card-name {{ font-size: 13px; font-weight: 600; color: #333; }}
+        .agent-card-model {{ font-size: 11px; color: #888; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+        .agent-card-badges {{ display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }}
+        .agent-badge {{ font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #eef0f4; color: #666; }}
+        .agent-badge.default {{ background: #dcfce7; color: #166534; }}
+        .agent-badge.channel {{ background: #dbeafe; color: #1e40af; }}
+        .agent-card-actions {{ display: flex; gap: 4px; flex-shrink: 0; }}
+        .agent-card-actions button {{
+            background: none; border: none; cursor: pointer; padding: 3px; border-radius: 4px;
+            font-size: 14px; opacity: 0.5; transition: opacity 0.15s;
+        }}
+        .agent-card:hover .agent-card-actions button {{ opacity: 1; }}
+        .agent-card-actions button:hover {{ background: rgba(0,0,0,0.08); }}
+        .agent-card-actions button.delete:hover {{ background: #fce8e8; }}
+        .agent-form {{ padding: 14px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; flex: 1; }}
+        .agent-form-group {{ display: flex; flex-direction: column; gap: 4px; }}
+        .agent-form-group label {{ font-size: 11px; font-weight: 600; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }}
+        .agent-form-row {{ display: flex; gap: 8px; }}
+        .agent-form-row > * {{ flex: 1; }}
+        .agent-form-group input, .agent-form-group select, .agent-form-group textarea {{
+            padding: 7px 10px; border: 1px solid #d0d0d0; border-radius: 6px;
+            font-size: 13px; background: #fff; color: #333; outline: none;
+            transition: border-color 0.15s;
+        }}
+        .agent-form-group input:focus, .agent-form-group select:focus, .agent-form-group textarea:focus {{
+            border-color: #667eea;
+        }}
+        .agent-form-group textarea {{ min-height: 60px; resize: vertical; font-family: inherit; }}
+        .agent-form-group .emoji-picker {{
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }}
+        .agent-form-group .emoji-btn {{
+            width: 32px; height: 32px; border: 2px solid transparent; border-radius: 6px;
+            cursor: pointer; font-size: 18px; background: #f5f5f5; display: flex;
+            align-items: center; justify-content: center; transition: all 0.15s;
+        }}
+        .agent-form-group .emoji-btn:hover {{ background: #e8e8ff; }}
+        .agent-form-group .emoji-btn.selected {{ border-color: #667eea; background: #e8ebff; }}
+        .agent-tools-grid {{
+            display: flex; flex-wrap: wrap; gap: 4px; max-height: 120px; overflow-y: auto;
+        }}
+        .agent-tool-chip {{
+            font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+            background: #f0f0f0; color: #666; border: 1px solid transparent;
+            transition: all 0.15s; user-select: none;
+        }}
+        .agent-tool-chip:hover {{ background: #e8ebff; }}
+        .agent-tool-chip.selected {{ background: #667eea; color: white; border-color: #5a6fd6; }}
+        .agent-form-actions {{
+            display: flex; gap: 8px; justify-content: flex-end; padding-top: 8px;
+            border-top: 1px solid #e0e0e0;
+        }}
+        .agent-card.protected {{ opacity: 0.92; }}
+        .agent-card.protected .agent-card-actions {{ display: none; }}
+        .agent-protected-badge {{
+            font-size: 9px; background: #dbeafe; color: #1e40af; padding: 1px 6px;
+            border-radius: 8px; font-weight: 600; white-space: nowrap;
+        }}
+
+        /* Tooltip info icons */
+        .field-tip {{
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 15px; height: 15px; border-radius: 50%; background: #e0e0e0;
+            color: #555; font-size: 10px; font-weight: 700; cursor: help;
+            margin-left: 4px; position: relative; vertical-align: middle;
+            font-style: italic; font-family: Georgia, serif; line-height: 1;
+        }}
+        .field-tip:hover {{ background: #667eea; color: white; }}
+        .field-tip .tip-text {{
+            display: none; position: absolute; bottom: 120%; left: 50%;
+            transform: translateX(-50%); background: #333; color: #fff;
+            font-size: 11px; font-weight: 400; font-style: normal; font-family: inherit;
+            padding: 6px 10px; border-radius: 6px; white-space: normal;
+            min-width: 180px; max-width: 260px; z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.25); line-height: 1.35;
+            text-align: left; letter-spacing: 0;
+        }}
+        .field-tip .tip-text::after {{
+            content: ''; position: absolute; top: 100%; left: 50%;
+            transform: translateX(-50%); border: 5px solid transparent;
+            border-top-color: #333;
+        }}
+        .field-tip:hover .tip-text {{ display: block; }}
+
+        /* MCP server cards */
+        .mcp-server-card {{
+            border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 8px;
+            overflow: hidden; background: white;
+        }}
+        .mcp-server-header {{
+            display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+            background: #f5f5ff; cursor: pointer; user-select: none;
+        }}
+        .mcp-server-header:hover {{ background: #ebebff; }}
+        .mcp-server-name {{ flex: 1; font-weight: 600; font-size: 13px; color: #333; }}
+        .mcp-server-toggle {{ font-size: 12px; color: #888; transition: transform 0.2s; }}
+        .mcp-server-toggle.open {{ transform: rotate(90deg); }}
+        .mcp-server-body {{ padding: 12px; display: none; border-top: 1px solid #e8e8f0; }}
+        .mcp-server-body.open {{ display: block; }}
+        .mcp-server-actions {{ display: flex; gap: 4px; }}
+        .mcp-server-actions button {{
+            background: none; border: none; cursor: pointer; font-size: 14px;
+            padding: 2px 4px; border-radius: 4px; opacity: 0.6;
+        }}
+        .mcp-server-actions button:hover {{ opacity: 1; background: rgba(0,0,0,0.05); }}
+        .mcp-server-actions button.delete:hover {{ background: #fce8e8; }}
+
+        /* Enhanced text editor (system prompt / memory) */
+        .enhanced-editor-stats {{
+            display: flex; gap: 12px; align-items: center; padding: 6px 12px;
+            background: #f8f9fa; border-bottom: 1px solid #e8e8f0;
+            font-size: 11px; color: #888;
+        }}
+        .enhanced-editor-stats span {{ font-weight: 600; color: #555; }}
 
         /* ===== FILE PREVIEW PANEL (middle column) ===== */
         .file-panel {{
@@ -1477,6 +2021,18 @@ def get_chat_ui():
             color: #a0a0a0;
         }}
 
+        body.dark-mode .costs-panel {{ color: #c0c0c0; }}
+        body.dark-mode .costs-panel h3 {{ color: #e0e0e0; }}
+        body.dark-mode .costs-panel .cost-card {{ background: #2a2a2a; }}
+        body.dark-mode .costs-panel .cost-card-value {{ color: #e0e0e0; }}
+        body.dark-mode .costs-panel .cost-card-sub {{ color: #808080; }}
+        body.dark-mode .costs-panel .cost-row {{ border-bottom-color: rgba(255,255,255,0.05); }}
+        body.dark-mode .costs-panel .cost-row-name {{ color: #c0c0c0; }}
+        body.dark-mode .costs-panel .cost-row-value {{ color: #e0e0e0; }}
+        body.dark-mode .costs-panel .cost-section-title {{ color: #808080; border-bottom-color: #3a3a3a; }}
+        body.dark-mode .costs-panel .cost-reset-btn {{ background: #3b1a1a; color: #fca5a5; }}
+        body.dark-mode .costs-panel .cost-reset-btn:hover {{ background: #4a2020; }}
+
         body.dark-mode .entity-input {{
             background: #2a2a2a;
             color: #e0e0e0;
@@ -1573,6 +2129,62 @@ def get_chat_ui():
         body.dark-mode .dark-mode-toggle.active {{
             background: #ffb340;
         }}
+
+        /* ===== CONFIG EDITOR DARK MODE ===== */
+        body.dark-mode .config-item {{ background: #2a2a3a; border-bottom-color: #3a3a4a; }}
+        body.dark-mode .config-item:hover {{ background: #33334a; }}
+        body.dark-mode .config-item.active {{ background: #2e2e5a; border-left-color: #8899ff; }}
+        body.dark-mode .config-item-title {{ color: #e0e0e0; }}
+        body.dark-mode .config-item-desc {{ color: #808090; }}
+        body.dark-mode .config-editor-header {{ border-bottom-color: #3a3a4a; }}
+        body.dark-mode .config-editor-title {{ color: #e0e0e0; }}
+        body.dark-mode .config-editor-body textarea {{
+            background: #1e1e2e; color: #cdd6f4;
+        }}
+        body.dark-mode .config-editor-footer {{ border-top-color: #3a3a4a; }}
+        body.dark-mode .config-cancel-btn {{ background: #3a3a4a; color: #ccc; }}
+        body.dark-mode .config-cancel-btn:hover {{ background: #4a4a5a; }}
+        body.dark-mode .config-status.success {{ background: #1a3a2a; color: #6ee7b7; }}
+        body.dark-mode .config-status.error {{ background: #3a1a1a; color: #fca5a5; }}
+
+        /* Agent form dark mode */
+        body.dark-mode .agent-list-header {{ border-bottom-color: #3a3a4a; }}
+        body.dark-mode .agent-list-header h3 {{ color: #e0e0e0; }}
+        body.dark-mode .agent-card {{ border-bottom-color: #3a3a4a; }}
+        body.dark-mode .agent-card:hover {{ background: #2e2e4a; }}
+        body.dark-mode .agent-card.active {{ background: #2e2e5a; border-left-color: #8899ff; }}
+        body.dark-mode .agent-card-name {{ color: #e0e0e0; }}
+        body.dark-mode .agent-card-model {{ color: #808090; }}
+        body.dark-mode .agent-badge {{ background: #3a3a4a; color: #aaa; }}
+        body.dark-mode .agent-badge.default {{ background: #1a3a2a; color: #6ee7b7; }}
+        body.dark-mode .agent-badge.channel {{ background: #1e3a5f; color: #93c5fd; }}
+        body.dark-mode .agent-card-actions button:hover {{ background: rgba(255,255,255,0.1); }}
+        body.dark-mode .agent-form-group label {{ color: #999; }}
+        body.dark-mode .agent-form-group input,
+        body.dark-mode .agent-form-group select,
+        body.dark-mode .agent-form-group textarea {{
+            background: #2a2a3a; color: #e0e0e0; border-color: #4a4a5a;
+        }}
+        body.dark-mode .agent-form-group .emoji-btn {{ background: #2a2a3a; }}
+        body.dark-mode .agent-form-group .emoji-btn:hover {{ background: #3a3a5a; }}
+        body.dark-mode .agent-form-group .emoji-btn.selected {{ background: #2e2e5a; border-color: #8899ff; }}
+        body.dark-mode .agent-tool-chip {{ background: #3a3a4a; color: #aaa; }}
+        body.dark-mode .agent-tool-chip:hover {{ background: #3a3a5a; }}
+        body.dark-mode .agent-tool-chip.selected {{ background: #667eea; color: white; }}
+        body.dark-mode .agent-form-actions {{ border-top-color: #3a3a4a; }}
+        body.dark-mode .agent-protected-badge {{ background: #1e3a5a; color: #93c5fd; }}
+        body.dark-mode .field-tip {{ background: #4a4a5a; color: #ccc; }}
+        body.dark-mode .field-tip:hover {{ background: #8899ff; color: white; }}
+        body.dark-mode .field-tip .tip-text {{ background: #1a1a2a; color: #e0e0e0; }}
+        body.dark-mode .field-tip .tip-text::after {{ border-top-color: #1a1a2a; }}
+        body.dark-mode .mcp-server-card {{ border-color: #3a3a4a; background: #1e1e2e; }}
+        body.dark-mode .mcp-server-header {{ background: #2a2a3a; }}
+        body.dark-mode .mcp-server-header:hover {{ background: #333350; }}
+        body.dark-mode .mcp-server-name {{ color: #e0e0e0; }}
+        body.dark-mode .mcp-server-body {{ border-top-color: #3a3a4a; }}
+        body.dark-mode .enhanced-editor-stats {{ background: #2a2a3a; border-bottom-color: #3a3a4a; }}
+        body.dark-mode .enhanced-editor-stats span {{ color: #aaa; }}
+
     </style>
 </head>
 <body>
@@ -1582,10 +2194,10 @@ def get_chat_ui():
         <span class="badge">v{api.get_version()}</span>
         <button id="sidebarToggleBtn" class="new-chat mobile-only" title="{ui_js['conversations']}">\u2630</button>
         <div id="modelSelectWrap">
+          <select id="agentSelect" title="Agent" style="display:none"></select>
           <select id="providerSelect" class="model-selector" title="{ui_js['change_model']}"></select>
           <select id="modelSelect" class="model-selector" title="{ui_js['change_model']}"></select>
         </div>
-        <button id="refreshModelsBtn" title="{ui_js.get('refresh_models', 'Refresh model list from provider APIs')}">&#x21bb;</button>
         <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
         <button id="newChatBtn" class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
@@ -1749,6 +2361,8 @@ def get_chat_ui():
                 <button class="sidebar-tab" data-tab="files" onclick="switchSidebarTab('files')">{ui_js['tab_files']}</button>
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
                 <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">⚙️ {ui_js['tab_devices']}</button>
+                <button class="sidebar-tab" data-tab="costs" onclick="switchSidebarTab('costs')">💰 {ui_js['tab_costs']}</button>
+                <button class="sidebar-tab" data-tab="config" onclick="switchSidebarTab('config')">{ui_js['tab_config']}</button>
             </div>
             <div class="sidebar-content active" id="tabChat">
                 <div class="chat-list" id="chatList"></div>
@@ -1767,6 +2381,12 @@ def get_chat_ui():
             </div>
             <div class="sidebar-content" id="tabFiles">
                 <div class="file-tree" id="fileTree"></div>
+            </div>
+            <div class="sidebar-content" id="tabCosts">
+                <div class="costs-panel" id="costsPanel"></div>
+            </div>
+            <div class="sidebar-content" id="tabConfig">
+                <div class="config-list" id="configList"></div>
             </div>
         </div>
         <div class="splitter" id="sidebarSplitter" title="{ui_js['drag_resize']}"></div>
@@ -2470,6 +3090,11 @@ def get_chat_ui():
         }}
 
         let currentSessionId = safeLocalStorageGet('currentSessionId') || Date.now().toString();
+        // If the stored session belongs to the bubble, start a fresh chat-UI conversation
+        if (currentSessionId.startsWith('bubble_')) {{
+            currentSessionId = Date.now().toString();
+            safeLocalStorageSet('currentSessionId', currentSessionId);
+        }}
         let currentImage = null;  // Stores base64 image data
         let pendingDocument = null;  // Stores {{file, name, size}} for upload on send
         let readOnlyMode = safeLocalStorageGet('readOnlyMode') === 'true';
@@ -2895,6 +3520,900 @@ def get_chat_ui():
                     return '[FILE: ' + t.path + ']\\n' + c + '\\n[/FILE]';
                 }})
                 .join('\\n\\n');
+        }}
+
+        // ===== CONFIG EDITOR =====
+        const CONFIG_FILES = [
+            {{ file: 'amira/agents.json', icon: '\U0001f916', title: T.config_agents_title || 'Agent Profiles', desc: 'agents.json', formBased: 'agents' }},
+            {{ file: 'amira/mcp_config.json', icon: '\U0001f50c', title: T.config_mcp_title || 'MCP Configuration', desc: 'mcp_config.json', formBased: 'mcp' }},
+            {{ file: 'amira/custom_system_prompt.txt', icon: '\U0001f4dd', title: T.config_prompt_title || 'Custom System Prompt', desc: 'custom_system_prompt.txt', formBased: 'prompt' }},
+            {{ file: 'amira/memory/MEMORY.md', icon: '\U0001f9e0', title: T.config_memory_title || 'Memory (MEMORY.md)', desc: 'memory/MEMORY.md', formBased: 'memory' }},
+        ];
+        let configActiveFile = null;
+        let configOriginalContent = '';
+
+        // Known tool names for the agent form multi-select
+        const KNOWN_TOOLS = [
+            'get_entities', 'get_entity_state', 'call_service', 'search_entities',
+            'get_integration_entities', 'create_automation', 'update_automation',
+            'get_automations', 'trigger_automation', 'delete_automation',
+            'get_available_services', 'get_events', 'get_history', 'get_scenes',
+            'activate_scene', 'get_scripts', 'run_script', 'update_script',
+            'create_script', 'delete_script', 'get_areas', 'manage_areas',
+            'manage_entity', 'get_devices', 'send_notification', 'get_dashboards',
+            'create_dashboard', 'delete_dashboard', 'create_html_dashboard',
+            'read_config_file', 'write_config_file', 'list_config_files',
+            'manage_statistics',
+        ];
+        const AGENT_EMOJIS = ['\U0001f916', '\U0001f3e0', '\U0001f4bb', '\U0001f9e0', '\U0001f525', '\U0001f4a1', '\U0001f527', '\U0001f6e0\ufe0f', '\U0001f30d', '\U0001f3af', '\u2699\ufe0f', '\U0001f4ca', '\U0001f4dd', '\U0001f50d', '\U0001f680', '\U0001f6a8'];
+        const THINKING_LEVELS = ['off', 'low', 'medium', 'high', 'adaptive'];
+
+        // Cached providers/models data from loadModels
+        let _cachedProviders = [];
+        let _cachedModels = {{}};
+
+        function loadConfigList() {{
+            const listEl = document.getElementById('configList');
+            if (!listEl) return;
+            listEl.innerHTML = '';
+            CONFIG_FILES.forEach(cf => {{
+                const item = document.createElement('div');
+                item.className = 'config-item' + (configActiveFile === cf.file ? ' active' : '');
+                item.innerHTML = '<span class="config-item-icon">' + cf.icon + '</span>'
+                    + '<div class="config-item-info"><div class="config-item-title">' + cf.title + '</div>'
+                    + '<div class="config-item-desc">' + cf.desc + '</div></div>';
+                item.addEventListener('click', () => openConfigEditor(cf));
+                listEl.appendChild(item);
+            }});
+        }}
+
+        async function openConfigEditor(cf) {{
+            configActiveFile = cf.file;
+            loadConfigList();
+
+            // Open the file panel
+            if (filePanelEl) filePanelEl.classList.add('open');
+            if (fileSplitterEl) fileSplitterEl.classList.add('visible');
+            const saved = parseInt(safeLocalStorageGet('chatFilePanelWidth') || '', 10);
+            if (filePanelEl && !Number.isNaN(saved) && saved >= 180) filePanelEl.style.width = saved + 'px';
+
+            if (filePanelTabsEl) filePanelTabsEl.innerHTML = '<span style="padding:6px 10px;font-size:12px;font-weight:600;color:#667eea;">' + cf.icon + ' ' + cf.title + '</span>';
+            if (filePanelContentEl) filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            fileOpenTabs = [];
+            fileActiveTabIdx = -1;
+            updateFileContextBar();
+
+            // Form-based editors per type
+            if (cf.formBased === 'agents') {{
+                await openAgentFormUI();
+                return;
+            }}
+            if (cf.formBased === 'mcp') {{
+                await openMcpFormUI();
+                return;
+            }}
+            if (cf.formBased === 'prompt') {{
+                await openEnhancedTextEditor(cf, 'prompt');
+                return;
+            }}
+            if (cf.formBased === 'memory') {{
+                await openEnhancedTextEditor(cf, 'memory');
+                return;
+            }}
+
+            // Other config files: textarea editor
+            try {{
+                const resp = await fetch(apiUrl('api/config/read') + '?file=' + encodeURIComponent(cf.file), {{credentials:'same-origin'}});
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Read failed');
+
+                configOriginalContent = data.content || '';
+                const exists = data.exists !== false;
+
+                if (!filePanelContentEl) return;
+                filePanelContentEl.innerHTML = '';
+
+                const editor = document.createElement('div');
+                editor.className = 'config-editor';
+
+                const header = document.createElement('div');
+                header.className = 'config-editor-header';
+                header.innerHTML = '<span class="config-editor-title">' + cf.icon + ' ' + cf.title + '</span><span id="configStatus" class="config-status"></span>';
+
+                const body = document.createElement('div');
+                body.className = 'config-editor-body';
+                const ta = document.createElement('textarea');
+                ta.id = 'configTextarea';
+                ta.value = configOriginalContent;
+                ta.spellcheck = false;
+                if (!exists) {{
+                    if (cf.file.endsWith('.json')) {{
+                        ta.placeholder = '{{}}\\n\\n' + (T.config_file_not_found || 'File not found (will be created on save)');
+                    }} else {{
+                        ta.placeholder = T.config_file_not_found || 'File not found (will be created on save)';
+                    }}
+                }}
+                ta.addEventListener('keydown', function(e) {{
+                    if (e.key === 'Tab') {{
+                        e.preventDefault();
+                        const start = this.selectionStart;
+                        const end = this.selectionEnd;
+                        this.value = this.value.substring(0, start) + '  ' + this.value.substring(end);
+                        this.selectionStart = this.selectionEnd = start + 2;
+                    }}
+                }});
+                body.appendChild(ta);
+
+                const footer = document.createElement('div');
+                footer.className = 'config-editor-footer';
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'config-cancel-btn';
+                cancelBtn.textContent = T.config_cancel || 'Cancel';
+                cancelBtn.addEventListener('click', () => {{
+                    ta.value = configOriginalContent;
+                    setConfigStatus('', '');
+                }});
+                const saveBtn = document.createElement('button');
+                saveBtn.className = 'config-save-btn';
+                saveBtn.textContent = T.config_save || 'Save';
+                saveBtn.addEventListener('click', () => saveConfigFile(cf.file, ta.value));
+                footer.appendChild(cancelBtn);
+                footer.appendChild(saveBtn);
+
+                editor.appendChild(header);
+                editor.appendChild(body);
+                editor.appendChild(footer);
+                filePanelContentEl.appendChild(editor);
+            }} catch(e) {{
+                if (filePanelContentEl) filePanelContentEl.innerHTML = '<div style="padding:20px;color:#ef4444;">Error: ' + (e.message || '') + '</div>';
+            }}
+        }}
+
+        // ===== AGENT FORM-BASED UI =====
+        let _agentEditId = null;
+
+        async function _fetchProviderModels() {{
+            if (_cachedProviders.length > 0) return;
+            try {{
+                const resp = await fetch(apiUrl('api/get_models'), {{credentials:'same-origin'}});
+                const data = await resp.json();
+                if (data && data.available_providers) {{
+                    _cachedProviders = data.available_providers;
+                    _cachedModels = {{}};
+                    const techModels = data.models_technical || data.models || {{}};
+                    data.available_providers.forEach(p => {{
+                        _cachedModels[p.id] = techModels[p.id] || [];
+                    }});
+                }}
+            }} catch(e) {{ console.warn('Failed to fetch providers/models', e); }}
+        }}
+
+        async function openAgentFormUI() {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            // Fetch agents + providers + channel assignments in parallel
+            await _fetchProviderModels();
+            let agents = [];
+            let activeAgentId = null;
+            let channelAgents = {{}};  // channel -> agent_id
+            try {{
+                const [agentResp, chResp] = await Promise.all([
+                    fetch(apiUrl('api/agents') + '?include_disabled=true', {{credentials:'same-origin'}}),
+                    fetch(apiUrl('api/agents/channels'), {{credentials:'same-origin'}})
+                ]);
+                const data = await agentResp.json();
+                if (data.success) {{
+                    agents = data.agents || [];
+                    activeAgentId = data.active_agent;
+                }}
+                const chData = await chResp.json();
+                if (chData.success) {{
+                    const ca = chData.channel_agents || {{}};
+                    Object.keys(ca).forEach(ch => {{ channelAgents[ch] = ca[ch].agent_id || ca[ch]; }});
+                }}
+            }} catch(e) {{ console.warn('Failed to fetch agents/channels', e); }}
+            // Store channel mapping for the form
+            window._channelAgents = channelAgents;
+
+            filePanelContentEl.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            // Header with add button
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>\U0001f916 ' + (T.config_agents_title || 'Agent Profiles') + '</h3>';
+            const addBtn = document.createElement('button');
+            addBtn.className = 'agent-add-btn';
+            addBtn.textContent = '+ ' + (T.agent_add || 'Nuovo Agent');
+            addBtn.addEventListener('click', () => showAgentForm(null, wrap));
+            hdr.appendChild(addBtn);
+            wrap.appendChild(hdr);
+
+            // Agent cards
+            const listWrap = document.createElement('div');
+            listWrap.style.cssText = 'flex:1;overflow-y:auto;';
+            listWrap.id = 'agentCardList';
+
+            if (agents.length === 0) {{
+                listWrap.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">'
+                    + (T.agent_none || 'Nessun agent configurato. Clicca "Nuovo Agent" per iniziare.')
+                    + '</div>';
+            }} else {{
+                agents.forEach(a => {{
+                    const isProtected = (a.id === 'amira');
+                    const card = document.createElement('div');
+                    card.className = 'agent-card' + (a.id === activeAgentId ? ' active' : '') + (isProtected ? ' protected' : '');
+                    const model = a.model || '';
+                    const badges = [];
+                    if (isProtected) badges.push('<span class="agent-protected-badge">\U0001f512 ' + (T.agent_protected || 'Protected') + '</span>');
+                    if (a.is_default) badges.push('<span class="agent-badge default">default</span>');
+                    if (a.thinking_level) badges.push('<span class="agent-badge">' + a.thinking_level + '</span>');
+                    // Channel badges
+                    Object.keys(channelAgents).forEach(ch => {{
+                        if (channelAgents[ch] === a.id) {{
+                            const icon = ch === 'telegram' ? '\U0001f4e9' : ch === 'whatsapp' ? '\U0001f4f1' : '\U0001f4ac';
+                            badges.push('<span class="agent-badge channel">' + icon + ' ' + ch + '</span>');
+                        }}
+                    }});
+
+                    card.innerHTML = '<span class="agent-card-emoji">' + (a.emoji || '\U0001f916') + '</span>'
+                        + '<div class="agent-card-info">'
+                        + '<div class="agent-card-name">' + (a.name || a.id) + '</div>'
+                        + '<div class="agent-card-model">' + model + '</div>'
+                        + (badges.length ? '<div class="agent-card-badges">' + badges.join('') + '</div>' : '')
+                        + '</div>'
+                        + (isProtected ? '' : '<div class="agent-card-actions">'
+                        + '<button class="edit" title="Edit">\u270f\ufe0f</button>'
+                        + '<button class="delete" title="Delete">\U0001f5d1\ufe0f</button>'
+                        + '</div>');
+
+                    if (!isProtected) {{
+                        card.querySelector('.edit').addEventListener('click', (e) => {{
+                            e.stopPropagation();
+                            showAgentForm(a, wrap);
+                        }});
+                        card.querySelector('.delete').addEventListener('click', async (e) => {{
+                            e.stopPropagation();
+                            if (!confirm((T.agent_delete_confirm || 'Delete agent') + ' "' + (a.name || a.id) + '"?')) return;
+                            try {{
+                                const resp = await fetch(apiUrl('api/agents/' + encodeURIComponent(a.id)), {{
+                                    method: 'DELETE', credentials: 'same-origin'
+                                }});
+                                const d = await resp.json();
+                                if (!d.success) throw new Error(d.error || 'Delete failed');
+                                openAgentFormUI();
+                            }} catch(err) {{ console.error('[Agent Delete] ' + err.message); }}
+                        }});
+                        card.addEventListener('click', () => showAgentForm(a, wrap));
+                    }}
+                    listWrap.appendChild(card);
+                }});
+            }}
+            wrap.appendChild(listWrap);
+            filePanelContentEl.appendChild(wrap);
+        }}
+
+        function showAgentForm(agentData, parentWrap) {{
+            // agentData is null for new agent, or the existing agent dict
+            const isNew = !agentData;
+            _agentEditId = isNew ? null : agentData.id;
+
+            const formWrap = document.createElement('div');
+            formWrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            // Header
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>' + (isNew ? (T.agent_new || '\U0001f916 Nuovo Agent') : ('\u270f\ufe0f ' + (agentData.name || agentData.id))) + '</h3>';
+            const backBtn = document.createElement('button');
+            backBtn.className = 'config-cancel-btn';
+            backBtn.textContent = '\u2190 ' + (T.agent_back || 'Indietro');
+            backBtn.style.cssText = 'padding:4px 10px;font-size:11px;';
+            backBtn.addEventListener('click', () => openAgentFormUI());
+            hdr.appendChild(backBtn);
+            formWrap.appendChild(hdr);
+
+            // Form
+            const form = document.createElement('div');
+            form.className = 'agent-form';
+
+            // Helper: label with tooltip
+            function _lbl(text, tipKey) {{
+                const tip = T[tipKey] || '';
+                if (!tip) return text;
+                return text + ' <span class="field-tip">i<span class="tip-text">' + _escHtml(tip) + '</span></span>';
+            }}
+
+            // ID (only for new)
+            if (isNew) {{
+                form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_id_label || 'ID (unique)', 'tip_agent_id') + '</label>'
+                    + '<input type="text" id="af_id" placeholder="es. home, coder, energy..." '
+                    + 'pattern="[a-z0-9_-]+" style="font-family:monospace;"></div>';
+            }}
+
+            // Name + Emoji row
+            const nameRow = document.createElement('div');
+            nameRow.className = 'agent-form-row';
+            nameRow.innerHTML = '<div class="agent-form-group" style="flex:2;"><label>' + _lbl(T.agent_name || 'Name', 'tip_agent_name') + '</label>'
+                + '<input type="text" id="af_name" value="' + _escAttr(agentData ? (agentData.name || '') : 'Amira') + '" placeholder="Amira"></div>'
+                + '<div class="agent-form-group" style="flex:1;"><label>' + _lbl('Emoji', 'tip_agent_emoji') + '</label>'
+                + '<div class="emoji-picker" id="af_emoji_picker"></div></div>';
+            form.appendChild(nameRow);
+
+            // Description
+            form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_desc || 'Description', 'tip_agent_desc') + '</label>'
+                + '<input type="text" id="af_desc" value="' + _escAttr(agentData ? (agentData.description || '') : '') + '" '
+                + 'placeholder="Home automation expert..."></div>';
+
+            // Provider + Model row
+            const modelRow = document.createElement('div');
+            modelRow.className = 'agent-form-row';
+            modelRow.innerHTML = '<div class="agent-form-group"><label>' + _lbl('Provider', 'tip_agent_provider') + '</label>'
+                + '<select id="af_provider"><option value="">-- auto --</option></select></div>'
+                + '<div class="agent-form-group"><label>' + _lbl('Model', 'tip_agent_model') + '</label>'
+                + '<select id="af_model"><option value="">-- default --</option></select></div>';
+            form.appendChild(modelRow);
+
+            // Fallback models (simple text input)
+            form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_fallbacks || 'Fallback Models', 'tip_agent_fallbacks') + '</label>'
+                + '<input type="text" id="af_fallbacks" value="' + _escAttr(agentData && agentData.fallbacks ? agentData.fallbacks.join(', ') : '') + '" '
+                + 'placeholder="provider/model, provider/model, ..."></div>';
+
+            // Temperature + Thinking row
+            const behavRow = document.createElement('div');
+            behavRow.className = 'agent-form-row';
+            const tempVal = agentData && agentData.temperature != null ? agentData.temperature : '';
+            behavRow.innerHTML = '<div class="agent-form-group"><label>' + _lbl(T.agent_temperature || 'Temperature (0-2)', 'tip_agent_temperature') + '</label>'
+                + '<input type="number" id="af_temp" min="0" max="2" step="0.1" value="' + tempVal + '" placeholder="0.7"></div>'
+                + '<div class="agent-form-group"><label>' + _lbl(T.agent_thinking || 'Thinking', 'tip_agent_thinking') + '</label>'
+                + '<select id="af_thinking"><option value="">-- default --</option>'
+                + THINKING_LEVELS.map(lv => '<option value="' + lv + '"' + (agentData && agentData.thinking_level === lv ? ' selected' : '') + '>' + lv + '</option>').join('')
+                + '</select></div>';
+            form.appendChild(behavRow);
+
+            // Max tokens
+            const maxTok = agentData && agentData.max_tokens != null ? agentData.max_tokens : '';
+            form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_maxtokens || 'Max Tokens', 'tip_agent_maxtokens') + '</label>'
+                + '<input type="number" id="af_maxtokens" min="256" max="200000" step="256" value="' + maxTok + '" placeholder="4096"></div>';
+
+            // System prompt
+            form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_sysprompt_label || 'System Prompt Override', 'tip_agent_sysprompt') + '</label>'
+                + '<textarea id="af_sysprompt" rows="3" placeholder="' + _escAttr(T.agent_sysprompt_hint || 'Leave empty to use the default system prompt...') + '">'
+                + _escHtml(agentData && agentData.system_prompt ? agentData.system_prompt : '') + '</textarea></div>';
+
+            // Tools (multiselect chips)
+            form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_tools || 'Allowed Tools', 'tip_agent_tools')
+                + ' <span style="font-weight:normal;font-size:10px;color:#999;">(' + (T.agent_tools_hint || 'empty = all') + ')</span></label>'
+                + '<div class="agent-tools-grid" id="af_tools"></div></div>';
+
+            // Default + Enabled checkboxes
+            const isDefault = agentData ? agentData.is_default : false;
+            const isEnabled = agentData ? (agentData.enabled !== false) : true;
+            form.innerHTML += '<div class="agent-form-row">'
+                + '<div class="agent-form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;">'
+                + '<input type="checkbox" id="af_default"' + (isDefault ? ' checked' : '') + '> ' + (T.agent_default_flag || 'Default')
+                + '</label> <span class="field-tip">i<span class="tip-text">' + _escHtml(T.tip_agent_default || '') + '</span></span></div>'
+                + '<div class="agent-form-group"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;">'
+                + '<input type="checkbox" id="af_enabled"' + (isEnabled ? ' checked' : '') + '> ' + (T.agent_enabled || 'Enabled')
+                + '</label> <span class="field-tip">i<span class="tip-text">' + _escHtml(T.tip_agent_enabled || '') + '</span></span></div>'
+                + '</div>';
+
+            // Channel assignment (Telegram / WhatsApp)
+            const chMap = window._channelAgents || {{}};
+            const agentId = agentData ? agentData.id : null;
+            const CHANNELS = ['telegram', 'whatsapp'];
+            let chHtml = '<div class="agent-form-group"><label>' + _lbl(T.agent_channels || 'Channel Assignment', 'tip_agent_channels') + '</label>'
+                + '<div class="agent-form-row">';
+            CHANNELS.forEach(ch => {{
+                const isAssigned = agentId && chMap[ch] === agentId;
+                const otherAgent = chMap[ch] && chMap[ch] !== agentId ? chMap[ch] : null;
+                const label = ch === 'telegram' ? (T.agent_channel_telegram || 'Telegram')
+                    : (T.agent_channel_whatsapp || 'WhatsApp');
+                const icon = ch === 'telegram' ? '\U0001f4e9' : '\U0001f4f1';
+                chHtml += '<div class="agent-form-group" style="flex:1;">'
+                    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;">'
+                    + '<input type="checkbox" class="af_channel" data-channel="' + ch + '"'
+                    + (isAssigned ? ' checked' : '')
+                    + (otherAgent ? ' title="Currently: ' + otherAgent + '"' : '') + '> '
+                    + icon + ' ' + label + '</label></div>';
+            }});
+            chHtml += '</div></div>';
+            form.innerHTML += chHtml;
+
+            // Action buttons
+            form.innerHTML += '<div class="agent-form-actions">'
+                + '<button class="config-cancel-btn" id="af_cancel">' + (T.config_cancel || 'Annulla') + '</button>'
+                + '<button class="config-save-btn" id="af_save">' + (T.config_save || 'Salva') + '</button>'
+                + '</div>';
+
+            formWrap.appendChild(form);
+
+            // Replace panel content
+            filePanelContentEl.innerHTML = '';
+            filePanelContentEl.appendChild(formWrap);
+
+            // ---- Post-render: populate dynamic parts ----
+
+            // Emoji picker
+            const emojiPicker = document.getElementById('af_emoji_picker');
+            const currentEmoji = agentData ? (agentData.emoji || '\U0001f916') : '\U0001f916';
+            AGENT_EMOJIS.forEach(em => {{
+                const btn = document.createElement('button');
+                btn.className = 'emoji-btn' + (em === currentEmoji ? ' selected' : '');
+                btn.textContent = em;
+                btn.type = 'button';
+                btn.addEventListener('click', () => {{
+                    emojiPicker.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                }});
+                emojiPicker.appendChild(btn);
+            }});
+
+            // Provider/Model dropdowns
+            const provSel = document.getElementById('af_provider');
+            const modSel = document.getElementById('af_model');
+            let currentProv = '';
+            let currentMod = '';
+            if (agentData && agentData.model) {{
+                const parts = agentData.model.split('/');
+                if (parts.length >= 2) {{
+                    currentProv = parts[0];
+                    currentMod = parts.slice(1).join('/');
+                }}
+            }}
+            _cachedProviders.forEach(p => {{
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.name || p.id;
+                if (p.id === currentProv) opt.selected = true;
+                provSel.appendChild(opt);
+            }});
+            function _populateModels(prov) {{
+                modSel.innerHTML = '<option value="">-- default --</option>';
+                const models = _cachedModels[prov] || [];
+                models.forEach(m => {{
+                    const opt = document.createElement('option');
+                    opt.value = m;
+                    opt.textContent = m;
+                    if (m === currentMod) opt.selected = true;
+                    modSel.appendChild(opt);
+                }});
+            }}
+            if (currentProv) _populateModels(currentProv);
+            provSel.addEventListener('change', () => {{ currentMod = ''; _populateModels(provSel.value); }});
+
+            // Tools chips
+            const toolsGrid = document.getElementById('af_tools');
+            const selectedTools = new Set(agentData && Array.isArray(agentData.tools) ? agentData.tools : []);
+            const hasToolFilter = agentData && Array.isArray(agentData.tools);
+            KNOWN_TOOLS.forEach(t => {{
+                const chip = document.createElement('span');
+                chip.className = 'agent-tool-chip' + (hasToolFilter && selectedTools.has(t) ? ' selected' : '');
+                chip.textContent = t;
+                chip.addEventListener('click', () => chip.classList.toggle('selected'));
+                toolsGrid.appendChild(chip);
+            }});
+
+            // Save handler
+            document.getElementById('af_save').addEventListener('click', async () => {{
+                const body = _buildAgentPayload(isNew);
+                if (!body) return;
+                try {{
+                    let resp;
+                    if (isNew) {{
+                        resp = await fetch(apiUrl('api/agents'), {{
+                            method: 'POST', headers: {{'Content-Type':'application/json'}},
+                            credentials: 'same-origin', body: JSON.stringify(body)
+                        }});
+                    }} else {{
+                        resp = await fetch(apiUrl('api/agents/' + encodeURIComponent(_agentEditId)), {{
+                            method: 'PUT', headers: {{'Content-Type':'application/json'}},
+                            credentials: 'same-origin', body: JSON.stringify(body)
+                        }});
+                    }}
+                    const d = await resp.json();
+                    if (!d.success) throw new Error(d.error || 'Save failed');
+
+                    // Save channel assignments
+                    const savedAgentId = isNew ? body.id : _agentEditId;
+                    const channelUpdate = {{}};
+                    const chMap = window._channelAgents || {{}};
+                    document.querySelectorAll('.af_channel').forEach(cb => {{
+                        const ch = cb.dataset.channel;
+                        if (cb.checked) {{
+                            channelUpdate[ch] = savedAgentId;
+                        }} else if (chMap[ch] === savedAgentId) {{
+                            // Was assigned to this agent, now unchecked → clear
+                            channelUpdate[ch] = null;
+                        }}
+                    }});
+                    if (Object.keys(channelUpdate).length > 0) {{
+                        try {{
+                            await fetch(apiUrl('api/agents/channels'), {{
+                                method: 'PUT', headers: {{'Content-Type':'application/json'}},
+                                credentials: 'same-origin', body: JSON.stringify(channelUpdate)
+                            }});
+                        }} catch(chErr) {{ console.warn('Channel save warning:', chErr); }}
+                    }}
+
+                    // Reload models to pick up agent changes
+                    loadModels();
+                    openAgentFormUI();
+                }} catch(err) {{
+                    const _saveErr = (T.config_save_error || 'Save error') + ': ' + err.message;
+                    alert(_saveErr);
+                    console.error('[Agent Save] ' + _saveErr);
+                }}
+            }});
+
+            // Cancel handler
+            document.getElementById('af_cancel').addEventListener('click', () => openAgentFormUI());
+        }}
+
+        function _buildAgentPayload(isNew) {{
+            const payload = {{}};
+            if (isNew) {{
+                const rawId = ((document.getElementById('af_id') || {{}}).value || '').trim().toLowerCase();
+                if (!rawId || !/^[a-z0-9_-]+$/.test(rawId)) {{
+                    const _idErr = T.agent_id_invalid || 'ID must contain only lowercase letters, numbers, - and _';
+                    alert(_idErr);
+                    return null;
+                }}
+                payload.id = rawId;
+            }}
+
+            const name = (document.getElementById('af_name') || {{}}).value || '';
+            const selectedEmoji = document.querySelector('#af_emoji_picker .emoji-btn.selected');
+            const emoji = selectedEmoji ? selectedEmoji.textContent : '\U0001f916';
+            const desc = (document.getElementById('af_desc') || {{}}).value || '';
+
+            payload.identity = {{ name: name.trim() || 'Agent', emoji: emoji, description: desc.trim() }};
+            payload.name = name.trim() || 'Agent';
+
+            // Model
+            const prov = (document.getElementById('af_provider') || {{}}).value || '';
+            const mod = (document.getElementById('af_model') || {{}}).value || '';
+            if (prov && mod) {{
+                payload.model = {{ primary: prov + '/' + mod }};
+            }} else if (prov || mod) {{
+                payload.model = {{ primary: (prov || 'anthropic') + '/' + (mod || 'claude-sonnet-4-6') }};
+            }}
+
+            // Fallbacks
+            const fbText = (document.getElementById('af_fallbacks') || {{}}).value || '';
+            if (fbText.trim()) {{
+                const fbs = fbText.split(',').map(s => s.trim()).filter(Boolean);
+                if (fbs.length) {{
+                    payload.model = payload.model || {{}};
+                    payload.model.fallbacks = fbs;
+                }}
+            }}
+
+            // Temperature
+            const tempVal = (document.getElementById('af_temp') || {{}}).value;
+            if (tempVal !== '' && !isNaN(tempVal)) payload.temperature = parseFloat(tempVal);
+
+            // Thinking
+            const thinkVal = (document.getElementById('af_thinking') || {{}}).value;
+            if (thinkVal) payload.thinking_level = thinkVal;
+
+            // Max tokens
+            const mtVal = (document.getElementById('af_maxtokens') || {{}}).value;
+            if (mtVal !== '' && !isNaN(mtVal)) payload.max_tokens = parseInt(mtVal);
+
+            // System prompt
+            const sp = (document.getElementById('af_sysprompt') || {{}}).value || '';
+            if (sp.trim()) payload.system_prompt = sp.trim();
+
+            // Tools — only include if at least one chip selected
+            const toolChips = document.querySelectorAll('#af_tools .agent-tool-chip.selected');
+            if (toolChips.length > 0) {{
+                payload.tools = Array.from(toolChips).map(c => c.textContent);
+            }}
+
+            // Default + enabled
+            payload.default = !!(document.getElementById('af_default') || {{}}).checked;
+            payload.enabled = !!(document.getElementById('af_enabled') || {{}}).checked;
+
+            return payload;
+        }}
+
+        function _escAttr(s) {{ return (s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }}
+        function _escHtml(s) {{ return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }}
+        function _tipSpan(tipKey) {{
+            const tip = T[tipKey] || '';
+            if (!tip) return '';
+            return ' <span class="field-tip">i<span class="tip-text">' + _escHtml(tip) + '</span></span>';
+        }}
+
+        // ===== MCP FORM-BASED UI =====
+        async function openMcpFormUI() {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            let mcpConfig = {{}};
+            try {{
+                const resp = await fetch(apiUrl('api/config/read') + '?file=amira/mcp_config.json', {{credentials:'same-origin'}});
+                const data = await resp.json();
+                if (data.success && data.content) {{
+                    mcpConfig = JSON.parse(data.content);
+                }}
+            }} catch(e) {{ console.warn('Failed to load MCP config', e); }}
+
+            const servers = mcpConfig.mcpServers || mcpConfig.mcpservers || {{}};
+
+            filePanelContentEl.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            // Header
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>\U0001f50c ' + (T.config_mcp_title || 'MCP Configuration') + '</h3>';
+            const addBtn = document.createElement('button');
+            addBtn.className = 'agent-add-btn';
+            addBtn.textContent = '+ ' + (T.mcp_add_server || 'Add Server');
+            addBtn.addEventListener('click', () => {{
+                const newName = prompt(T.mcp_server_name || 'Server Name', 'my_server');
+                if (!newName || !newName.trim()) return;
+                const name = newName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+                servers[name] = {{ command: '', args: [], env: {{}} }};
+                _renderMcpCards(listWrap, servers);
+                // auto expand the new one
+                const lastCard = listWrap.querySelector('.mcp-server-card:last-child');
+                if (lastCard) {{
+                    lastCard.querySelector('.mcp-server-body').classList.add('open');
+                    lastCard.querySelector('.mcp-server-toggle').classList.add('open');
+                }}
+            }});
+            hdr.appendChild(addBtn);
+            wrap.appendChild(hdr);
+
+            const listWrap = document.createElement('div');
+            listWrap.style.cssText = 'flex:1;overflow-y:auto;padding:8px;';
+            _renderMcpCards(listWrap, servers);
+            wrap.appendChild(listWrap);
+
+            // Footer with save
+            const footer = document.createElement('div');
+            footer.className = 'agent-form-actions';
+            footer.style.cssText = 'padding:12px;';
+            footer.innerHTML = '<span id="mcpStatus" class="config-status"></span>';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'config-save-btn';
+            saveBtn.textContent = T.config_save || 'Save';
+            saveBtn.addEventListener('click', async () => {{
+                // Collect data from cards
+                const result = _collectMcpData(listWrap);
+                const json = JSON.stringify({{ mcpServers: result }}, null, 2);
+                try {{
+                    const resp = await fetch(apiUrl('api/config/save'), {{
+                        method: 'POST', headers: {{'Content-Type':'application/json'}},
+                        credentials: 'same-origin',
+                        body: JSON.stringify({{ file: 'amira/mcp_config.json', content: json }})
+                    }});
+                    const d = await resp.json();
+                    if (!d.success) throw new Error(d.error || 'Save failed');
+                    const st = document.getElementById('mcpStatus');
+                    if (st) {{ st.textContent = T.config_saved || 'Saved!'; st.className = 'config-status success'; }}
+                    setTimeout(() => {{ if (st) {{ st.textContent = ''; st.className = 'config-status'; }} }}, 3000);
+                }} catch(err) {{
+                    const st = document.getElementById('mcpStatus');
+                    if (st) {{ st.textContent = (T.config_save_error || 'Error') + ': ' + err.message; st.className = 'config-status error'; }}
+                }}
+            }});
+            footer.appendChild(saveBtn);
+            wrap.appendChild(footer);
+
+            filePanelContentEl.appendChild(wrap);
+        }}
+
+        function _renderMcpCards(container, servers) {{
+            container.innerHTML = '';
+            const names = Object.keys(servers);
+            if (names.length === 0) {{
+                container.innerHTML = '<div style="padding:20px;text-align:center;color:#999;">'
+                    + (T.mcp_no_servers || 'No MCP servers configured.') + '</div>';
+                return;
+            }}
+            names.forEach(name => {{
+                const srv = servers[name] || {{}};
+                const card = document.createElement('div');
+                card.className = 'mcp-server-card';
+                card.dataset.serverName = name;
+
+                const header = document.createElement('div');
+                header.className = 'mcp-server-header';
+                header.innerHTML = '<span class="mcp-server-toggle">\u25b6</span>'
+                    + '<span class="mcp-server-name">' + _escHtml(name) + '</span>'
+                    + '<div class="mcp-server-actions">'
+                    + '<button class="delete" title="Delete">\U0001f5d1\ufe0f</button></div>';
+
+                header.querySelector('.delete').addEventListener('click', (e) => {{
+                    e.stopPropagation();
+                    delete servers[name];
+                    _renderMcpCards(container, servers);
+                }});
+
+                // Toggle body
+                header.addEventListener('click', () => {{
+                    const body = card.querySelector('.mcp-server-body');
+                    const tog = card.querySelector('.mcp-server-toggle');
+                    body.classList.toggle('open');
+                    tog.classList.toggle('open');
+                }});
+
+                const body = document.createElement('div');
+                body.className = 'mcp-server-body';
+
+                body.innerHTML = '<div class="agent-form-group"><label>'
+                    + (T.mcp_command || 'Command') + _tipSpan('tip_mcp_command')
+                    + '</label><input type="text" class="mcp-cmd" value="'
+                    + _escAttr(srv.command || '') + '" placeholder="python, uvx, npx..."></div>'
+                    + '<div class="agent-form-group"><label>'
+                    + (T.mcp_args || 'Arguments') + _tipSpan('tip_mcp_args')
+                    + '</label><textarea class="mcp-args" rows="2" placeholder="-m\\nmcp.server.stdio">'
+                    + _escHtml((srv.args || []).join('\\n')) + '</textarea></div>'
+                    + '<div class="agent-form-group"><label>'
+                    + (T.mcp_env || 'Environment Variables') + _tipSpan('tip_mcp_env')
+                    + '</label><textarea class="mcp-env" rows="2" placeholder="API_KEY=your_key_here">'
+                    + _escHtml(Object.entries(srv.env || {{}}).map(([k,v]) => k + '=' + v).join('\\n'))
+                    + '</textarea></div>';
+
+                card.appendChild(header);
+                card.appendChild(body);
+                container.appendChild(card);
+            }});
+        }}
+
+        function _collectMcpData(container) {{
+            const result = {{}};
+            container.querySelectorAll('.mcp-server-card').forEach(card => {{
+                const name = card.dataset.serverName;
+                const cmd = (card.querySelector('.mcp-cmd') || {{}}).value || '';
+                const argsText = (card.querySelector('.mcp-args') || {{}}).value || '';
+                const envText = (card.querySelector('.mcp-env') || {{}}).value || '';
+                const args = argsText.split('\\n').map(s => s.trim()).filter(Boolean);
+                const env = {{}};
+                envText.split('\\n').forEach(line => {{
+                    const idx = line.indexOf('=');
+                    if (idx > 0) env[line.substring(0, idx).trim()] = line.substring(idx + 1).trim();
+                }});
+                result[name] = {{ command: cmd.trim(), args: args, env: env }};
+            }});
+            return result;
+        }}
+
+        // ===== ENHANCED TEXT EDITOR (System Prompt / Memory) =====
+        async function openEnhancedTextEditor(cf, editorType) {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            let content = '';
+            let exists = true;
+            try {{
+                const resp = await fetch(apiUrl('api/config/read') + '?file=' + encodeURIComponent(cf.file), {{credentials:'same-origin'}});
+                const data = await resp.json();
+                if (data.success) {{ content = data.content || ''; exists = data.exists !== false; }}
+            }} catch(e) {{ console.warn('Failed to load', cf.file, e); }}
+
+            configOriginalContent = content;
+
+            filePanelContentEl.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            // Header
+            const hdr = document.createElement('div');
+            hdr.className = 'config-editor-header';
+            hdr.innerHTML = '<span class="config-editor-title">' + cf.icon + ' ' + cf.title + '</span>'
+                + '<span id="configStatus" class="config-status"></span>';
+            wrap.appendChild(hdr);
+
+            // Stats bar
+            const statsBar = document.createElement('div');
+            statsBar.className = 'enhanced-editor-stats';
+            const charLabel = editorType === 'memory' ? (T.memory_lines || 'lines') : (T.prompt_chars || 'characters');
+            statsBar.innerHTML = '<span id="editorStatCount">0</span> ' + charLabel;
+            wrap.appendChild(statsBar);
+
+            // Textarea
+            const bodyDiv = document.createElement('div');
+            bodyDiv.className = 'config-editor-body';
+            const ta = document.createElement('textarea');
+            ta.id = 'configTextarea';
+            ta.value = content;
+            ta.spellcheck = false;
+
+            const placeholder = editorType === 'memory'
+                ? (T.memory_hint || 'Markdown notes the AI will remember...')
+                : (T.prompt_hint || 'Write custom instructions here...');
+            if (!exists) ta.placeholder = (T.config_file_not_found || 'File not found') + '\\n\\n' + placeholder;
+            else ta.placeholder = placeholder;
+
+            function updateStats() {{
+                const el = document.getElementById('editorStatCount');
+                if (!el) return;
+                if (editorType === 'memory') {{
+                    el.textContent = (ta.value || '').split('\\n').length;
+                }} else {{
+                    el.textContent = (ta.value || '').length;
+                }}
+            }}
+            ta.addEventListener('input', updateStats);
+            ta.addEventListener('keydown', function(e) {{
+                if (e.key === 'Tab') {{
+                    e.preventDefault();
+                    const start = this.selectionStart;
+                    this.value = this.value.substring(0, start) + '  ' + this.value.substring(this.selectionEnd);
+                    this.selectionStart = this.selectionEnd = start + 2;
+                }}
+            }});
+            bodyDiv.appendChild(ta);
+            wrap.appendChild(bodyDiv);
+
+            // Footer
+            const footer = document.createElement('div');
+            footer.className = 'config-editor-footer';
+
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'config-cancel-btn';
+            clearBtn.textContent = editorType === 'memory' ? (T.prompt_reset || 'Clear') : (T.prompt_reset || 'Clear');
+            clearBtn.addEventListener('click', () => {{
+                if (ta.value && !confirm((T.costs_reset_confirm || 'Are you sure?').split('?')[0] + '?')) return;
+                ta.value = '';
+                updateStats();
+            }});
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'config-cancel-btn';
+            cancelBtn.textContent = T.config_cancel || 'Cancel';
+            cancelBtn.addEventListener('click', () => {{
+                ta.value = configOriginalContent;
+                updateStats();
+                setConfigStatus('', '');
+            }});
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'config-save-btn';
+            saveBtn.textContent = T.config_save || 'Save';
+            saveBtn.addEventListener('click', () => saveConfigFile(cf.file, ta.value));
+
+            footer.appendChild(clearBtn);
+            footer.appendChild(cancelBtn);
+            footer.appendChild(saveBtn);
+            wrap.appendChild(footer);
+
+            filePanelContentEl.appendChild(wrap);
+            updateStats();
+        }}
+
+        function setConfigStatus(text, cls) {{
+            const el = document.getElementById('configStatus');
+            if (!el) return;
+            el.textContent = text;
+            el.className = 'config-status' + (cls ? ' ' + cls : '');
+            if (text) setTimeout(() => {{ el.textContent = ''; el.className = 'config-status'; }}, 3000);
+        }}
+
+        async function saveConfigFile(filePath, content) {{
+            try {{
+                const resp = await fetch(apiUrl('api/config/save'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({{ file: filePath, content: content }})
+                }});
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.error || 'Save failed');
+                configOriginalContent = content;
+                setConfigStatus(T.config_saved || 'Saved!', 'success');
+            }} catch(e) {{
+                setConfigStatus((T.config_save_error || 'Save failed') + ': ' + (e.message || ''), 'error');
+            }}
         }}
 
         function isMobileLayout() {{
@@ -3423,20 +4942,59 @@ def get_chat_ui():
             return wrapper;
         }}
 
+        function _fmtTokens(n) {{
+            if (!n || n <= 0) return '0';
+            if (n >= 1000000) return (n/1000000).toFixed(1) + 'm';
+            if (n >= 10000)  return (n/1000).toFixed(0) + 'k';
+            if (n >= 1000)   return (n/1000).toFixed(1) + 'k';
+            return String(Math.round(n));
+        }}
+
+        function _currSym(currency) {{
+            const c = (currency || 'USD').toUpperCase().trim();
+            if (c === 'EUR') return '\u20ac';
+            if (c === 'GBP') return '\u00a3';
+            if (c === 'JPY') return '\u00a5';
+            return '$';
+        }}
+
+        function _fmtCost(val) {{
+            if (val === undefined || val === null) return null;
+            if (val >= 0.01) return val.toFixed(2);
+            if (val > 0) return val.toFixed(4);
+            return '0.00';
+        }}
+
         function formatUsage(usage) {{
             if (!usage || (!usage.input_tokens && !usage.output_tokens)) return '';
-            const inp = (usage.input_tokens || 0).toLocaleString();
-            const out = (usage.output_tokens || 0).toLocaleString();
+            const inp = _fmtTokens(usage.input_tokens || 0);
+            const out = _fmtTokens(usage.output_tokens || 0);
             let tokens = inp + ' in / ' + out + ' out';
+            // Show cache tokens if present
+            const cacheR = usage.cache_read_tokens || 0;
+            const cacheW = usage.cache_write_tokens || 0;
+            if (cacheR > 0 || cacheW > 0) {{
+                let cacheParts = [];
+                if (cacheR > 0) cacheParts.push(_fmtTokens(cacheR) + ' cache\u2193');
+                if (cacheW > 0) cacheParts.push(_fmtTokens(cacheW) + ' cache\u2191');
+                tokens += ' (' + cacheParts.join(', ') + ')';
+            }}
             if (usage.cost !== undefined && usage.cost !== null) {{
+                const sym = _currSym(usage.currency);
                 if (usage.cost > 0) {{
-                    let sym = '$';  // Default
-                    const curr = (usage.currency || 'USD').toUpperCase().trim();
-                    if (curr === 'EUR') sym = '\u20ac';
-                    else if (curr === 'GBP') sym = '\u00a3';
-                    else if (curr === 'JPY') sym = '\u00a5';
-                    else sym = '$';  // Fallback for any other currency
-                    tokens += ' \u2022 ' + sym + usage.cost.toFixed(4);
+                    tokens += ' \u2022 ' + sym + _fmtCost(usage.cost);
+                    // Tooltip with breakdown if available
+                    if (usage.cost_breakdown) {{
+                        const bd = usage.cost_breakdown;
+                        let tip = [];
+                        if (bd.input > 0)       tip.push('Input: ' + sym + _fmtCost(bd.input));
+                        if (bd.output > 0)      tip.push('Output: ' + sym + _fmtCost(bd.output));
+                        if (bd.cache_read > 0)  tip.push('Cache read: ' + sym + _fmtCost(bd.cache_read));
+                        if (bd.cache_write > 0) tip.push('Cache write: ' + sym + _fmtCost(bd.cache_write));
+                        if (tip.length > 1) {{
+                            return '<div class="message-usage" title="' + tip.join('\\n') + '">' + tokens + '</div>';
+                        }}
+                    }}
                 }} else {{
                     tokens += ' \u2022 free';
                 }}
@@ -3444,19 +5002,22 @@ def get_chat_ui():
             return '<div class="message-usage">' + tokens + '</div>';
         }}
 
-        let conversationUsage = {{ input_tokens: 0, output_tokens: 0, cost: 0, currency: 'USD' }};
+        const COST_CURRENCY = '{cost_currency}';
+        let conversationUsage = {{ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, cost: 0, currency: COST_CURRENCY }};
 
         function updateConversationUsage(usage) {{
             if (!usage) return;
             conversationUsage.input_tokens += (usage.input_tokens || 0);
             conversationUsage.output_tokens += (usage.output_tokens || 0);
+            conversationUsage.cache_read_tokens += (usage.cache_read_tokens || 0);
+            conversationUsage.cache_write_tokens += (usage.cache_write_tokens || 0);
             conversationUsage.cost += (usage.cost || 0);
-            conversationUsage.currency = usage.currency || 'USD';
+            conversationUsage.currency = usage.currency || COST_CURRENCY;
             renderConversationTotal();
         }}
 
         function resetConversationUsage() {{
-            conversationUsage = {{ input_tokens: 0, output_tokens: 0, cost: 0, currency: 'USD' }};
+            conversationUsage = {{ input_tokens: 0, output_tokens: 0, cache_read_tokens: 0, cache_write_tokens: 0, cost: 0, currency: COST_CURRENCY }};
             renderConversationTotal();
         }}
 
@@ -3475,12 +5036,21 @@ def get_chat_ui():
                 return;
             }}
             el.style.display = 'block';
-            const inp = conversationUsage.input_tokens.toLocaleString();
-            const out = conversationUsage.output_tokens.toLocaleString();
-            let text = '📊 ' + inp + ' in / ' + out + ' out';
+            const inp = _fmtTokens(conversationUsage.input_tokens);
+            const out = _fmtTokens(conversationUsage.output_tokens);
+            const sym = _currSym(conversationUsage.currency);
+            let text = '\ud83d\udcca ' + inp + ' in / ' + out + ' out';
+            // Cache tokens in session total
+            const cR = conversationUsage.cache_read_tokens;
+            const cW = conversationUsage.cache_write_tokens;
+            if (cR > 0 || cW > 0) {{
+                let cp = [];
+                if (cR > 0) cp.push(_fmtTokens(cR) + ' cache\u2193');
+                if (cW > 0) cp.push(_fmtTokens(cW) + ' cache\u2191');
+                text += ' (' + cp.join(', ') + ')';
+            }}
             if (conversationUsage.cost > 0) {{
-                const sym = conversationUsage.currency === 'EUR' ? '\u20ac' : '$';
-                text += ' \u2022 ' + sym + conversationUsage.cost.toFixed(4) + ' total';
+                text += ' \u2022 ' + sym + _fmtCost(conversationUsage.cost) + ' total';
             }}
             el.textContent = text;
         }}
@@ -4102,7 +5672,115 @@ def get_chat_ui():
             }} else if (tabName === 'files') {{
                 document.getElementById('tabFiles').classList.add('active');
                 loadFileTree(fileCurrentPath);
+            }} else if (tabName === 'costs') {{
+                document.getElementById('tabCosts').classList.add('active');
+                loadCostsPanel();
+            }} else if (tabName === 'config') {{
+                document.getElementById('tabConfig').classList.add('active');
+                loadConfigList();
             }}
+        }}
+
+        async function loadCostsPanel() {{
+            const panel = document.getElementById('costsPanel');
+            if (!panel) return;
+            panel.innerHTML = '<div style="padding:16px;text-align:center;color:#999;">' + T.files_loading + '</div>';
+            try {{
+                const resp = await fetch(apiUrl('api/usage_stats?days=7'));
+                if (!resp.ok) throw new Error(resp.statusText);
+                const data = await resp.json();
+                const sym = _currSym(COST_CURRENCY);
+                let html = '';
+
+                // daily is an array of {{date, input_tokens, output_tokens, total_cost, requests, ...}}
+                const dailyArr = Array.isArray(data.daily) ? data.daily : [];
+                // Find today's entry from the daily array
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const todayEntry = dailyArr.find(d => d.date === todayStr) || {{}};
+                const todayTokensIn = todayEntry.input_tokens || 0;
+                const todayTokensOut = todayEntry.output_tokens || 0;
+                const todayCost = todayEntry.total_cost || 0;
+                const todayReqs = todayEntry.requests || 0;
+
+                // Today card
+                html += '<div class="cost-card">';
+                html += '<div class="cost-card-title">' + T.costs_today + '</div>';
+                if (todayCost > 0) {{
+                    html += '<div class="cost-card-value">' + sym + _fmtCost(todayCost) + '</div>';
+                }} else {{
+                    html += '<div class="cost-card-value" style="font-size:16px;color:#999;">—</div>';
+                }}
+                html += '<div class="cost-card-sub">' + _fmtTokens(todayTokensIn) + ' in / ' + _fmtTokens(todayTokensOut) + ' out';
+                if (todayReqs > 0) html += ' &middot; ' + todayReqs + ' ' + T.costs_requests;
+                html += '</div></div>';
+
+                // By model
+                const byModel = data.by_model || {{}};
+                const modelEntries = Object.entries(byModel).sort((a,b) => (b[1].total_cost||0) - (a[1].total_cost||0));
+                if (modelEntries.length > 0) {{
+                    html += '<div class="cost-section">';
+                    html += '<div class="cost-section-title">' + T.costs_by_model + '</div>';
+                    for (const [model, stats] of modelEntries) {{
+                        const mc = stats.total_cost || 0;
+                        html += '<div class="cost-row">';
+                        html += '<div class="cost-row-name" title="' + model + '">' + model.split('/').pop() + '</div>';
+                        html += '<div class="cost-row-value">' + (mc > 0 ? sym + _fmtCost(mc) : 'free') + '</div>';
+                        html += '</div>';
+                    }}
+                    html += '</div>';
+                }}
+
+                // By provider
+                const byProvider = data.by_provider || {{}};
+                const provEntries = Object.entries(byProvider).sort((a,b) => (b[1].total_cost||0) - (a[1].total_cost||0));
+                if (provEntries.length > 0) {{
+                    html += '<div class="cost-section">';
+                    html += '<div class="cost-section-title">' + T.costs_by_provider + '</div>';
+                    for (const [prov, stats] of provEntries) {{
+                        const pc = stats.total_cost || 0;
+                        const pr = stats.requests || 0;
+                        html += '<div class="cost-row">';
+                        html += '<div class="cost-row-name">' + prov + '</div>';
+                        html += '<div class="cost-row-value">' + (pc > 0 ? sym + _fmtCost(pc) : 'free') + ' &middot; ' + pr + ' ' + T.costs_requests + '</div>';
+                        html += '</div>';
+                    }}
+                    html += '</div>';
+                }}
+
+                // History (last 7 days) — dailyArr is already sorted ascending by date
+                if (dailyArr.length > 0) {{
+                    html += '<div class="cost-section">';
+                    html += '<div class="cost-section-title">' + T.costs_history + '</div>';
+                    const reversed = [...dailyArr].reverse();
+                    for (const dayObj of reversed) {{
+                        const dc = dayObj.total_cost || 0;
+                        html += '<div class="cost-row">';
+                        html += '<div class="cost-row-name">' + (dayObj.date || '?') + '</div>';
+                        html += '<div class="cost-row-value">' + (dc > 0 ? sym + _fmtCost(dc) : '—') + '</div>';
+                        html += '</div>';
+                    }}
+                    html += '</div>';
+                }}
+
+                if (!modelEntries.length && !provEntries.length && todayReqs === 0) {{
+                    html = '<div style="padding:24px;text-align:center;color:#999;">' + T.costs_no_data + '</div>';
+                }}
+
+                // Reset button
+                html += '<button class="cost-reset-btn" onclick="resetUsageStats()">' + T.costs_reset + '</button>';
+
+                panel.innerHTML = html;
+            }} catch (e) {{
+                panel.innerHTML = '<div style="padding:16px;text-align:center;color:#e53e3e;">' + T.files_error + ': ' + e.message + '</div>';
+            }}
+        }}
+
+        async function resetUsageStats() {{
+            if (!confirm(T.costs_reset_confirm)) return;
+            try {{
+                await fetch(apiUrl('api/usage_stats/reset'), {{ method: 'POST' }});
+                loadCostsPanel();
+            }} catch (e) {{}}
         }}
 
         function renderConversationList(convs, listEl, source) {{
@@ -4186,7 +5864,7 @@ def get_chat_ui():
                 const del = document.createElement('span');
                 del.className = 'chat-item-delete';
                 del.title = T.delete_chat || 'Delete chat';
-                del.textContent = '\U0001f5d1';
+                del.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>';
                 del.addEventListener('click', (evt) => deleteConversation(evt, conv.id));
                 item.appendChild(left);
                 item.appendChild(del);
@@ -4576,7 +6254,10 @@ def get_chat_ui():
 
         async function loadConversation(sessionId) {{
             currentSessionId = sessionId;
-            safeLocalStorageSet('currentSessionId', sessionId);
+            // Only persist non-bubble sessions so reopening the page won't resume a bubble chat
+            if (!sessionId.startsWith('bubble_')) {{
+                safeLocalStorageSet('currentSessionId', sessionId);
+            }}
             try {{
                 const resp = await fetch(apiUrl(`api/conversations/${{sessionId}}`));
                 if (resp.status === 404) {{
@@ -4680,34 +6361,7 @@ def get_chat_ui():
             statusDotEl.style.background = configured ? '#4caf50' : '#ff9800';
         }}
 
-        // Refresh model lists by calling official provider /v1/models endpoints
-        async function refreshModels() {{
-            const btn = document.getElementById('refreshModelsBtn');
-            if (!btn) return;
-            btn.classList.add('spinning');
-            btn.disabled = true;
-            try {{
-                const r = await fetch(apiUrl('api/refresh_models'), {{method: 'POST', credentials: 'same-origin'}});
-                const data = await r.json();
-                if (data.success) {{
-                    const updated = Object.keys(data.updated || {{}});
-                    const counts = updated.map(p => p + ':' + data.updated[p]).join(', ');
-                    if (updated.length > 0) {{
-                        addMessage('\u2705 Models refreshed \u2014 ' + updated.length + ' provider(s): ' + counts, 'system');
-                    }} else {{
-                        addMessage('\u2139\ufe0f No updates \u2014 all providers already up to date or no endpoint available.', 'system');
-                    }}
-                    await loadModels();
-                }} else {{
-                    addMessage('\u26a0\ufe0f Refresh failed: ' + (data.error || 'unknown error'), 'system');
-                }}
-            }} catch(e) {{
-                addMessage('\u26a0\ufe0f Could not reach refresh endpoint: ' + e.message, 'system');
-            }} finally {{
-                btn.classList.remove('spinning');
-                btn.disabled = false;
-            }}
-        }}
+
 
         // Load models and populate dropdown with ALL providers
         // Stores full models data for use by populateModelSelect()
@@ -4717,6 +6371,20 @@ def get_chat_ui():
 
         function _stripProviderPrefix(model) {{
             return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
+        }}
+
+        // Capability badge helper
+        function _capBadges(model, providerId) {{
+            if (!_modelsData || !_modelsData.model_capabilities) return '';
+            const key = providerId + '/' + model;
+            const caps = _modelsData.model_capabilities[key];
+            if (!caps || !caps.capabilities) return '';
+            const badges = [];
+            if (caps.capabilities.includes('vision'))    badges.push('\U0001f441\ufe0f');
+            if (caps.capabilities.includes('reasoning')) badges.push('\U0001f9e0');
+            if (caps.capabilities.includes('tool_use'))  badges.push('\U0001f527');
+            if (caps.capabilities.includes('code'))      badges.push('\U0001f4bb');
+            return badges.length ? ' ' + badges.join('') : '';
         }}
 
         // Populate the model <select> based on selected provider
@@ -4740,7 +6408,7 @@ def get_chat_ui():
                     g.models.forEach(m => {{
                         const opt = document.createElement('option');
                         opt.value = m;
-                        opt.textContent = _stripProviderPrefix(m);
+                        opt.textContent = _stripProviderPrefix(m) + _capBadges(m, providerId);
                         if (m === currentModel) opt.selected = true;
                         grp.appendChild(opt);
                     }});
@@ -4750,7 +6418,7 @@ def get_chat_ui():
                 models.forEach(m => {{
                     const opt = document.createElement('option');
                     opt.value = m;
-                    opt.textContent = _stripProviderPrefix(m);
+                    opt.textContent = _stripProviderPrefix(m) + _capBadges(m, providerId);
                     if (m === currentModel) opt.selected = true;
                     modelSel.appendChild(opt);
                 }});
@@ -4836,6 +6504,36 @@ def get_chat_ui():
                     // Populate model select for current provider
                     const activeProv = providerSel.value || currentProvider;
                     populateModelSelect(activeProv, currentModel);
+                }}
+
+                // --- Agent selector population ---
+                const agentSel = document.getElementById('agentSelect');
+                if (agentSel && Array.isArray(data.agents) && data.agents.length >= 1) {{
+                    agentSel.innerHTML = '';
+                    data.agents.forEach(a => {{
+                        const opt = document.createElement('option');
+                        opt.value = a.id;
+                        const ident = a.identity || {{}};
+                        opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
+                        if (data.active_agent && a.id === data.active_agent) opt.selected = true;
+                        agentSel.appendChild(opt);
+                    }});
+                    agentSel.style.display = '';
+                }} else if (agentSel) {{
+                    agentSel.style.display = 'none';
+                }}
+
+                // --- Update header identity from active agent ---
+                if (data.active_agent_identity) {{
+                    const ident = data.active_agent_identity;
+                    if (ident.name) {{
+                        const h1 = document.querySelector('.header h1');
+                        if (h1) h1.textContent = ident.name;
+                    }}
+                    if (ident.emoji) {{
+                        const emojiSpan = document.querySelector('.header > span');
+                        if (emojiSpan) emojiSpan.textContent = ident.emoji;
+                    }}
                 }}
 
                 console.log('[loadModels] Loaded models for', availableProviders.length, 'providers');
@@ -4988,6 +6686,41 @@ def get_chat_ui():
                 }}
             }} catch (error) {{
                 console.error('Error changing model:', error);
+            }}
+        }}
+
+        // Change active agent
+        async function changeAgent(agentId) {{
+            if (!agentId) return;
+            try {{
+                const response = await fetch(apiUrl('api/agents/set'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{agent_id: agentId}})
+                }});
+                if (response.ok) {{
+                    const data = await response.json();
+                    console.log('[changeAgent] Switched to agent:', agentId, data);
+                    // Update header identity
+                    const identity = data.identity || {{}};
+                    if (identity.name) {{
+                        const h1 = document.querySelector('.header h1');
+                        if (h1) h1.textContent = identity.name;
+                    }}
+                    if (identity.emoji) {{
+                        const emojiSpan = document.querySelector('.header > span');
+                        if (emojiSpan) emojiSpan.textContent = identity.emoji;
+                    }}
+                    // Notify user
+                    const agentLabel = (identity.emoji || '') + ' ' + (identity.name || agentId);
+                    addMessage('\U0001f916 ' + T.switched_to.replace('{{provider}}', 'Agent').replace('{{model}}', agentLabel.trim()), 'system');
+                    // Refresh dropdowns (agent may have changed provider/model)
+                    await loadModels();
+                }} else {{
+                    console.error('[changeAgent] Failed:', response.status);
+                }}
+            }} catch (error) {{
+                console.error('[changeAgent] Error:', error);
             }}
         }}
 
@@ -5352,9 +7085,10 @@ def get_chat_ui():
                 // Provider select: repopulate model select, then apply change
                 const providerSelect = document.getElementById('providerSelect');
                 const modelSelect = document.getElementById('modelSelect');
+                const agentSelect = document.getElementById('agentSelect');
 
                 // Track open/closed state so loadModels() skips DOM reset while user browses
-                [providerSelect, modelSelect].forEach(sel => {{
+                [providerSelect, modelSelect, agentSelect].forEach(sel => {{
                     if (!sel) return;
                     sel.addEventListener('mousedown', () => {{ _selectOpen = true; }});
                     sel.addEventListener('focus',     () => {{ _selectOpen = true; }});
@@ -5365,6 +7099,9 @@ def get_chat_ui():
                         if (e.key === 'Escape' || e.key === 'Tab') _selectOpen = false;
                     }});
                 }});
+
+                // Agent select: switch active agent
+                if (agentSelect) agentSelect.addEventListener('change', (e) => changeAgent(e.target.value));
 
                 if (providerSelect) providerSelect.addEventListener('change', (e) => {{
                     const pid = e.target.value;
@@ -5382,9 +7119,6 @@ def get_chat_ui():
 
                 const testBtn = document.getElementById('testNvidiaBtn');
                 if (testBtn) testBtn.addEventListener('click', testNvidiaModel);
-
-                const refreshModelsBtn = document.getElementById('refreshModelsBtn');
-                if (refreshModelsBtn) refreshModelsBtn.addEventListener('click', refreshModels);
 
                 const newChatBtn = document.getElementById('newChatBtn');
                 if (newChatBtn) newChatBtn.addEventListener('click', newChat);
@@ -5603,7 +7337,6 @@ def get_chat_ui():
         window.removeDocument = removeDocument;
         window.changeModel = changeModel;
         window.handleButtonClick = handleButtonClick;
-        window.refreshModels = refreshModels;
         window.switchSidebarTab = switchSidebarTab;
         window.newChat = newChat;
         window.toggleSidebar = toggleSidebar;

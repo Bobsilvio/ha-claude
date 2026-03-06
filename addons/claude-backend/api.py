@@ -55,6 +55,24 @@ except ImportError:
     FALLBACK_AVAILABLE = False
 
 try:
+    import model_catalog
+    MODEL_CATALOG_AVAILABLE = True
+except ImportError:
+    MODEL_CATALOG_AVAILABLE = False
+
+try:
+    import agent_config
+    AGENT_CONFIG_AVAILABLE = True
+except ImportError:
+    AGENT_CONFIG_AVAILABLE = False
+
+try:
+    import model_fallback
+    MODEL_FALLBACK_AVAILABLE = True
+except ImportError:
+    MODEL_FALLBACK_AVAILABLE = False
+
+try:
     import semantic_cache
     SEMANTIC_CACHE_AVAILABLE = True
 except ImportError:
@@ -173,6 +191,9 @@ ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
 COST_CURRENCY = os.getenv("COST_CURRENCY", "USD").upper()
 
+# Last usage data captured by synchronous chat functions (chat_openai/anthropic/google)
+_last_sync_usage: dict = {}
+
 SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN", "")
 
 # Persisted runtime selection (preferred over add-on configuration).
@@ -182,7 +203,7 @@ RUNTIME_SELECTION_FILE = "/config/amira/runtime_selection.json"
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
 
-# Agent defaults (hardcoded)
+# Agent defaults (hardcoded, overridden by agents.json if present)
 AGENT_NAME = "Amira"
 AGENT_AVATAR = "🤖"
 AGENT_INSTRUCTIONS = ""
@@ -193,14 +214,37 @@ MAX_SNAPSHOTS_PER_FILE = max(1, min(50, int(os.getenv("MAX_SNAPSHOTS_PER_FILE", 
 # Persist system prompt override across restarts
 CUSTOM_SYSTEM_PROMPT_FILE = "/config/amira/custom_system_prompt.txt"
 
+# Agent profiles configuration file
+AGENTS_FILE = "/config/amira/agents.json"
+
+# Whitelist of config files editable via /api/config/save
+CONFIG_EDITABLE_FILES = {
+    "amira/agents.json",
+    "amira/mcp_config.json",
+    "amira/custom_system_prompt.txt",
+    "amira/memory/MEMORY.md",
+}
+
 _LOG_LEVEL = logging.DEBUG if DEBUG_MODE else logging.INFO
 
+# Custom log level for user questions and AI responses — stands out from INFO
+CHAT = 25  # between INFO (20) and WARNING (30)
+logging.addLevelName(CHAT, "CHAT")
+
+
+def _log_chat(self, message, *args, **kwargs):
+    if self.isEnabledFor(CHAT):
+        self._log(CHAT, message, args, **kwargs)
+
+
+logging.Logger.chat = _log_chat
 
 
 class _ColorFormatter(logging.Formatter):
     COLORS = {
         "DEBUG": "\x1b[36m",     # cyan
         "INFO": "\x1b[32m",      # green
+        "CHAT": "\x1b[34m",      # blue — distinct from green INFO
         "WARNING": "\x1b[33m",   # yellow
         "ERROR": "\x1b[31m",     # red
         "CRITICAL": "\x1b[35m",  # magenta
@@ -208,6 +252,7 @@ class _ColorFormatter(logging.Formatter):
     ICONS = {
         "DEBUG": "🔵",
         "INFO": "🟢",
+        "CHAT": "💬",
         "WARNING": "🟡",
         "ERROR": "🔴",
         "CRITICAL": "🟣",
@@ -294,6 +339,133 @@ _persisted_prompt = _load_custom_system_prompt_from_disk()
 if _persisted_prompt:
     CUSTOM_SYSTEM_PROMPT = _persisted_prompt
     logger.info(f"Loaded custom system prompt from disk ({len(CUSTOM_SYSTEM_PROMPT)} chars)")
+
+
+def load_agents_config() -> Optional[Dict]:
+    """Load agent profiles from /config/amira/agents.json.
+
+    Updates AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS globals.
+    Returns the full config dict or None if file doesn't exist.
+
+    Supports multiple JSON formats:
+    1. Canonical array: {"agents": [{id, identity, model, ...}], "defaults": {...}}
+    2. Legacy dict: {"agents": {"home": {...}, "coder": {...}}, "active": "home"}
+    3. Flat dict (README shorthand): {"home": {...}, "coder": {...}}
+    """
+    global AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS
+    try:
+        if not os.path.isfile(AGENTS_FILE):
+            return None
+        with open(AGENTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f) or {}
+
+        # Also reload AgentManager (canonical agent system) if available
+        if AGENT_CONFIG_AVAILABLE:
+            try:
+                mgr = agent_config.get_agent_manager()
+                mgr.reload_config()
+                active = mgr.get_active_agent()
+                if active:
+                    AGENT_NAME = (active.identity.name or active.name or "Amira").strip()
+                    AGENT_AVATAR = (active.identity.emoji or "\U0001f916").strip()
+                    AGENT_INSTRUCTIONS = (active.system_prompt_override or "").strip()
+                    try:
+                        import tools as _tools_mod
+                        _tools_mod.AI_SIGNATURE = AGENT_NAME
+                    except Exception:
+                        pass
+                    logger.info(
+                        f"Loaded agent '{active.id}' via AgentManager: "
+                        f"name={AGENT_NAME}, avatar={AGENT_AVATAR}"
+                    )
+                    return data
+            except Exception as e:
+                logger.warning(f"AgentManager reload failed, trying legacy parse: {e}")
+
+        # Legacy fallback: parse agents dict format
+        agents_raw = data.get("agents")
+        agent = None
+        active_key = "default"
+
+        if isinstance(agents_raw, dict) and agents_raw:
+            # Format 2: {"agents": {"home": {...}}, "active": "home"}
+            active_key = data.get("active", "default")
+            agent = agents_raw.get(active_key)
+            if not agent:
+                agent = next(iter(agents_raw.values()))
+                active_key = next(iter(agents_raw.keys()))
+        elif isinstance(agents_raw, list) and agents_raw:
+            # Format 1: canonical array — take the default or first
+            for a in agents_raw:
+                if a.get("default") or a.get("is_default"):
+                    agent = a
+                    active_key = a.get("id", "default")
+                    break
+            if not agent:
+                agent = agents_raw[0]
+                active_key = agent.get("id", "default")
+        else:
+            # Format 3: flat dict — top-level keys are agent IDs
+            _meta = {"defaults", "active", "channel_agents", "agents"}
+            for key, val in data.items():
+                if key in _meta or not isinstance(val, dict):
+                    continue
+                if val.get("is_default") or val.get("default") or agent is None:
+                    agent = val
+                    active_key = key
+
+        if not agent:
+            logger.warning("agents.json: no valid agent found in any format")
+            return None
+
+        # Extract identity fields (support both nested identity.name and flat name)
+        identity = agent.get("identity") or {}
+        AGENT_NAME = (identity.get("name") or agent.get("name") or "Amira").strip()
+        AGENT_AVATAR = (identity.get("emoji") or agent.get("avatar") or "\U0001f916").strip()
+        AGENT_INSTRUCTIONS = (agent.get("system_prompt_override") or agent.get("system_prompt") or agent.get("instructions") or "").strip()
+
+        try:
+            import tools as _tools_mod
+            _tools_mod.AI_SIGNATURE = AGENT_NAME
+        except Exception:
+            pass
+
+        logger.info(
+            f"Loaded agent '{active_key}': name={AGENT_NAME}, avatar={AGENT_AVATAR}, "
+            f"instructions={len(AGENT_INSTRUCTIONS)} chars"
+        )
+        return data
+    except json.JSONDecodeError as e:
+        logger.warning(f"agents.json: invalid JSON — {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Could not load agents.json: {e}")
+        return None
+
+
+def get_channel_agent(channel: str) -> Optional[Dict]:
+    """Resolve the agent assigned to a messaging channel (telegram, whatsapp).
+
+    Reads agents.json -> channel_agents -> {channel} -> agent key.
+    Returns the agent dict or None if no channel-specific agent is configured.
+    """
+    try:
+        if not os.path.isfile(AGENTS_FILE):
+            return None
+        with open(AGENTS_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f) or {}
+        channel_agents = data.get("channel_agents", {})
+        agent_key = channel_agents.get(channel)
+        if not agent_key:
+            return None
+        agents = data.get("agents", {})
+        agent = agents.get(agent_key)
+        if agent:
+            logger.debug(f"Channel '{channel}' -> agent '{agent_key}': {agent.get('name', '?')}")
+        return agent
+    except Exception as e:
+        logger.warning(f"get_channel_agent('{channel}'): {e}")
+        return None
 
 
 def _truncate(s: str, max_len: int = 160) -> str:
@@ -669,20 +841,10 @@ LANGUAGE_TEXT = {
 
         "intent_modify_automation": "Modify automation",
         "intent_modify_script": "Modify script",
-        "intent_create_automation": "Create automation",
-        "intent_create_script": "Create script",
         "intent_create_dashboard": "Create dashboard",
         "intent_modify_dashboard": "Modify dashboard",
-        "intent_control_device": "Device control",
-        "intent_query_state": "Device state",
-        "intent_query_history": "Data history",
-        "intent_delete": "Delete",
         "intent_config_edit": "Edit configuration",
-        "intent_areas": "Room management",
-        "intent_notifications": "Notification",
-        "intent_helpers": "Helper management",
         "intent_chat": "Chat",
-        "intent_generic": "Analyzing request",
         "intent_default": "Processing",
 
         "read_only_note": "**Read-only mode — no files were modified.**",
@@ -753,20 +915,10 @@ LANGUAGE_TEXT = {
 
         "intent_modify_automation": "Modifica automazione",
         "intent_modify_script": "Modifica script",
-        "intent_create_automation": "Crea automazione",
-        "intent_create_script": "Crea script",
         "intent_create_dashboard": "Crea dashboard",
         "intent_modify_dashboard": "Modifica dashboard",
-        "intent_control_device": "Controllo dispositivo",
-        "intent_query_state": "Stato dispositivo",
-        "intent_query_history": "Storico dati",
-        "intent_delete": "Eliminazione",
         "intent_config_edit": "Modifica configurazione",
-        "intent_areas": "Gestione stanze",
-        "intent_notifications": "Notifica",
-        "intent_helpers": "Gestione helper",
         "intent_chat": "Chat",
-        "intent_generic": "Analisi richiesta",
         "intent_default": "Elaborazione",
 
         "read_only_note": "**Modalità sola lettura — nessun file è stato modificato.**",
@@ -834,22 +986,12 @@ LANGUAGE_TEXT = {
         "write_yaml_created": "\n**YAML creato:**",
         "write_snapshot_created": "\n💾 Snapshot creato: `{snapshot_id}`",
 
-        "intent_modify_automation": "Modificar automazione",
+        "intent_modify_automation": "Modificar automación",
         "intent_modify_script": "Modificar script",
-        "intent_create_automation": "Crear automazione",
-        "intent_create_script": "Crear script",
         "intent_create_dashboard": "Crear dashboard",
         "intent_modify_dashboard": "Modificar dashboard",
-        "intent_control_device": "Controllo dispositivo",
-        "intent_query_state": "Stato dispositivo",
-        "intent_query_history": "Storico dati",
-        "intent_delete": "Eliminazione",
-        "intent_config_edit": "Modifica configurazione",
-        "intent_areas": "Gestione stanze",
-        "intent_notifications": "Notifica",
-        "intent_helpers": "Gestione helper",
+        "intent_config_edit": "Modificar configuración",
         "intent_chat": "Chat",
-        "intent_generic": "Analisi richiesta",
         "intent_default": "Procesando",
 
         "read_only_note": "**Modalità sola lettura — nessun file è stato modificato.**",
@@ -920,20 +1062,10 @@ LANGUAGE_TEXT = {
 
         "intent_modify_automation": "Modifier une automatisation",
         "intent_modify_script": "Modifier un script",
-        "intent_create_automation": "Créer une automatisation",
-        "intent_create_script": "Créer un script",
         "intent_create_dashboard": "Créer un dashboard",
         "intent_modify_dashboard": "Modifier un dashboard",
-        "intent_control_device": "Contrôle d'appareil",
-        "intent_query_state": "État de l'appareil",
-        "intent_query_history": "Historique des données",
-        "intent_delete": "Suppression",
         "intent_config_edit": "Modifier la configuration",
-        "intent_areas": "Gestion des pièces",
-        "intent_notifications": "Notification",
-        "intent_helpers": "Gestion des helpers",
         "intent_chat": "Chat",
-        "intent_generic": "Analyse de la demande",
         "intent_default": "Traitement",
 
         "read_only_note": "**Mode lecture seule — aucun fichier n'a été modifié.**",
@@ -1057,15 +1189,8 @@ PROVIDER_DEFAULTS = {
     "chatgpt_web": {"model": "gpt-4o", "name": "ChatGPT Web ⚠️ [UNSTABLE]"},
 }
 
-# GitHub models that returned unknown_model at runtime (per current token)
-GITHUB_MODEL_BLOCKLIST: set[str] = set()
-
 # NVIDIA models that returned 404/unknown at runtime (per current key)
 NVIDIA_MODEL_BLOCKLIST: set[str] = set()
-GITHUB_MODEL_BLOCKLIST: set[str] = set()  # may be used by providers
-
-# GitHub Copilot models that returned model_not_supported at runtime
-GITHUB_COPILOT_MODEL_BLOCKLIST: set[str] = set()
 
 # NVIDIA models that have been successfully chat-tested (per current key)
 NVIDIA_MODEL_TESTED_OK: set[str] = set()
@@ -1074,15 +1199,13 @@ MODEL_BLOCKLIST_FILE = "/config/amira/model_blocklist.json"
 
 
 def load_model_blocklists() -> None:
-    """Load persistent model blocklists from disk."""
-    global NVIDIA_MODEL_BLOCKLIST, GITHUB_MODEL_BLOCKLIST, GITHUB_COPILOT_MODEL_BLOCKLIST, NVIDIA_MODEL_TESTED_OK
+    """Load persistent NVIDIA model blocklist from disk."""
+    global NVIDIA_MODEL_BLOCKLIST, NVIDIA_MODEL_TESTED_OK
     try:
         if os.path.isfile(MODEL_BLOCKLIST_FILE):
             with open(MODEL_BLOCKLIST_FILE, "r") as f:
                 data = json.load(f) or {}
             nvidia = data.get("nvidia") or []
-            github = data.get("github") or []
-            github_copilot = data.get("github_copilot") or []
 
             # Backward compatible formats:
             # - {"nvidia": [..]} (legacy blocked-only)
@@ -1096,21 +1219,16 @@ def load_model_blocklists() -> None:
                     NVIDIA_MODEL_TESTED_OK.update([m for m in tested_ok if isinstance(m, str) and m.strip()])
             elif isinstance(nvidia, list):
                 NVIDIA_MODEL_BLOCKLIST.update([m for m in nvidia if isinstance(m, str) and m.strip()])
-            if isinstance(github, list):
-                GITHUB_MODEL_BLOCKLIST.update([m for m in github if isinstance(m, str) and m.strip()])
-            if isinstance(github_copilot, list):
-                GITHUB_COPILOT_MODEL_BLOCKLIST.update([m for m in github_copilot if isinstance(m, str) and m.strip()])
-            if NVIDIA_MODEL_BLOCKLIST or GITHUB_MODEL_BLOCKLIST or GITHUB_COPILOT_MODEL_BLOCKLIST or NVIDIA_MODEL_TESTED_OK:
-                logger.info(
-                    f"Loaded model lists: nvidia_blocked={len(NVIDIA_MODEL_BLOCKLIST)}, nvidia_tested_ok={len(NVIDIA_MODEL_TESTED_OK)}, "
-                    f"github_blocked={len(GITHUB_MODEL_BLOCKLIST)}, github_copilot_blocked={len(GITHUB_COPILOT_MODEL_BLOCKLIST)}"
+            if NVIDIA_MODEL_BLOCKLIST or NVIDIA_MODEL_TESTED_OK:
+                logger.debug(
+                    f"Loaded NVIDIA model lists: blocked={len(NVIDIA_MODEL_BLOCKLIST)}, tested_ok={len(NVIDIA_MODEL_TESTED_OK)}"
                 )
     except Exception as e:
         logger.warning(f"Could not load model blocklists: {e}")
 
 
 def save_model_blocklists() -> None:
-    """Persist model blocklists to disk."""
+    """Persist NVIDIA model blocklist to disk."""
     try:
         os.makedirs(os.path.dirname(MODEL_BLOCKLIST_FILE), exist_ok=True)
         payload = {
@@ -1118,8 +1236,6 @@ def save_model_blocklists() -> None:
                 "blocked": sorted(NVIDIA_MODEL_BLOCKLIST),
                 "tested_ok": sorted(NVIDIA_MODEL_TESTED_OK),
             },
-            "github": sorted(GITHUB_MODEL_BLOCKLIST),
-            "github_copilot": sorted(GITHUB_COPILOT_MODEL_BLOCKLIST),
         }
         with open(MODEL_BLOCKLIST_FILE, "w") as f:
             json.dump(payload, f, ensure_ascii=False)
@@ -1156,20 +1272,12 @@ def blocklist_nvidia_model(model_id: str) -> None:
 
 
 def blocklist_model(provider: str, model_id: str) -> None:
-    """Add a model to the blocklist for any provider. Persists to disk."""
+    """Add a model to the blocklist for a provider. Only NVIDIA is persisted."""
     if not isinstance(model_id, str) or not model_id.strip():
         return
     model_id = model_id.strip()
     if provider == "nvidia":
         blocklist_nvidia_model(model_id)
-    elif provider == "github":
-        GITHUB_MODEL_BLOCKLIST.add(model_id)
-        save_model_blocklists()
-    elif provider == "github_copilot":
-        if model_id not in GITHUB_COPILOT_MODEL_BLOCKLIST:
-            GITHUB_COPILOT_MODEL_BLOCKLIST.add(model_id)
-            logger.warning(f"Auto-blocklisted github_copilot model '{model_id}' (model_not_supported)")
-            save_model_blocklists()
     else:
         logger.debug(f"blocklist_model: no blocklist for provider '{provider}'")
 
@@ -1234,191 +1342,20 @@ def get_nvidia_models_cached() -> Optional[list[str]]:
     return None
 
 # ---------------------------------------------------------------------------
-# PROVIDER_MODELS — single source of truth is each provider's get_available_models().
-# The static dict below is the authoritative fallback; at startup it is patched
-# with the live list from each provider so edits to provider files take effect
-# immediately without touching api.py.
-# To update models for a provider → edit ONLY that provider's get_available_models().
+# PROVIDER_MODELS — Single source of truth lives in model_catalog._PROVIDER_MODELS.
+# At startup we get a mutable copy, then patch it with live provider discovery
+# and the on-disk model cache.  To edit the static model list → edit model_catalog.py.
 # ---------------------------------------------------------------------------
-_PROVIDER_MODELS_STATIC = {
-    "anthropic": [
-        # Ultimi (correnti)
-        "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001",
-        # Legacy (ancora disponibili)
-        "claude-sonnet-4-5-20250929", "claude-opus-4-5-20251101", "claude-opus-4-1-20250805",
-        "claude-sonnet-4-20250514", "claude-opus-4-20250514",
-    ],
-    "openai": ["gpt-5.2", "gpt-5.2-mini", "gpt-5", "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3", "o3-mini", "o1"],
-    "google": ["gemini-2.0-flash", "gemini-2.5-pro", "gemini-2.5-flash"],
-    "nvidia": [
-        "moonshotai/kimi-k2.5",
-        "meta/llama-3.1-70b-instruct",
-        "meta/llama-3.1-405b-instruct",
-        "mistralai/mistral-large-2-instruct",
-        "microsoft/phi-4",
-        "nvidia/llama-3.1-nemotron-70b-instruct",
-    ],
-    "github": [
-        # OpenAI (via Azure) - gpt-4o and gpt-4o-mini are the stable defaults
-        "openai/gpt-4o", "openai/gpt-4o-mini",
-        "openai/gpt-4.1", "openai/gpt-4.1-mini", "openai/gpt-4.1-nano",
-        "openai/o1", "openai/o1-mini", "openai/o1-preview",
-        "openai/o3", "openai/o3-mini", "openai/o4-mini",
-        # Preview / may not be available on all accounts
-        "openai/gpt-5.2", "openai/gpt-5.2-mini",
-        "openai/gpt-5", "openai/gpt-5-chat", "openai/gpt-5-mini", "openai/gpt-5-nano",
-        # Meta Llama
-        "meta/meta-llama-3.1-405b-instruct", "meta/meta-llama-3.1-8b-instruct",
-        "meta/llama-3.3-70b-instruct",
-        "meta/llama-4-scout-17b-16e-instruct", "meta/llama-4-maverick-17b-128e-instruct-fp8",
-        "meta/llama-3.2-11b-vision-instruct", "meta/llama-3.2-90b-vision-instruct",
-        # Mistral
-        "mistral-ai/mistral-small-2503", "mistral-ai/mistral-medium-2505",
-        "mistral-ai/ministral-3b", "mistral-ai/codestral-2501",
-        # Cohere
-        "cohere/cohere-command-r-plus-08-2024", "cohere/cohere-command-r-08-2024",
-        "cohere/cohere-command-a",
-        # DeepSeek
-        "deepseek/deepseek-r1", "deepseek/deepseek-r1-0528", "deepseek/deepseek-v3-0324",
-        # Microsoft
-        "microsoft/mai-ds-r1", "microsoft/phi-4", "microsoft/phi-4-mini-instruct",
-        "microsoft/phi-4-reasoning", "microsoft/phi-4-mini-reasoning",
-        "microsoft/phi-4-multimodal-instruct",
-        # AI21
-        "ai21-labs/ai21-jamba-1.5-large",
-        # xAI
-        "xai/grok-3", "xai/grok-3-mini",
-    ],
-    "groq": [
-        # Production models
-        "llama-3.3-70b-versatile",
-        "llama-3.1-8b-instant",
-        "openai/gpt-oss-120b",
-        "openai/gpt-oss-20b",
-        # Production systems (agentic)
-        "groq/compound",
-        "groq/compound-mini",
-        # Preview models
-        "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "meta-llama/llama-4-scout-17b-16e-instruct",
-        "qwen/qwen3-32b",
-        "moonshotai/kimi-k2-instruct-0905",
-    ],
-    "mistral": [
-        "mistral-large-latest",
-        "mistral-medium",
-        "mistral-small-latest",
-        "open-mixtral-8x7b",
-        "open-mixtral-8x22b",
-    ],
-    "ollama": [],  # populated live from Ollama /api/tags — no fake fallback
-    "openrouter": [
-        "anthropic/claude-opus-4.6", "anthropic/claude-sonnet-4.6",
-        "openai/gpt-4o", "openai/gpt-4o-mini",
-        "meta-llama/llama-3.1-405b-instruct",
-        "mistralai/mistral-large-2512",
-        "google/gemini-2.0-flash-001",
-        "openrouter/auto",
-    ],
-    "deepseek": [
-        "deepseek-chat",
-        "deepseek-r1",
-        "deepseek-v3",
-    ],
-    "minimax": [
-        "MiniMax-M2.1",
-        "MiniMax-M2",
-        "MiniMax-M3",
-    ],
-    "aihubmix": [
-        "gpt-4o", "gpt-4-turbo",
-        "claude-opus-4-6", "claude-sonnet-4-6",
-        "gemini-2.0-flash",
-        "llama-3.1-405b",
-    ],
-    "siliconflow": [
-        "Qwen/Qwen2.5-7B-Instruct",
-        "Qwen/Qwen2.5-32B-Instruct",
-        "meta-llama/Llama-3.1-8B-Instruct",
-        "meta-llama/Llama-3.1-70B-Instruct",
-        "mistral/Mistral-7B-Instruct-v0.3",
-    ],
-    "volcengine": [
-        "Qwen/Qwen2.5-7B-Instruct",
-        "Qwen/Qwen2.5-32B-Instruct",
-        "meta-llama/Llama-3.1-8B-Instruct",
-        "meta-llama/Llama-3.1-70B-Instruct",
-    ],
-    "dashscope": [
-        "qwen-max",
-        "qwen-plus",
-        "qwen-turbo",
-        "qwen-long",
-        "qwen-vl-plus",
-    ],
-    "moonshot": [
-        "kimi-k2.5",
-        "kimi-k2",
-        "kimi-k1.5",
-        "kimi-k1",
-    ],
-    "zhipu": [
-        "glm-4-flash",
-        "glm-4-flash-250414",
-        "glm-4-air",
-        "glm-4-airx",
-        "glm-4-plus",
-        "glm-4-long",
-        "glm-z1-flash",
-        "glm-z1-air",
-        "glm-z1-airx",
-        "glm-4",
-        "glm-4v",
-    ],
-    "perplexity": [
-        "sonar-pro",
-        "sonar",
-        "sonar-reasoning-pro",
-        "sonar-reasoning",
-        "r1-1776",
-    ],
-    # GitHub Copilot (direct OAuth → api.githubcopilot.com)
-    # This list is used as a static fallback before the first token-based refresh.
-    # After authenticating and clicking "Refresh models", the live list replaces it.
-    "github_copilot": [
-        # Claude (via Copilot)
-        "claude-opus-4.6-fast", "claude-opus-4.6",
-        "claude-sonnet-4.6", "claude-sonnet-4.5", "claude-sonnet-4",
-        "claude-haiku-4.5", "claude-opus-4.5",
-        # GPT-5 family
-        "gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.1-codex-max", "gpt-5.1-codex",
-        "gpt-5.1-codex-mini", "gpt-5.1", "gpt-5.2", "gpt-5-mini",
-        # GPT-4o family
-        "gpt-4o", "gpt-4o-mini", "gpt-4o-2024-11-20", "gpt-4o-2024-08-06",
-        "gpt-4o-mini-2024-07-18", "gpt-4o-2024-05-13", "gpt-4-o-preview",
-        "gpt-41-copilot",
-        # GPT-4.1 / GPT-4 legacy
-        "gpt-4.1", "gpt-4.1-2025-04-14", "gpt-4", "gpt-4-0613",
-        "gpt-4-0125-preview", "gpt-3.5-turbo", "gpt-3.5-turbo-0613",
-        # Gemini (via Copilot)
-        "gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-3-flash-preview",
-        "gemini-2.5-pro",
-        # Grok
-        "grok-code-fast-1",
-        # OSWE (internal Copilot agents)
-        "oswe-vscode-prime", "oswe-vscode-secondary",
-    ],
-    "custom": [],  # model name comes from CUSTOM_MODEL_NAME env var
-}
-
-# Build PROVIDER_MODELS: start from static fallback, then patch each provider
-# with its own get_available_models() so the provider file is the single source
-# of truth. Providers that fail to import (missing deps at import time) keep
-# the static fallback silently.
-PROVIDER_MODELS = dict(_PROVIDER_MODELS_STATIC)
+if MODEL_CATALOG_AVAILABLE:
+    PROVIDER_MODELS = model_catalog.get_catalog().get_provider_models()
+else:
+    # Bare-minimum fallback if model_catalog is missing
+    PROVIDER_MODELS = {"anthropic": ["claude-sonnet-4-6"], "openai": ["gpt-4o"]}
 
 try:
     from providers import _PROVIDER_CLASSES, get_provider_class as _get_provider_class
+    _dynamic_ok = []
+    _dynamic_fail = []
     for _pid in list(_PROVIDER_CLASSES):
         try:
             _cls = _get_provider_class(_pid)
@@ -1430,12 +1367,19 @@ try:
             _live = _inst.get_available_models()
             if _live:  # only replace if the provider returned something
                 PROVIDER_MODELS[_pid] = _live
-        except Exception:
-            pass  # keep static fallback for this provider
+                _dynamic_ok.append(f"{_pid}({len(_live)})")
+        except Exception as _e:
+            _dynamic_fail.append(f"{_pid}:{_e.__class__.__name__}")
+    import logging as _log
+    _dlog = _log.getLogger(__name__)
+    if _dynamic_ok:
+        _dlog.info(f"Dynamic model discovery: {', '.join(_dynamic_ok)}")
+    if _dynamic_fail:
+        _dlog.warning(f"Dynamic model discovery failed: {', '.join(_dynamic_fail)}")
 except Exception:
     pass
 
-# Load persisted model cache from disk (populated by /api/refresh_models).
+# Load persisted model cache from disk.
 # Overlay on PROVIDER_MODELS so the UI shows dynamically-fetched models.
 try:
     from providers.model_fetcher import load_cache as _load_model_cache
@@ -2123,6 +2067,78 @@ def initialize_ai_client():
     return ai_client
 
 
+from contextlib import contextmanager
+
+@contextmanager
+def _apply_channel_agent(channel: str):
+    """Context manager: temporarily activate the agent assigned to *channel*.
+
+    If the channel has a dedicated agent (configured via /api/agents/channels),
+    the global AI_PROVIDER / AI_MODEL / ai_client are switched to that agent's
+    model for the duration of the block and restored afterwards.
+    If no channel agent is configured, this is a no-op.
+    """
+    global AI_PROVIDER, AI_MODEL, SELECTED_PROVIDER, SELECTED_MODEL, ai_client
+
+    if not AGENT_CONFIG_AVAILABLE:
+        yield
+        return
+
+    try:
+        mgr = agent_config.get_agent_manager()
+        agent_id = mgr.get_channel_agent(channel)
+        if not agent_id:
+            yield
+            return
+
+        agent = mgr.resolve_agent(agent_id)
+        if not agent or not agent.model_config.primary:
+            yield
+            return
+
+        ref = agent.model_config.primary
+        # Nothing to change if already on the right agent
+        if ref.provider == AI_PROVIDER and ref.model == AI_MODEL:
+            # Still set the agent as active so identity/tools resolve correctly
+            prev_active = mgr.get_active_agent()
+            prev_active_id = prev_active.id if prev_active else None
+            mgr.set_active_agent(agent_id)
+            try:
+                yield
+            finally:
+                if prev_active_id:
+                    mgr.set_active_agent(prev_active_id)
+            return
+
+        # Save current state
+        saved = (AI_PROVIDER, AI_MODEL, SELECTED_PROVIDER, SELECTED_MODEL, ai_client)
+        prev_active = mgr.get_active_agent()
+        prev_active_id = prev_active.id if prev_active else None
+
+        # Switch to channel agent
+        AI_PROVIDER = ref.provider
+        AI_MODEL = ref.model
+        SELECTED_PROVIDER = ref.provider
+        SELECTED_MODEL = ref.model
+        mgr.set_active_agent(agent_id)
+        initialize_ai_client()
+        logger.info(f"Channel '{channel}' → agent '{agent_id}' ({ref.provider}/{ref.model})")
+
+        try:
+            yield
+        finally:
+            # Restore previous state
+            AI_PROVIDER, AI_MODEL, SELECTED_PROVIDER, SELECTED_MODEL, ai_client = saved
+            if prev_active_id:
+                mgr.set_active_agent(prev_active_id)
+            else:
+                # re-init to the saved provider
+                initialize_ai_client()
+    except Exception as e:
+        logger.warning(f"_apply_channel_agent('{channel}') error: {e}")
+        yield
+
+
 ai_client = None
 # Prefer persisted selection (set by /api/set_model) over add-on configuration
 load_runtime_selection()
@@ -2603,6 +2619,17 @@ def chat_anthropic(messages: List[Dict]) -> tuple:
         )
 
     final_text = "".join(block.text for block in response.content if hasattr(block, "text"))
+    # Capture usage for non-streaming cost display
+    global _last_sync_usage
+    try:
+        _last_sync_usage = {
+            "input_tokens": getattr(response.usage, "input_tokens", 0),
+            "output_tokens": getattr(response.usage, "output_tokens", 0),
+            "cache_read_input_tokens": getattr(response.usage, "cache_read_input_tokens", 0) or 0,
+            "cache_creation_input_tokens": getattr(response.usage, "cache_creation_input_tokens", 0) or 0,
+        }
+    except Exception:
+        _last_sync_usage = {}
     return final_text, messages
 
 
@@ -2660,9 +2687,9 @@ def chat_openai(messages: List[Dict]) -> tuple:
                         continue
                     raise
             else:
-                # Still unknown after variants: blocklist canonical ID (the one shown in UI)
+                # Still unknown after variants — log and continue
                 if bad_model:
-                    GITHUB_MODEL_BLOCKLIST.add(bad_model)
+                    logger.warning(f"GitHub: all variants of '{bad_model}' returned unknown_model")
 
                 # Final fallback attempts (both qualified and short)
                 fallback_candidates = ["openai/gpt-4o", "gpt-4o"]
@@ -2733,6 +2760,15 @@ def chat_openai(messages: List[Dict]) -> tuple:
         response = ai_client.chat.completions.create(**kwargs)
         msg = response.choices[0].message
 
+    # Capture usage for non-streaming cost display
+    global _last_sync_usage
+    try:
+        _last_sync_usage = {
+            "prompt_tokens": getattr(response.usage, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(response.usage, "completion_tokens", 0) or 0,
+        }
+    except Exception:
+        _last_sync_usage = {}
     return msg.content or "", messages
 
 
@@ -2768,6 +2804,14 @@ def chat_google(messages: List[Dict]) -> tuple:
             contents.append({"role": role, "parts": parts})
 
     tool = tools.get_gemini_tools()
+    # If ToolRegistry available, use it for Gemini format with policies
+    _reg = tools.get_tool_registry()
+    if _reg is not None:
+        try:
+            _ctx = {"tier": tools._get_tool_tier(), "enable_file_access": ENABLE_FILE_ACCESS}
+            tool = _reg.format_for_gemini(_ctx)
+        except Exception as e:
+            logger.debug(f"Registry Gemini format failed, using legacy: {e}")
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         tools=[tool],
@@ -2783,6 +2827,19 @@ def chat_google(messages: List[Dict]) -> tuple:
 
         function_calls = getattr(response, "function_calls", None) or []
         if not function_calls:
+            # Capture usage for non-streaming cost display
+            global _last_sync_usage
+            try:
+                _usage_meta = getattr(response, "usage_metadata", None)
+                if _usage_meta:
+                    _last_sync_usage = {
+                        "prompt_tokens": getattr(_usage_meta, "prompt_token_count", 0) or 0,
+                        "completion_tokens": getattr(_usage_meta, "candidates_token_count", 0) or 0,
+                    }
+                else:
+                    _last_sync_usage = {}
+            except Exception:
+                _last_sync_usage = {}
             return (response.text or ""), messages
 
         # Append the model's function-call content, then our tool responses.
@@ -2830,6 +2887,7 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
     """Remove messages incompatible with the current provider.
     Also truncates old messages to reduce token count (critical for rate limits)."""
     clean = []
+    _skip_tool_ids: set = set()  # tool_call_ids from skipped assistant messages
     i = 0
     while i < len(messages):
         m = messages[i]
@@ -2861,13 +2919,17 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
                         # Skip this orphaned tool_use message
                         skip = True
 
-        # Skip Anthropic-format tool_result messages for OpenAI/GitHub
-        elif AI_PROVIDER in ("openai", "github") and role == "user" and isinstance(m.get("content"), list):
+        # Skip Anthropic-format tool_result messages for non-Anthropic providers
+        elif AI_PROVIDER != "anthropic" and role == "user" and isinstance(m.get("content"), list):
             if any(isinstance(c, dict) and c.get("type") == "tool_result" for c in m.get("content", [])):
                 skip = True
 
-        # For OpenAI/GitHub: Skip assistant messages with tool_calls if tool responses are missing
-        elif AI_PROVIDER in ("openai", "github") and role == "assistant" and m.get("tool_calls"):
+        # Skip orphaned tool responses whose assistant+tool_calls was already skipped
+        elif role == "tool" and m.get("tool_call_id") in _skip_tool_ids:
+            skip = True
+
+        # For non-Anthropic providers: Skip assistant messages with tool_calls if tool responses are missing
+        elif AI_PROVIDER != "anthropic" and role == "assistant" and m.get("tool_calls"):
             tool_call_ids = {tc.get("id") or (tc.get("function", {}).get("name", "")) for tc in m.get("tool_calls", []) if isinstance(tc, dict)}
             # Look ahead for matching tool responses
             found_ids = set()
@@ -2878,6 +2940,8 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
                     break
             if not tool_call_ids.issubset(found_ids):
                 skip = True
+                # Mark all associated tool IDs so their responses are also skipped
+                _skip_tool_ids.update(tool_call_ids)
 
         # Keep user/assistant/tool messages if not skipped
         if not skip:
@@ -2885,19 +2949,53 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
                 content = m.get("content", "")
                 # Accept strings or arrays (arrays can contain images)
                 if isinstance(content, str) and content:
-                    clean.append({"role": role, "content": content})
+                    out_msg = {"role": role, "content": content}
                 elif isinstance(content, list) and content:
-                    clean.append({"role": role, "content": content})
-            elif AI_PROVIDER in ("openai", "github") and role == "tool":
-                # Pass through tool responses for OpenAI/GitHub (required after tool_calls)
+                    out_msg = {"role": role, "content": content}
+                elif role == "assistant" and m.get("tool_calls"):
+                    # assistant message may have null/empty content but tool_calls
+                    out_msg = {"role": role, "content": content or None}
+                else:
+                    out_msg = None
+                if out_msg is not None:
+                    # Preserve tool_calls on assistant messages (required for paired tool responses)
+                    if role == "assistant" and m.get("tool_calls"):
+                        out_msg["tool_calls"] = m["tool_calls"]
+                    clean.append(out_msg)
+            elif role == "tool":
+                # Pass through tool responses (required after tool_calls for OpenAI-compatible APIs)
                 clean.append(m)
 
         i += 1
     
-    # Limit total messages: keep only last 10
-    if len(clean) > 10:
-        clean = clean[-10:]
+    # Limit total messages: keep only last MAX_MSGS, but never cut inside
+    # an assistant(tool_calls) + tool response group.
+    MAX_MSGS = 10
+    if len(clean) > MAX_MSGS:
+        cut = len(clean) - MAX_MSGS
+        # Advance cut past any orphaned tool messages at the start
+        while cut < len(clean) and clean[cut].get("role") == "tool":
+            cut += 1
+        # If we advanced past all messages, fall back to hard cut
+        if cut >= len(clean):
+            cut = len(clean) - MAX_MSGS
+        clean = clean[cut:]
     
+    # Final safety: remove any orphaned tool messages that survived truncation.
+    # A tool message is valid only if preceded by assistant+tool_calls or another tool.
+    validated = []
+    for m in clean:
+        if m.get("role") == "tool":
+            if not validated:
+                continue  # orphan at start
+            prev = validated[-1]
+            if prev.get("role") == "tool" or (prev.get("role") == "assistant" and prev.get("tool_calls")):
+                validated.append(m)
+            # else: orphaned tool message — skip silently
+        else:
+            validated.append(m)
+    clean = validated
+
     # Truncate OLD messages to save tokens (keep last 2 messages full)
     MAX_OLD_MSG = 1500
     for i in range(len(clean) - 2):
@@ -2913,6 +3011,113 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
             clean[i] = {"role": clean[i]["role"], "content": content}
     
     return clean
+
+
+def _validate_entity_ids_in_response(text: str) -> str:
+    """Validate entity IDs mentioned in AI responses against real HA states.
+
+    If the AI hallucinated entity IDs (e.g. invented sensor.epcube_pvpower when
+    the real ID is sensor.ep_cube_pv_power), append a warning with the correct
+    entity IDs found via keyword matching.
+
+    Only runs when the response contains multiple entity_id references.
+    """
+    import re
+
+    HA_DOMAINS = (
+        "sensor", "binary_sensor", "light", "switch", "climate", "cover",
+        "fan", "media_player", "automation", "script", "scene", "group",
+        "person", "input_boolean", "input_number", "input_text", "input_select",
+        "input_datetime", "button", "number", "select", "text", "lock",
+        "alarm_control_panel", "camera", "vacuum", "water_heater", "humidifier",
+        "weather", "device_tracker", "timer", "counter", "update", "siren",
+        "remote", "notify",
+    )
+    domain_pattern = "|".join(re.escape(d) for d in HA_DOMAINS)
+    entity_re = re.compile(rf'\b({domain_pattern})\.[a-z0-9][a-z0-9_]*\b')
+
+    found_full = set(m.group(0) for m in entity_re.finditer(text))
+    if not found_full or len(found_full) < 2:
+        return text
+
+    # Skip generic examples
+    EXAMPLE_ENTITIES = {"light.living_room", "switch.living_room", "sensor.temperature",
+                        "binary_sensor.motion", "light.soggiorno", "light.camera",
+                        "light.xxx", "switch.xxx", "sensor.xxx", "scene.movie_night"}
+    if found_full.issubset(EXAMPLE_ENTITIES):
+        return text
+
+    try:
+        all_states = get_all_states()
+        real_eids = {s.get("entity_id", "") for s in all_states}
+
+        invalid = found_full - real_eids
+        if not invalid:
+            return text
+
+        # Only warn if a significant portion are invalid (>= 2 or majority)
+        if len(invalid) < 2 and len(invalid) / max(len(found_full), 1) < 0.5:
+            return text
+
+        # Find correct entities via keyword matching from invalid IDs
+        suggestions = []
+        _keywords = set()
+        for eid in invalid:
+            parts = eid.split(".")
+            if len(parts) == 2:
+                for p in parts[1].split("_"):
+                    if len(p) >= 4:
+                        _keywords.add(p)
+
+        if _keywords:
+            seen = set()
+            for keyword in list(_keywords)[:3]:
+                for s in all_states:
+                    s_eid = s.get("entity_id", "")
+                    fname = s.get("attributes", {}).get("friendly_name", "")
+                    if keyword in s_eid.lower() or keyword in fname.lower():
+                        if s_eid not in seen:
+                            seen.add(s_eid)
+                            state_val = s.get("state", "")
+                            unit = s.get("attributes", {}).get("unit_of_measurement", "")
+                            suggestions.append(
+                                f"- `{s_eid}` ({fname}) = {state_val}{' ' + unit if unit else ''}"
+                            )
+
+        suggestions = suggestions[:15]
+
+        lang = LANGUAGE
+        inv_list = ", ".join(f"`{e}`" for e in sorted(invalid))
+        if lang == "it":
+            warning = f"\n\n⚠️ **Attenzione: alcuni entity ID potrebbero non esistere.**\n"
+            warning += f"Non trovati su HA: {inv_list}\n"
+            if suggestions:
+                warning += "\n**Entità reali trovate nel tuo sistema:**\n" + "\n".join(suggestions[:10])
+                warning += "\n\n_Usa questi entity ID al posto di quelli suggeriti sopra._"
+            else:
+                warning += "\nChiedi di nuovo specificando di cercare prima le entità reali."
+        elif lang == "es":
+            warning = f"\n\n⚠️ **Atención: algunos entity ID podrían no existir.**\n"
+            warning += f"No encontrados: {inv_list}\n"
+            if suggestions:
+                warning += "\n**Entidades reales:**\n" + "\n".join(suggestions[:10])
+        elif lang == "fr":
+            warning = f"\n\n⚠️ **Attention : certains entity ID pourraient ne pas exister.**\n"
+            warning += f"Non trouvés : {inv_list}\n"
+            if suggestions:
+                warning += "\n**Entités réelles :**\n" + "\n".join(suggestions[:10])
+        else:
+            warning = f"\n\n⚠️ **Warning: some entity IDs may not exist.**\n"
+            warning += f"Not found: {inv_list}\n"
+            if suggestions:
+                warning += "\n**Real entities found:**\n" + "\n".join(suggestions[:10])
+
+        logger.warning(f"Entity validation: {len(invalid)} invalid IDs in response: {invalid}")
+        return text + warning
+
+    except Exception as e:
+        logger.warning(f"Entity validation error: {e}")
+        return text
 
 
 def _clean_unnecessary_comments(text: str) -> str:
@@ -2955,6 +3160,7 @@ def _clean_unnecessary_comments(text: str) -> str:
 def _collect_from_stream(user_message: str, session_id: str) -> str:
     """Blocking wrapper: collects all text from stream_chat_with_ai.
     Used by Telegram/WhatsApp for manager.py providers (groq, mistral, claude_web, etc.)."""
+    global _last_sync_usage
     parts: list[str] = []
     for event in stream_chat_with_ai(user_message, session_id):
         event_type = event.get("type")
@@ -2964,10 +3170,15 @@ def _collect_from_stream(user_message: str, session_id: str) -> str:
         elif event_type == "text":
             # fallback: some paths might still yield "text" directly
             parts.append(event.get("text", ""))
+        elif event_type == "done":
+            # Capture usage for non-streaming cost display
+            if event.get("usage"):
+                _last_sync_usage = event["usage"]
         elif event_type == "error":
             return "❌ " + event.get("message", "Errore sconosciuto")
     result = "".join(parts).strip()
     result = _clean_unnecessary_comments(result)
+    result = _validate_entity_ids_in_response(result)
     return result
 
 
@@ -2979,7 +3190,7 @@ def _log_response_preview(response_text: str, session_id: str) -> None:
     preview = _re.sub(r'\s+', ' ', preview).strip()
     if len(preview) > 300:
         preview = preview[:300] + '...'
-    logger.info(f"[AI Response] ({session_id}) ({len(response_text)} chars): {preview}")
+    logger.chat(f"📤 ({session_id}) ({len(response_text)} chars): {preview}")
 
 
 def chat_with_ai(user_message: str, session_id: str = "default") -> str:
@@ -3022,6 +3233,7 @@ def chat_with_ai(user_message: str, session_id: str = "default") -> str:
         save_conversations()
         # Clean unnecessary comments from response before returning
         final_text = _clean_unnecessary_comments(final_text)
+        final_text = _validate_entity_ids_in_response(final_text)
         _log_response_preview(final_text, session_id)
         return final_text
 
@@ -3244,17 +3456,15 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     # Get previous intent for confirmation continuity
     prev_intent = session_last_intent.get(session_id)
 
-    # Step 1: LOCAL intent detection FIRST (need this BEFORE building smart context)
-    # We do a preliminary detect to know if user is creating or modifying
-    intent_info = intent.detect_intent(user_message, "", previous_intent=prev_intent)  # Empty context for first pass
+    # Step 1: LOCAL intent detection (preliminary — for bubble contexts and chat)
+    # Simplified LLM-first approach: most intents are "auto" (all tools, LLM decides)
+    intent_info = intent.detect_intent(user_message, "", previous_intent=prev_intent)
     intent_name = intent_info["intent"]
 
-    # Step 2: Build smart context NOW that we know the intent
-    # If user is creating new automation/script, skip fuzzy matching to avoid false automation injection
+    # Step 2: Build smart context (skip for chat — not needed)
     # When the message contains [CURRENT_DASHBOARD_HTML] the HTML is extracted and will be injected
     # as a SEPARATE earlier turn in the conversation (user: HTML, assistant: "ok, letto"), so the
     # actual user message sent to the model is only the clean request text + normal smart context.
-    # This avoids token overflow without losing entity awareness.
     _dashboard_in_msg = "[CURRENT_DASHBOARD_HTML]" in user_message
 
     # Extract dashboard HTML block if present (will be injected as a separate history turn below)
@@ -3273,71 +3483,52 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             _dashboard_name_hint = _nm.group(1)
         logger.info(f"Dashboard HTML split: extracted {len(_dashboard_html_block)} chars, name='{_dashboard_name_hint}'")
 
-    smart_context = intent.build_smart_context(
-        user_message,
-        intent=intent_name,
-        # Use normal cap — the HTML will be a separate turn, not part of this message
-    )
+    if intent_name != "chat":
+        smart_context = intent.build_smart_context(
+            user_message,
+            intent=intent_name,
+        )
 
-    # Step 2.5: Inject memory context if enabled (nanobot style: reads MEMORY.md once, no cross-session search)
-    memory_context = ""
-    if ENABLE_MEMORY and MEMORY_AVAILABLE:
-        memory_context = memory.get_memory_context()
-        if memory_context:
-            logger.info(f"Memory context (MEMORY.md) injected for session {session_id}")
-            smart_context = memory_context + "\n\n" + smart_context
+        # Step 2.5: Inject memory context if enabled
+        memory_context = ""
+        if ENABLE_MEMORY and MEMORY_AVAILABLE:
+            memory_context = memory.get_memory_context()
+            if memory_context:
+                logger.info(f"Memory context (MEMORY.md) injected for session {session_id}")
+                smart_context = memory_context + "\n\n" + smart_context
 
-    # Step 3: Re-detect intent WITH full smart context for accuracy
-    intent_info = intent.detect_intent(user_message, smart_context, previous_intent=prev_intent)
-    intent_name = intent_info["intent"]
-
-    # Step 3b: AI-based tool classification for "generic" intent
-    # Instead of using a fixed 12-tool fallback, ask the AI which tools are needed.
-    # This handles any phrasing without requiring keyword lists.
-    if intent_name == "generic":
-        yield {"type": "status", "message": f"{tr('intent_generic')}... 🔍"}
-        _ai_tools = intent.ai_classify_tools(user_message, AI_PROVIDER, get_active_model())
-        if _ai_tools is not None:
-            # AI classification succeeded
-            if len(_ai_tools) == 0:
-                # AI says no tools needed → treat as chat
-                intent_name = "chat"
-                intent_info["intent"] = "chat"
-                intent_info["tools"] = []
-                intent_info["prompt"] = intent.INTENT_PROMPTS.get("chat", "")
-                logger.info("AI classify: reclassified generic → chat (no tools needed)")
-            else:
-                intent_info["tools"] = _ai_tools
-                logger.info(f"AI classify: generic → {len(_ai_tools)} tools: {_ai_tools}")
-        else:
-            # AI classification failed — keep the static 12-tool generic fallback
-            logger.info("AI classify: failed, using static generic fallback")
+        # Step 3: Re-detect intent WITH full smart context (for HTML dashboard refs in context)
+        intent_info = intent.detect_intent(user_message, smart_context, previous_intent=prev_intent)
+        intent_name = intent_info["intent"]
+    else:
+        smart_context = ""
 
     # Store this intent for next message's confirmation continuity
     session_last_intent[session_id] = intent_name
     _intent_tools = intent_info.get("tools")
-    # tools=None means "all tools" (legacy), tools=[] means "no tools" (chat)
-    tool_count = len(_intent_tools) if _intent_tools is not None else len(tools.HA_TOOLS_DESCRIPTION)
-    logger.info(f"Intent detected: {intent_name} (specific_target={intent_info['specific_target']}, tools={tool_count})")
+    # tools=None means "all tools" (LLM-first), tools=[] means "no tools" (chat)
+    # Compute ACTUAL tool count (respects provider tier: compact/extended/full)
+    if _intent_tools is not None:
+        tool_count = len(_intent_tools)
+    else:
+        _tier = getattr(tools, "_get_tool_tier", lambda: "full")()
+        _tier_counts = {"compact": len(tools.HA_TOOLS_COMPACT), "extended": len(tools.HA_TOOLS_EXTENDED)}
+        tool_count = _tier_counts.get(_tier, len(tools.HA_TOOLS_DESCRIPTION))
+    logger.info(f"Intent detected: {intent_name} (specific_target={intent_info['specific_target']}, tools={tool_count}, tier={_tier if _intent_tools is None else 'filtered'})")
     
     # Show intent to user (translated)
     INTENT_KEYS = {
+        "auto": "intent_default",
+        "chat": "intent_chat",
+        "card_editor": "intent_default",
+        "create_html_dashboard": "intent_create_dashboard",
+        "manage_statistics": "intent_default",
         "modify_automation": "intent_modify_automation",
         "modify_script": "intent_modify_script",
-        "create_automation": "intent_create_automation",
-        "create_script": "intent_create_script",
         "create_dashboard": "intent_create_dashboard",
         "modify_dashboard": "intent_modify_dashboard",
-        "control_device": "intent_control_device",
-        "query_state": "intent_query_state",
-        "query_history": "intent_query_history",
-        "delete": "intent_delete",
         "config_edit": "intent_config_edit",
-        "areas": "intent_areas",
-        "notifications": "intent_notifications",
-        "helpers": "intent_helpers",
-        "chat": "intent_chat",
-        "generic": "intent_generic",
+        "system_debug": "intent_default",
     }
     intent_key = INTENT_KEYS.get(intent_name, "intent_default")
     intent_label = tr(intent_key)
@@ -3410,7 +3601,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             if intent_info["specific_target"]:
                 api_content = f"{user_message}\n\n---\nDATA:\n{smart_context}"
             else:
-                api_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
+                api_content = f"{user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT re-request data already provided above."
         else:
             api_content = user_message
 
@@ -3457,7 +3648,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     "Output ONLY the complete <!DOCTYPE html>…</html> page, nothing else."
                 )
             else:
-                api_content = f"{clean_user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT request data already provided above. ONE tool call only, then respond."
+                api_content = f"{clean_user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT re-request data already provided above."
             # Log estimated token count
             est_tokens = len(api_content) // 4  # ~4 chars per token
             logger.info(f"Smart context: {len(smart_context)} chars, est. ~{est_tokens} tokens for user message")
@@ -3555,27 +3746,45 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         last_usage = None  # Will capture usage from done event
         _streamed_text_parts: list = []  # accumulate streamed tokens for saving
 
-        # Clean messages for specific providers that need it
-        if AI_PROVIDER in ("anthropic", "google"):
-            clean_messages = sanitize_messages_for_provider(messages)
-            messages = clean_messages
+        # Clean messages for all providers: remove orphaned tool_calls / tool
+        # responses that would cause 400 errors on OpenAI-compatible APIs.
+        messages = sanitize_messages_for_provider(messages)
 
         # Inject tool schemas into intent_info so providers can pass them to the API.
         # This enables tool calling for all OpenAI-compatible providers (Mistral, Groq, etc.)
         # and for the Anthropic SDK provider.
-        # IMPORTANT: filter to only the intent's tools to minimize token usage.
+        # tools=None → ALL tools (LLM-first mode), tools=[] → no tools (chat), tools=[...] → subset
+        #
+        # === OpenClaw-style pipeline (via ToolRegistry) ===
+        # When the registry is available, the entire filtering/formatting chain
+        # (tier → intent → file_access → category) runs in a single pass via
+        # ToolRegistry.get_tools(context) + format_for_provider().  This replaces
+        # the manual filtering below with a declarative policy chain.
+        _tool_registry = tools.get_tool_registry()
         if intent_info is not None:
             _intent_tool_names = intent_info.get("tools")
-            if _intent_tool_names:
-                # Focused intent (or generic default): only include the needed tools
-                _allowed = set(_intent_tool_names)
-                intent_info["tool_schemas"] = [
-                    t for t in tools.get_openai_tools()
-                    if t.get("function", {}).get("name") in _allowed
-                ]
+            if _tool_registry is not None:
+                # Registry path: single-pass policy pipeline
+                _registry_ctx = {
+                    "tier": tools._get_tool_tier(),
+                    "intent_tools": _intent_tool_names,   # None=all, []=none, [names]=subset
+                    "enable_file_access": ENABLE_FILE_ACCESS,
+                }
+                intent_info["tool_schemas"] = _tool_registry.format_for_provider(
+                    "openai", _registry_ctx
+                )
             else:
-                # Chat intent (empty list): no tools needed
-                intent_info["tool_schemas"] = []
+                # Legacy path (fallback)
+                if _intent_tool_names is None:
+                    intent_info["tool_schemas"] = tools.get_openai_tools()
+                elif len(_intent_tool_names) == 0:
+                    intent_info["tool_schemas"] = []
+                else:
+                    _allowed = set(_intent_tool_names)
+                    intent_info["tool_schemas"] = [
+                        t for t in tools.get_openai_tools()
+                        if t.get("function", {}).get("name") in _allowed
+                    ]
 
         # Tool execution loop: providers surface tool_calls in the done event;
         # we execute them here and loop until the model produces a final answer.
@@ -3586,13 +3795,21 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _duplicate_count = 0             # how many consecutive duplicate rounds
         _skip_tool_extraction = False    # after dedup, skip ToolSimulator next round
         _last_write_result = None        # last WRITE tool result (for fallback display)
-        _read_only_tools = {
-            "get_automations", "get_scripts", "get_dashboards",
-            "get_dashboard_config", "read_config_file",
-            "list_config_files", "get_frontend_resources",
-            "search_entities", "get_entity_state", "get_entities",
-            "get_integration_entities",
-        }
+
+        # Build read-only tool set: from registry (categories) or static fallback
+        if _tool_registry is not None:
+            from tool_registry import ToolCategory
+            _read_only_tools = {
+                t.name for t in _tool_registry._tools.values() if t.read_only
+            }
+        else:
+            _read_only_tools = {
+                "get_automations", "get_scripts", "get_dashboards",
+                "get_dashboard_config", "read_config_file",
+                "list_config_files", "get_frontend_resources",
+                "search_entities", "get_entity_state", "get_entities",
+                "get_integration_entities",
+            }
 
         # Helper: is this tool call read-only? (used for UI suppression + write detection)
         def _is_read_only_call(tc):
@@ -3613,11 +3830,61 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
             # Use unified provider interface (replaces old provider_*.py functions)
             # Passa il modello attivo esplicitamente così il provider non usa default errati
-            provider_gen = provider_stream_chat(
-                AI_PROVIDER, messages,
-                intent_info=intent_info,
-                model=get_active_model(),
-            )
+            #
+            # Model Fallback: if enabled, wrap the call through the fallback engine
+            # which tries the primary model first, then agent/global fallbacks on error.
+            _active_provider = AI_PROVIDER
+            _active_model = get_active_model()
+
+            if MODEL_FALLBACK_AVAILABLE and AGENT_CONFIG_AVAILABLE:
+                try:
+                    _agent_id = None
+                    try:
+                        _mgr = agent_config.get_agent_manager()
+                        _active_ag = _mgr.get_active_agent()
+                        if _active_ag:
+                            _agent_id = _active_ag.id
+                    except Exception:
+                        pass
+
+                    _fb_result = model_fallback.run_with_model_fallback_streaming(
+                        provider=_active_provider,
+                        model=_active_model,
+                        run=lambda p, m: provider_stream_chat(p, messages, intent_info=intent_info, model=m),
+                        agent_id=_agent_id,
+                        on_fallback=lambda fp, fm, tp, tm: logger.warning(
+                            f"⚡ Fallback: {fp}/{fm} → {tp}/{tm}"
+                        ),
+                    )
+                    if _fb_result.success:
+                        provider_gen = _fb_result.result
+                        # Update active provider/model if fallback switched them
+                        if _fb_result.provider != _active_provider or _fb_result.model != _active_model:
+                            logger.info(f"Fallback active: using {_fb_result.provider}/{_fb_result.model} "
+                                        f"instead of {_active_provider}/{_active_model}")
+                            _active_provider = _fb_result.provider
+                            _active_model = _fb_result.model
+                    else:
+                        # All candidates failed — re-raise the original error
+                        if _fb_result.error:
+                            raise _fb_result.error
+                        raise Exception("All model candidates exhausted")
+                except model_fallback.FailoverReason if False else Exception as _fb_err:
+                    # If fallback engine itself fails, fall through to direct call
+                    if model_fallback.is_context_overflow(_fb_err):
+                        raise  # context overflow: abort immediately
+                    logger.warning(f"Fallback engine error, trying direct: {_fb_err}")
+                    provider_gen = provider_stream_chat(
+                        AI_PROVIDER, messages,
+                        intent_info=intent_info,
+                        model=get_active_model(),
+                    )
+            else:
+                provider_gen = provider_stream_chat(
+                    AI_PROVIDER, messages,
+                    intent_info=intent_info,
+                    model=get_active_model(),
+                )
 
             _pending_tool_calls: list = []
 
@@ -3792,23 +4059,67 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         # Normal completion — enrich with cost and forward to client
                         if event.get("usage"):
                             raw_usage = event["usage"]
-                            input_tokens = raw_usage.get("input_tokens") or raw_usage.get("prompt_tokens", 0)
-                            output_tokens = raw_usage.get("output_tokens") or raw_usage.get("completion_tokens", 0)
+                            logger.debug(f"💰 Usage received from provider: {raw_usage}")
+                            # Normalize usage from any provider naming convention
+                            norm = pricing.normalize_usage(raw_usage)
+                            input_tokens = norm["input_tokens"]
+                            output_tokens = norm["output_tokens"]
+                            cache_read_tokens = norm["cache_read_tokens"]
+                            cache_write_tokens = norm["cache_write_tokens"]
                             model_name = raw_usage.get("model") or get_active_model()
                             provider_name = raw_usage.get("provider") or AI_PROVIDER
-                            cost = pricing.calculate_cost(
-                                model_name, provider_name, input_tokens, output_tokens, COST_CURRENCY,
+                            # Full cost breakdown (input/output/cache_read/cache_write)
+                            cost_bd = pricing.calculate_cost_breakdown(
+                                model_name, provider_name,
+                                input_tokens, output_tokens,
+                                cache_read_tokens, cache_write_tokens,
+                                COST_CURRENCY,
                             )
                             usage = {
                                 **raw_usage,
                                 "input_tokens": input_tokens,
                                 "output_tokens": output_tokens,
-                                "cost": cost,
+                                "cache_read_tokens": cache_read_tokens,
+                                "cache_write_tokens": cache_write_tokens,
+                                "cost": cost_bd["total_cost"],
+                                "cost_breakdown": {
+                                    "input": cost_bd["input_cost"],
+                                    "output": cost_bd["output_cost"],
+                                    "cache_read": cost_bd["cache_read_cost"],
+                                    "cache_write": cost_bd["cache_write_cost"],
+                                },
                                 "currency": COST_CURRENCY,
                             }
+                            # Persist to disk for daily/model/provider aggregation
+                            usage["model"] = model_name
+                            usage["provider"] = provider_name
+                            # Log cost at INFO level for visibility
+                            _cost_val = cost_bd["total_cost"]
+                            _sym = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥"}.get(COST_CURRENCY, COST_CURRENCY)
+                            if _cost_val > 0:
+                                logger.info(f"💰 {provider_name}/{model_name}: {input_tokens} in + {output_tokens} out → {_sym}{_cost_val:.6f}")
+                            else:
+                                logger.info(f"💰 {provider_name}/{model_name}: {input_tokens} in + {output_tokens} out → free")
+                            try:
+                                from usage_tracker import get_tracker
+                                get_tracker().record(usage)
+                            except Exception:
+                                pass  # non-critical — don't break the stream
                             event = {**event, "usage": usage}
                             last_usage = usage
+                        else:
+                            logger.debug(f"⚠️ Done event without usage: finish_reason={event.get('finish_reason')}")
                         if not _pending_tool_calls:
+                            # Validate entity IDs before emitting "done"
+                            try:
+                                _assembled_for_check = "".join(_streamed_text_parts).strip()
+                                _validated_text = _validate_entity_ids_in_response(_assembled_for_check)
+                                if _validated_text != _assembled_for_check:
+                                    _warning_suffix = _validated_text[len(_assembled_for_check):]
+                                    yield {"type": "token", "content": _warning_suffix}
+                                    _streamed_text_parts.append(_warning_suffix)
+                            except Exception as _val_err:
+                                logger.warning(f"Entity validation in stream failed: {_val_err}")
                             yield event
                     # If tool_calls present: do NOT yield done — execute tools and loop
                     break  # exit inner for-loop regardless
@@ -3974,8 +4285,11 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 if not isinstance(tc_args, dict):
                     tc_args = {}
 
-                # Show status to user
-                _status_label = tools.TOOL_DESCRIPTIONS.get(fn_name, fn_name)
+                # Show status to user (registry provides Italian labels)
+                if _tool_registry is not None:
+                    _status_label = _tool_registry.get_user_description(fn_name)
+                else:
+                    _status_label = tools.TOOL_DESCRIPTIONS.get(fn_name, fn_name)
                 yield {"type": "status", "message": f"🔧 {_status_label}..."}
                 logger.info(f"Tool (round {_tool_round}): {fn_name} {list(tc_args.keys())}")
 
@@ -3983,7 +4297,27 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 if fn_name in _read_only_tools and _sig in _tool_cache:
                     logger.debug(f"Tool cache hit: {fn_name}")
                     result = _tool_cache[_sig]
+                elif _tool_registry is not None:
+                    # === OpenClaw-style execution with hooks ===
+                    # The registry applies before/after hooks:
+                    # - ReadOnlyHook: blocks writes in read-only sessions
+                    # - DuplicateCallHook: detects repeated calls
+                    # - EntityValidationHook: validates entity_id format
+                    # - LoggingHook: logs timing and results
+                    from tool_registry import ToolCallContext
+                    _exec_ctx = ToolCallContext(
+                        tool_name=fn_name,
+                        arguments=tc_args,
+                        session_id=session_id,
+                        read_only=getattr(tools, 'is_read_only_session', lambda s: False)(session_id) if hasattr(tools, 'is_read_only_session') else False,
+                        round_number=_tool_round,
+                        call_history=_tool_call_history,
+                    )
+                    result = _tool_registry.execute(fn_name, tc_args, context=_exec_ctx)
+                    if fn_name in _read_only_tools:
+                        _tool_cache[_sig] = result
                 else:
+                    # Legacy execution path
                     result = tools.execute_tool(fn_name, tc_args)
                     if fn_name in _read_only_tools:
                         _tool_cache[_sig] = result
@@ -3998,6 +4332,10 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         yield {"type": "diff", "content": _diff_content, "file": _modified_file}
                 except Exception:
                     pass
+
+                # Log tool result (truncate to 300 chars)
+                _log_result = result[:300] + ('...' if len(result) > 300 else '')
+                logger.info(f"Tool result [{fn_name}]: {_log_result}")
 
                 messages.append({
                     "role": "tool",
@@ -4049,15 +4387,16 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         is_anthropic_or_google = AI_PROVIDER in ("anthropic", "google")
         new_msgs_from_provider = [
             msg for msg in messages[conv_length_before:]
-            if msg.get("role") == "assistant"
+            if msg.get("role") in ("assistant", "tool")
             and not (is_anthropic_or_google and isinstance(msg.get("content", ""), list))
         ]
         if new_msgs_from_provider:
             for msg in new_msgs_from_provider:
-                msg["model"] = get_active_model()
-                msg["provider"] = AI_PROVIDER
-                if last_usage:
-                    msg["usage"] = last_usage
+                if msg.get("role") == "assistant":
+                    msg["model"] = get_active_model()
+                    msg["provider"] = AI_PROVIDER
+                    if last_usage:
+                        msg["usage"] = last_usage
                 conversations[session_id].append(msg)
         if _streamed_text_parts:
             # Assemble streamed tokens into the final assistant message.
@@ -4069,6 +4408,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 from providers.tool_simulator import clean_display_text as _cdt_hist
                 assembled = _cdt_hist(assembled)
             if assembled:
+                # Log the AI response for debugging (truncate to 500 chars)
+                _log_resp = assembled[:500] + ('...' if len(assembled) > 500 else '')
+                logger.chat(f"📤 [{AI_PROVIDER}/{get_active_model()}]: {_log_resp}")
                 assistant_msg: dict = {
                     "role": "assistant",
                     "content": assembled,
@@ -4689,11 +5031,31 @@ def api_set_model():
     except Exception:
         pass
 
-    return jsonify({
+    # Clear model fallback cooldown for the new provider (fresh start)
+    if MODEL_FALLBACK_AVAILABLE:
+        try:
+            model_fallback.clear_cooldown(AI_PROVIDER)
+        except Exception:
+            pass
+
+    # Build response with agent identity if available
+    resp = {
         "success": True,
         "provider": AI_PROVIDER,
-        "model": AI_MODEL
-    })
+        "model": AI_MODEL,
+    }
+    if AGENT_CONFIG_AVAILABLE:
+        try:
+            mgr = agent_config.get_agent_manager()
+            identity = mgr.resolve_identity()
+            resp["agent_identity"] = {
+                "name": identity.name,
+                "emoji": identity.emoji,
+            }
+        except Exception:
+            pass
+
+    return jsonify(resp)
 
 
 @app.route('/api/bubble/device-id', methods=['POST'])
@@ -5011,8 +5373,61 @@ def api_chat():
     if not message:
         return jsonify({"error": "Empty message"}), 400
     logger.info(f"Chat [{AI_PROVIDER}]: {_strip_context_for_log(message)}")
+    global _last_sync_usage
+    _last_sync_usage = {}  # Reset before call
     response_text = chat_with_ai(message, session_id)
-    return jsonify({"response": response_text}), 200
+    # Enrich usage data with cost breakdown (same pipeline as streaming)
+    usage_data = None
+    if _last_sync_usage:
+        try:
+            norm = pricing.normalize_usage(_last_sync_usage)
+            input_tokens = norm["input_tokens"]
+            output_tokens = norm["output_tokens"]
+            cache_read_tokens = norm["cache_read_tokens"]
+            cache_write_tokens = norm["cache_write_tokens"]
+            model_name = _last_sync_usage.get("model") or get_active_model()
+            provider_name = _last_sync_usage.get("provider") or AI_PROVIDER
+            cost_bd = pricing.calculate_cost_breakdown(
+                model_name, provider_name,
+                input_tokens, output_tokens,
+                cache_read_tokens, cache_write_tokens,
+                COST_CURRENCY,
+            )
+            usage_data = {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "cache_read_tokens": cache_read_tokens,
+                "cache_write_tokens": cache_write_tokens,
+                "cost": cost_bd["total_cost"],
+                "cost_breakdown": {
+                    "input": cost_bd["input_cost"],
+                    "output": cost_bd["output_cost"],
+                    "cache_read": cost_bd["cache_read_cost"],
+                    "cache_write": cost_bd["cache_write_cost"],
+                },
+                "currency": COST_CURRENCY,
+                "model": model_name,
+                "provider": provider_name,
+            }
+            # Log cost
+            _cost_val = cost_bd["total_cost"]
+            _sym = {"USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥"}.get(COST_CURRENCY, COST_CURRENCY)
+            if _cost_val > 0:
+                logger.info(f"💰 {provider_name}/{model_name}: {input_tokens} in + {output_tokens} out → {_sym}{_cost_val:.6f}")
+            else:
+                logger.info(f"💰 {provider_name}/{model_name}: {input_tokens} in + {output_tokens} out → free")
+            # Persist to disk
+            try:
+                from usage_tracker import get_tracker
+                get_tracker().record(usage_data)
+            except Exception:
+                pass
+        except Exception as e:
+            logger.debug(f"Cost enrichment for /api/chat failed: {e}")
+    result = {"response": response_text}
+    if usage_data:
+        result["usage"] = usage_data
+    return jsonify(result), 200
 
 
 @app.route('/api/chat/stream', methods=['POST'])
@@ -5033,10 +5448,10 @@ def api_chat_stream():
     if not message:
         return jsonify({"error": "Empty message"}), 400
     if image_data:
-        logger.info(f"Stream [{AI_PROVIDER}] with image: {message[:50]}...")
+        logger.chat(f"📩 [{AI_PROVIDER}] with image: {message[:50]}...")
     else:
         log_msg = _strip_context_for_log(message)
-        logger.info(f"Stream [{AI_PROVIDER}]: {log_msg}")
+        logger.chat(f"📩 [{AI_PROVIDER}]: {log_msg}")
     if read_only:
         logger.info(f"Read-only mode active for session {session_id}")
     abort_streams[session_id] = False  # Reset abort flag
@@ -5389,27 +5804,6 @@ def api_mcp_server_tools(server_name):
 
 # ============ Nanobot-Inspired Features Endpoints ============
 
-@app.route('/api/fallback/stats', methods=['GET'])
-def api_fallback_stats():
-    """Get multi-provider fallback chain statistics."""
-    try:
-        if not FALLBACK_AVAILABLE:
-            return jsonify({"status": "error", "message": "Fallback not available"}), 501
-        
-        chain = fallback.get_fallback_chain()
-        if not chain:
-            return jsonify({"status": "error", "message": "Fallback chain not initialized"}), 503
-        
-        stats = chain.get_stats()
-        return jsonify({
-            "status": "success",
-            "fallback_stats": stats,
-        }), 200
-    except Exception as e:
-        logger.error(f"Fallback stats error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
 @app.route('/api/cache/semantic/stats', methods=['GET'])
 def api_semantic_cache_stats():
     """Get semantic cache statistics."""
@@ -5641,45 +6035,6 @@ def api_scheduled_task_toggle(task_id):
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
-# ============ Agent Discovery ============
-
-@app.route('/api/agents', methods=['GET'])
-def api_agents_list():
-    """List all available agents with their capabilities and endpoint info."""
-    agents = [
-        {
-            "id": "main",
-            "name": "Home Assistant AI",
-            "description": "Main AI agent: home automation, devices, automations, scripts, dashboards.",
-            "endpoint": "/api/chat",
-            "method": "POST",
-            "available": True,
-            "builtin": True,
-            "icon": "🏠",
-        },
-    ]
-    if SCHEDULER_AGENT_AVAILABLE:
-        agents.append({
-            "id": "scheduler",
-            "name": "SchedulerAgent",
-            "description": "Create, list, enable/disable and delete scheduled tasks using natural language.",
-            "endpoint": "/api/agent/scheduler",
-            "method": "POST",
-            "available": True,
-            "builtin": False,
-            "icon": "🗓️",
-            "extra_endpoints": {
-                "sessions": "GET /api/agent/scheduler/sessions",
-                "clear_session": "DELETE /api/agent/scheduler/session/<session_id>",
-            },
-        })
-    return jsonify({
-        "status": "success",
-        "agents": agents,
-        "count": len(agents),
-    }), 200
-
-
 # ============ SchedulerAgent Endpoints ============
 
 @app.route('/api/agent/scheduler', methods=['POST'])
@@ -5775,6 +6130,307 @@ def api_browser_errors_post():
 def api_browser_errors_get():
     """Get stored browser console errors."""
     return jsonify({"errors": _browser_console_errors, "count": len(_browser_console_errors)}), 200
+
+
+# ============ Agent / Catalog / Fallback Endpoints ============
+
+@app.route('/api/agents', methods=['GET'])
+def api_agents_list():
+    """List all agents with their configuration."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        mgr = agent_config.get_agent_manager()
+        include_disabled = request.args.get("include_disabled", "false").lower() == "true"
+        agents = mgr.get_agents_for_api() if not include_disabled else [
+            a.to_dict() for a in mgr.list_agents(include_disabled=True)
+        ]
+        active = mgr.get_active_agent()
+        return jsonify({
+            "success": True,
+            "agents": agents,
+            "active_agent": active.id if active else None,
+            "stats": mgr.stats(),
+        }), 200
+    except Exception as e:
+        logger.error(f"api_agents_list error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents', methods=['POST'])
+def api_agents_create():
+    """Create a new agent."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        data = request.get_json() or {}
+        if not data.get("id"):
+            return jsonify({"success": False, "error": "Agent 'id' is required"}), 400
+        entry = agent_config.AgentEntry.from_dict(data)
+        mgr = agent_config.get_agent_manager()
+        mgr.add_agent(entry)
+        mgr.save_config()
+        return jsonify({"success": True, "agent": entry.to_dict()}), 201
+    except Exception as e:
+        logger.error(f"api_agents_create error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/<agent_id>', methods=['GET'])
+def api_agent_get(agent_id):
+    """Get a single agent by ID."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        mgr = agent_config.get_agent_manager()
+        agent = mgr.get_agent(agent_id)
+        if not agent:
+            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found"}), 404
+        return jsonify({"success": True, "agent": agent.to_dict()}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/<agent_id>', methods=['PUT'])
+def api_agent_update(agent_id):
+    """Update an existing agent."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        data = request.get_json() or {}
+        mgr = agent_config.get_agent_manager()
+        updated = mgr.update_agent(agent_id, data)
+        if not updated:
+            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found"}), 404
+        mgr.save_config()
+        return jsonify({"success": True, "agent": updated.to_dict()}), 200
+    except Exception as e:
+        logger.error(f"api_agent_update error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/<agent_id>', methods=['DELETE'])
+def api_agent_delete(agent_id):
+    """Delete an agent."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        mgr = agent_config.get_agent_manager()
+        if not mgr.remove_agent(agent_id):
+            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found"}), 404
+        mgr.save_config()
+        return jsonify({"success": True, "message": f"Agent '{agent_id}' deleted"}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/set', methods=['POST'])
+def api_agent_set_active():
+    """Switch the active agent."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        data = request.get_json() or {}
+        agent_id = (data.get("agent_id") or "").strip()
+        if not agent_id:
+            return jsonify({"success": False, "error": "agent_id is required"}), 400
+        mgr = agent_config.get_agent_manager()
+        if not mgr.set_active_agent(agent_id):
+            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found or disabled"}), 404
+
+        # If agent has a configured model, apply it as the active model
+        # (user can still override via the cascade dropdowns)
+        agent = mgr.resolve_agent(agent_id)
+        if agent and agent.model_config.primary:
+            global AI_PROVIDER, AI_MODEL, SELECTED_MODEL, SELECTED_PROVIDER
+            ref = agent.model_config.primary
+            AI_PROVIDER = ref.provider
+            AI_MODEL = ref.model
+            SELECTED_PROVIDER = ref.provider
+            SELECTED_MODEL = ref.model
+            try:
+                save_runtime_selection(AI_PROVIDER, AI_MODEL)
+                initialize_ai_client()
+            except Exception:
+                pass
+            logger.info(f"Agent '{agent_id}' activated → model {ref.provider}/{ref.model}")
+
+        identity = mgr.resolve_identity(agent_id)
+        return jsonify({
+            "success": True,
+            "agent_id": agent_id,
+            "identity": {"name": identity.name, "emoji": identity.emoji},
+            "provider": AI_PROVIDER,
+            "model": AI_MODEL,
+        }), 200
+    except Exception as e:
+        logger.error(f"api_agent_set_active error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/channels', methods=['GET'])
+def api_agent_channels_get():
+    """Get channel → agent assignments (telegram, whatsapp, alexa…)."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        mgr = agent_config.get_agent_manager()
+        mapping = mgr.get_all_channel_agents()
+        # Enrich with agent identity for the UI
+        enriched = {}
+        for ch, aid in mapping.items():
+            identity = mgr.resolve_identity(aid)
+            enriched[ch] = {
+                "agent_id": aid,
+                "name": identity.name,
+                "emoji": identity.emoji,
+            }
+        return jsonify({
+            "success": True,
+            "channel_agents": enriched,
+            "available_channels": ["telegram", "whatsapp", "alexa"],
+        }), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/channels', methods=['PUT'])
+def api_agent_channels_set():
+    """Set channel → agent assignments.
+
+    Body: {"telegram": "agent_id_or_null", "whatsapp": "agent_id_or_null"}
+    Pass null/empty string to remove the assignment for a channel.
+    """
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        data = request.get_json() or {}
+        mgr = agent_config.get_agent_manager()
+        errors = []
+        for channel, agent_id in data.items():
+            channel = str(channel).strip().lower()
+            if not channel:
+                continue
+            aid = str(agent_id).strip() if agent_id else None
+            if not mgr.set_channel_agent(channel, aid or None):
+                errors.append(f"Agent '{aid}' not found or disabled for channel '{channel}'")
+        mgr.save_config()
+        mapping = mgr.get_all_channel_agents()
+        resp = {"success": True, "channel_agents": mapping}
+        if errors:
+            resp["warnings"] = errors
+        return jsonify(resp), 200
+    except Exception as e:
+        logger.error(f"api_agent_channels_set error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/defaults', methods=['GET'])
+def api_agent_defaults_get():
+    """Get global agent defaults."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        mgr = agent_config.get_agent_manager()
+        return jsonify({"success": True, "defaults": mgr.get_defaults().to_dict()}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/agents/defaults', methods=['PUT'])
+def api_agent_defaults_update():
+    """Update global agent defaults."""
+    if not AGENT_CONFIG_AVAILABLE:
+        return jsonify({"success": False, "error": "Agent system not available"}), 501
+    try:
+        data = request.get_json() or {}
+        mgr = agent_config.get_agent_manager()
+        updated = mgr.update_defaults(data)
+        mgr.save_config()
+        return jsonify({"success": True, "defaults": updated.to_dict()}), 200
+    except Exception as e:
+        logger.error(f"api_agent_defaults_update error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/catalog/stats', methods=['GET'])
+def api_catalog_stats():
+    """Get model catalog statistics."""
+    if not MODEL_CATALOG_AVAILABLE:
+        return jsonify({"success": False, "error": "Model catalog not available"}), 501
+    try:
+        cat = model_catalog.get_catalog()
+        return jsonify({"success": True, "catalog": cat.stats()}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/catalog/models', methods=['GET'])
+def api_catalog_models():
+    """Get all catalog models (optionally filtered by provider or capability)."""
+    if not MODEL_CATALOG_AVAILABLE:
+        return jsonify({"success": False, "error": "Model catalog not available"}), 501
+    try:
+        cat = model_catalog.get_catalog()
+        provider = request.args.get("provider")
+        capability = request.args.get("capability")
+        include_deprecated = request.args.get("include_deprecated", "false").lower() == "true"
+
+        entries = cat.get_all(provider, include_deprecated=include_deprecated)
+        if capability:
+            try:
+                cap_enum = model_catalog.ModelCapability[capability.upper()]
+                entries = [e for e in entries if cap_enum in e.capabilities]
+            except KeyError:
+                pass
+
+        result = []
+        for e in entries:
+            result.append({
+                "id": e.id,
+                "provider": e.provider,
+                "name": e.name or e.id,
+                "capabilities": [c.name.lower() for c in e.capabilities],
+                "context_window": e.context_window,
+                "max_output_tokens": e.max_output_tokens,
+                "reasoning": e.reasoning,
+                "pricing_tier": e.pricing_tier.value,
+                "deprecated": e.deprecated,
+            })
+        return jsonify({"success": True, "models": result, "count": len(result)}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/fallback/stats', methods=['GET'])
+def api_fallback_stats():
+    """Get model fallback system statistics (cooldowns, etc.)."""
+    if not MODEL_FALLBACK_AVAILABLE:
+        return jsonify({"success": False, "error": "Model fallback not available"}), 501
+    try:
+        stats = model_fallback.get_fallback_stats()
+        return jsonify({"success": True, "fallback": stats}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/fallback/clear', methods=['POST'])
+def api_fallback_clear():
+    """Clear all cooldowns in the model fallback system."""
+    if not MODEL_FALLBACK_AVAILABLE:
+        return jsonify({"success": False, "error": "Model fallback not available"}), 501
+    try:
+        provider = (request.get_json() or {}).get("provider")
+        if provider:
+            model_fallback.clear_cooldown(provider)
+            msg = f"Cooldown cleared for '{provider}'"
+        else:
+            model_fallback.clear_all_cooldowns()
+            msg = "All cooldowns cleared"
+        logger.info(f"Fallback: {msg}")
+        return jsonify({"success": True, "message": msg}), 200
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============ Voice Transcription Endpoints ============
@@ -5934,7 +6590,7 @@ def api_telegram_message():
         user_id = data.get("user_id")
         chat_id = data.get("chat_id")
         text = data.get("text", "").strip()
-        logger.info(f"Telegram API: message from user {user_id}: {text[:60]}")
+        logger.chat(f"📩 Telegram from user {user_id}: {text[:60]}")
 
         if not text:
             return jsonify({"status": "error", "message": "Empty message"}), 400
@@ -5942,7 +6598,8 @@ def api_telegram_message():
         # Get AI response — session history is already managed by chat_with_ai
         response_text = ""
         try:
-            response_text = chat_with_ai(text, f"telegram_{user_id}")
+            with _apply_channel_agent("telegram"):
+                response_text = chat_with_ai(text, f"telegram_{user_id}")
         except Exception as e:
             logger.error(f"Telegram AI response error: {e}")
             response_text = f"⚠️ Errore: {str(e)[:100]}"
@@ -6057,7 +6714,7 @@ def api_whatsapp_webhook():
         from_number = msg.get("from")
         text = msg.get("text")
         
-        logger.debug(f"WhatsApp message from {from_number}: {text[:50]}...")
+        logger.chat(f"📩 WhatsApp from {from_number}: {text[:50]}...")
 
         # Check if first message BEFORE adding to history
         mgr = get_messaging_manager()
@@ -6070,7 +6727,8 @@ def api_whatsapp_webhook():
         # session which already accumulates history; no need to inject "Recent context:"
         response_text = ""
         try:
-            response_text = chat_with_ai(text, f"whatsapp_{from_number}")
+            with _apply_channel_agent("whatsapp"):
+                response_text = chat_with_ai(text, f"whatsapp_{from_number}")
         except Exception as e:
             logger.error(f"WhatsApp AI response error: {e}")
             response_text = f"⚠️ Error: {str(e)[:100]}"
@@ -6240,7 +6898,7 @@ def api_alexa_webhook():
                     }.get(LANGUAGE, "What would you like to know?")
                     return jsonify(_alexa_response(prompt, end_session=False, reprompt=prompt)), 200
 
-                logger.info(f"[Alexa] AskAmiraIntent: {user_query[:80]}")
+                logger.chat(f"📩 [Alexa] AskAmiraIntent: {user_query[:80]}")
 
                 # Get AI response (voice_mode for concise answers)
                 try:
@@ -6255,7 +6913,7 @@ def api_alexa_webhook():
                     # Alexa has a 8000 char speech limit
                     if len(response_text) > 6000:
                         response_text = response_text[:6000] + "... Per il resto, puoi chiedermi di continuare."
-                    logger.info(f"[Alexa] Response ({len(response_text)} chars): {response_text[:200]}")
+                    logger.chat(f"📤 [Alexa] Response ({len(response_text)} chars): {response_text[:200]}")
                 except Exception as e:
                     logger.error(f"[Alexa] AI error: {e}")
                     response_text = "Mi dispiace, non sono riuscita a elaborare la risposta."
@@ -6599,8 +7257,6 @@ def api_get_models():
 
             # Live discovery for GitHub Copilot (models depend on subscription)
             # Live discovery for GitHub Copilot: use cache only on regular loads.
-            # The full network discovery (token + /models) runs exclusively via
-            # the manual "Refresh models" button (api/refresh_models endpoint).
             # This avoids automatic HTTP calls on every UI startup/reload.
             if provider == "github_copilot":
                 try:
@@ -6610,8 +7266,6 @@ def api_get_models():
                         filtered_models = live
                 except Exception as _e:
                     logger.debug(f"Copilot model discovery skipped: {_e}")
-                if GITHUB_COPILOT_MODEL_BLOCKLIST:
-                    filtered_models = [m for m in filtered_models if m not in GITHUB_COPILOT_MODEL_BLOCKLIST]
 
             # Live discovery for NVIDIA (per-key availability)
             if provider == "nvidia":
@@ -6626,8 +7280,6 @@ def api_get_models():
                 to_test = [m for m in filtered_models if m not in NVIDIA_MODEL_TESTED_OK]
                 filtered_models = tested_ok + to_test
 
-            if provider == "github" and GITHUB_MODEL_BLOCKLIST:
-                filtered_models = [m for m in filtered_models if m not in GITHUB_MODEL_BLOCKLIST]
             models_technical[provider] = list(filtered_models)
             # Use per-provider display mapping to avoid cross-provider conflicts
             prov_map = PROVIDER_DISPLAY.get(provider, {})
@@ -6658,6 +7310,46 @@ def api_get_models():
                 "is_current": tech_name == current_model_tech
             })
 
+        # --- Agent info for UI ---
+        agents_info = []
+        active_agent_id = None
+        active_agent_identity = None
+        if AGENT_CONFIG_AVAILABLE:
+            try:
+                mgr = agent_config.get_agent_manager()
+                agents_info = mgr.get_agents_for_api()
+                active = mgr.get_active_agent()
+                if active:
+                    active_agent_id = active.id
+                    active_agent_identity = {
+                        "name": active.identity.name,
+                        "emoji": active.identity.emoji,
+                        "description": active.identity.description or active.description,
+                    }
+            except Exception as _e:
+                logger.debug(f"Agent info for get_models: {_e}")
+
+        # --- Catalog capability badges per model ---
+        model_capabilities = {}
+        if MODEL_CATALOG_AVAILABLE:
+            try:
+                cat = model_catalog.get_catalog()
+                for prov_key in models_technical:
+                    for mid in models_technical[prov_key]:
+                        entry = cat.get_entry(prov_key, mid)
+                        if entry:
+                            model_capabilities[f"{prov_key}/{mid}"] = {
+                                "caps": [c.name.lower() for c in entry.capabilities
+                                         if c not in (model_catalog.ModelCapability.TEXT,
+                                                      model_catalog.ModelCapability.STREAMING)],
+                                "ctx": entry.context_window,
+                                "out": entry.max_output_tokens,
+                                "tier": entry.pricing_tier.value,
+                                "reasoning": entry.reasoning,
+                            }
+            except Exception as _e:
+                logger.debug(f"Catalog info for get_models: {_e}")
+
         return jsonify({
             "success": True,
 
@@ -6677,91 +7369,20 @@ def api_get_models():
             "current_model_technical": current_model_tech,
             "models_technical": models_technical,
             "available_providers": available_providers,
-            "available_models": available_models
+            "available_models": available_models,
+
+            # Agent system
+            "agents": agents_info,
+            "active_agent": active_agent_id,
+            "active_agent_identity": active_agent_identity,
+            "channel_agents": agent_config.get_agent_manager().get_all_channel_agents() if AGENT_CONFIG_AVAILABLE else {},
+
+            # Model catalog capabilities (keyed by "provider/model")
+            "model_capabilities": model_capabilities,
         }), 200
     except Exception as e:
         logger.error(f"api_get_models error: {e}")
         return jsonify({"success": False, "error": str(e), "models": {}, "available_providers": []}), 500
-
-
-@app.route('/api/refresh_models', methods=['POST'])
-def api_refresh_models():
-    """Fetch latest model lists from official provider APIs and update the cache.
-
-    Calls the /v1/models (or equivalent) endpoint for each configured provider,
-    filters out non-chat models, saves results to /data/amira_models_cache.json,
-    and updates the in-memory PROVIDER_MODELS dict so /api/get_models returns
-    the fresh lists immediately.
-    """
-    try:
-        from providers.model_fetcher import refresh_all_providers
-
-        provider_keys = {
-            "openai":      OPENAI_API_KEY,
-            "anthropic":   ANTHROPIC_API_KEY,
-            "google":      GOOGLE_API_KEY,
-            "groq":        GROQ_API_KEY,
-            "mistral":     MISTRAL_API_KEY,
-            "nvidia":      NVIDIA_API_KEY,
-            "deepseek":    DEEPSEEK_API_KEY,
-            "openrouter":  OPENROUTER_API_KEY,
-            "zhipu":       ZHIPU_API_KEY,
-            "siliconflow": SILICONFLOW_API_KEY,
-            "moonshot":    MOONSHOT_API_KEY,
-            "dashscope":   DASHSCOPE_API_KEY,
-            "minimax":     MINIMAX_API_KEY,
-            "aihubmix":    AIHUBMIX_API_KEY,
-            "volcengine":  VOLCENGINE_API_KEY,
-            "custom":      CUSTOM_API_KEY,
-            "ollama":      "",  # key-less, uses base URL
-        }
-        extra = {
-            "ollama_base_url": OLLAMA_BASE_URL,
-            "custom_api_base": CUSTOM_API_BASE,
-        }
-
-        results = refresh_all_providers(provider_keys, extra)
-
-        # Update in-memory model lists so the UI reflects the fresh data immediately
-        for provider, models in results["updated"].items():
-            PROVIDER_MODELS[provider] = models
-
-        # GitHub Copilot: full live discovery (token + /models) runs ONLY here,
-        # triggered by the manual refresh button — never on automatic get_models calls.
-        if os.path.exists("/data/oauth_copilot.json"):
-            try:
-                from providers.github_copilot import (
-                    _fetch_models_from_api,
-                    _get_copilot_session_token,
-                    _get_best_gh_token,
-                )
-                gh_tok = _get_best_gh_token(GITHUB_COPILOT_TOKEN)
-                if gh_tok:
-                    session_tok = _get_copilot_session_token(gh_tok)
-                    copilot_models = _fetch_models_from_api(session_tok)
-                    if copilot_models:
-                        PROVIDER_MODELS["github_copilot"] = copilot_models
-                        results["updated"]["github_copilot"] = copilot_models
-                        logger.info(f"refresh_models: github_copilot discovered {len(copilot_models)} models")
-            except Exception as _ce:
-                logger.debug(f"refresh_models: github_copilot discovery failed: {_ce}")
-                results["errors"]["github_copilot"] = str(_ce)
-
-        logger.info(
-            f"refresh_models: updated={list(results['updated'].keys())} "
-            f"errors={list(results['errors'].keys())} "
-            f"skipped={results['skipped']}"
-        )
-        return jsonify({
-            "success": True,
-            "updated": {p: len(m) for p, m in results["updated"].items()},
-            "errors":  results["errors"],
-            "skipped": results["skipped"],
-        }), 200
-
-    except Exception as e:
-        logger.error(f"refresh_models error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @app.route('/api/snapshots/restore', methods=['POST'])
@@ -6840,14 +7461,14 @@ def api_download_snapshot(snapshot_id):
             except Exception:
                 pass
 
-        # Generate download filename: original_name.YYYYMMDD_HHMMSS.bak
-        # E.g.: automations.yaml.20260220_143022.bak
+        # Generate download filename: original_name.YYYYMMDD_HHMMSS.ext
+        # E.g.: automations.20260220_143022.yaml
         base_name = os.path.basename(original_filename)
         if "." in base_name:
             name_parts = base_name.rsplit(".", 1)
-            dl_filename = f"{name_parts[0]}.{timestamp}.bak"
+            dl_filename = f"{name_parts[0]}.{timestamp}.{name_parts[1]}"
         else:
-            dl_filename = f"{base_name}.{timestamp}.bak"
+            dl_filename = f"{base_name}.{timestamp}"
 
         logger.info(f"Snapshot download: {snapshot_id} as {dl_filename}")
         return send_file(
@@ -7730,6 +8351,47 @@ def rag_stats():
         return jsonify({"error": str(e)}), 500
 
 
+# ---------------------------------------------------------------------------
+# Usage / cost tracking endpoints (inspired by OpenClaw)
+# ---------------------------------------------------------------------------
+
+@app.route("/api/usage_stats", methods=["GET"])
+def usage_stats():
+    """Return usage statistics (daily, by model, by provider).
+
+    Query params:
+        days (int): number of days to include (default 30)
+    """
+    try:
+        from usage_tracker import get_tracker
+        days = request.args.get("days", 30, type=int)
+        return jsonify(get_tracker().get_summary(days)), 200
+    except Exception as e:
+        logger.error(f"Usage stats error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/usage_stats/today", methods=["GET"])
+def usage_stats_today():
+    """Return today's usage totals."""
+    try:
+        from usage_tracker import get_tracker
+        return jsonify(get_tracker().get_today()), 200
+    except Exception as e:
+        logger.error(f"Usage stats today error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/usage_stats/reset", methods=["POST"])
+def usage_stats_reset():
+    """Clear all accumulated usage data."""
+    try:
+        from usage_tracker import get_tracker
+        get_tracker().reset()
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        logger.error(f"Usage stats reset error: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
@@ -8016,6 +8678,77 @@ def initialize_mcp() -> None:
         logger.warning(f"⚠️ MCP initialization error: {e}")
 
 
+# ===== CONFIG FILE EDITOR API =====
+
+@app.route('/api/config/read', methods=['GET'])
+def api_config_read():
+    """Read a whitelisted config file for the in-app editor."""
+    filepath = (request.args.get("file") or "").strip()
+    if not filepath or filepath not in CONFIG_EDITABLE_FILES:
+        return jsonify({"success": False, "error": "File not accessible"}), 403
+
+    full_path = os.path.join(HA_CONFIG_DIR, filepath)
+    if not os.path.isfile(full_path):
+        return jsonify({"success": True, "file": filepath, "content": "", "exists": False})
+
+    try:
+        with open(full_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        return jsonify({"success": True, "file": filepath, "content": content, "exists": True, "size": len(content)})
+    except Exception as e:
+        logger.error(f"api_config_read error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/config/save', methods=['POST'])
+def api_config_save():
+    """Save content to a whitelisted config file."""
+    global CUSTOM_SYSTEM_PROMPT
+
+    data = request.get_json() or {}
+    filepath = (data.get("file") or "").strip()
+    content = data.get("content")
+
+    if content is None:
+        return jsonify({"success": False, "error": "content is required"}), 400
+    if not filepath:
+        return jsonify({"success": False, "error": "file path is required"}), 400
+
+    # Security: only allow whitelisted files
+    if filepath not in CONFIG_EDITABLE_FILES:
+        return jsonify({"success": False, "error": f"File '{filepath}' is not editable"}), 403
+
+    # Validate JSON for .json files
+    if filepath.endswith(".json") and content.strip():
+        try:
+            json.loads(content)
+        except json.JSONDecodeError as e:
+            return jsonify({"success": False, "error": f"Invalid JSON: {e}"}), 400
+
+    # Size guard
+    if len(content) > 500_000:
+        return jsonify({"success": False, "error": "Content too large (max 500KB)"}), 413
+
+    full_path = os.path.join(HA_CONFIG_DIR, filepath)
+    try:
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        with open(full_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # Post-save hooks
+        if filepath == "amira/agents.json":
+            load_agents_config()
+        elif filepath == "amira/custom_system_prompt.txt":
+            loaded = _load_custom_system_prompt_from_disk()
+            CUSTOM_SYSTEM_PROMPT = loaded
+
+        logger.info(f"Config file saved: {filepath} ({len(content)} chars)")
+        return jsonify({"success": True, "file": filepath, "size": len(content)})
+    except Exception as e:
+        logger.error(f"api_config_save error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
     _OAUTH_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web"}
@@ -8043,7 +8776,7 @@ if __name__ == "__main__":
     # MCP initialization is handled by initialize_mcp() called from server.py
     pass
 
-    # Initialize fallback chain if available
+    # Initialize fallback chain if available (legacy provider-level)
     if FALLBACK_AVAILABLE:
         try:
             provider_order = [AI_PROVIDER]  # Primary provider
@@ -8064,6 +8797,38 @@ if __name__ == "__main__":
                 logger.info(f"🔄 Fallback chain: {' → '.join(available_providers[:3])}")
         except Exception as e:
             logger.warning(f"Fallback chain initialization: {e}")
+
+    # Initialize Model Catalog (OpenClaw-style)
+    if MODEL_CATALOG_AVAILABLE:
+        try:
+            cat = model_catalog.get_catalog()
+            cat_stats = cat.stats()
+            logger.info(f"📚 Model Catalog: {cat_stats['total_models']} models, "
+                        f"{cat_stats['vision_models']} vision, "
+                        f"{cat_stats['reasoning_models']} reasoning, "
+                        f"{cat_stats['tool_use_models']} tool_use")
+        except Exception as e:
+            logger.warning(f"Model catalog initialization: {e}")
+
+    # Initialize Agent Config (OpenClaw-style)
+    if AGENT_CONFIG_AVAILABLE:
+        try:
+            mgr = agent_config.get_agent_manager()
+            mgr_stats = mgr.stats()
+            active = mgr.get_active_agent()
+            active_name = active.identity.name if active else "none"
+            logger.info(f"🤖 Agent Manager: {mgr_stats['enabled_agents']} agents, "
+                        f"active='{active_name}'")
+            # Sync agent identity with global AGENT_NAME/AGENT_AVATAR
+            if active:
+                AGENT_NAME = active.identity.name
+                AGENT_AVATAR = active.identity.emoji
+        except Exception as e:
+            logger.warning(f"Agent config initialization: {e}")
+
+    # Initialize Model Fallback (OpenClaw-style)
+    if MODEL_FALLBACK_AVAILABLE:
+        logger.info("⚡ Model Fallback engine ready (per-model cooldowns + probe)")
     
     # Initialize semantic cache if available
     if SEMANTIC_CACHE_AVAILABLE:

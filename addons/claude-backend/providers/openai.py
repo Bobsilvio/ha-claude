@@ -81,9 +81,22 @@ class OpenAIProvider(EnhancedProvider):
         _timeout = _httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
         client = _OpenAI(api_key=self.api_key, timeout=_timeout, max_retries=0)
         stream = client.chat.completions.create(
-            model=model, messages=messages, stream=True
+            model=model, messages=messages, stream=True,
+            stream_options={"include_usage": True},
         )
+        captured_usage = None
         for chunk in stream:
+            # Capture usage from the final chunk (empty choices, usage populated)
+            if getattr(chunk, "usage", None):
+                u = chunk.usage
+                captured_usage = {
+                    "input_tokens": getattr(u, "prompt_tokens", 0) or 0,
+                    "output_tokens": getattr(u, "completion_tokens", 0) or 0,
+                }
+                # OpenAI nests cache info in prompt_tokens_details
+                ptd = getattr(u, "prompt_tokens_details", None)
+                if ptd:
+                    captured_usage["cache_read_tokens"] = getattr(ptd, "cached_tokens", 0) or 0
             if not chunk.choices:
                 continue
             delta = chunk.choices[0].delta
@@ -92,7 +105,10 @@ class OpenAIProvider(EnhancedProvider):
                 yield {"type": "text", "text": content}
             finish = chunk.choices[0].finish_reason
             if finish:
-                yield {"type": "done", "finish_reason": finish}
+                done_event: dict = {"type": "done", "finish_reason": finish}
+                if captured_usage:
+                    done_event["usage"] = captured_usage
+                yield done_event
 
     def get_available_models(self) -> List[str]:
         """Return list of available OpenAI models."""

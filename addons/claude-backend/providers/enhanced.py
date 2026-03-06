@@ -61,6 +61,7 @@ class EnhancedProvider(BaseProvider):
     DEFAULT_MODEL: str = ""   # Fallback model when self.model is empty
     INCLUDE_USAGE: bool = True  # Set False if provider rejects stream_options
     EXTRA_HEADERS: Dict[str, str] = {}  # Additional HTTP headers
+    MAX_TOKENS: int = 4096    # Default max output tokens (override per-provider)
 
     def __init__(self, api_key: str = "", model: str = ""):
         """Initialize enhanced provider."""
@@ -161,28 +162,11 @@ class EnhancedProvider(BaseProvider):
         Used by OpenAI-compatible providers (Mistral, Groq, DeepSeek, …) that call
         _openai_compat_stream directly and have no separate system-prompt parameter.
         For web providers (claude_web, chatgpt_web) this is handled inside stream_chat.
-        """
-        intent_name = (intent_info or {}).get("intent", "")
 
-        if intent_name == "create_html_dashboard":
-            system_text = (
-                "You are a creative Home Assistant HTML dashboard designer.\n"
-                "The user wants a UNIQUE, beautiful STANDALONE HTML page — NOT YAML, NOT a Lovelace card.\n\n"
-                "MANDATORY RULES — VIOLATION IS NOT ALLOWED:\n"
-                "• Output a COMPLETE <!DOCTYPE html>...</html> page wrapped in ```html ... ```\n"
-                "• YOUR FIRST LINE OF OUTPUT MUST BE: ```html\n"
-                "• NEVER output YAML, 'vertical-stack', 'type: entities', 'type: custom:', "
-                "  or ANY Lovelace / Home Assistant card format\n"
-                "• Do NOT produce JSON, markdown lists, or explanatory text — ONLY the HTML block\n"
-                "• Use a modern dark design with CSS animations, gradients, and card-based layout\n"
-                "• Poll HA states via: fetch('/api/states/ENTITY_ID', {headers:{Authorization:'Bearer '+tok}})\n"
-                "  where tok = JSON.parse(localStorage.getItem('hassTokens')||'{}').access_token || ''\n"
-                "• Refresh every 5 seconds with setInterval\n"
-                "• Include ALL the entity_ids provided in the CONTEXT section of the user message\n"
-                "• The HTML is automatically saved — no tool call, no explanation needed\n"
-            )
-        else:
-            system_text = (intent_info or {}).get("prompt", "")
+        The prompt text comes from intent_info["prompt"], which is set by
+        INTENT_PROMPTS in intent.py — including the create_html_dashboard prompt.
+        """
+        system_text = (intent_info or {}).get("prompt", "")
 
         if not system_text:
             return messages
@@ -247,6 +231,7 @@ class EnhancedProvider(BaseProvider):
             tools=tools,
             extra_headers=self.EXTRA_HEADERS or None,
             include_usage=self.INCLUDE_USAGE,
+            max_tokens=self.MAX_TOKENS,
         )
 
     @staticmethod
@@ -267,6 +252,7 @@ class EnhancedProvider(BaseProvider):
         tools: Optional[List[Dict[str, Any]]] = None,
         extra_headers: Optional[Dict[str, str]] = None,
         include_usage: bool = True,
+        max_tokens: Optional[int] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """Shared streaming helper for OpenAI-compatible REST APIs.
 
@@ -291,6 +277,15 @@ class EnhancedProvider(BaseProvider):
             "messages": messages,
             "stream": True,
         }
+        if max_tokens:
+            # Newer reasoning models (o1, o3, o4, GPT-5) require
+            # 'max_completion_tokens' instead of 'max_tokens'.
+            _NEW_PARAM_MODELS = ("o1", "o3", "o4", "gpt-5", "grok-3")
+            _model_lower = model.lower()
+            if any(m in _model_lower for m in _NEW_PARAM_MODELS):
+                body["max_completion_tokens"] = max_tokens
+            else:
+                body["max_tokens"] = max_tokens
         if include_usage:
             body["stream_options"] = {"include_usage": True}
         if tools:
@@ -299,6 +294,11 @@ class EnhancedProvider(BaseProvider):
         captured_usage: Optional[Dict[str, Any]] = None
         # Accumulate streaming tool_call fragments keyed by index
         accumulated_tool_calls: Dict[int, Dict[str, Any]] = {}
+        # Track the real finish_reason from the choices chunk (may arrive
+        # before the usage-only chunk), so we can emit ONE done event
+        # at [DONE] time with both usage and the correct finish_reason.
+        final_finish_reason: Optional[str] = None
+        _done_emitted = False
         # connect=10s: fallisce subito se il server non risponde
         # read=120s: i modelli grandi (DeepSeek, Llama 405B) sono lenti ma streamano
         # pool/write standard
@@ -313,11 +313,15 @@ class EnhancedProvider(BaseProvider):
                 data_str = line[5:].strip()
                 if not data_str or data_str == "[DONE]":
                     if data_str == "[DONE]":
-                        done_event: Dict[str, Any] = {"type": "done", "finish_reason": "stop"}
+                        done_event: Dict[str, Any] = {
+                            "type": "done",
+                            "finish_reason": final_finish_reason or "stop",
+                        }
                         if captured_usage:
                             done_event["usage"] = captured_usage
                         if accumulated_tool_calls:
                             done_event["tool_calls"] = list(accumulated_tool_calls.values())
+                        _done_emitted = True
                         yield done_event
                     continue
                 try:
@@ -366,56 +370,31 @@ class EnhancedProvider(BaseProvider):
                         yield {"type": "text", "text": content}
                     finish = choice.get("finish_reason")
                     if finish:
-                        done_event = {"type": "done", "finish_reason": finish}
-                        if captured_usage:
-                            done_event["usage"] = captured_usage
-                        if finish == "tool_calls" and accumulated_tool_calls:
-                            done_event["tool_calls"] = list(accumulated_tool_calls.values())
-                        yield done_event
+                        # Save the finish_reason but do NOT yield done yet.
+                        # The usage-only chunk often arrives AFTER this chunk,
+                        # and api.py only processes the first done event.
+                        # We'll emit the combined done at [DONE] time.
+                        final_finish_reason = finish
                 except json.JSONDecodeError:
                     continue
+            # If the stream ended without a [DONE] sentinel (some providers
+            # just close the connection), emit the done event here so the
+            # UI gets a proper end-of-stream signal.
+            if not _done_emitted and final_finish_reason:
+                done_event = {
+                    "type": "done",
+                    "finish_reason": final_finish_reason,
+                }
+                if captured_usage:
+                    done_event["usage"] = captured_usage
+                if final_finish_reason == "tool_calls" and accumulated_tool_calls:
+                    done_event["tool_calls"] = list(accumulated_tool_calls.values())
+                yield done_event
 
     def _should_retry_error(self, error_msg: str) -> bool:
-        """Determine if error is retryable.
-        
-        Retryable errors:
-        - Rate limits (429)
-        - Timeouts
-        - Server errors (5xx)
-        - Temporary network issues
-        
-        Non-retryable:
-        - Auth errors (401, 403)
-        - Invalid requests (400)
-        - Quota exceeded
-        """
-        msg = (error_msg or "").lower()
-
-        # Never retry auth/billing/config errors (permanent failures)
-        if (
-            self._is_auth_error(msg)
-            or "insufficient_quota" in msg
-            or "exceeded your current quota" in msg
-            or "quota esaurita" in msg
-            or "resource_exhausted" in msg
-            or "billing" in msg
-            or "invalid" in msg
-            or "not found" in msg
-        ):
-            return False
-
-        # Retry transient errors
-        if (
-            self._is_rate_limit_error(msg)
-            or "timeout" in msg
-            or "connection" in msg
-            or "500" in msg
-            or "502" in msg
-            or "503" in msg
-        ):
-            return True
-
-        return False
+        """Determine if error is retryable via centralized ErrorTranslator."""
+        from .error_handler import ErrorTranslator
+        return ErrorTranslator.is_retryable(error_msg or "", provider=self.name)
 
     def _record_cache_usage(self, usage: Dict[str, Any], intent_name: str):
         """Record cache usage statistics."""
@@ -501,42 +480,3 @@ class EnhancedProvider(BaseProvider):
         self.last_error_time = 0.0
         logger.info(f"{self.name}: Statistics reset")
 
-    # Error translation methods for common providers
-    @staticmethod
-    def get_error_translations() -> Dict[str, Dict[str, str]]:
-        """Get provider-specific error translations.
-        
-        Override in subclasses for provider-specific translations.
-        """
-        return {
-            "auth": {
-                "en": "Authentication failed. Check your API key.",
-                "it": "Autenticazione fallita. Controlla la tua API key.",
-                "es": "Fallo en la autenticación. Verifica tu clave de API.",
-                "fr": "L'authentification a échoué. Vérifiez votre clé API.",
-            },
-            "rate_limit": {
-                "en": "Rate limit exceeded. Please retry in a moment.",
-                "it": "Limite di velocità superato. Riprova tra poco.",
-                "es": "Límite de velocidad excedido. Reintenta en un momento.",
-                "fr": "Limite de débit dépassée. Réessayez dans un moment.",
-            },
-            "quota": {
-                "en": "Usage quota exceeded. Upgrade your plan or retry later.",
-                "it": "Quota di utilizzo superata. Aggiorna il tuo piano o riprova più tardi.",
-                "es": "Cuota de uso excedida. Actualiza tu plan o reintenta más tarde.",
-                "fr": "Quota d'utilisation dépassé. Mettez à jour votre plan ou réessayez plus tard.",
-            },
-            "server_error": {
-                "en": "Server error. Please retry.",
-                "it": "Errore del server. Riprova.",
-                "es": "Error del servidor. Reintenta.",
-                "fr": "Erreur du serveur. Réessayez.",
-            },
-            "invalid_request": {
-                "en": "Invalid request. Check your input.",
-                "it": "Richiesta non valida. Controlla il tuo input.",
-                "es": "Solicitud no válida. Verifica tu entrada.",
-                "fr": "Demande invalide. Vérifiez votre saisie.",
-            },
-        }

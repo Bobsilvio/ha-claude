@@ -100,6 +100,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "messages_count": "messages",
             "load_error": "Error loading conversations",
             "back_to_chat": "Back to chat",
+            "channel_agents": "Channel Agents",
+            "channel_default": "Default (active)",
+            "channel_telegram": "Telegram",
+            "channel_whatsapp": "WhatsApp",
+            "channel_saved": "Saved",
         },
         "it": {
             "placeholder": "Chiedi qualcosa su questa pagina...",
@@ -168,6 +173,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "messages_count": "messaggi",
             "load_error": "Errore nel caricamento conversazioni",
             "back_to_chat": "Torna alla chat",
+            "channel_agents": "Agent per canale",
+            "channel_default": "Predefinito (attivo)",
+            "channel_telegram": "Telegram",
+            "channel_whatsapp": "WhatsApp",
+            "channel_saved": "Salvato",
         },
         "es": {
             "placeholder": "Pregunta sobre esta página...",
@@ -236,6 +246,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "messages_count": "mensajes",
             "load_error": "Error al cargar conversaciones",
             "back_to_chat": "Volver al chat",
+            "channel_agents": "Agentes por canal",
+            "channel_default": "Predeterminado (activo)",
+            "channel_telegram": "Telegram",
+            "channel_whatsapp": "WhatsApp",
+            "channel_saved": "Guardado",
         },
         "fr": {
             "placeholder": "Posez une question sur cette page...",
@@ -304,6 +319,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
             "messages_count": "messages",
             "load_error": "Erreur de chargement des conversations",
             "back_to_chat": "Retour au chat",
+            "channel_agents": "Agents par canal",
+            "channel_default": "Par d\u00e9faut (actif)",
+            "channel_telegram": "Telegram",
+            "channel_whatsapp": "WhatsApp",
+            "channel_saved": "Enregistr\u00e9",
         },
     }
 
@@ -1351,9 +1371,24 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         <div class="history-list" id="haHistoryList"></div>
       </div>
       <div class="agent-bar" id="haAgentBar">
-        <label>Agent:</label>
+        <select id="haAgentSelect" style="display:none"></select>
         <select id="haProviderSelect"></select>
         <select id="haModelSelect"></select>
+        <button id="haChannelAgentsBtn" title="${{T.channel_agents}}" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;line-height:1;flex-shrink:0;opacity:0.6;">&#9881;</button>
+      </div>
+      <div id="haChannelAgentsPanel" style="display:none;padding:8px 12px;border-bottom:1px solid var(--divider-color,#e0e0e0);background:var(--secondary-background-color,#f5f5f5);flex-shrink:0;">
+        <div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--primary-text-color,#333);">&#128225; ${{T.channel_agents}}</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--secondary-text-color,#666);flex:1;min-width:140px;">
+            ${{T.channel_telegram}}
+            <select id="haChannelTelegramAgent" style="flex:1;font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--divider-color,#ddd);background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);cursor:pointer;min-width:80px;"></select>
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--secondary-text-color,#666);flex:1;min-width:140px;">
+            ${{T.channel_whatsapp}}
+            <select id="haChannelWhatsappAgent" style="flex:1;font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--divider-color,#ddd);background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);cursor:pointer;min-width:80px;"></select>
+          </label>
+        </div>
+        <div id="haChannelAgentsSaved" style="display:none;font-size:10px;color:#4caf50;margin-top:4px;">&#10003; ${{T.channel_saved}}</div>
       </div>
       <div class="context-bar" id="haChatContext" style="display:none;"></div>
       <div class="quick-actions" id="haQuickActions" style="display:none;"></div>
@@ -1397,6 +1432,12 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   const historyCloseBtn = document.getElementById('haHistoryClose');
   const providerSelect = document.getElementById('haProviderSelect');
   const modelSelect = document.getElementById('haModelSelect');
+  const agentSelect = document.getElementById('haAgentSelect');
+  const channelAgentsBtn = document.getElementById('haChannelAgentsBtn');
+  const channelAgentsPanel = document.getElementById('haChannelAgentsPanel');
+  const channelTelegramSel = document.getElementById('haChannelTelegramAgent');
+  const channelWhatsappSel = document.getElementById('haChannelWhatsappAgent');
+  const channelSavedMsg = document.getElementById('haChannelAgentsSaved');
 
   let isOpen = false;
   let isStreaming = false;
@@ -1788,7 +1829,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       }} else {{
         removeCardEditorButton();
         _cardBtnInjected = false;
-        restoreScrim();  // re-enable scrim pointer-events when editor closes
       }}
     }}
     // Re-inject button if editor open but button disappeared (HA re-rendered)
@@ -1813,6 +1853,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   let _cardMsgsEl  = null;
   let _cardInputEl = null;
   let _cardPanelEl = null;
+  let _cardProvSel   = null;  // card panel provider select mirror
+  let _cardModSel    = null;  // card panel model select mirror
+  let _cardAgentSel  = null;  // card panel agent select mirror
 
   function _cardBtnExists() {{
     return !!(_cardBtnParent && _cardBtnParent.querySelector('#' + CARD_BTN_ID));
@@ -1889,6 +1932,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     const hdrTitle = document.createElement('span');
     hdrTitle.textContent = '🤖 Amira';
     hdrTitle.style.cssText = 'font-weight:600;font-size:13px;white-space:nowrap;';
+    // Agent select — mirrors haAgentSelect
+    const _mainAgentSel = document.getElementById('haAgentSelect');
+    const cardAgentSel = document.createElement('select');
+    cardAgentSel.style.cssText = 'font-size:11px;padding:2px 4px;border-radius:4px;border:none;background:rgba(255,255,255,0.2);color:#fff;cursor:pointer;max-width:130px;min-width:0;flex-shrink:1;';
+    if (_mainAgentSel && _mainAgentSel.style.display !== 'none' && _mainAgentSel.options.length) {{
+      Array.from(_mainAgentSel.options).forEach(o => {{
+        const opt = document.createElement('option');
+        opt.value = o.value; opt.textContent = o.textContent;
+        if (o.selected) opt.selected = true;
+        cardAgentSel.appendChild(opt);
+      }});
+      cardAgentSel.addEventListener('change', () => {{ _mainAgentSel.value = cardAgentSel.value; _mainAgentSel.dispatchEvent(new Event('change')); }});
+    }} else {{
+      cardAgentSel.style.display = 'none';
+    }}
     // Provider select — mirrors haProviderSelect
     const _mainProvSel = document.getElementById('haProviderSelect');
     const _mainModSel  = document.getElementById('haModelSelect');
@@ -1919,6 +1977,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     hdrClose.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:0 4px;line-height:1;margin-left:auto;';
     hdrClose.onclick = closeCardPanel;
     hdr.appendChild(hdrTitle);
+    if (_mainAgentSel && _mainAgentSel.style.display !== 'none' && _mainAgentSel.options.length) hdr.appendChild(cardAgentSel);
     if (_mainProvSel && _mainProvSel.options.length) hdr.appendChild(cardProvSel);
     if (_mainModSel  && _mainModSel.options.length)  hdr.appendChild(cardModSel);
     hdr.appendChild(hdrClose);
@@ -1967,6 +2026,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     _cardPanelEl = panel;
     _cardMsgsEl  = msgs;
     _cardInputEl = inp;
+    _cardProvSel   = cardProvSel;
+    _cardModSel    = cardModSel;
+    _cardAgentSel  = cardAgentSel;
     _cardPanelOpen = true;
     setTimeout(() => inp.focus(), 50);
   }}
@@ -1985,6 +2047,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     _cardPanelEl = null;
     _cardMsgsEl  = null;
     _cardInputEl = null;
+    _cardProvSel   = null;
+    _cardModSel    = null;
+    _cardAgentSel  = null;
     _cardPanelOpen = false;
   }}
 
@@ -2028,6 +2093,23 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         return;
       }}
       if (thinkEl) thinkEl.innerHTML = _renderInlineMd(data.response || data.error || '?');
+      // Show cost if returned by API
+      if (thinkEl && data.usage && (data.usage.input_tokens || data.usage.output_tokens)) {{
+        const u = data.usage;
+        const inp = (u.input_tokens || 0).toLocaleString();
+        const out = (u.output_tokens || 0).toLocaleString();
+        let usageTxt = inp + ' in / ' + out + ' out';
+        if (u.cost !== undefined && u.cost > 0) {{
+          const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+          usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+        }} else if (u.cost === 0) {{
+          usageTxt += ' \u2022 free';
+        }}
+        const uDiv = document.createElement('div');
+        uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
+        uDiv.textContent = usageTxt;
+        thinkEl.appendChild(uDiv);
+      }}
     }} catch(e) {{
       console.error('[Amira card panel] send error:', e);
       if (thinkEl) thinkEl.textContent = T.error_connection + ' (' + e.message + ')';
@@ -2671,16 +2753,38 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         // Flush any remaining buffer data on stream close
         if (done) {{
           if (buffer.trim()) {{
+            let _flushUsage = null;
             for (const line of buffer.split('\\n')) {{
               if (!line.startsWith('data: ')) continue;
               try {{
                 const evt = JSON.parse(line.slice(6));
                 if (evt.type === 'token') {{ assistantText += evt.content || ''; }}
-                else if (evt.type === 'done' && evt.full_text) {{ assistantText = evt.full_text; }}
+                else if (evt.type === 'done') {{
+                  if (evt.full_text) {{ assistantText = evt.full_text; }}
+                  if (evt.usage) {{ _flushUsage = evt.usage; }}
+                }}
               }} catch(e) {{}}
             }}
             if (assistantText) {{
+              assistantEl.style.display = '';
               assistantEl.innerHTML = renderMarkdown(assistantText);
+            }}
+            // Show cost from buffered done event
+            if (_flushUsage && (_flushUsage.input_tokens || _flushUsage.output_tokens)) {{
+              const u = _flushUsage;
+              const inp = (u.input_tokens || 0).toLocaleString();
+              const out = (u.output_tokens || 0).toLocaleString();
+              let usageTxt = inp + ' in / ' + out + ' out';
+              if (u.cost !== undefined && u.cost > 0) {{
+                const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+              }} else if (u.cost === 0) {{
+                usageTxt += ' \u2022 free';
+              }}
+              const uDiv = document.createElement('div');
+              uDiv.className = 'msg-usage';
+              uDiv.textContent = usageTxt;
+              assistantEl.appendChild(uDiv);
             }}
           }}
           break;
@@ -2958,6 +3062,81 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }};
   }}
 
+  // ---- Channel Agents Panel ----
+  let _channelAgentsVisible = false;
+
+  function _populateChannelAgentSelect(sel, agents, currentAgentId) {{
+    if (!sel) return;
+    sel.innerHTML = '';
+    const defOpt = document.createElement('option');
+    defOpt.value = '';
+    defOpt.textContent = T.channel_default;
+    sel.appendChild(defOpt);
+    if (Array.isArray(agents)) {{
+      agents.forEach(a => {{
+        const opt = document.createElement('option');
+        opt.value = a.id;
+        const ident = a.identity || {{}};
+        opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
+        if (a.id === currentAgentId) opt.selected = true;
+        sel.appendChild(opt);
+      }});
+    }}
+  }}
+
+  async function _loadChannelAgents() {{
+    try {{
+      const resp = await fetch(API_BASE + '/api/agents/channels', {{credentials:'same-origin'}});
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (!data.success) return;
+      const mapping = data.channel_agents || {{}};
+      const agents = agentData ? (agentData.agents || []) : [];
+      _populateChannelAgentSelect(channelTelegramSel, agents, (mapping.telegram || {{}}).agent_id || '');
+      _populateChannelAgentSelect(channelWhatsappSel, agents, (mapping.whatsapp || {{}}).agent_id || '');
+      // Show/hide gear button based on whether we have multiple agents
+      if (channelAgentsBtn) {{
+        channelAgentsBtn.style.display = agents.length >= 2 ? '' : 'none';
+      }}
+    }} catch(e) {{
+      console.warn('[Amira] Channel agents load error:', e);
+    }}
+  }}
+
+  async function _saveChannelAgent(channel, agentId) {{
+    try {{
+      const body = {{}};
+      body[channel] = agentId || null;
+      await fetch(API_BASE + '/api/agents/channels', {{
+        method: 'PUT',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify(body),
+        credentials: 'same-origin',
+      }});
+      if (channelSavedMsg) {{
+        channelSavedMsg.style.display = '';
+        setTimeout(() => {{ if (channelSavedMsg) channelSavedMsg.style.display = 'none'; }}, 2000);
+      }}
+    }} catch(e) {{
+      console.warn('[Amira] Channel agent save error:', e);
+    }}
+  }}
+
+  if (channelAgentsBtn) {{
+    channelAgentsBtn.addEventListener('click', () => {{
+      _channelAgentsVisible = !_channelAgentsVisible;
+      if (channelAgentsPanel) channelAgentsPanel.style.display = _channelAgentsVisible ? '' : 'none';
+      channelAgentsBtn.style.opacity = _channelAgentsVisible ? '1' : '0.6';
+      if (_channelAgentsVisible) _loadChannelAgents();
+    }});
+  }}
+  if (channelTelegramSel) {{
+    channelTelegramSel.addEventListener('change', () => _saveChannelAgent('telegram', channelTelegramSel.value));
+  }}
+  if (channelWhatsappSel) {{
+    channelWhatsappSel.addEventListener('change', () => _saveChannelAgent('whatsapp', channelWhatsappSel.value));
+  }}
+
   // ---- Agent/Provider Selector ----
   let agentData = null; // cached response from /api/get_models
   let _syncProvider = '';  // last known provider (for cross-UI polling)
@@ -2969,6 +3148,22 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (!resp.ok) return;
       agentData = await resp.json();
       if (!agentData.success) return;
+
+      // Populate agent select if agents available
+      if (agentSelect && Array.isArray(agentData.agents) && agentData.agents.length >= 1) {{
+        agentSelect.innerHTML = '';
+        agentData.agents.forEach(a => {{
+          const opt = document.createElement('option');
+          opt.value = a.id;
+          const ident = a.identity || {{}};
+          opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
+          if (agentData.active_agent && a.id === agentData.active_agent) opt.selected = true;
+          agentSelect.appendChild(opt);
+        }});
+        agentSelect.style.display = '';
+      }} else if (agentSelect) {{
+        agentSelect.style.display = 'none';
+      }}
 
       // Populate provider select — web providers always last with warning label
       providerSelect.innerHTML = '';
@@ -2985,9 +3180,36 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 
       // Populate models for current provider
       populateModels(agentData.current_provider);
+      // Sync card-panel provider mirror (if open)
+      if (_cardProvSel) {{
+        _cardProvSel.innerHTML = '';
+        Array.from(providerSelect.options).forEach(o => {{
+          const c = document.createElement('option');
+          c.value = o.value; c.textContent = o.textContent;
+          if (o.selected) c.selected = true;
+          _cardProvSel.appendChild(c);
+        }});
+      }}
+      // Sync card-panel agent mirror (if open)
+      if (_cardAgentSel) {{
+        if (agentSelect && agentSelect.style.display !== 'none' && agentSelect.options.length) {{
+          _cardAgentSel.innerHTML = '';
+          Array.from(agentSelect.options).forEach(o => {{
+            const c = document.createElement('option');
+            c.value = o.value; c.textContent = o.textContent;
+            if (o.selected) c.selected = true;
+            _cardAgentSel.appendChild(c);
+          }});
+          _cardAgentSel.style.display = '';
+        }} else {{
+          _cardAgentSel.style.display = 'none';
+        }}
+      }}
       // Track for cross-UI sync polling
       _syncProvider = agentData.current_provider || '';
       _syncModel    = agentData.current_model_technical || '';
+      // Refresh channel agents dropdown (needs agentData.agents)
+      _loadChannelAgents();
     }} catch(e) {{
       console.warn('[Amira] Could not load agents:', e);
     }}
@@ -3005,6 +3227,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       if (tech === agentData.current_model_technical) opt.selected = true;
       modelSelect.appendChild(opt);
     }});
+    // Sync card-panel model mirror (if open)
+    if (_cardModSel) {{
+      _cardModSel.innerHTML = '';
+      Array.from(modelSelect.options).forEach(o => {{
+        const c = document.createElement('option');
+        c.value = o.value; c.textContent = o.textContent;
+        if (o.selected) c.selected = true;
+        _cardModSel.appendChild(c);
+      }});
+    }}
   }}
 
   providerSelect.addEventListener('change', async () => {{
@@ -3034,6 +3266,21 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       }});
     }} catch(e) {{}}
   }});
+
+  if (agentSelect) {{
+    agentSelect.addEventListener('change', async () => {{
+      const agentId = agentSelect.value;
+      try {{
+        await fetch(API_BASE + '/api/agents/set', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ agent_id: agentId }}),
+          credentials: 'same-origin',
+        }});
+        await loadAgents();
+      }} catch(e) {{}}
+    }});
+  }}
 
   // ---- Register device to bubble tracking system ----
   async function registerDevice() {{

@@ -234,6 +234,51 @@ Issues and pull requests welcome: [github.com/Bobsilvio/ha-claude/issues](https:
 
 ---
 
+## 🤖 Custom Agents
+
+Define multiple AI assistant profiles, each with its own LLM, persona, and instructions. Create `/config/amira/agents.json`:
+
+```json
+{
+  "active": "default",
+  "agents": {
+    "default": {
+      "name": "Amira",
+      "avatar": "🤖",
+      "instructions": "",
+      "provider": "",
+      "model": ""
+    },
+    "energy": {
+      "name": "EcoBot",
+      "avatar": "🌱",
+      "instructions": "You are an energy efficiency expert. Always suggest ways to reduce consumption.",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514"
+    }
+  },
+  "channel_agents": {
+    "telegram": "energy",
+    "whatsapp": "default"
+  }
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `active` | Yes | Key of the currently active agent (web UI) |
+| `agents.*.name` | Yes | Display name in chat header |
+| `agents.*.avatar` | No | Emoji avatar (default: 🤖) |
+| `agents.*.instructions` | No | Extra system prompt instructions for persona |
+| `agents.*.provider` | No | LLM provider override (e.g. `anthropic`, `openai`) |
+| `agents.*.model` | No | Model override (e.g. `claude-sonnet-4-20250514`) |
+| `channel_agents.telegram` | No | Agent key to use for Telegram messages |
+| `channel_agents.whatsapp` | No | Agent key to use for WhatsApp messages |
+
+Edit via the **Config** tab in the sidebar, or manually. If `provider`/`model` are empty, the agent uses the currently selected model. `channel_agents` allows assigning a specific agent per messaging channel.
+
+---
+
 ## 🙏 Credits
 
 Created with ❤️ for the Home Assistant community — Anthropic, OpenAI, Google, GitHub.

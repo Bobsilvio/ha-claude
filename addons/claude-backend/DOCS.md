@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Amira add-on** brings enterprise-grade AI to your Home Assistant instance. It provides a web-based chat interface with multi-provider AI support (20+ providers, 60+ models), file access capabilities, persistent memory, document analysis, MCP tool integration, Telegram & WhatsApp messaging, and more.
+The **Amira add-on** brings enterprise-grade AI to your Home Assistant instance. It provides a web-based chat interface with multi-provider AI support (22+ providers, 60+ models), real-time cost tracking, multi-agent system, file access capabilities, persistent memory, document analysis, MCP tool integration, Telegram & WhatsApp messaging, and more.
 
 The add-on integrates seamlessly with Home Assistant's Supervisor API — no long-lived tokens required, just your AI provider API keys.
 
@@ -10,13 +10,115 @@ The add-on integrates seamlessly with Home Assistant's Supervisor API — no lon
 
 ### Core Features
 - **Streaming chat UI** with real-time responses
-- **Multi-provider support**: 20+ AI providers, 60+ models
+- **Multi-provider support**: 22+ AI providers, 60+ models
 - **Model switching**: Change AI providers and models on-the-fly without restarting
 - **Persistent model selection**: Your chosen agent is saved and restored after restart
 - **Multi-language UI**: English, Italian, Spanish, French
 - **Home Assistant integration**: Read device states, call services directly from chat
 - **Floating Chat Bubble**: AI accessible on every HA page
 - **MCP Tools**: Extend AI with external tools and APIs
+
+### Cost & Usage Tracking
+- **Per-message cost**: Token count (input/output/cache) + dollar cost displayed on every AI response
+- **Cache token visibility**: Cache read (↓) and cache write (↑) tokens shown separately with tooltips
+- **Cost breakdown tooltip**: Hover to see input, output, cache read, cache write costs individually
+- **Session totals**: Running conversation cost in the UI footer
+- **Persistent daily tracking**: Usage aggregated by day, model, and provider in `/data/usage_stats.json`
+- **REST API**: `GET /api/usage_stats`, `GET /api/usage_stats/today`, `POST /api/usage_stats/reset`
+- **Cache-aware pricing**: Anthropic (cache reads 10% of input), OpenAI (50%), Google (25%), DeepSeek (10%)
+- **120+ models priced**: Anthropic, OpenAI, Google, Groq, Mistral, DeepSeek, Moonshot, Chinese providers
+
+### Dynamic Model Catalog
+- **Centralized metadata**: Every model has capabilities (vision, reasoning, code, tool_use), context window, max output tokens, pricing tier
+- **Capability enum**: TEXT, VISION, DOCUMENT, REASONING, TOOL_USE, CODE, STREAMING
+- **Pricing tiers**: FREE, CHEAP, STANDARD, PREMIUM — used by the fallback engine to pick cost-effective alternatives
+- **Runtime enrichment**: Static table + live `/v1/models` discovery from NVIDIA, Ollama, GitHub Copilot
+- **Programmatic queries**: `catalog.get_entry(provider, model)` → capabilities, context window, pricing
+
+### Multi-Agent System
+- **Agent profiles**: Define agents with custom identity (name, emoji, description), preferred model, fallback chain, and tool whitelist
+- **JSON config**: `/config/amira/agents.json` — user-editable, hot-reloadable (no restart needed)
+- **Agent selector**: Switch agents from chat UI or bubble — model/provider auto-apply
+- **Model fallback**: Cascading chain (primary → agent fallbacks → global defaults) with intelligent error classification
+- **Error types**: Rate-limit (cooldown + probe), auth (permanent skip), billing (abort), context-overflow (abort)
+- **Provider health**: Automatic tracking with periodic probe recovery for rate-limited providers
+
+#### Why multiple agents?
+A single generic assistant works fine, but multiple agents unlock:
+1. **Task specialisation** — each agent has its own model, tools, temperature and system prompt
+2. **Cost control** — route expensive reasoning tasks to premium models, simple Q&A to free/cheap models
+3. **Tool isolation** — only the "home" agent can create automations; a "coder" agent can only read/write config files
+4. **Personality** — different name, emoji and response style per task
+
+#### Agent configuration reference
+
+Create `/config/amira/agents.json` with one or more agent entries:
+
+```json
+{
+  "home": {
+    "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+    "model": "anthropic/claude-sonnet-4-6",
+    "fallback": ["google/gemini-2.0-flash", "groq/llama-3.3-70b-versatile"],
+    "tools": ["create_automation", "update_automation", "call_service", "get_entity"],
+    "is_default": true
+  },
+  "coder": {
+    "identity": { "name": "CodeBot", "emoji": "💻", "description": "Coding & config specialist" },
+    "model": "anthropic/claude-opus-4-6",
+    "fallback": ["openai/gpt-4o"],
+    "tools": ["read_config_file", "write_config_file"],
+    "system_prompt_override": "You are a coding expert. Always show code with comments.",
+    "temperature": 0.2,
+    "thinking_level": "high"
+  },
+  "quick": {
+    "identity": { "name": "Flash", "emoji": "⚡", "description": "Fast answers, no tools" },
+    "model": "groq/llama-3.3-70b-versatile",
+    "fallback": ["google/gemini-2.0-flash"],
+    "tools": [],
+    "temperature": 0.7
+  }
+}
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `identity.name` | string | `"Amira"` | Display name shown in UI and message prefix |
+| `identity.emoji` | string | `"🤖"` | Icon in agent selector and chat messages |
+| `identity.description` | string | `""` | Tooltip / short description |
+| `model` | string | — | `provider/model` format (e.g. `anthropic/claude-sonnet-4-6`) |
+| `fallback` | string[] | `[]` | Ordered fallback models if primary fails |
+| `tools` | string[] \| null | `null` | Allowed tool names. `null` = all tools, `[]` = no tools |
+| `tools_blocked` | string[] | `[]` | Explicitly blocked tool names (subtracted from allowed) |
+| `system_prompt_override` | string \| null | `null` | Replaces the default system prompt entirely |
+| `temperature` | number \| null | `null` | 0.0–2.0 (null uses provider default) |
+| `max_tokens` | number \| null | `null` | Max response tokens |
+| `thinking_level` | string \| null | `null` | `off`, `low`, `medium`, `high`, `adaptive` |
+| `is_default` | bool | `false` | If true, this agent is pre-selected on load |
+| `enabled` | bool | `true` | Set false to hide without deleting |
+| `tags` | string[] | `[]` | Arbitrary tags for organisation |
+
+#### How it works at runtime
+1. User selects an agent from the sidebar selector
+2. The agent's `model` field sets the active provider + model
+3. If the model fails, the `fallback` chain is tried in order
+4. If all agent fallbacks fail, the global fallback list is tried
+5. Only the tools listed in `tools` are exposed to the AI (or all if `null`)
+6. `tools_blocked` entries are always removed, even if `tools` is `null`
+7. `system_prompt_override` replaces the default prompt; `temperature`, `max_tokens`, `thinking_level` override globals
+
+### Automation Safety Guards
+- **Empty automation rejection**: `create_automation` returns an error if both triggers and actions are empty
+- **Duplicate alias detection**: Before creating, checks `automations.yaml` for similar names — suggests `update_automation`
+- **Improved tool schemas**: Parameter descriptions include concrete examples (`{'platform': 'time', 'at': '20:00'}`)
+- **System prompt rules**: AI is explicitly instructed to never use `create_automation` for modifying existing automations
+
+### Enhanced Logging
+- **Custom CHAT level** (25, between INFO and WARNING): Dedicated log level for user questions and AI responses
+- **Color-coded**: Blue color with 💬 icon in terminal logs
+- **All channels**: Web UI (📩/📤), Telegram, WhatsApp, Alexa — all use CHAT level
+- **Easy filtering**: `grep CHAT` in logs to see only conversations, not system noise
 
 ### Advanced Features
 - **File Upload & Analysis**: Upload PDF, DOCX, TXT, MD, YAML files for AI analysis
@@ -234,6 +336,9 @@ The add-on exposes a REST API accessible via HA Ingress or directly on port 5010
 | `/api/snapshots` | GET | List config file backups |
 | `/api/documents/upload` | POST | Upload document for analysis |
 | `/api/messaging/stats` | GET | Telegram & WhatsApp statistics |
+| `/api/usage_stats` | GET | Usage summary (daily, per-model, per-provider) |
+| `/api/usage_stats/today` | GET | Today's token and cost totals |
+| `/api/usage_stats/reset` | POST | Reset all usage data |
 | `/health` | GET | Simple health check |
 
 ## Data Storage
@@ -244,6 +349,7 @@ All persistent data lives in **`/config/amira/`**:
 /config/amira/
 ├── conversations.json        # Chat history
 ├── runtime_selection.json    # Last selected model/provider
+├── agents.json               # Multi-agent config (name, model, tools, fallback)
 ├── mcp_config.json           # MCP servers (create manually)
 ├── scheduled_tasks.json      # Scheduled task definitions
 ├── snapshots/                # Config file backups (before edits)
@@ -252,6 +358,9 @@ All persistent data lives in **`/config/amira/`**:
 └── memory/
     ├── MEMORY.md             # Long-term facts (always in context)
     └── HISTORY.md            # Session log (append-only)
+
+/data/
+└── usage_stats.json          # Persistent cost/usage tracking (daily, per-model, per-provider)
 ```
 
 ## Security Notes

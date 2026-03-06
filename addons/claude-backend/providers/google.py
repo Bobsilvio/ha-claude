@@ -117,6 +117,7 @@ class GoogleProvider(EnhancedProvider):
                 ):
                     raise RuntimeError(f"Google: quota esaurita. Controlla il piano e la fatturazione su ai.google.dev. (HTTP 429)")
                 raise RuntimeError(f"Google HTTP {response.status_code}: {error_text[:300]}")
+            captured_usage = None
             for line in response.iter_lines():
                 if not line.startswith("data:"):
                     continue
@@ -125,6 +126,14 @@ class GoogleProvider(EnhancedProvider):
                     continue
                 try:
                     event = json.loads(data_str)
+                    # Google returns usageMetadata in SSE chunks
+                    um = event.get("usageMetadata")
+                    if um:
+                        captured_usage = {
+                            "input_tokens": um.get("promptTokenCount", 0) or 0,
+                            "output_tokens": um.get("candidatesTokenCount", 0) or 0,
+                            "cache_read_tokens": um.get("cachedContentTokenCount", 0) or 0,
+                        }
                     candidates = event.get("candidates", [])
                     if candidates:
                         parts = candidates[0].get("content", {}).get("parts", [])
@@ -134,10 +143,16 @@ class GoogleProvider(EnhancedProvider):
                                 yield {"type": "text", "text": text}
                         finish = candidates[0].get("finishReason", "")
                         if finish and finish not in ("", "STOP_REASON_UNSPECIFIED"):
-                            yield {"type": "done", "finish_reason": finish.lower()}
+                            done_evt: dict = {"type": "done", "finish_reason": finish.lower()}
+                            if captured_usage:
+                                done_evt["usage"] = captured_usage
+                            yield done_evt
                 except json.JSONDecodeError:
                     continue
-        yield {"type": "done", "finish_reason": "stop"}
+        done_evt_final: dict = {"type": "done", "finish_reason": "stop"}
+        if captured_usage:
+            done_evt_final["usage"] = captured_usage
+        yield done_evt_final
 
     def get_available_models(self) -> List[str]:
         return [

@@ -7,6 +7,7 @@ Improvements over base ProviderManager:
 - Exponential backoff on provider failures
 """
 
+import os
 import logging
 import time
 from typing import Any, Dict, Generator, List, Optional
@@ -30,7 +31,7 @@ class EnhancedProviderManager:
         self.last_error = ""
         self.last_error_time = 0.0
         self.provider_stats = {}
-        self.default_fallback = default_fallback or ["anthropic", "google"]
+        self.default_fallback = default_fallback or []
         self.coordinator = get_rate_limit_coordinator()
         self.translator = ErrorTranslator()
         
@@ -44,6 +45,7 @@ class EnhancedProviderManager:
         messages: List[Dict[str, Any]],
         intent_info: Optional[Dict[str, Any]] = None,
         fallback_providers: Optional[List[str]] = None,
+        model: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream with rate-aware fallback.
         
@@ -52,6 +54,7 @@ class EnhancedProviderManager:
             messages: Chat messages
             intent_info: Intent context
             fallback_providers: Ordered fallback list
+            model: Optional model override (only used for the primary provider)
             
         Yields:
             Standardized event dicts
@@ -91,7 +94,10 @@ class EnhancedProviderManager:
                 event_count = 0
                 content_started = False
 
-                for event in self._stream_with_provider(prov, messages, intent_info):
+                for event in self._stream_with_provider(
+                    prov, messages, intent_info,
+                    model=model if prov == provider else None,
+                ):
                     event_count += 1
                     last_event = event
 
@@ -167,9 +173,13 @@ class EnhancedProviderManager:
         if last_error_event:
             yield last_error_event
         else:
+            language = os.getenv("LANGUAGE", "en").lower()
+            failed_prov = providers_to_try[-1] if providers_to_try else "generic"
             yield {
                 "type": "error",
-                "message": f"All providers unavailable: {error_msg}",
+                "message": ErrorTranslator.translate_error(
+                    error_msg, provider=failed_prov, language=language
+                ),
             }
 
     def _order_providers_by_availability(self, providers: List[str]) -> List[str]:
@@ -271,30 +281,71 @@ class EnhancedProviderManager:
         provider: str,
         messages: List[Dict[str, Any]],
         intent_info: Optional[Dict[str, Any]] = None,
+        model: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
-        """Stream with specific provider (same as base manager)."""
-        from providers_openai import stream_chat_openai, stream_chat_nvidia_direct
-        from providers_anthropic import stream_chat_anthropic
-        from providers_google import stream_chat_google
+        """Stream with a specific provider using class-based provider loading.
 
-        stream_fns = {
-            "openai": stream_chat_openai,
-            "nvidia": stream_chat_nvidia_direct,
-            "anthropic": stream_chat_anthropic,
-            "google": stream_chat_google,
-            "github": stream_chat_openai,  # GitHub uses OpenAI protocol
+        Uses the same dynamic provider instantiation as ProviderManager
+        (reads API key from env, loads provider class from __init__.py registry).
+        Also records each request in the rate limiter.
+        """
+        from . import get_provider_class
+
+        provider_class = get_provider_class(provider)
+
+        # --- resolve API key from env ---
+        env_prefix_map = {
+            "openai": "OPENAI", "nvidia": "NVIDIA", "anthropic": "ANTHROPIC",
+            "google": "GOOGLE", "github": "GITHUB", "groq": "GROQ",
+            "mistral": "MISTRAL", "ollama": "OLLAMA", "openrouter": "OPENROUTER",
+            "deepseek": "DEEPSEEK", "minimax": "MINIMAX", "aihubmix": "AIHUBMIX",
+            "siliconflow": "SILICONFLOW", "volcengine": "VOLCENGINE",
+            "dashscope": "DASHSCOPE", "moonshot": "MOONSHOT", "zhipu": "ZHIPU",
+            "perplexity": "PERPLEXITY", "github_copilot": "GITHUB_COPILOT",
+            "openai_codex": "OPENAI_CODEX", "claude_web": "CLAUDE_WEB",
+            "chatgpt_web": "CHATGPT_WEB",
         }
+        env_prefix = env_prefix_map.get(provider, provider.upper())
 
-        stream_fn = stream_fns.get(provider)
-        if not stream_fn:
-            raise ValueError(f"Unknown provider: {provider}")
+        if provider == "anthropic":
+            api_key = os.getenv("ANTHROPIC_API_KEY", "") or os.getenv("CLAUDE_API_KEY", "")
+        elif provider == "github":
+            api_key = os.getenv("GITHUB_TOKEN", "") or os.getenv("GITHUB_API_KEY", "")
+        elif provider == "github_copilot":
+            api_key = os.getenv("GITHUB_COPILOT_TOKEN", "")
+        elif provider == "openai_codex":
+            api_key = os.getenv("OPENAI_CODEX_TOKEN", "")
+        elif provider in ("claude_web", "chatgpt_web"):
+            api_key = ""
+        else:
+            api_key = os.getenv(f"{env_prefix}_API_KEY", "")
 
-        for event in stream_fn(messages, intent_info=intent_info):
-            # Record request for rate limiter
-            if event.get("type") == "start":
-                limiter = self.coordinator.get_limiter(provider)
-                limiter.record_request()
-            
+        if not model:
+            model = os.getenv(f"{env_prefix}_MODEL", "")
+
+        # --- instantiate ---
+        if provider == "ollama":
+            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            provider_instance = provider_class(api_key=api_key, model=model, base_url=base_url)
+        elif provider == "custom":
+            api_base = os.getenv("CUSTOM_API_BASE", "")
+            if not model:
+                model = os.getenv("CUSTOM_MODEL_NAME", "")
+            provider_instance = provider_class(api_key=api_key, model=model, api_base=api_base)
+        else:
+            provider_instance = provider_class(api_key=api_key, model=model)
+
+        # --- strip internal metadata from messages ---
+        _ALLOWED_MSG_KEYS = {"role", "content", "name", "tool_calls", "tool_call_id"}
+        clean_messages = [
+            {k: v for k, v in m.items() if k in _ALLOWED_MSG_KEYS}
+            for m in messages
+        ]
+
+        # --- stream & record rate-limit events ---
+        limiter = self.coordinator.get_limiter(provider)
+        limiter.record_request()
+        for event in provider_instance.stream_chat(clean_messages, intent_info=intent_info):
             yield event
 
     def _record_success(self, provider: str, event_count: int):

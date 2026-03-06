@@ -14,15 +14,15 @@ class GitHubProvider(EnhancedProvider):
     """Provider adapter for GitHub Models (OpenAI-compatible API).
 
     Inherits the standard _do_stream() from EnhancedProvider.
-    INCLUDE_USAGE=False because GitHub Models API does not support stream_options.
     _get_model() strips the optional 'provider/' prefix from model names.
     """
 
     # --- Provider contract ---
     BASE_URL      = "https://models.github.ai/inference"
     DEFAULT_MODEL = "gpt-4o"
-    INCLUDE_USAGE = False   # GitHub Models API rejects stream_options
+    INCLUDE_USAGE = True    # stream_options.include_usage → token count in UI
     EXTRA_HEADERS = {"User-Agent": "ha-amira (python)"}
+    MAX_TOKENS    = 4000    # GitHub Models free-tier limit
     # -------------------------
 
     def __init__(self, api_key: str = "", model: str = ""):
@@ -119,18 +119,22 @@ class GitHubProvider(EnhancedProvider):
         """Convert GitHub Models API error to user-friendly message."""
         error_msg = str(error).lower()
 
+        # Token / payload too large (413 or tokens_limit_reached) — MUST be first
+        if "tokens_limit_reached" in error_msg or "request body too large" in error_msg or "413" in error_msg or "payload too large" in error_msg:
+            return "GitHub: token_limit"  # classified as TOKEN_LIMIT by ErrorTranslator
+        # Budget / spending cap (403 with budget keywords)
         if "budget limit" in error_msg or "reached its budget" in error_msg or "spending limit" in error_msg:
-            return "GitHub: 403 budget limit"  # let humanize_provider_error handle it with the right key
-        if self._is_auth_error(error_msg):
+            return "GitHub: budget_exhausted"  # classified as BUDGET_EXHAUSTED by ErrorTranslator
+        if self._is_auth_error(error_msg) and "budget" not in error_msg:
             return "GitHub: Token invalid or expired. Check your GitHub personal access token in the add-on settings."
         # Quota / billing errors — must come BEFORE _is_rate_limit_error
         if self._is_quota_error(error_msg) and ("insufficient_quota" in error_msg or "exceeded your current quota" in error_msg or "run out of credits" in error_msg):
-            return f"Error code: 429 - insufficient_quota: {error}"  # preserve keywords for humanize_provider_error
+            return "GitHub: quota exceeded (insufficient_quota)"
         if self._is_rate_limit_error(error_msg):
             return "GitHub: Rate limit exceeded. Please retry in a moment."
+        if "unknown_model" in error_msg or "unknown model" in error_msg:
+            return "GitHub: Model identifier not recognized by GitHub Models API."
         if "model" in error_msg and "not found" in error_msg:
             return "GitHub: Model not found or not yet available."
-        if "unknown" in error_msg:
-            return "GitHub: Model identifier not recognized by GitHub Models API."
 
         return f"GitHub error: {error}"

@@ -2,6 +2,62 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
+## 4.5.1 — Fix conversazioni card/bubble + icona cestino + salvataggio agenti
+
+### 🐛 Fix
+- **Fix conversazione card continua nella bubble**: aprendo la chat UI dalla card dopo aver usato la bubble, la conversazione proseguiva nella sessione bubble invece di crearne una nuova — ora se il `currentSessionId` salvato è di tipo `bubble_*`, viene generato un nuovo ID automaticamente
+- **Fix sessione bubble non persistita**: cliccando su una conversazione bubble nella sidebar, il suo ID non viene più salvato in `localStorage` — riaprendo la pagina si riparte dalla chat UI, non dalla bubble
+- **Fix icona cestino non visibile**: il carattere Unicode U+1F5D1 (🗑) non era supportato da tutti i browser/dispositivi e appariva come un quadrato con caratteri — sostituito con un'icona SVG trash universalmente compatibile
+- **Fix salvataggio agente silenzioso**: creare un agente con ID contenente maiuscole (es. "Amira") falliva silenziosamente perché la validazione `[a-z0-9_-]` rifiutava l'input senza mostrare errori — ora l'ID viene auto-convertito in minuscolo e gli errori di validazione/salvataggio mostrano un `alert()` visibile
+
+## 4.5.0 — Architettura OpenClaw: catalogo modelli, cost tracking, multi-agent, safety guards
+
+### 🧠 Dynamic Model Catalog (`model_catalog.py`)
+- **Catalogo centralizzato**: ogni modello ha capabilities (VISION, REASONING, CODE, TOOL_USE, STREAMING, DOCUMENT), context window, max output tokens, pricing tier (FREE/CHEAP/STANDARD/PREMIUM)
+- **Fonte unica di verità**: eliminati tutti gli elenchi statici sparsi — un solo registro consultato da agent system, fallback engine, UI e intent classifier
+- **Arricchimento runtime**: tabella statica + discovery live da `/v1/models` (NVIDIA, Ollama, GitHub Copilot)
+- **Query programmatiche**: `catalog.get_entry("anthropic", "claude-opus-4-6")` → capabilities, context window, pricing
+
+### 💰 Real-time Cost Tracking (`pricing.py` + `usage_tracker.py`)
+- **Pricing cache-aware per 120+ modelli**: Anthropic (cache read 10% input, write 125%), OpenAI (cache 50%), Google (25%), DeepSeek (10%), Groq, Mistral, Moonshot
+- **Usage normalizer**: gestisce 20+ varianti di naming tra provider (prompt_tokens, input_tokens, promptTokens, cache_read_input_tokens, prompt_tokens_details.cached_tokens, ...)
+- **Cost breakdown per messaggio**: input, output, cache_read, cache_write — mostrato con tooltip dettagliato nella UI
+- **Visualizzazione UI**: `1.5k in / 300 out (500 cache↓, 200 cache↑) • $0.0084` con icone e formatting smart
+- **Totali sessione**: contatore running di token e costi nella barra conversazione
+- **Tracking persistente**: aggregazione giornaliera, per-modello, per-provider su `/data/usage_stats.json`
+- **3 nuovi endpoint API**: `GET /api/usage_stats`, `GET /api/usage_stats/today`, `POST /api/usage_stats/reset`
+
+### 🤖 Multi-Agent System (`agent_config.py` + `model_fallback.py`)
+- **Profili agente**: identità (nome, emoji, descrizione), modello preferito, catena fallback, whitelist tool
+- **Config JSON**: `/config/amira/agents.json` — editabile dall'utente, hot-reload
+- **Selettore agente**: switch da UI chat e bubble — modello/provider applicati automaticamente
+- **Fallback intelligente**: catena cascading (primario → fallback agente → default globali) con classificazione errori
+- **Classificazione errori**: rate-limit (cooldown + probe periodico), auth (skip permanente), billing (abort), context-overflow (abort)
+- **Health tracking**: monitoraggio salute provider con recovery automatico via probe
+
+### 📊 Livello log CHAT personalizzato
+- **Nuovo livello CHAT (25)**: tra INFO (20) e WARNING (30) — dedicato a domande utente e risposte AI
+- **Colore blu** con icona 💬 nei log terminale
+- **Tutti i canali**: Web UI (📩 domanda / 📤 risposta), Telegram, WhatsApp, Alexa
+- **Facile da filtrare**: `grep CHAT` mostra solo conversazioni, niente rumore di sistema
+
+### 🛡️ Safety Guards per automazioni
+- **Rifiuto automazioni vuote**: `create_automation` restituisce errore se trigger E action sono vuoti
+- **Rilevamento alias duplicati**: prima di creare, controlla `automations.yaml` — se esiste nome simile, suggerisce `update_automation`
+- **Schema tool migliorati**: descrizioni parametri con esempi concreti (`{'platform': 'time', 'at': '20:00'}`)
+- **Regole system prompt**: 3 nuove regole esplicite — mai usare `create_automation` per modificare automazioni esistenti
+
+### 🐛 Fix
+- **Fix SyntaxError chat UI**: `tip.join('\\n')` in formatUsage produceva newline letterale nel JS → `SyntaxError: string literal contains unescaped line break` → `switchSidebarTab is not defined` a cascata
+- **Fix INCLUDE_USAGE**: `providers/github.py` ora invia `include_usage: true` per ricevere token count
+
+### 📦 Nuovi file
+- `model_catalog.py` — catalogo modelli centralizzato (~573 righe)
+- `agent_config.py` — sistema multi-agente (~691 righe)
+- `model_fallback.py` — fallback intelligente con health tracking (~596 righe)
+- `tool_registry.py` — registro tool centralizzato ispirato a OpenClaw (~1049 righe)
+- `usage_tracker.py` — tracking persistente costi/uso (~222 righe)
+
 ## 4.4.5 — AI intent classification + TTS vocale + 3 nuovi tool + error UX
 
 ### 🧠 Classificazione intent via AI
