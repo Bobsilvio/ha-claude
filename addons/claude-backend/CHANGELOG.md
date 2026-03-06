@@ -2,7 +2,11 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
-## 4.5.1 — Fix conversazioni card/bubble + icona cestino + salvataggio agenti
+## 4.5.1 — Fix conversazioni card/bubble + icona cestino + salvataggio agenti + anti-allucinazione entity
+
+### 🧠 Anti-hallucination
+- **Validazione entity_id in `get_history`**: prima di interrogare lo storico, il tool verifica che l'entità esista in Home Assistant — se non esiste restituisce un errore chiaro con fino a 8 suggerimenti fuzzy (match per keyword su entity_id e friendly_name), permettendo anche ai modelli più piccoli di correggere e riprovare
+- **Ricerca keyword in `get_entities`**: nuovo parametro opzionale `query` che filtra le entità per keyword nel nome/entity_id (es. `query="umidita"`) — evita che il modello debba scegliere tra i primi 30 sensori restituiti a caso e riduce drasticamente le allucinazioni di entity_id inesistenti
 
 ### 🐛 Fix
 - **Fix conversazione card continua nella bubble**: aprendo la chat UI dalla card dopo aver usato la bubble, la conversazione proseguiva nella sessione bubble invece di crearne una nuova — ora se il `currentSessionId` salvato è di tipo `bubble_*`, viene generato un nuovo ID automaticamente

@@ -952,13 +952,17 @@ def get_tool_description(tool_name: str) -> str:
 HA_TOOLS_DESCRIPTION = [
     {
         "name": "get_entities",
-        "description": "Get the current state of all Home Assistant entities, or filter by domain (e.g. 'light', 'switch', 'sensor', 'automation', 'climate').",
+        "description": "Get the current state of Home Assistant entities. Filter by domain and/or search by keyword in entity_id and friendly_name. IMPORTANT: always use 'query' when looking for a specific entity (e.g. query='umidita' or query='temperature bedroom').",
         "parameters": {
             "type": "object",
             "properties": {
                 "domain": {
                     "type": "string",
                     "description": "Optional domain filter (e.g. 'light', 'switch', 'sensor')."
+                },
+                "query": {
+                    "type": "string",
+                    "description": "Optional keyword to search in entity_id and friendly_name (e.g. 'umidita', 'temperature', 'bedroom'). Case-insensitive partial match."
                 }
             },
             "required": []
@@ -1903,11 +1907,23 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         if tool_name == "get_entities":
             domain = tool_input.get("domain", "")
+            query = tool_input.get("query", "").strip().lower()
             states = api.get_all_states()
             if domain:
                 states = [s for s in states if s.get("entity_id", "").startswith(f"{domain}.")]
+            # Keyword search: filter by query in entity_id or friendly_name
+            if query:
+                keywords = query.split()
+                filtered = []
+                for s in states:
+                    eid = s.get("entity_id", "").lower()
+                    fname = (s.get("attributes") or {}).get("friendly_name", "").lower()
+                    if all(kw in eid or kw in fname for kw in keywords):
+                        filtered.append(s)
+                states = filtered
             # Limit results for providers with small context windows
-            max_entities = 30 if api.AI_PROVIDER == "github" else 100
+            # When using query, allow more results since they're already filtered
+            max_entities = (50 if query else 30) if api.AI_PROVIDER == "github" else 100
             result = []
             for s in states[:max_entities]:
                 result.append({
@@ -2701,6 +2717,34 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         elif tool_name == "get_history":
             entity_id = tool_input.get("entity_id", "")
             hours = min(int(tool_input.get("hours", 24)), 168)
+
+            # Validate entity exists before querying history
+            entity_check = api.call_ha_api("GET", f"states/{entity_id}")
+            if isinstance(entity_check, dict) and "error" in entity_check:
+                # Entity does not exist — find similar ones to help the LLM retry
+                domain = entity_id.split(".")[0] if "." in entity_id else ""
+                eid_parts = entity_id.replace(".", " ").replace("_", " ").lower().split()
+                all_states = api.get_all_states()
+                scored = []
+                for s in all_states:
+                    sid = s.get("entity_id", "")
+                    fname = (s.get("attributes") or {}).get("friendly_name", "").lower()
+                    sid_lower = sid.lower()
+                    # Filter by same domain if specified
+                    if domain and not sid.startswith(f"{domain}."):
+                        continue
+                    # Score by keyword overlap
+                    score = sum(1 for kw in eid_parts if kw in sid_lower or kw in fname)
+                    if score > 0:
+                        scored.append((score, sid, fname))
+                scored.sort(key=lambda x: -x[0])
+                suggestions = [{"entity_id": s[1], "friendly_name": s[2]} for s in scored[:8]]
+                return json.dumps({
+                    "error": f"Entity '{entity_id}' does NOT exist in Home Assistant. You must use a real entity_id.",
+                    "suggestions": suggestions,
+                    "hint": "Pick one of the suggested entity_ids and call get_history again."
+                }, ensure_ascii=False, default=str)
+
             start = (datetime.utcnow() - timedelta(hours=hours)).strftime("%Y-%m-%dT%H:%M:%S")
             endpoint = f"history/period/{start}?filter_entity_id={entity_id}&significant_changes_only=1"
             result = api.call_ha_api("GET", endpoint)
@@ -4727,8 +4771,8 @@ For CUSTOM HTML dashboards: use __ENTITIES_JSON__ placeholder, copy ALL entity_i
 HA_TOOLS_COMPACT = [
     {
         "name": "get_entities",
-        "description": "Get HA entity states, optionally filtered by domain.",
-        "parameters": {"type": "object", "properties": {"domain": {"type": "string"}}, "required": []}
+        "description": "Get HA entity states. Filter by domain and/or search by keyword in entity_id/friendly_name. ALWAYS use 'query' when looking for a specific entity.",
+        "parameters": {"type": "object", "properties": {"domain": {"type": "string"}, "query": {"type": "string", "description": "Keyword to search (e.g. 'umidita', 'temperature')."}}, "required": []}
     },
     {
         "name": "call_service",
