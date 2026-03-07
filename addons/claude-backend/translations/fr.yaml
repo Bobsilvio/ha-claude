@@ -88,7 +88,7 @@ configuration:
     description: Autoriser l'IA à lire/écrire les fichiers de configuration Home Assistant (automatisations, scripts, YAML)
   enable_memory:
     name: Activer la Mémoire
-    description: "[EXPÉRIMENTAL] Activer la mémoire persistante - l'IA se souvient des conversations passées entre les sessions"
+    description: "[EXPÉRIMENTAL] Active la mémoire persistante : l’IA ne retient que ce que vous écrivez dans MEMORY.md entre les sessions. Les conversations passées ne sont JAMAIS injectées dans le prompt."
   enable_file_upload:
     name: Activer l'Upload de Fichiers
     description: "[EXPÉRIMENTAL] Autoriser le téléchargement de documents (PDF, DOCX, TXT, MD, YAML) pour l'analyse IA"

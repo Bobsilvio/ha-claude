@@ -88,7 +88,7 @@ configuration:
     description: Allow AI to read/write Home Assistant config files (automations, scripts, YAML)
   enable_memory:
     name: Enable Memory
-    description: "[EXPERIMENTAL] Enable persistent memory - AI remembers past conversations across sessions"
+    description: "[EXPERIMENTAL] Enable persistent memory - the AI only remembers what you write in MEMORY.md across sessions. Past conversations are NEVER injected into the prompt."
   enable_file_upload:
     name: Enable File Upload
     description: "[EXPERIMENTAL] Allow uploading documents (PDF, DOCX, TXT, MD, YAML) for AI analysis"

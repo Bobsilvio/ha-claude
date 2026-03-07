@@ -560,12 +560,27 @@ class AgentManager:
     # -- CRUD for agents --
 
     def list_agents(self, include_disabled: bool = False) -> List[AgentEntry]:
-        """Return all agents."""
+        """Return all agents, always including Amira as enabled and default."""
         with self._lock:
             agents = list(self._agents.values())
+            # Ensure Amira is always present, enabled, and default
+            amira = next((a for a in agents if a.id == "amira"), None)
+            if not amira:
+                amira = AgentEntry(
+                    id="amira",
+                    name="Amira",
+                    identity=AgentIdentity(name="Amira", emoji="🤖", description="Your AI assistant for Home Assistant"),
+                    is_default=True,
+                    enabled=True,
+                )
+                agents.append(amira)
+            else:
+                amira.enabled = True
+                amira.is_default = True
         if not include_disabled:
             agents = [a for a in agents if a.enabled]
-        return sorted(agents, key=lambda a: (not a.is_default, a.name or a.id))
+        # Always sort Amira first
+        return sorted(agents, key=lambda a: (a.id != "amira", a.name or a.id))
 
     def get_agent(self, agent_id: str) -> Optional[AgentEntry]:
         """Get a specific agent by ID."""
@@ -645,10 +660,14 @@ class AgentManager:
     # -- API response helpers --
 
     def get_agents_for_api(self) -> List[Dict[str, Any]]:
-        """Return agent list suitable for the API/UI."""
+        """Return agent list suitable for the API/UI. Amira is always present, enabled, and default."""
         agents = self.list_agents()
         result = []
         for a in agents:
+            # Force Amira always enabled/default in API
+            if a.id == "amira":
+                a.enabled = True
+                a.is_default = True
             d = {
                 "id": a.id,
                 "name": a.identity.name or a.name or a.id,
@@ -666,7 +685,8 @@ class AgentManager:
             if a.tags:
                 d["tags"] = a.tags
             result.append(d)
-        return result
+        # Always sort Amira first
+        return sorted(result, key=lambda d: (d["id"] != "amira", d["name"]))
 
     def get_defaults(self) -> AgentDefaults:
         """Return global defaults."""
