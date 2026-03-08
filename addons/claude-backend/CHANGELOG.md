@@ -2,10 +2,14 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
-## 4.5.8 — UI polish: stili bottoni uniformi + tools grid espandibile
+## 4.5.9 — Fix copia card editor (shadow DOM) + tools grid ridimensionabile
+
+### 🐛 Fix
+- **Fix tasto Copia nel card editor**: il bottone "Copia" nei code block del pannello card editor non funzionava perché il pannello è dentro lo shadow DOM del dialog HA — `e.target` veniva retargetted al shadow host. Ora usa `e.composedPath()` + capture phase per attraversare i confini shadow DOM
+- **Hover bottone Copia**: anche hover/mouseout ora usano `composedPath()` per funzionare dentro shadow DOM
 
 ### 🎨 UI
-- **Tools grid più alto**: la griglia dei tool consentiti nell'agent form passa da 120px a 200px di altezza massima, più spazio per vedere le chip
+- **Tools grid ridimensionabile**: la griglia dei tool consentiti nell'agent form ora si può trascinare col mouse per allungarla (`resize: vertical`), con bordo visibile e padding interno
 - **Stili bottoni uniformati**: i bottoni Salva di LLM Priority e Settings ora usano `config-save-btn` (come agent form e config editor) — prima usavano `agent-add-btn` con stile diverso
 - **Bottoni agent form allineati**: aggiunto padding e font-size consistenti ai bottoni Salva/Annulla dell'agent form, in linea con gli altri form
 - **Dark mode bottoni**: aggiunto dark mode per `config-save-btn` e `agent-add-btn` — prima mancavano gli override per il tema scuro

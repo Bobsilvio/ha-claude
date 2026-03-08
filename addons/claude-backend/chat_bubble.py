@@ -1945,17 +1945,29 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     }} else {{ fallback(); }}
   }};
 
-  // Event delegation for copy buttons (inline onclick blocked by HA CSP)
+  // Event delegation for copy buttons (inline onclick blocked by HA CSP).
+  // Uses composedPath() to cross shadow DOM boundaries (card editor panel
+  // lives inside HA dialog shadow root, so e.target is retargeted).
+  function _findCopyBtn(e) {{
+    var path = e.composedPath ? e.composedPath() : [e.target];
+    for (var i = 0; i < path.length; i++) {{
+      var el = path[i];
+      if (el.classList && el.classList.contains('amira-copy-btn')) return el;
+    }}
+    return null;
+  }}
   document.addEventListener('click', function(e) {{
-    var btn = e.target && e.target.closest ? e.target.closest('.amira-copy-btn') : null;
-    if (btn) {{ e.preventDefault(); window.__amiraCopyCode(btn); }}
-  }});
+    var btn = _findCopyBtn(e);
+    if (btn) {{ e.preventDefault(); e.stopPropagation(); window.__amiraCopyCode(btn); }}
+  }}, true);
   document.addEventListener('mouseover', function(e) {{
-    if (e.target && e.target.classList && e.target.classList.contains('amira-copy-btn')) e.target.style.background = '#475569';
-  }});
+    var btn = _findCopyBtn(e);
+    if (btn) btn.style.background = '#475569';
+  }}, true);
   document.addEventListener('mouseout', function(e) {{
-    if (e.target && e.target.classList && e.target.classList.contains('amira-copy-btn')) e.target.style.background = '#334155';
-  }});
+    var btn = _findCopyBtn(e);
+    if (btn) btn.style.background = '#334155';
+  }}, true);
 
   function _renderInlineMd(text) {{
     // Fenced code blocks: ```lang + newline + content + ``` -> styled pre with copy button
