@@ -22,12 +22,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
+def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool = True, show_card_button: bool = True) -> str:
     """Generate the floating chat bubble JavaScript module.
 
     Args:
         ingress_url: Addon ingress URL prefix (e.g. '/api/hassio_ingress/<token>')
         language: User language (en/it/es/fr)
+        show_bubble: If False, the floating bubble button is hidden.
+        show_card_button: If False, the Amira button in the card editor is hidden.
 
     Returns:
         Complete JavaScript ES module as string
@@ -338,6 +340,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
 (function() {{
   'use strict';
 
+  console.log('[Amira] Bubble JS executing — bubble={show_bubble}, card_btn={show_card_button}');
+
   // Global error handler — shows JS errors as visible banner + sends to backend
   if (!window.__AMIRA_BUBBLE_ERROR_HANDLER) {{
     window.__AMIRA_BUBBLE_ERROR_HANDLER = true;
@@ -361,6 +365,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       d.onclick = function() {{ d.remove(); }};
       if (document.body) document.body.prepend(d);
     }});
+  }}
+
+  // Ensure DOM is ready before injecting
+  if (!document.body) {{
+    console.warn('[Amira] document.body not ready — deferring to DOMContentLoaded');
+    document.addEventListener('DOMContentLoaded', function() {{
+      // Re-run by re-creating script element
+      var s = document.createElement('script');
+      s.src = document.currentScript ? document.currentScript.src : '';
+      if (s.src) document.head.appendChild(s);
+    }});
+    return;
   }}
 
   const INGRESS_URL = '{ingress_url}';
@@ -586,14 +602,20 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     }} catch(e) {{ return null; }}
   }}
 
-  // Returns the footer#actions element (for button injection).
+  // Returns the footer element (for button injection).
+  // Supports both legacy (footer#actions in shadowRoot) and new HA (ha-dialog-footer in light DOM).
   function getCardEditorFooter() {{
     try {{
       const editCardEl = _findEditCardEl();
       if (!editCardEl || !editCardEl.shadowRoot) return null;
       const haDialog = editCardEl.shadowRoot.querySelector('ha-dialog[open]');
-      if (!haDialog || !haDialog.shadowRoot) return null;
-      return haDialog.shadowRoot.querySelector('footer#actions') || null;
+      if (!haDialog) return null;
+      // New HA: <ha-dialog-footer slot="footer"> as light DOM child
+      const newFooter = haDialog.querySelector('ha-dialog-footer[slot="footer"]');
+      if (newFooter) return newFooter;
+      // Legacy: footer#actions in shadowRoot
+      if (haDialog.shadowRoot) return haDialog.shadowRoot.querySelector('footer#actions') || null;
+      return null;
     }} catch(e) {{ return null; }}
   }}
 
@@ -925,6 +947,19 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     // Remove current session so getSessionId() generates a fresh one on next call
     try {{ localStorage.removeItem(SESSION_KEY); }} catch(e) {{}}
     try {{ sessionStorage.removeItem(SESSION_KEY); }} catch(e) {{}}
+  }}
+
+  // Card editor uses a separate session so conversations don't mix with bubble
+  const CARD_SESSION_KEY = 'ha-claude-card-session';
+  function getCardSessionId() {{
+    let sid = null;
+    try {{ sid = localStorage.getItem(CARD_SESSION_KEY); }} catch(e) {{}}
+    if (!sid) {{ sid = 'card_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7); }}
+    try {{ localStorage.setItem(CARD_SESSION_KEY, sid); }} catch(e) {{}}
+    return sid;
+  }}
+  function resetCardSession() {{
+    try {{ localStorage.removeItem(CARD_SESSION_KEY); }} catch(e) {{}}
   }}
   
   // ---- Fallback in-memory storage (for private browsing or disabled localStorage) ----
@@ -1410,7 +1445,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
         </span>
       </div>
     </div>
-    <button class="bubble-btn" id="haChatBubbleBtn" title="Amira">&#129302;</button>
+    <button class="bubble-btn" id="haChatBubbleBtn" title="Amira"{' style="display:none"' if not show_bubble else ''}>&#129302;</button>
   `;
   document.body.appendChild(root);
 
@@ -1861,14 +1896,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     return !!(_cardBtnParent && _cardBtnParent.querySelector('#' + CARD_BTN_ID));
   }}
 
-  // Returns the mdc-dialog__surface element (the visible card panel of the dialog)
+  // Returns the dialog surface element (visible card panel container).
+  // Supports legacy (.mdc-dialog__surface) and new HA (.content-wrapper / .body).
   function _getCardSurface() {{
     try {{
       const editCardEl = _findEditCardEl();
       if (!editCardEl?.shadowRoot) return null;
       const haDialog = editCardEl.shadowRoot.querySelector('ha-dialog[open]');
       if (!haDialog?.shadowRoot) return null;
-      return haDialog.shadowRoot.querySelector('.mdc-dialog__surface') || null;
+      return haDialog.shadowRoot.querySelector('.mdc-dialog__surface')
+          || haDialog.shadowRoot.querySelector('.content-wrapper')
+          || haDialog.shadowRoot.querySelector('.body')
+          || null;
     }} catch(e) {{ return null; }}
   }}
 
@@ -2018,6 +2057,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     inputRow.appendChild(sendB);
 
     panel.appendChild(hdr);
+    // Info banner: YAML not detected (GUI mode)
+    if (!ctx.cardYaml) {{
+      const warn = document.createElement('div');
+      warn.style.cssText = 'padding:6px 12px;background:#fff3cd;color:#856404;font-size:11px;border-bottom:1px solid #ffeeba;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;';
+      warn.innerHTML = '<span>' + (T.card_no_yaml_warn || '') + '</span>';
+      const closeW = document.createElement('button');
+      closeW.textContent = '\u2715';
+      closeW.style.cssText = 'background:none;border:none;color:#856404;cursor:pointer;font-size:13px;padding:0 2px;';
+      closeW.onclick = () => warn.remove();
+      warn.appendChild(closeW);
+      panel.appendChild(warn);
+    }}
     if (actions.length) panel.appendChild(qaRow);
     panel.appendChild(msgs);
     panel.appendChild(inputRow);
@@ -2076,39 +2127,110 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
       const ctx = detectContext();
       const prefix = buildContextPrefix(ctx);
       const fullMsg = prefix ? prefix + '\\n\\n' + text : text;
-      // Read provider/model from the bubble's select elements (always in DOM)
-      const _provider = document.getElementById('haProviderSelect')?.value || 'anthropic';
-      const _model    = document.getElementById('haModelSelect')?.value || '';
-      const _session  = getSessionId();
-      const resp = await fetch(API_BASE + '/api/chat', {{
+      const _session = getCardSessionId();
+      const response = await fetch(API_BASE + '/api/chat/stream', {{
         method: 'POST',
-        headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify({{ message: fullMsg, provider: _provider, model: _model, session_id: _session, stream: false }})
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ message: fullMsg, session_id: _session }})
       }});
-      const rawText = await resp.text();
-      let data;
-      try {{ data = JSON.parse(rawText); }} catch(e) {{
-        console.error('[Amira card panel] non-JSON response (status=' + resp.status + '):', rawText.substring(0, 200));
-        if (thinkEl) thinkEl.textContent = T.error_connection + ' (HTTP ' + resp.status + ')';
-        return;
-      }}
-      if (thinkEl) thinkEl.innerHTML = _renderInlineMd(data.response || data.error || '?');
-      // Show cost if returned by API
-      if (thinkEl && data.usage && (data.usage.input_tokens || data.usage.output_tokens)) {{
-        const u = data.usage;
-        const inp = (u.input_tokens || 0).toLocaleString();
-        const out = (u.output_tokens || 0).toLocaleString();
-        let usageTxt = inp + ' in / ' + out + ' out';
-        if (u.cost !== undefined && u.cost > 0) {{
-          const sym = u.currency === 'EUR' ? '\u20ac' : '$';
-          usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
-        }} else if (u.cost === 0) {{
-          usageTxt += ' \u2022 free';
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '', assistantText = '';
+      let firstToken = true;
+
+      while (true) {{
+        const {{ done, value }} = await reader.read();
+        if (done) {{
+          // Flush remaining buffer
+          if (buffer.trim()) {{
+            let _flushUsage = null;
+            for (const line of buffer.split('\\n')) {{
+              if (!line.startsWith('data: ')) continue;
+              try {{
+                const evt = JSON.parse(line.slice(6));
+                if (evt.type === 'token') {{ assistantText += evt.content || ''; }}
+                else if (evt.type === 'done') {{
+                  if (evt.full_text) {{ assistantText = evt.full_text; }}
+                  if (evt.usage) {{ _flushUsage = evt.usage; }}
+                }}
+              }} catch(e) {{}}
+            }}
+            if (thinkEl && assistantText) {{
+              thinkEl.innerHTML = _renderInlineMd(assistantText);
+            }}
+            if (thinkEl && _flushUsage && (_flushUsage.input_tokens || _flushUsage.output_tokens)) {{
+              const u = _flushUsage;
+              const inp = (u.input_tokens || 0).toLocaleString();
+              const out = (u.output_tokens || 0).toLocaleString();
+              let usageTxt = inp + ' in / ' + out + ' out';
+              if (u.cost !== undefined && u.cost > 0) {{
+                const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+              }} else if (u.cost === 0) {{
+                usageTxt += ' \u2022 free';
+              }}
+              const uDiv = document.createElement('div');
+              uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
+              uDiv.textContent = usageTxt;
+              thinkEl.appendChild(uDiv);
+            }}
+          }}
+          break;
         }}
-        const uDiv = document.createElement('div');
-        uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
-        uDiv.textContent = usageTxt;
-        thinkEl.appendChild(uDiv);
+
+        buffer += decoder.decode(value, {{ stream: true }});
+        const lines = buffer.split('\\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {{
+          if (!line.startsWith('data: ')) continue;
+          try {{
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === 'token') {{
+              if (firstToken) {{ firstToken = false; }}
+              assistantText += evt.content || '';
+              if (thinkEl) thinkEl.innerHTML = _renderInlineMd(assistantText);
+              if (_cardMsgsEl) _cardMsgsEl.scrollTop = _cardMsgsEl.scrollHeight;
+            }} else if (evt.type === 'clear') {{
+              assistantText = '';
+              if (thinkEl) thinkEl.innerHTML = T.thinking + '…';
+            }} else if (evt.type === 'done') {{
+              if (evt.full_text) {{
+                assistantText = evt.full_text;
+                if (thinkEl) thinkEl.innerHTML = _renderInlineMd(assistantText);
+              }}
+              if (thinkEl && evt.usage && (evt.usage.input_tokens || evt.usage.output_tokens)) {{
+                const u = evt.usage;
+                const inp = (u.input_tokens || 0).toLocaleString();
+                const out = (u.output_tokens || 0).toLocaleString();
+                let usageTxt = inp + ' in / ' + out + ' out';
+                if (u.cost !== undefined && u.cost > 0) {{
+                  const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                  usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+                }} else if (u.cost === 0) {{
+                  usageTxt += ' \u2022 free';
+                }}
+                const uDiv = document.createElement('div');
+                uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
+                uDiv.textContent = usageTxt;
+                thinkEl.appendChild(uDiv);
+              }}
+            }} else if (evt.type === 'error') {{
+              if (thinkEl) thinkEl.textContent = evt.message || T.error_connection;
+            }} else if (evt.type === 'status') {{
+              const msg = evt.message || evt.content || '';
+              if (firstToken && thinkEl) thinkEl.textContent = msg + '…';
+            }} else if (evt.type === 'tool') {{
+              const desc = evt.description || evt.name || 'tool';
+              if (firstToken && thinkEl) thinkEl.textContent = '\U0001f527 ' + desc + '…';
+            }}
+          }} catch (parseErr) {{}}
+        }}
+      }}
+      // Fallback: if stream closed without any tokens, show something
+      if (!assistantText && thinkEl) {{
+        thinkEl.textContent = T.error_connection;
       }}
     }} catch(e) {{
       console.error('[Amira card panel] send error:', e);
@@ -2118,6 +2240,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
   }}
 
   function injectCardEditorButton() {{
+    if (!{'true' if show_card_button else 'false'}) return;
     if (_cardBtnInjected && _cardBtnExists()) return;
     const footer = getCardEditorFooter();
     if (!footer) return;
@@ -2125,6 +2248,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     aiBtn.id = CARD_BTN_ID;
     aiBtn.setAttribute('role', 'button');
     aiBtn.setAttribute('tabindex', '0');
+    // If footer is ha-dialog-footer (new HA), slot it as primaryAction
+    if (footer.tagName && footer.tagName.toLowerCase() === 'ha-dialog-footer') {{
+      aiBtn.setAttribute('slot', 'primaryAction');
+    }}
     aiBtn.textContent = '🤖 Amira';
     aiBtn.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;padding:0 16px;height:36px;min-width:64px;font-size:13px;font-weight:600;cursor:pointer;border:none;border-radius:4px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;box-shadow:0 2px 8px rgba(102,126,234,0.45);user-select:none;white-space:nowrap;margin-left:8px;transition:opacity 0.15s;';
     aiBtn.onmouseenter = () => {{ aiBtn.style.opacity='0.85'; }};
@@ -2681,14 +2808,14 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     sendBtn.className = 'input-btn abort-btn';
     sendBtn.disabled = false;
 
-    const thinkingEl = addMessage('thinking', '', false);
+    let thinkingEl = addMessage('thinking', '', false);
     // Show current model name in the thinking label (like the main chat UI)
     const _thinkModel = agentData ? (agentData.current_model_technical || '') : '';
     const _thinkLabel = _thinkModel ? T.thinking + ' <span class="thinking-model">· ' + _thinkModel + '</span>' : T.thinking;
     thinkingEl.innerHTML = _thinkLabel + '... <span class="thinking-elapsed"></span><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span><div class="thinking-steps"></div>';
     const _thinkingStart = Date.now();
     let _thinkingSteps = [];
-    const _thinkingTimer = setInterval(() => {{
+    let _thinkingTimer = setInterval(() => {{
       const el = thinkingEl.querySelector('.thinking-elapsed');
       if (!el) return;
       const s = Math.floor((Date.now() - _thinkingStart) / 1000);
@@ -2723,6 +2850,23 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
     function _removeThinking() {{
       clearInterval(_thinkingTimer);
       if (thinkingEl.parentNode) thinkingEl.remove();
+    }}
+
+    function _restoreThinking() {{
+      // Re-create thinking indicator between tool rounds
+      clearInterval(_thinkingTimer);
+      if (thinkingEl.parentNode) thinkingEl.remove();
+      thinkingEl = addMessage('thinking', '', false);
+      thinkingEl.innerHTML = _thinkLabel + '... <span class="thinking-elapsed"></span><span class="thinking-dots"><span>.</span><span>.</span><span>.</span></span><div class="thinking-steps"></div>';
+      _thinkingTimer = setInterval(() => {{
+        const el = thinkingEl.querySelector('.thinking-elapsed');
+        if (!el) return;
+        const s = Math.floor((Date.now() - _thinkingStart) / 1000);
+        const m = Math.floor(s / 60);
+        const r = s % 60;
+        el.textContent = '(' + (m > 0 ? m + ':' + String(r).padStart(2, '0') : r + 's') + ')';
+      }}, 1000);
+      firstToken = true;
     }}
 
     let toolBadgesEl = null;
@@ -2818,8 +2962,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en") -> str:
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }} else if (evt.type === 'clear') {{
               assistantText = '';
+              assistantEl.style.display = 'none';
               assistantEl.innerHTML = '';
               if (toolBadgesEl) {{ toolBadgesEl.remove(); toolBadgesEl = null; }}
+              _restoreThinking();
             }} else if (evt.type === 'done') {{
               if (firstToken) {{
                 _removeThinking();

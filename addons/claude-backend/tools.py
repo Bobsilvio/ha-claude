@@ -942,10 +942,6 @@ TOOL_DESCRIPTIONS = {
 }
 
 
-def get_tool_description(tool_name: str) -> str:
-    """Get user-friendly Italian description for a tool."""
-    return TOOL_DESCRIPTIONS.get(tool_name, tool_name.replace('_', ' ').title())
-
 
 # ---- Tool definitions (shared across providers) ----
 
@@ -2026,6 +2022,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             import time as _time
             # Accept both singular and plural keys from the model
             alias = tool_input.get("alias", "New Automation")
+
+            # Prefix with agent name (e.g. "Amira - Accendi luce")
+            _agent_prefix = (AI_SIGNATURE or "Amira").strip()
+            if _agent_prefix and not alias.lower().startswith(_agent_prefix.lower()):
+                alias = f"{_agent_prefix} - {alias}"
+
             triggers = tool_input.get("triggers") or tool_input.get("trigger", [])
             actions = tool_input.get("actions") or tool_input.get("action", [])
             conditions = tool_input.get("conditions") or tool_input.get("condition", [])
@@ -2145,6 +2147,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             resp = {
                 "status": "success",
                 "message": f"Automation '{alias}' created!",
+                "automation_id": config['id'],
                 "yaml": created_yaml,
                 "IMPORTANT": "Show the user the YAML code you created."
             }
@@ -2479,6 +2482,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             result_obj = {
                 "status": "success",
                 "message": " ".join(msg_parts),
+                "automation_id": automation_id,
                 "updated_via": updated_via,
                 "old_yaml": old_yaml,
                 "new_yaml": new_yaml,
@@ -2836,6 +2840,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 return json.dumps({
                     "status": "success",
                     "message": f"Script '{found.get('alias', script_id)}' updated.",
+                    "script_id": script_id,
                     "old_yaml": old_yaml,
                     "new_yaml": new_yaml,
                     "snapshot": snapshot.get("snapshot_id", ""),
@@ -5078,88 +5083,3 @@ def get_tool_registry():
 
 # ---- Registry-aware tool functions (new API, backward-compatible) ----
 
-def get_tools_for_provider_via_registry(
-    provider: str,
-    intent_tools=None,
-    tier: str = "full",
-    model: str = "",
-    agent_id: str = "",
-):
-    """Get tools formatted for a specific provider using the ToolRegistry.
-
-    This is the NEW preferred way to get tools. Falls back to legacy functions
-    if the registry isn't available.
-
-    Args:
-        provider: Provider name ("anthropic", "openai", "google", etc.)
-        intent_tools: None (all tools), [] (no tools), or list of tool names
-        tier: "compact", "extended", or "full"
-        model: Model ID (used for xAI/Grok detection behind gateways)
-        agent_id: Active agent ID (for per-agent tool allow/block filtering)
-
-    Returns:
-        List of tool dicts in provider-specific format
-    """
-    registry = get_tool_registry()
-    if registry is None:
-        # Fallback to legacy
-        if provider == "anthropic":
-            return get_anthropic_tools()
-        elif provider == "google":
-            return get_gemini_tools()
-        else:
-            return get_openai_tools_for_provider()
-
-    context = {
-        "tier": tier,
-        "intent_tools": intent_tools,
-        "enable_file_access": getattr(api, "ENABLE_FILE_ACCESS", False),
-    }
-    if agent_id:
-        context["agent_id"] = agent_id
-
-    if provider == "google":
-        return registry.format_for_gemini(context)
-
-    return registry.format_for_provider(provider, context, model=model)
-
-
-def execute_tool_via_registry(
-    tool_name: str,
-    tool_input: dict,
-    session_id: str = "default",
-    read_only: bool = False,
-    round_number: int = 0,
-    call_history: set = None,
-) -> str:
-    """Execute a tool using the ToolRegistry with hooks.
-
-    This is the NEW preferred way to execute tools. Falls back to legacy
-    execute_tool() if the registry isn't available.
-
-    Args:
-        tool_name: Name of the tool to execute
-        tool_input: Arguments dict
-        session_id: Session ID for read-only state
-        read_only: Whether session is in read-only mode
-        round_number: Current tool loop round (for metrics)
-        call_history: Set of previous call signatures (for dedup)
-
-    Returns:
-        Result string (JSON)
-    """
-    from tool_registry import ToolCallContext
-
-    registry = get_tool_registry()
-    if registry is None:
-        return execute_tool(tool_name, tool_input)
-
-    ctx = ToolCallContext(
-        tool_name=tool_name,
-        arguments=tool_input,
-        session_id=session_id,
-        read_only=read_only,
-        round_number=round_number,
-        call_history=call_history or set(),
-    )
-    return registry.execute(tool_name, tool_input, context=ctx)

@@ -71,17 +71,18 @@ class EnhancedProviderManager:
         last_event = None
         last_error_event = None
 
+        _primary = providers_to_try[0] if providers_to_try else provider
         for prov in providers_to_try:
             try:
                 logger.info(
                     f"EnhancedProviderManager: attempting {prov} "
                     f"(priority={self._get_failure_priority(prov)})"
                 )
-                
+
                 # Check rate limit before attempting
                 limiter = self.coordinator.get_limiter(prov)
                 can_request, wait_time = limiter.can_request()
-                
+
                 if not can_request:
                     logger.warning(
                         f"EnhancedProviderManager: {prov} rate limited, "
@@ -93,6 +94,7 @@ class EnhancedProviderManager:
 
                 event_count = 0
                 content_started = False
+                _fallback_notice_sent = False
 
                 for event in self._stream_with_provider(
                     prov, messages, intent_info,
@@ -125,6 +127,15 @@ class EnhancedProviderManager:
                         self._record_failure(prov, event.get("message", "provider error event"))
                         last_exception = Exception(event.get("message", "provider error event"))
                         break
+
+                    # Emit fallback notice once, before the first content event
+                    if prov != _primary and not _fallback_notice_sent:
+                        _fallback_notice_sent = True
+                        yield {
+                            "type": "fallback_notice",
+                            "original_provider": _primary,
+                            "actual_provider": prov,
+                        }
 
                     yield event
 

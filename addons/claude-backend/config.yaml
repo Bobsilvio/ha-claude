@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: Amira
-version: "4.5.1"
+version: "4.5.2"
 slug: claude-backend
 description: >-
   Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -30,7 +30,6 @@ environment:
   DEBUG_MODE: "False"
   API_PORT: "5010"
 options:
-  language: en
   anthropic_api_key: ""
   openai_api_key: ""
   google_api_key: ""
@@ -52,33 +51,10 @@ options:
   custom_api_base: ""
   custom_model_name: ""
   ollama_base_url: "http://localhost:11434"
-  nvidia_thinking_mode: false
-  anthropic_extended_thinking: false
-  anthropic_prompt_caching: false
-  openai_extended_thinking: false
-  enable_file_access: false
-  enable_memory: false
-  enable_file_upload: false
-  enable_voice_input: true
-  tts_voice: female
-  enable_rag: false
-  enable_chat_bubble: false
-  enable_mcp: false
-  mcp_config_file: /config/amira/mcp_config.json
-  timeout: "30"
-  max_retries: "3"
-  max_snapshots_per_file: 5
-  max_conversations: 10
-  cost_currency: USD
-  telegram_bot_token: ""
-  twilio_account_sid: ""
-  twilio_auth_token: ""
-  twilio_whatsapp_from: ""
   colored_logs: true
   debug_mode: false
   log_level: normal
 schema:
-  language: list(en|it|es|fr)?
   anthropic_api_key: password?
   openai_api_key: password?
   google_api_key: password?
@@ -100,28 +76,6 @@ schema:
   custom_api_base: str?
   custom_model_name: str?
   ollama_base_url: str?
-  nvidia_thinking_mode: bool?
-  anthropic_extended_thinking: bool?
-  anthropic_prompt_caching: bool?
-  openai_extended_thinking: bool?
-  enable_file_access: bool?
-  enable_memory: bool?
-  enable_file_upload: bool?
-  enable_voice_input: bool?
-  tts_voice: list(female|male)?
-  enable_rag: bool?
-  enable_chat_bubble: bool?
-  enable_mcp: bool?
-  mcp_config_file: str?
-  timeout: str?
-  max_retries: str?
-  max_snapshots_per_file: "int(1,50)?"
-  max_conversations: "int(1,100)?"
-  cost_currency: "list(USD|EUR|GBP|JPY)?"
-  telegram_bot_token: password?
-  twilio_account_sid: password?
-  twilio_auth_token: password?
-  twilio_whatsapp_from: str?
   colored_logs: bool?
   debug_mode: bool?
   log_level: list(normal|verbose|debug)?

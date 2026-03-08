@@ -304,12 +304,24 @@ class AgentManager:
     # -- config I/O --
 
     def _load_config(self) -> None:
-        """Load agent config from disk (or create default)."""
+        """Load agent config from disk (or create default).
+        
+        Preserves the active agent if it still exists after reload.
+        """
+        # Remember currently active agent before reloading
+        prev_active = self._active_agent_id
+        
         try:
             if os.path.isfile(self._config_path):
                 with open(self._config_path, "r", encoding="utf-8") as f:
                     data = json.load(f) or {}
                 self._parse_config(data)
+                
+                # Restore previous active agent if it still exists and is enabled
+                if prev_active and prev_active in self._agents and self._agents[prev_active].enabled:
+                    self._active_agent_id = prev_active
+                    logger.debug(f"AgentManager: preserved active agent '{prev_active}' after reload")
+                
                 self._last_load_ts = time.time()
                 logger.info(f"AgentManager: loaded {len(self._agents)} agents from {self._config_path}")
             else:
@@ -365,10 +377,14 @@ class AgentManager:
                 except Exception as e:
                     logger.warning(f"AgentManager: skipping flat agent '{key}': {e}")
 
-        # Set active agent to default
-        default_agent = self._find_default_agent()
-        if default_agent:
-            self._active_agent_id = default_agent.id
+        # Set active agent: try persisted selection first, then default
+        persisted = self._load_active_agent()
+        if persisted:
+            self._active_agent_id = persisted
+        else:
+            default_agent = self._find_default_agent()
+            if default_agent:
+                self._active_agent_id = default_agent.id
 
         # Channel → agent assignments
         self._channel_agents = {}
@@ -452,14 +468,41 @@ class AgentManager:
         return self.resolve_agent()
 
     def set_active_agent(self, agent_id: str) -> bool:
-        """Switch the active agent."""
+        """Switch the active agent and persist the selection."""
         with self._lock:
             agent = self._agents.get(agent_id)
             if not agent or not agent.enabled:
                 return False
             self._active_agent_id = agent_id
         logger.info(f"AgentManager: active agent set to '{agent_id}'")
+        # Persist selection to disk so it survives restarts and config reloads
+        self._save_active_agent(agent_id)
         return True
+    
+    def _save_active_agent(self, agent_id: str) -> None:
+        """Persist the active agent selection to disk."""
+        try:
+            selection_file = "/config/amira/active_agent.txt"
+            os.makedirs(os.path.dirname(selection_file), exist_ok=True)
+            with open(selection_file, "w", encoding="utf-8") as f:
+                f.write(agent_id)
+            logger.debug(f"AgentManager: persisted active agent '{agent_id}'")
+        except Exception as e:
+            logger.warning(f"AgentManager: could not save active agent: {e}")
+    
+    def _load_active_agent(self) -> Optional[str]:
+        """Load the persisted active agent selection from disk."""
+        try:
+            selection_file = "/config/amira/active_agent.txt"
+            if os.path.isfile(selection_file):
+                with open(selection_file, "r", encoding="utf-8") as f:
+                    agent_id = f.read().strip()
+                if agent_id and agent_id in self._agents and self._agents[agent_id].enabled:
+                    logger.debug(f"AgentManager: loaded persisted active agent '{agent_id}'")
+                    return agent_id
+        except Exception as e:
+            logger.debug(f"AgentManager: could not load active agent: {e}")
+        return None
 
     # -- model resolution (OpenClaw-style cascade) --
 

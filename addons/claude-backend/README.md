@@ -4,7 +4,7 @@ Multi-provider AI assistant for Home Assistant. Control your smart home, create 
 
 Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot, OpenAI Codex, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
 
-**New in v4.5.1**: Fix card/bubble conversation separation, trash icon rendering, silent agent save failure. See [CHANGELOG](CHANGELOG.md) for full details.
+**New in v4.5.2**: Settings now managed from the chat UI (no more config.yaml toggles), floating bubble + card editor button ON by default with independent toggles, tool execution feedback in bubble chat, multi-provider voice system. See [CHANGELOG](CHANGELOG.md) for full details.
 
 ---
 
@@ -17,6 +17,36 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 > 💡 **Free options**: GitHub Models (40+ models), NVIDIA NIM, Groq, Google Gemini (1500 req/day).
 >
 > 💳 **Already paying for ChatGPT Plus/Pro?** Use **OpenAI Codex** — included in your subscription, no API key needed. See below.
+
+---
+
+## ✨ Features
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| 🏠 **Smart Home Control** | Built-in | Natural language device control, service calls, area management |
+| 🤖 **Automation Management** | Built-in | Create & modify automations with YAML diff view |
+| 🔧 **System Diagnostics** | Built-in | View HA repairs, health checks, AI-suggested fixes |
+| 💬 **Streaming Chat UI** | Built-in | Real-time responses, tool badges, code copy, conversation history |
+| 🫧 **Floating Chat Bubble** | ⚙️ ON | AI accessible on every HA page, context-aware |
+| 🤖 **Card Editor Button** | ⚙️ ON | Amira button in Lovelace card editor for inline AI help |
+| 🎙️ **Voice Input & TTS** | ⚙️ ON | Multi-provider voice: Groq/OpenAI/Google STT + Edge/Groq/OpenAI TTS |
+| 📎 **File Upload** | ⚙️ ON | Upload PDF, DOCX, TXT, MD, YAML for AI analysis |
+| 👁️ **Vision** | Built-in | Image upload & analysis (Claude, GPT-4o, Gemini) |
+| 🧠 **Memory** | ⚙️ OFF | Persistent MEMORY.md injected in every conversation |
+| 📁 **File Access** | ⚙️ OFF | Read/write HA config files with automatic snapshots |
+| 🔍 **RAG** | ⚙️ OFF | Semantic search over uploaded documents |
+| 🔌 **MCP Tools** | ⚙️ OFF | Extend AI with external tools via Model Context Protocol |
+| 🔄 **Provider Fallback** | ⚙️ OFF | Automatic fallback chain when primary provider fails |
+| 🤖 **Multi-Agent System** | Built-in | Custom agents with own model, tools, prompt, fallback |
+| 💰 **Cost Tracking** | Built-in | Per-message cost with cache breakdown, daily aggregates |
+| 🛠️ **Dashboard Creation** | Built-in | Lovelace cards + AI-generated HTML dashboards (Vue 3) |
+| 📱 **Telegram Bot** | ⚙️ OFF | Long polling — no public IP needed |
+| 📱 **WhatsApp** | ⚙️ OFF | Twilio integration with webhook |
+| ⏰ **Scheduled Tasks** | Built-in | Cron-based task scheduler |
+| 🌍 **4 Languages** | Built-in | EN / IT / ES / FR — UI + AI responses |
+
+> ⚙️ = configurable from **Settings** UI (⚙️ icon in chat). ON/OFF shows the default.
 
 ---
 
@@ -71,20 +101,50 @@ If you already pay for **ChatGPT Plus** ($20/mo) or **Pro** ($200/mo), you can u
 4. Copy the redirect URL (`localhost:1455/...`) and paste it in the Amira modal
 5. Done — a green banner confirms the connection with expiry info
 
-### Key Settings
+### Configuration Architecture
+
+Amira uses **two layers** of configuration:
+
+1. **`config.yaml`** (HA Add-on page → Configuration tab) — API keys and log settings only
+2. **Settings UI** (Amira chat → ⚙️ Settings) — All runtime features, managed from the web interface with descriptions in 4 languages
+
+> 💡 After saving settings in the UI, you'll be prompted to restart the addon to apply changes.
+
+#### config.yaml settings (API keys + logging)
+
+| Setting | Description |
+|---------|-------------|
+| `anthropic_api_key` | Anthropic Claude API key |
+| `openai_api_key` | OpenAI API key |
+| `google_api_key` | Google Gemini API key |
+| `github_token` | GitHub Models / Copilot token |
+| `nvidia_api_key` | NVIDIA NIM API key |
+| `groq_api_key` | Groq API key |
+| `ollama_base_url` | Ollama server URL (e.g. `http://192.168.1.x:11434`) |
+| + 12 more providers | See providers table above |
+| `colored_logs` | Pretty-print add-on logs |
+| `debug_mode` | Verbose logging for troubleshooting |
+| `log_level` | `normal` / `verbose` / `debug` |
+
+#### Runtime settings (managed via Settings UI)
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `language` | `en` | UI language: en / it / es / fr |
-| `enable_file_access` | `false` | Read/write HA config files |
-| `enable_chat_bubble` | `false` | Floating AI button on every HA page |
-| `enable_memory` | `false` | Persistent MEMORY.md (see below) |
-| `enable_file_upload` | `false` | Upload PDF / DOCX / TXT |
-| `enable_rag` | `false` | Semantic search in uploaded documents |
+| `enable_file_access` | OFF | Read/write HA config files |
+| `enable_file_upload` | **ON** | Upload PDF / DOCX / TXT |
+| `enable_memory` | OFF | Persistent MEMORY.md (see below) |
+| `enable_rag` | OFF | Semantic search in uploaded documents |
+| `enable_chat_bubble` | **ON** | Floating AI button on every HA page |
+| `enable_amira_card_button` | **ON** | 🤖 Amira button in the Lovelace card editor |
+| `enable_voice_input` | **ON** | Voice input in chat bubble |
+| `enable_mcp` | OFF | Enable MCP tool servers |
+| `fallback_enabled` | OFF | Provider fallback chain |
+| `tts_voice` | `female` | TTS voice gender (male / female) |
 | `max_conversations` | `10` | Chat history depth (1–100) |
 | `cost_currency` | `USD` | Cost display currency (USD, EUR) |
 | `timeout` | `30` | Request timeout (seconds) |
-| `mcp_config_file` | `/config/amira/mcp_config.json` | Custom MCP tools |
+| `max_retries` | `3` | Retry failed API requests |
 
 ### 💰 Cost & Usage Tracking
 
@@ -213,13 +273,14 @@ All persistent data lives in **`/config/amira/`** — one folder, easy to backup
 
 ```
 /config/amira/
+├── settings.json             # Runtime settings (managed via Settings UI)
 ├── conversations.json        # Chat history
 ├── runtime_selection.json    # Last selected model/provider
 ├── model_blocklist.json      # NVIDIA blocked/tested models (auto-managed)
 ├── agents.json               # Multi-agent config (name, model, tools, fallback)
 ├── bubble_devices.json       # Chat bubble per-device config
 ├── custom_system_prompt.txt  # Custom system prompt override
-├── mcp_config.json           # MCP servers (create this manually)
+├── mcp_config.json           # MCP servers config
 ├── snapshots/                # Config file backups (before edits)
 ├── rag/                      # RAG document index
 ├── documents/                # Uploaded files
@@ -227,6 +288,9 @@ All persistent data lives in **`/config/amira/`** — one folder, easy to backup
     ├── MEMORY.md             # Long-term facts (always in context)
     ├── HISTORY.md            # Session log (append-only)
     └── conversations.json    # Full conversation archive
+
+/config/www/
+└── ha-claude-chat-bubble.js  # Floating chat bubble (auto-generated)
 
 /data/
 └── usage_stats.json          # Persistent cost/usage tracking (daily, per-model, per-provider)
@@ -268,8 +332,9 @@ No per-message keyword search, no cross-session contamination. Simple and token-
 
 Extend the AI with external tools via [Model Context Protocol](https://modelcontextprotocol.io/):
 
-1. Create `/config/amira/mcp_config.json`
-2. Add your servers:
+1. Enable MCP in **Settings → Features → MCP**
+2. Configure the MCP config file path (default: `/config/amira/mcp_config.json`)
+3. Add your servers to the config file:
 
 ```json
 {
@@ -316,10 +381,10 @@ For stdio servers (if node/python available on the host):
 |---------|----------|
 | "Invalid API key" | Check key format matches selected provider |
 | No models in dropdown | Add at least one API key, restart |
-| File access not working | Enable `enable_file_access: true`, restart |
-| Bubble not visible | Enable `enable_chat_bubble: true`, refresh |
+| File access not working | Enable in Settings → Features → File Access, restart |
+| Bubble not visible | Check Settings → Features → Chat Bubble is ON; hard-refresh browser (Ctrl+F5) |
 | Chat history lost | Check write permissions on `/config/amira/` |
-| Memory not working | Enable `enable_memory: true`; check `/config/amira/memory/MEMORY.md` |
+| Memory not working | Enable in Settings → Features → Memory; check `/config/amira/memory/MEMORY.md` |
 | MCP not loading | Validate JSON at `/config/amira/mcp_config.json`; check logs |
 
 Check logs: **Settings → Add-ons → Amira → Logs**

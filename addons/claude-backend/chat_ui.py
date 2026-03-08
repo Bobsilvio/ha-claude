@@ -103,10 +103,8 @@ def get_chat_ui():
             "nvidia_tested": "Tested",
             "nvidia_to_test": "To test",
             "no_models": "No models available",
-            "no_models_msg": "No models available. Check the provider API keys.",
             "models_load_error": "Error loading models: ",
             "nvidia_test_result": "NVIDIA Test: OK {ok}, removed {removed}, tested {tested}/{total}",
-            "nvidia_timeout": "timeout: {n}",
             "nvidia_remaining": "remaining: {n} (press again to continue)",
             "nvidia_test_failed": "NVIDIA test failed",
             "switched_to": "Switched to {provider} \u2192 {model}",
@@ -145,7 +143,6 @@ def get_chat_ui():
             "document_uploaded": "Document uploaded",
             "mic_not_supported": "Browser does not support audio recording. Use HTTPS or a compatible browser.",
             "mic_needs_https": "Microphone requires HTTPS. Quick fix for Chrome: open chrome://flags/#unsafely-treat-insecure-origin-as-secure, add your HA address (e.g. http://192.168.x.x:8123), set Enabled, restart Chrome. Otherwise configure SSL in HA or use localhost.",
-            "mic_needs_https_short": "Microphone blocked (HTTP). See message above for Chrome workaround.",
             "mic_denied_settings": "Microphone access denied. Go to browser settings to enable it.",
             "mic_denied_icon": "Microphone denied. Click the 🔒 icon in the browser bar to enable it.",
             "mic_not_found": "No microphone found. Connect a microphone and try again.",
@@ -153,16 +150,12 @@ def get_chat_ui():
             "mic_error": "Microphone error",
             # Voice mode
             "voice_mode": "Voice mode",
-            "voice_mode_on": "Voice ON – responses will be read aloud",
-            "voice_mode_off": "Voice OFF",
             "voice_listening": "Listening...",
             "voice_processing": "Processing audio...",
-            "voice_tts_error": "Could not play voice response",
             "voice_tts_no_provider": "Voice output unavailable. Edge TTS or a Groq/OpenAI API key is needed.",
             "voice_transcription_error": "Transcription failed. Try again.",
             "voice_speaking": "Speaking...",
             "voice_stop_speaking": "Stop speaking",
-            "wake_word_active": "Listening for 'Ok Amira'...",
             "wake_word_detected": "Amira activated! Speak now...",
             # Sidebar tabs
             "tab_chat": "Chat",
@@ -177,14 +170,10 @@ def get_chat_ui():
             "files_close_panel": "Close file panel",
             "files_context_label": "File context:",
             "messaging_no_chats": "No messaging chats yet",
-            "messaging_user": "User",
             "messaging_messages": "Messages",
-            "messaging_last": "Last message",
             "messaging_delete": "Delete",
             "messaging_confirm_delete": "Delete this chat?",
             "no_backups": "No backups yet",
-            "backup_file": "File",
-            "backup_date": "Date",
             "restore": "Restore",
             "confirm_restore_backup": "Restore this backup? The current file will be replaced.",
             "delete_backup": "Delete",
@@ -192,11 +181,6 @@ def get_chat_ui():
             "download_backup": "Download",
             # Device manager
             "no_devices": "No devices registered yet",
-            "device_id": "Device ID",
-            "device_name": "Name",
-            "device_type": "Type",
-            "device_enabled": "Enabled",
-            "device_last_seen": "Last Seen",
             "enable_device": "Enable",
             "disable_device": "Disable",
             "rename_device": "Rename",
@@ -206,21 +190,16 @@ def get_chat_ui():
             "device_updated": "Device updated",
             # Dark mode
             "dark_mode": "Dark mode",
-            "light_mode": "Light mode",
             # Costs tab
             "tab_costs": "Costs",
             "costs_today": "Today",
-            "costs_total_tokens": "Total tokens",
-            "costs_total_cost": "Total cost",
             "costs_by_model": "By model",
             "costs_by_provider": "By provider",
             "costs_history": "Last 7 days",
             "costs_no_data": "No usage data yet",
             "costs_reset": "Reset",
             "costs_reset_confirm": "Reset all usage statistics? This cannot be undone.",
-            "costs_reset_done": "Usage data cleared",
             "costs_requests": "requests",
-            "costs_tokens": "tokens",
             # Config tab
             "tab_config": "\U0001f527 Config",
             "config_loading": "Loading...",
@@ -228,12 +207,83 @@ def get_chat_ui():
             "config_cancel": "Cancel",
             "config_saved": "Saved!",
             "config_save_error": "Save failed",
-            "config_invalid_json": "Invalid JSON",
             "config_file_not_found": "File not found (will be created on save)",
             "config_agents_title": "Agent Profiles",
             "config_mcp_title": "MCP Configuration",
             "config_prompt_title": "Custom System Prompt",
             "config_memory_title": "Memory (MEMORY.md)",
+            "config_llm_title": "LLM Priority",
+            "llm_fallback_label": "Auto Fallback",
+            "llm_priority_label": "Priority order",
+            "llm_no_key": "no key",
+            "llm_saved": "Saved!",
+            "llm_fallback_on": "If the primary provider fails, the system will try the next one in the list.",
+            "llm_fallback_off": "Fallback disabled. Only the primary provider will be used.",
+            "fallback_notice": "Fallback: {{from}} → {{to}}",
+            # Settings
+            "config_settings_title": "Settings",
+            "settings_saved": "Settings saved!",
+            "restart_confirm": "Some changes require a restart to take effect. Restart the add-on now?",
+            "restart_in_progress": "Restarting add-on...",
+            "restart_failed": "Restart failed",
+            "settings_language": "Language",
+            "settings_enable_memory": "Memory",
+            "settings_enable_file_access": "File Access",
+            "settings_enable_file_upload": "File Upload",
+            "settings_enable_voice_input": "Voice Input",
+            "settings_enable_rag": "RAG",
+            "settings_enable_chat_bubble": "Chat Bubble",
+            "settings_enable_amira_card_button": "Amira Card Button",
+            "settings_enable_mcp": "MCP Servers",
+            "settings_fallback_enabled": "Auto Fallback",
+            "settings_anthropic_thinking": "Anthropic Thinking",
+            "settings_anthropic_caching": "Prompt Caching",
+            "settings_openai_thinking": "OpenAI Thinking",
+            "settings_nvidia_thinking": "NVIDIA Thinking",
+            "settings_tts_voice": "TTS Voice",
+            "settings_telegram_token": "Telegram Bot Token",
+            "settings_twilio_sid": "Twilio Account SID",
+            "settings_twilio_token": "Twilio Auth Token",
+            "settings_twilio_from": "WhatsApp From Number",
+            "settings_timeout": "Timeout (s)",
+            "settings_max_retries": "Max Retries",
+            "settings_max_conversations": "Max Conversations",
+            "settings_max_snapshots": "Max Snapshots/File",
+            "settings_cost_currency": "Currency",
+            "settings_section_language": "Language",
+            "settings_section_features": "Features",
+            "settings_section_ai": "AI",
+            "settings_section_voice": "Voice",
+            "settings_section_messaging": "Messaging",
+            "settings_section_advanced": "Advanced",
+            "settings_section_costs": "Costs",
+            # Settings descriptions
+            "settings_desc_language": "AI response language (English, Italian, Spanish, or French)",
+            "settings_desc_enable_memory": "[EXPERIMENTAL] Persistent memory \u2013 the AI only remembers what you write in MEMORY.md across sessions. Past conversations are NEVER injected into the prompt.",
+            "settings_desc_enable_file_access": "Allow AI to read/write Home Assistant config files (automations, scripts, YAML)",
+            "settings_desc_enable_file_upload": "[EXPERIMENTAL] Allow uploading documents (PDF, DOCX, TXT, MD, YAML) for AI analysis",
+            "settings_desc_enable_voice_input": "Enable microphone button for voice messages (Groq Whisper, with OpenAI/Google fallback) \u2013 requires HTTPS",
+            "settings_desc_enable_rag": "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search and context injection",
+            "settings_desc_enable_chat_bubble": "Show a floating AI chat bubble on every HA page.",
+            "settings_desc_enable_amira_card_button": "Show the Amira button inside the Lovelace card editor dialog for AI-assisted card editing.",
+            "settings_desc_enable_mcp": "Enable MCP (Model Context Protocol) support. When disabled, Amira skips MCP server connections at startup.",
+            "mcp_config_path": "Config File",
+            "settings_desc_mcp_config_file": "Path to MCP configuration JSON file",
+            "settings_desc_fallback_enabled": "If the primary provider fails, automatically try the next one in the priority list",
+            "settings_desc_anthropic_extended_thinking": "Enable Claude extended thinking for complex reasoning tasks (slower, uses more tokens)",
+            "settings_desc_anthropic_prompt_caching": "Cache long repetitive instructions to save costs and improve response speed",
+            "settings_desc_openai_extended_thinking": "Enable o1/o3 reasoning mode for complex problem-solving (slower, uses more tokens)",
+            "settings_desc_nvidia_thinking_mode": "Enable thinking mode to see AI reasoning process (slower but more transparent)",
+            "settings_desc_tts_voice": "Voice for AI spoken responses \u2013 automatically matched to your language (Edge TTS, free)",
+            "settings_desc_telegram_bot_token": "Telegram bot token from @BotFather \u2013 leave empty to disable",
+            "settings_desc_twilio_account_sid": "Your Twilio Account SID for WhatsApp integration \u2013 get from console.twilio.com",
+            "settings_desc_twilio_auth_token": "Your Twilio Auth Token for WhatsApp integration \u2013 get from console.twilio.com",
+            "settings_desc_twilio_whatsapp_from": "Your Twilio WhatsApp number (e.g. +1234567890) \u2013 leave empty to disable",
+            "settings_desc_timeout": "API request timeout in seconds (default 30, increase if responses are slow)",
+            "settings_desc_max_retries": "Maximum retry attempts for failed API calls (default 3)",
+            "settings_desc_max_conversations": "Maximum number of chat conversations to keep in history (1\u2013100)",
+            "settings_desc_max_snapshots_per_file": "Maximum backup snapshots per file. Oldest backups are auto-deleted when the limit is reached.",
+            "settings_desc_cost_currency": "Currency for token cost display",
             # Agent form
             "agent_add": "New Agent",
             "agent_new": "\U0001f916 New Agent",
@@ -292,9 +342,7 @@ def get_chat_ui():
             "agent_channels": "Channel Assignment",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
-            "agent_channel_none": "-- none --",
             "tip_agent_channels": "Assign this agent to a messaging channel. Each channel can have one agent.",
-            "agent_channel_badge": "Channel",
         },
         "it": {
             "change_model": "Cambia modello",
@@ -331,10 +379,8 @@ def get_chat_ui():
             "nvidia_tested": "Testati",
             "nvidia_to_test": "Da testare",
             "no_models": "Nessun modello disponibile",
-            "no_models_msg": "Nessun modello disponibile. Verifica le API key dei provider.",
             "models_load_error": "Errore nel caricamento dei modelli: ",
             "nvidia_test_result": "Test NVIDIA: OK {ok}, rimossi {removed}, testati {tested}/{total}",
-            "nvidia_timeout": "timeout: {n}",
             "nvidia_remaining": "restanti: {n} (ripremi per continuare)",
             "nvidia_test_failed": "Test NVIDIA fallito",
             "switched_to": "Passato a {provider} \u2192 {model}",
@@ -373,7 +419,6 @@ def get_chat_ui():
             "document_uploaded": "Documento caricato",
             "mic_not_supported": "Il browser non supporta la registrazione audio. Usa HTTPS o un browser compatibile.",
             "mic_needs_https": "Il microfono richiede HTTPS. Soluzione rapida per Chrome: apri chrome://flags/#unsafely-treat-insecure-origin-as-secure, aggiungi il tuo indirizzo HA (es. http://192.168.x.x:8123), imposta Enabled, riavvia Chrome. Altrimenti configura SSL in HA o usa localhost.",
-            "mic_needs_https_short": "Microfono bloccato (HTTP). Vedi il messaggio sopra per la soluzione Chrome.",
             "mic_denied_settings": "Accesso al microfono negato. Vai nelle impostazioni del browser per abilitarlo.",
             "mic_denied_icon": "Permesso microfono negato. Clicca l'icona 🔒 nella barra del browser per abilitarlo.",
             "mic_not_found": "Nessun microfono trovato. Collega un microfono e riprova.",
@@ -381,16 +426,12 @@ def get_chat_ui():
             "mic_error": "Errore microfono",
             # Voice mode
             "voice_mode": "Modalità voce",
-            "voice_mode_on": "Voce ON – le risposte verranno lette ad alta voce",
-            "voice_mode_off": "Voce OFF",
             "voice_listening": "In ascolto...",
             "voice_processing": "Elaborazione audio...",
-            "voice_tts_error": "Impossibile riprodurre la risposta vocale",
             "voice_tts_no_provider": "Voce in uscita non disponibile. Serve Edge TTS o una API key Groq/OpenAI.",
             "voice_transcription_error": "Trascrizione fallita. Riprova.",
             "voice_speaking": "Sto parlando...",
             "voice_stop_speaking": "Ferma riproduzione",
-            "wake_word_active": "In ascolto per 'Ok Amira'...",
             "wake_word_detected": "Amira attivata! Parla ora...",
             # Sidebar tabs
             "tab_chat": "Chat",
@@ -405,14 +446,10 @@ def get_chat_ui():
             "files_close_panel": "Chiudi pannello file",
             "files_context_label": "File di contesto:",
             "messaging_no_chats": "Nessuna chat di messaggi",
-            "messaging_user": "Utente",
             "messaging_messages": "Messaggi",
-            "messaging_last": "Ultimo messaggio",
             "messaging_delete": "Elimina",
             "messaging_confirm_delete": "Eliminare questa chat?",
             "no_backups": "Nessun backup",
-            "backup_file": "File",
-            "backup_date": "Data",
             "restore": "Ripristina",
             "confirm_restore_backup": "Ripristinare questo backup? Il file attuale verrà sostituito.",
             "delete_backup": "Elimina",
@@ -420,11 +457,6 @@ def get_chat_ui():
             "download_backup": "Scarica",
             # Device manager
             "no_devices": "Nessun dispositivo registrato",
-            "device_id": "ID Dispositivo",
-            "device_name": "Nome",
-            "device_type": "Tipo",
-            "device_enabled": "Abilitato",
-            "device_last_seen": "Visto l'ultima volta",
             "enable_device": "Abilita",
             "disable_device": "Disabilita",
             "rename_device": "Rinomina",
@@ -434,21 +466,16 @@ def get_chat_ui():
             "device_updated": "Dispositivo aggiornato",
             # Dark mode
             "dark_mode": "Tema scuro",
-            "light_mode": "Tema chiaro",
             # Costs tab
             "tab_costs": "Costi",
             "costs_today": "Oggi",
-            "costs_total_tokens": "Token totali",
-            "costs_total_cost": "Costo totale",
             "costs_by_model": "Per modello",
             "costs_by_provider": "Per provider",
             "costs_history": "Ultimi 7 giorni",
             "costs_no_data": "Nessun dato di utilizzo",
             "costs_reset": "Azzera",
             "costs_reset_confirm": "Azzerare tutte le statistiche di utilizzo? Non si può annullare.",
-            "costs_reset_done": "Dati di utilizzo azzerati",
             "costs_requests": "richieste",
-            "costs_tokens": "token",
             # Config tab
             "tab_config": "\U0001f527 Config",
             "config_loading": "Caricamento...",
@@ -456,12 +483,83 @@ def get_chat_ui():
             "config_cancel": "Annulla",
             "config_saved": "Salvato!",
             "config_save_error": "Errore nel salvataggio",
-            "config_invalid_json": "JSON non valido",
             "config_file_not_found": "File non trovato (verrà creato al salvataggio)",
             "config_agents_title": "Profili Agente",
             "config_mcp_title": "Configurazione MCP",
             "config_prompt_title": "System Prompt Personalizzato",
             "config_memory_title": "Memoria (MEMORY.md)",
+            "config_llm_title": "Priorita LLM",
+            "llm_fallback_label": "Fallback automatico",
+            "llm_priority_label": "Ordine di priorita",
+            "llm_no_key": "senza chiave",
+            "llm_saved": "Salvato!",
+            "llm_fallback_on": "Se il provider primario fallisce, il sistema provera il prossimo nella lista.",
+            "llm_fallback_off": "Fallback disattivato. Verra usato solo il provider primario.",
+            "fallback_notice": "Fallback: {{from}} → {{to}}",
+            # Settings
+            "config_settings_title": "Impostazioni",
+            "settings_saved": "Impostazioni salvate!",
+            "restart_confirm": "Alcune modifiche richiedono un riavvio per essere applicate. Riavviare l'add-on ora?",
+            "restart_in_progress": "Riavvio add-on in corso...",
+            "restart_failed": "Riavvio fallito",
+            "settings_language": "Lingua",
+            "settings_enable_memory": "Memoria",
+            "settings_enable_file_access": "Accesso File",
+            "settings_enable_file_upload": "Upload File",
+            "settings_enable_voice_input": "Input Vocale",
+            "settings_enable_rag": "RAG",
+            "settings_enable_chat_bubble": "Bolla Chat",
+            "settings_enable_amira_card_button": "Pulsante Amira Card",
+            "settings_enable_mcp": "Server MCP",
+            "settings_fallback_enabled": "Fallback Automatico",
+            "settings_anthropic_thinking": "Pensiero Anthropic",
+            "settings_anthropic_caching": "Cache Prompt",
+            "settings_openai_thinking": "Pensiero OpenAI",
+            "settings_nvidia_thinking": "Pensiero NVIDIA",
+            "settings_tts_voice": "Voce TTS",
+            "settings_telegram_token": "Token Bot Telegram",
+            "settings_twilio_sid": "Twilio Account SID",
+            "settings_twilio_token": "Twilio Auth Token",
+            "settings_twilio_from": "Numero WhatsApp",
+            "settings_timeout": "Timeout (s)",
+            "settings_max_retries": "Tentativi Max",
+            "settings_max_conversations": "Conversazioni Max",
+            "settings_max_snapshots": "Max Snapshot/File",
+            "settings_cost_currency": "Valuta",
+            "settings_section_language": "Lingua",
+            "settings_section_features": "Funzionalita",
+            "settings_section_ai": "AI",
+            "settings_section_voice": "Voce",
+            "settings_section_messaging": "Messaggistica",
+            "settings_section_advanced": "Avanzate",
+            "settings_section_costs": "Costi",
+            # Settings descriptions
+            "settings_desc_language": "Lingua delle risposte AI (Inglese, Italiano, Spagnolo o Francese)",
+            "settings_desc_enable_memory": "[SPERIMENTALE] Memoria persistente \u2013 l'AI ricorda solo ci\u00f2 che scrivi in MEMORY.md tra le sessioni. Le conversazioni passate NON vengono mai iniettate nel prompt.",
+            "settings_desc_enable_file_access": "Permetti all'AI di leggere/scrivere file di configurazione Home Assistant (automazioni, script, YAML)",
+            "settings_desc_enable_file_upload": "[SPERIMENTALE] Permetti di caricare documenti (PDF, DOCX, TXT, MD, YAML) per l'analisi AI",
+            "settings_desc_enable_voice_input": "Abilita il pulsante microfono per messaggi vocali (Groq Whisper, con fallback OpenAI/Google) \u2013 richiede HTTPS",
+            "settings_desc_enable_rag": "[SPERIMENTALE] Abilita RAG (Retrieval-Augmented Generation) per ricerca documenti e iniezione contesto",
+            "settings_desc_enable_chat_bubble": "Mostra una bolla chat AI flottante su ogni pagina di HA.",
+            "settings_desc_enable_amira_card_button": "Mostra il pulsante Amira nel dialog dell'editor card Lovelace per la modifica assistita dall'AI.",
+            "settings_desc_enable_mcp": "Abilita il supporto MCP (Model Context Protocol). Se disattivato, Amira non si connette agli MCP server all'avvio.",
+            "mcp_config_path": "File di Configurazione",
+            "settings_desc_mcp_config_file": "Percorso del file JSON di configurazione MCP",
+            "settings_desc_fallback_enabled": "Se il provider primario fallisce, prova automaticamente il prossimo nella lista di priorit\u00e0",
+            "settings_desc_anthropic_extended_thinking": "Abilita il pensiero esteso di Claude per compiti di ragionamento complesso (pi\u00f9 lento, usa pi\u00f9 token)",
+            "settings_desc_anthropic_prompt_caching": "Memorizza nella cache istruzioni lunghe e ripetitive per risparmiare costi e migliorare la velocit\u00e0",
+            "settings_desc_openai_extended_thinking": "Abilita modalit\u00e0 ragionamento o1/o3 per problemi complessi (pi\u00f9 lento, usa pi\u00f9 token)",
+            "settings_desc_nvidia_thinking_mode": "Abilita modalit\u00e0 thinking per vedere il ragionamento dell'AI (pi\u00f9 lento ma pi\u00f9 trasparente)",
+            "settings_desc_tts_voice": "Voce per le risposte parlate \u2013 selezionata automaticamente per la tua lingua (Edge TTS, gratis)",
+            "settings_desc_telegram_bot_token": "Token bot Telegram da @BotFather \u2013 lascia vuoto per disabilitare",
+            "settings_desc_twilio_account_sid": "Tuo SID Account Twilio per l'integrazione WhatsApp \u2013 ottieni da console.twilio.com",
+            "settings_desc_twilio_auth_token": "Tuo Token Auth Twilio per l'integrazione WhatsApp \u2013 ottieni da console.twilio.com",
+            "settings_desc_twilio_whatsapp_from": "Tuo numero WhatsApp Twilio (es. +1234567890) \u2013 lascia vuoto per disabilitare",
+            "settings_desc_timeout": "Timeout richieste API in secondi (predefinito 30, aumenta se le risposte sono lente)",
+            "settings_desc_max_retries": "Numero massimo di tentativi per chiamate API fallite (predefinito 3)",
+            "settings_desc_max_conversations": "Numero massimo di conversazioni da mantenere nello storico (1\u2013100)",
+            "settings_desc_max_snapshots_per_file": "Numero massimo di backup per file. I pi\u00f9 vecchi vengono eliminati automaticamente al raggiungimento del limite.",
+            "settings_desc_cost_currency": "Valuta per la visualizzazione dei costi token",
             # Agent form
             "agent_add": "Nuovo Agent",
             "agent_new": "\U0001f916 Nuovo Agent",
@@ -520,9 +618,7 @@ def get_chat_ui():
             "agent_channels": "Associazione Canali",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
-            "agent_channel_none": "-- nessuno --",
             "tip_agent_channels": "Associa questo agent a un canale di messaggistica. Ogni canale pu\u00f2 avere un solo agent.",
-            "agent_channel_badge": "Canale",
         },
         "es": {
             "change_model": "Cambiar modelo",
@@ -559,10 +655,8 @@ def get_chat_ui():
             "nvidia_tested": "Probados",
             "nvidia_to_test": "Por probar",
             "no_models": "Sin modelos disponibles",
-            "no_models_msg": "Sin modelos disponibles. Verifica las API keys de los proveedores.",
             "models_load_error": "Error al cargar los modelos: ",
             "nvidia_test_result": "Test NVIDIA: OK {ok}, eliminados {removed}, probados {tested}/{total}",
-            "nvidia_timeout": "timeout: {n}",
             "nvidia_remaining": "restantes: {n} (pulsa de nuevo para continuar)",
             "nvidia_test_failed": "Test NVIDIA fallido",
             "switched_to": "Cambiado a {provider} \u2192 {model}",
@@ -601,7 +695,6 @@ def get_chat_ui():
             "document_uploaded": "Documento subido",
             "mic_not_supported": "El navegador no soporta grabación de audio. Usa HTTPS o un navegador compatible.",
             "mic_needs_https": "El micrófono requiere HTTPS. Solución rápida para Chrome: abre chrome://flags/#unsafely-treat-insecure-origin-as-secure, añade tu dirección HA (ej. http://192.168.x.x:8123), pon Enabled, reinicia Chrome. Si no, configura SSL en HA o usa localhost.",
-            "mic_needs_https_short": "Micrófono bloqueado (HTTP). Ver el mensaje anterior para la solución Chrome.",
             "mic_denied_settings": "Acceso al micrófono denegado. Ve a los ajustes del navegador para habilitarlo.",
             "mic_denied_icon": "Permiso de micrófono denegado. Haz clic en el icono 🔒 en la barra del navegador.",
             "mic_not_found": "No se encontró micrófono. Conecta un micrófono e inténtalo de nuevo.",
@@ -609,16 +702,12 @@ def get_chat_ui():
             "mic_error": "Error de micrófono",
             # Voice mode
             "voice_mode": "Modo voz",
-            "voice_mode_on": "Voz ON – las respuestas se leerán en voz alta",
-            "voice_mode_off": "Voz OFF",
             "voice_listening": "Escuchando...",
             "voice_processing": "Procesando audio...",
-            "voice_tts_error": "No se pudo reproducir la respuesta de voz",
             "voice_tts_no_provider": "Salida de voz no disponible. Se necesita Edge TTS o una API key de Groq/OpenAI.",
             "voice_transcription_error": "Transcripción fallida. Inténtalo de nuevo.",
             "voice_speaking": "Hablando...",
             "voice_stop_speaking": "Detener reproducción",
-            "wake_word_active": "Escuchando 'Ok Amira'...",
             "wake_word_detected": "¡Amira activada! Habla ahora...",
             # Sidebar tabs
             "tab_chat": "Chat",
@@ -633,14 +722,10 @@ def get_chat_ui():
             "files_close_panel": "Cerrar panel de archivo",
             "files_context_label": "Archivo de contexto:",
             "messaging_no_chats": "Sin chats de mensajes",
-            "messaging_user": "Usuario",
             "messaging_messages": "Mensajes",
-            "messaging_last": "Último mensaje",
             "messaging_delete": "Eliminar",
             "messaging_confirm_delete": "¿Eliminar este chat?",
             "no_backups": "Sin copias de seguridad",
-            "backup_file": "Archivo",
-            "backup_date": "Fecha",
             "restore": "Restaurar",
             "confirm_restore_backup": "¿Restaurar esta copia? El archivo actual será reemplazado.",
             "delete_backup": "Eliminar",
@@ -648,11 +733,6 @@ def get_chat_ui():
             "download_backup": "Descargar",
             # Device manager
             "no_devices": "Sin dispositivos registrados",
-            "device_id": "ID del dispositivo",
-            "device_name": "Nombre",
-            "device_type": "Tipo",
-            "device_enabled": "Habilitado",
-            "device_last_seen": "Última vez visto",
             "enable_device": "Habilitar",
             "disable_device": "Deshabilitar",
             "rename_device": "Renombrar",
@@ -662,21 +742,16 @@ def get_chat_ui():
             "device_updated": "Dispositivo actualizado",
             # Dark mode
             "dark_mode": "Tema oscuro",
-            "light_mode": "Tema claro",
             # Costs tab
             "tab_costs": "Costes",
             "costs_today": "Hoy",
-            "costs_total_tokens": "Tokens totales",
-            "costs_total_cost": "Coste total",
             "costs_by_model": "Por modelo",
             "costs_by_provider": "Por proveedor",
             "costs_history": "Últimos 7 días",
             "costs_no_data": "Sin datos de uso",
             "costs_reset": "Restablecer",
             "costs_reset_confirm": "¿Restablecer todas las estadísticas? No se puede deshacer.",
-            "costs_reset_done": "Datos de uso borrados",
             "costs_requests": "solicitudes",
-            "costs_tokens": "tokens",
             # Config tab
             "tab_config": "\U0001f527 Config",
             "config_loading": "Cargando...",
@@ -684,12 +759,83 @@ def get_chat_ui():
             "config_cancel": "Cancelar",
             "config_saved": "Guardado!",
             "config_save_error": "Error al guardar",
-            "config_invalid_json": "JSON no válido",
             "config_file_not_found": "Archivo no encontrado (se creará al guardar)",
             "config_agents_title": "Perfiles de Agente",
             "config_mcp_title": "Configuración MCP",
             "config_prompt_title": "Prompt de Sistema",
             "config_memory_title": "Memoria (MEMORY.md)",
+            "config_llm_title": "Prioridad LLM",
+            "llm_fallback_label": "Respaldo automatico",
+            "llm_priority_label": "Orden de prioridad",
+            "llm_no_key": "sin clave",
+            "llm_saved": "Guardado!",
+            "llm_fallback_on": "Si el proveedor principal falla, el sistema intentara el siguiente en la lista.",
+            "llm_fallback_off": "Respaldo desactivado. Solo se usara el proveedor principal.",
+            "fallback_notice": "Respaldo: {{from}} → {{to}}",
+            # Settings
+            "config_settings_title": "Configuracion",
+            "settings_saved": "Configuracion guardada!",
+            "restart_confirm": "Algunos cambios requieren un reinicio para aplicarse. \u00bfReiniciar el add-on ahora?",
+            "restart_in_progress": "Reiniciando add-on...",
+            "restart_failed": "Reinicio fallido",
+            "settings_language": "Idioma",
+            "settings_enable_memory": "Memoria",
+            "settings_enable_file_access": "Acceso a Archivos",
+            "settings_enable_file_upload": "Carga de Archivos",
+            "settings_enable_voice_input": "Entrada de Voz",
+            "settings_enable_rag": "RAG",
+            "settings_enable_chat_bubble": "Burbuja Chat",
+            "settings_enable_amira_card_button": "Bot\u00f3n Amira Card",
+            "settings_enable_mcp": "Servidores MCP",
+            "settings_fallback_enabled": "Respaldo Automatico",
+            "settings_anthropic_thinking": "Pensamiento Anthropic",
+            "settings_anthropic_caching": "Cache de Prompt",
+            "settings_openai_thinking": "Pensamiento OpenAI",
+            "settings_nvidia_thinking": "Pensamiento NVIDIA",
+            "settings_tts_voice": "Voz TTS",
+            "settings_telegram_token": "Token Bot Telegram",
+            "settings_twilio_sid": "Twilio Account SID",
+            "settings_twilio_token": "Twilio Auth Token",
+            "settings_twilio_from": "Numero WhatsApp",
+            "settings_timeout": "Timeout (s)",
+            "settings_max_retries": "Reintentos Max",
+            "settings_max_conversations": "Conversaciones Max",
+            "settings_max_snapshots": "Max Snapshots/Archivo",
+            "settings_cost_currency": "Moneda",
+            "settings_section_language": "Idioma",
+            "settings_section_features": "Funcionalidades",
+            "settings_section_ai": "IA",
+            "settings_section_voice": "Voz",
+            "settings_section_messaging": "Mensajeria",
+            "settings_section_advanced": "Avanzado",
+            "settings_section_costs": "Costos",
+            # Settings descriptions
+            "settings_desc_language": "Idioma de las respuestas de la IA (Ingl\u00e9s, Italiano, Espa\u00f1ol o Franc\u00e9s)",
+            "settings_desc_enable_memory": "[EXPERIMENTAL] Memoria persistente \u2013 la IA solo recuerda lo que escribes en MEMORY.md entre sesiones. Las conversaciones pasadas NUNCA se inyectan en el prompt.",
+            "settings_desc_enable_file_access": "Permitir a la IA leer/escribir archivos de configuraci\u00f3n de Home Assistant (automatizaciones, scripts, YAML)",
+            "settings_desc_enable_file_upload": "[EXPERIMENTAL] Permitir subir documentos (PDF, DOCX, TXT, MD, YAML) para an\u00e1lisis de la IA",
+            "settings_desc_enable_voice_input": "Habilitar bot\u00f3n de micr\u00f3fono para mensajes de voz (Groq Whisper, con fallback OpenAI/Google) \u2013 requiere HTTPS",
+            "settings_desc_enable_rag": "[EXPERIMENTAL] Habilitar RAG (Generaci\u00f3n Aumentada por Recuperaci\u00f3n) para b\u00fasqueda de documentos e inyecci\u00f3n de contexto",
+            "settings_desc_enable_chat_bubble": "Mostrar una burbuja de chat AI flotante en cada p\u00e1gina de HA.",
+            "settings_desc_enable_amira_card_button": "Mostrar el bot\u00f3n Amira dentro del di\u00e1logo del editor de tarjetas Lovelace para edici\u00f3n asistida por AI.",
+            "settings_desc_enable_mcp": "Habilitar soporte MCP (Model Context Protocol). Si est\u00e1 desactivado, Amira no se conecta a servidores MCP al inicio.",
+            "mcp_config_path": "Archivo de Configuraci\u00f3n",
+            "settings_desc_mcp_config_file": "Ruta al archivo JSON de configuraci\u00f3n MCP",
+            "settings_desc_fallback_enabled": "Si el proveedor principal falla, intentar autom\u00e1ticamente el siguiente en la lista de prioridad",
+            "settings_desc_anthropic_extended_thinking": "Habilitar pensamiento extendido de Claude para razonamiento complejo (m\u00e1s lento, usa m\u00e1s tokens)",
+            "settings_desc_anthropic_prompt_caching": "Cachear instrucciones largas y repetitivas para ahorrar costes y mejorar la velocidad",
+            "settings_desc_openai_extended_thinking": "Habilitar modo razonamiento o1/o3 para problemas complejos (m\u00e1s lento, usa m\u00e1s tokens)",
+            "settings_desc_nvidia_thinking_mode": "Habilitar modo thinking para ver el razonamiento de la IA (m\u00e1s lento pero m\u00e1s transparente)",
+            "settings_desc_tts_voice": "Voz para las respuestas habladas \u2013 seleccionada autom\u00e1ticamente seg\u00fan tu idioma (Edge TTS, gratis)",
+            "settings_desc_telegram_bot_token": "Token bot Telegram de @BotFather \u2013 dejar vac\u00edo para desactivar",
+            "settings_desc_twilio_account_sid": "Tu SID de Cuenta Twilio para la integraci\u00f3n WhatsApp \u2013 obt\u00e9n de console.twilio.com",
+            "settings_desc_twilio_auth_token": "Tu Auth Token de Twilio para la integraci\u00f3n WhatsApp \u2013 obt\u00e9n de console.twilio.com",
+            "settings_desc_twilio_whatsapp_from": "Tu n\u00famero WhatsApp Twilio (ej. +1234567890) \u2013 dejar vac\u00edo para desactivar",
+            "settings_desc_timeout": "Tiempo de espera de solicitudes API en segundos (predeterminado 30, aumentar si las respuestas son lentas)",
+            "settings_desc_max_retries": "N\u00famero m\u00e1ximo de intentos para llamadas API fallidas (predeterminado 3)",
+            "settings_desc_max_conversations": "N\u00famero m\u00e1ximo de conversaciones en el historial (1\u2013100)",
+            "settings_desc_max_snapshots_per_file": "N\u00famero m\u00e1ximo de copias de seguridad por archivo. Las m\u00e1s antiguas se eliminan autom\u00e1ticamente.",
+            "settings_desc_cost_currency": "Moneda para mostrar los costes de tokens",
             # Agent form
             "agent_add": "Nuevo Agente",
             "agent_new": "\U0001f916 Nuevo Agente",
@@ -748,9 +894,7 @@ def get_chat_ui():
             "agent_channels": "Asignación de Canal",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
-            "agent_channel_none": "-- ninguno --",
             "tip_agent_channels": "Asigna este agente a un canal de mensajería. Cada canal puede tener un único agente.",
-            "agent_channel_badge": "Canal",
         },
         "fr": {
             "change_model": "Changer de modèle",
@@ -787,10 +931,8 @@ def get_chat_ui():
             "nvidia_tested": "Testés",
             "nvidia_to_test": "À tester",
             "no_models": "Aucun modèle disponible",
-            "no_models_msg": "Aucun modèle disponible. Vérifie les clés API des fournisseurs.",
             "models_load_error": "Erreur lors du chargement des modèles : ",
             "nvidia_test_result": "Test NVIDIA : OK {ok}, supprimés {removed}, testés {tested}/{total}",
-            "nvidia_timeout": "timeout : {n}",
             "nvidia_remaining": "restants : {n} (appuie à nouveau pour continuer)",
             "nvidia_test_failed": "Test NVIDIA échoué",
             "switched_to": "Passé à {provider} \u2192 {model}",
@@ -829,7 +971,6 @@ def get_chat_ui():
             "document_uploaded": "Document t\u00e9l\u00e9charg\u00e9",
             "mic_not_supported": "Le navigateur ne prend pas en charge l'enregistrement audio. Utilisez HTTPS ou un navigateur compatible.",
             "mic_needs_https": "Le microphone nécessite HTTPS. Solution rapide pour Chrome : ouvrez chrome://flags/#unsafely-treat-insecure-origin-as-secure, ajoutez votre adresse HA (ex. http://192.168.x.x:8123), mettez Enabled, redémarrez Chrome. Sinon configurez SSL dans HA ou utilisez localhost.",
-            "mic_needs_https_short": "Microphone bloqué (HTTP). Voir le message ci-dessus pour la solution Chrome.",
             "mic_denied_settings": "Acc\u00e8s au microphone refus\u00e9. Allez dans les param\u00e8tres du navigateur pour l'activer.",
             "mic_denied_icon": "Microphone refus\u00e9. Cliquez sur l'ic\u00f4ne \ud83d\udd12 dans la barre du navigateur.",
             "mic_not_found": "Aucun microphone trouv\u00e9. Connectez un microphone et r\u00e9essayez.",
@@ -837,16 +978,12 @@ def get_chat_ui():
             "mic_error": "Erreur de microphone",
             # Voice mode
             "voice_mode": "Mode vocal",
-            "voice_mode_on": "Voix ON – les réponses seront lues à haute voix",
-            "voice_mode_off": "Voix OFF",
             "voice_listening": "Écoute en cours...",
             "voice_processing": "Traitement audio...",
-            "voice_tts_error": "Impossible de lire la réponse vocale",
             "voice_tts_no_provider": "Sortie vocale indisponible. Edge TTS ou une clé API Groq/OpenAI est nécessaire.",
             "voice_transcription_error": "Échec de la transcription. Réessayez.",
             "voice_speaking": "En train de parler...",
             "voice_stop_speaking": "Arrêter la lecture",
-            "wake_word_active": "Écoute de 'Ok Amira'...",
             "wake_word_detected": "Amira activée ! Parlez maintenant...",
             # Sidebar tabs
             "tab_chat": "Chat",
@@ -861,14 +998,10 @@ def get_chat_ui():
             "files_close_panel": "Fermer le panneau",
             "files_context_label": "Fichier de contexte:",
             "messaging_no_chats": "Pas de chats de messages",
-            "messaging_user": "Utilisateur",
             "messaging_messages": "Messages",
-            "messaging_last": "Dernier message",
             "messaging_delete": "Supprimer",
             "messaging_confirm_delete": "Supprimer ce chat ?",
             "no_backups": "Aucune sauvegarde",
-            "backup_file": "Fichier",
-            "backup_date": "Date",
             "restore": "Restaurer",
             "confirm_restore_backup": "Restaurer cette sauvegarde ? Le fichier actuel sera remplacé.",
             "delete_backup": "Supprimer",
@@ -876,11 +1009,6 @@ def get_chat_ui():
             "download_backup": "Télécharger",
             # Device manager
             "no_devices": "Aucun appareil enregistré",
-            "device_id": "ID de l'appareil",
-            "device_name": "Nom",
-            "device_type": "Type",
-            "device_enabled": "Activé",
-            "device_last_seen": "Dernière visite",
             "enable_device": "Activer",
             "disable_device": "Désactiver",
             "rename_device": "Renommer",
@@ -888,20 +1016,18 @@ def get_chat_ui():
             "confirm_delete_device": "Supprimer définitivement cet appareil ?",
             "device_deleted": "Appareil supprimé",
             "device_updated": "Appareil mis à jour",
+            # Dark mode
+            "dark_mode": "Mode sombre",
             # Costs tab
             "tab_costs": "Coûts",
             "costs_today": "Aujourd'hui",
-            "costs_total_tokens": "Tokens totaux",
-            "costs_total_cost": "Coût total",
             "costs_by_model": "Par modèle",
             "costs_by_provider": "Par fournisseur",
             "costs_history": "7 derniers jours",
             "costs_no_data": "Aucune donnée d'utilisation",
             "costs_reset": "Réinitialiser",
             "costs_reset_confirm": "Réinitialiser toutes les statistiques ? Cette action est irréversible.",
-            "costs_reset_done": "Données d'utilisation effacées",
             "costs_requests": "requêtes",
-            "costs_tokens": "tokens",
             # Config tab
             "tab_config": "\U0001f527 Config",
             "config_loading": "Chargement...",
@@ -909,12 +1035,81 @@ def get_chat_ui():
             "config_cancel": "Annuler",
             "config_saved": "Enregistré !",
             "config_save_error": "Erreur lors de l'enregistrement",
-            "config_invalid_json": "JSON invalide",
             "config_file_not_found": "Fichier non trouvé (sera créé à l'enregistrement)",
             "config_agents_title": "Profils d'Agent",
             "config_mcp_title": "Configuration MCP",
             "config_prompt_title": "Prompt Système Personnalisé",
             "config_memory_title": "Mémoire (MEMORY.md)",
+            "config_llm_title": "Priorite LLM",
+            "llm_fallback_label": "Repli automatique",
+            "llm_priority_label": "Ordre de priorite",
+            "llm_no_key": "sans cle",
+            "llm_saved": "Enregistre!",
+            "llm_fallback_on": "Si le fournisseur principal echoue, le systeme essaiera le suivant dans la liste.",
+            "llm_fallback_off": "Repli desactive. Seul le fournisseur principal sera utilise.",
+            "fallback_notice": "Repli: {{from}} → {{to}}",
+            # Settings
+            "config_settings_title": "Parametres",
+            "settings_saved": "Parametres enregistres!",
+            "restart_confirm": "Certains changements n\u00e9cessitent un red\u00e9marrage. Red\u00e9marrer l'add-on maintenant ?",
+            "restart_in_progress": "Red\u00e9marrage de l'add-on...",
+            "restart_failed": "\u00c9chec du red\u00e9marrage",
+            "settings_language": "Langue",
+            "settings_enable_memory": "Memoire",
+            "settings_enable_file_access": "Acces Fichiers",
+            "settings_enable_file_upload": "Telechargement",
+            "settings_enable_voice_input": "Entree Vocale",
+            "settings_enable_rag": "RAG",
+            "settings_enable_chat_bubble": "Bulle Chat",
+            "settings_enable_amira_card_button": "Bouton Amira Card",
+            "settings_enable_mcp": "Serveurs MCP",
+            "settings_fallback_enabled": "Repli Automatique",
+            "settings_anthropic_thinking": "Reflexion Anthropic",
+            "settings_anthropic_caching": "Cache Prompt",
+            "settings_openai_thinking": "Reflexion OpenAI",
+            "settings_nvidia_thinking": "Reflexion NVIDIA",
+            "settings_tts_voice": "Voix TTS",
+            "settings_telegram_token": "Token Bot Telegram",
+            "settings_twilio_sid": "Twilio Account SID",
+            "settings_twilio_token": "Twilio Auth Token",
+            "settings_twilio_from": "Numero WhatsApp",
+            "settings_timeout": "Timeout (s)",
+            "settings_max_retries": "Tentatives Max",
+            "settings_max_conversations": "Conversations Max",
+            "settings_max_snapshots": "Max Snapshots/Fichier",
+            "settings_cost_currency": "Devise",
+            "settings_section_language": "Langue",
+            "settings_section_features": "Fonctionnalites",
+            "settings_section_ai": "IA",
+            "settings_section_voice": "Voix",
+            "settings_section_messaging": "Messagerie",
+            "settings_section_advanced": "Avance",
+            "settings_section_costs": "Couts",
+            # Settings descriptions
+            "settings_desc_language": "Langue des r\u00e9ponses de l'IA (Anglais, Italien, Espagnol ou Fran\u00e7ais)",
+            "settings_desc_enable_memory": "[EXP\u00c9RIMENTAL] M\u00e9moire persistante \u2013 l'IA ne retient que ce que vous \u00e9crivez dans MEMORY.md entre les sessions. Les conversations pass\u00e9es ne sont JAMAIS inject\u00e9es dans le prompt.",
+            "settings_desc_enable_file_access": "Autoriser l'IA \u00e0 lire/\u00e9crire les fichiers de configuration Home Assistant (automatisations, scripts, YAML)",
+            "settings_desc_enable_file_upload": "[EXP\u00c9RIMENTAL] Autoriser le t\u00e9l\u00e9chargement de documents (PDF, DOCX, TXT, MD, YAML) pour l'analyse IA",
+            "settings_desc_enable_voice_input": "Activer le bouton microphone pour les messages vocaux (Groq Whisper, avec fallback OpenAI/Google) \u2013 n\u00e9cessite HTTPS",
+            "settings_desc_enable_rag": "[EXP\u00c9RIMENTAL] Activer RAG (G\u00e9n\u00e9ration Augment\u00e9e par R\u00e9cup\u00e9ration) pour la recherche de documents et l'injection de contexte",
+            "settings_desc_enable_chat_bubble": "Afficher une bulle de chat IA flottante sur chaque page HA.",
+            "settings_desc_enable_amira_card_button": "Afficher le bouton Amira dans la bo\u00eete de dialogue de l'\u00e9diteur de cartes Lovelace pour l'\u00e9dition assist\u00e9e par IA.",
+            "settings_desc_enable_mcp": "Activer le support MCP (Model Context Protocol). Si d\u00e9sactiv\u00e9, Amira ne se connecte pas aux serveurs MCP au d\u00e9marrage.",
+            "settings_desc_fallback_enabled": "Si le fournisseur principal \u00e9choue, essayer automatiquement le suivant dans la liste de priorit\u00e9",
+            "settings_desc_anthropic_extended_thinking": "Activer la pens\u00e9e \u00e9tendue de Claude pour le raisonnement complexe (plus lent, utilise plus de tokens)",
+            "settings_desc_anthropic_prompt_caching": "Mettre en cache les instructions longues et r\u00e9p\u00e9titives pour \u00e9conomiser les co\u00fbts et am\u00e9liorer la vitesse",
+            "settings_desc_openai_extended_thinking": "Activer le mode raisonnement o1/o3 pour les probl\u00e8mes complexes (plus lent, utilise plus de tokens)",
+            "settings_desc_nvidia_thinking_mode": "Activer le mode thinking pour voir le raisonnement de l'IA (plus lent mais plus transparent)",
+            "settings_desc_tts_voice": "Voix pour les r\u00e9ponses parl\u00e9es \u2013 s\u00e9lectionn\u00e9e automatiquement selon votre langue (Edge TTS, gratuit)",
+            "settings_desc_telegram_bot_token": "Token bot Telegram de @BotFather \u2013 laisser vide pour d\u00e9sactiver",
+            "settings_desc_twilio_account_sid": "Votre SID de Compte Twilio pour l'int\u00e9gration WhatsApp \u2013 obtenez de console.twilio.com",
+            "settings_desc_twilio_auth_token": "Votre Auth Token Twilio pour l'int\u00e9gration WhatsApp \u2013 obtenez de console.twilio.com",
+            "settings_desc_twilio_whatsapp_from": "Votre num\u00e9ro WhatsApp Twilio (ex. +1234567890) \u2013 laisser vide pour d\u00e9sactiver",
+            "settings_desc_timeout": "D\u00e9lai d'attente des requ\u00eates API en secondes (par d\u00e9faut 30, augmenter si les r\u00e9ponses sont lentes)",
+            "settings_desc_max_retries": "Nombre maximal de tentatives pour les appels API \u00e9chou\u00e9s (par d\u00e9faut 3)",
+            "settings_desc_max_conversations": "Nombre maximal de conversations dans l'historique (1\u2013100)",
+            "settings_desc_max_snapshots_per_file": "Nombre maximal de sauvegardes par fichier. Les plus anciennes sont supprim\u00e9es automatiquement.",
+            "settings_desc_cost_currency": "Devise pour l'affichage des co\u00fbts de tokens",
             # Agent form
             "agent_add": "Nouvel Agent",
             "agent_new": "\U0001f916 Nouvel Agent",
@@ -973,9 +1168,7 @@ def get_chat_ui():
             "agent_channels": "Attribution de Canal",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
-            "agent_channel_none": "-- aucun --",
             "tip_agent_channels": "Attribuez cet agent à un canal de messagerie. Chaque canal ne peut avoir qu'un seul agent.",
-            "agent_channel_badge": "Canal",
         },
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
@@ -1247,6 +1440,8 @@ def get_chat_ui():
         .diff-empty {{ background: #fafbfc; }}
         .diff-table td + td {{ border-left: 1px solid #e1e4e8; }}
         .diff-collapse {{ text-align: center; color: #6a737d; background: #f1f8ff; font-style: italic; font-size: 11px; padding: 2px 10px; }}
+        .ha-entity-link {{ display: inline-block; margin: 10px 0 4px; padding: 6px 16px; background: #4361ee; color: white !important; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.2s; }}
+        .ha-entity-link:hover {{ background: #3a56d4; }}
         .message.assistant strong {{ color: #333; }}
         .message.assistant ul, .message.assistant ol {{ margin: 6px 0 6px 20px; }}
         .message.assistant p {{ margin: 4px 0; }}
@@ -1458,6 +1653,20 @@ def get_chat_ui():
         .config-item-info {{ flex: 1; min-width: 0; }}
         .config-item-title {{ font-size: 13px; font-weight: 600; color: #333; }}
         .config-item-desc {{ font-size: 11px; color: #888; margin-top: 2px; }}
+        .llm-priority-list {{ list-style: none; padding: 0; margin: 8px 0; }}
+        .llm-priority-item {{ display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 4px; background: #fafafa; }}
+        .llm-priority-item .llm-idx {{ font-size: 12px; font-weight: 600; color: #999; min-width: 18px; text-align: center; }}
+        .llm-priority-item .llm-dot {{ width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }}
+        .llm-priority-item .llm-dot.on {{ background: #4caf50; }}
+        .llm-priority-item .llm-dot.off {{ background: #ccc; }}
+        .llm-priority-item .llm-name {{ flex: 1; font-size: 13px; }}
+        .llm-priority-item .llm-nokey {{ font-size: 11px; color: #999; font-style: italic; }}
+        .llm-priority-btn {{ background: none; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; padding: 2px 6px; font-size: 11px; line-height: 1; }}
+        .llm-priority-btn:hover {{ background: #eee; }}
+        .llm-priority-btn:disabled {{ opacity: 0.3; cursor: default; }}
+        .llm-toggle-row {{ display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #e0e0e0; }}
+        .llm-toggle-label {{ flex: 1; font-size: 13px; font-weight: 500; }}
+        .llm-toggle-desc {{ font-size: 12px; color: #888; padding: 8px 14px; }}
         .config-editor {{ display: flex; flex-direction: column; height: 100%; }}
         .config-editor-header {{
             padding: 10px 14px; border-bottom: 1px solid #e0e0e0;
@@ -1487,6 +1696,61 @@ def get_chat_ui():
         .config-status {{ font-size: 11px; padding: 4px 8px; border-radius: 4px; transition: opacity 0.3s; }}
         .config-status.success {{ background: #dcfce7; color: #166534; }}
         .config-status.error {{ background: #fce8e8; color: #991b1b; }}
+
+        /* ===== SETTINGS FORM ===== */
+        .settings-section {{ margin-bottom: 2px; }}
+        .settings-section-header {{
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 14px; cursor: pointer; user-select: none;
+            font-size: 12px; font-weight: 700; color: #555; letter-spacing: 0.5px;
+            background: #f5f6f8; border-bottom: 1px solid #e8e8e8;
+        }}
+        .settings-section-header:hover {{ background: #eef0f4; }}
+        .settings-section-arrow {{ font-size: 10px; color: #999; }}
+        .settings-section-body {{ padding: 6px 0; }}
+        .settings-row {{
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 14px; min-height: 36px;
+        }}
+        .settings-row:hover {{ background: #f8f9fb; }}
+        .settings-label {{ font-size: 13px; color: #444; flex: 1; }}
+        .settings-desc {{
+            font-size: 11px; color: #999; padding: 0 14px 6px; line-height: 1.4;
+        }}
+        .settings-toggle {{
+            position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0;
+        }}
+        .settings-toggle input {{ opacity: 0; width: 0; height: 0; }}
+        .settings-slider {{
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background: #ccc; border-radius: 24px; transition: .3s;
+        }}
+        .settings-slider:before {{
+            content: ""; position: absolute; height: 18px; width: 18px;
+            left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .3s;
+        }}
+        .settings-toggle input:checked + .settings-slider {{ background: #667eea; }}
+        .settings-toggle input:checked + .settings-slider:before {{ transform: translateX(18px); }}
+        .settings-select {{
+            padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; background: #fff; color: #333; min-width: 120px;
+            outline: none; cursor: pointer;
+        }}
+        .settings-select:focus {{ border-color: #667eea; }}
+        .settings-input {{
+            padding: 5px 8px; border: 1px solid #ddd; border-radius: 6px;
+            font-size: 13px; background: #fff; color: #333; width: 220px;
+            outline: none; box-sizing: border-box;
+        }}
+        .settings-input:focus {{ border-color: #667eea; }}
+        .settings-input[type="number"] {{ width: 80px; text-align: center; }}
+        .settings-pw-wrap {{ display: flex; align-items: center; gap: 4px; }}
+        .settings-password {{ width: 260px; font-family: monospace; }}
+        .settings-eye-btn {{
+            background: none; border: none; cursor: pointer; font-size: 14px;
+            padding: 2px 4px; opacity: 0.6;
+        }}
+        .settings-eye-btn:hover {{ opacity: 1; }}
 
         /* ===== AGENT FORM ===== */
         .agent-list-header {{
@@ -2088,6 +2352,8 @@ def get_chat_ui():
             background: #1e3a8a;
             color: #8ab4f8;
         }}
+        body.dark-mode .ha-entity-link {{ background: #5a6fd6; }}
+        body.dark-mode .ha-entity-link:hover {{ background: #6b7ee0; }}
 
         body.dark-mode .image-preview-container {{
             background: #2a2a2a;
@@ -2134,6 +2400,12 @@ def get_chat_ui():
         body.dark-mode .config-item {{ background: #2a2a3a; border-bottom-color: #3a3a4a; }}
         body.dark-mode .config-item:hover {{ background: #33334a; }}
         body.dark-mode .config-item.active {{ background: #2e2e5a; border-left-color: #8899ff; }}
+        body.dark-mode .llm-priority-item {{ background: #2a2a3a; border-color: #3a3a4a; }}
+        body.dark-mode .llm-priority-item .llm-name {{ color: #ddd; }}
+        body.dark-mode .llm-priority-btn {{ border-color: #555; color: #ccc; }}
+        body.dark-mode .llm-priority-btn:hover {{ background: #3a3a4a; }}
+        body.dark-mode .llm-toggle-row {{ border-bottom-color: #3a3a4a; }}
+        body.dark-mode .llm-toggle-desc {{ color: #777; }}
         body.dark-mode .config-item-title {{ color: #e0e0e0; }}
         body.dark-mode .config-item-desc {{ color: #808090; }}
         body.dark-mode .config-editor-header {{ border-bottom-color: #3a3a4a; }}
@@ -2146,6 +2418,19 @@ def get_chat_ui():
         body.dark-mode .config-cancel-btn:hover {{ background: #4a4a5a; }}
         body.dark-mode .config-status.success {{ background: #1a3a2a; color: #6ee7b7; }}
         body.dark-mode .config-status.error {{ background: #3a1a1a; color: #fca5a5; }}
+
+        /* Settings dark mode */
+        body.dark-mode .settings-section-header {{ background: #252535; color: #aaa; border-bottom-color: #3a3a4a; }}
+        body.dark-mode .settings-section-header:hover {{ background: #2e2e40; }}
+        body.dark-mode .settings-section-arrow {{ color: #777; }}
+        body.dark-mode .settings-row:hover {{ background: #2a2a3a; }}
+        body.dark-mode .settings-label {{ color: #ccc; }}
+        body.dark-mode .settings-desc {{ color: #777; }}
+        body.dark-mode .settings-select {{ background: #2a2a3a; color: #ddd; border-color: #4a4a5a; }}
+        body.dark-mode .settings-select:focus {{ border-color: #8899ff; }}
+        body.dark-mode .settings-input {{ background: #2a2a3a; color: #ddd; border-color: #4a4a5a; }}
+        body.dark-mode .settings-input:focus {{ border-color: #8899ff; }}
+        body.dark-mode .settings-eye-btn {{ color: #aaa; }}
 
         /* Agent form dark mode */
         body.dark-mode .agent-list-header {{ border-bottom-color: #3a3a4a; }}
@@ -2182,6 +2467,7 @@ def get_chat_ui():
         body.dark-mode .mcp-server-header:hover {{ background: #333350; }}
         body.dark-mode .mcp-server-name {{ color: #e0e0e0; }}
         body.dark-mode .mcp-server-body {{ border-top-color: #3a3a4a; }}
+        body.dark-mode .mcp-settings-bar {{ border-bottom-color: #3a3a4a; }}
         body.dark-mode .enhanced-editor-stats {{ background: #2a2a3a; border-bottom-color: #3a3a4a; }}
         body.dark-mode .enhanced-editor-stats span {{ color: #aaa; }}
 
@@ -3528,6 +3814,8 @@ def get_chat_ui():
             {{ file: 'amira/mcp_config.json', icon: '\U0001f50c', title: T.config_mcp_title || 'MCP Configuration', desc: 'mcp_config.json', formBased: 'mcp' }},
             {{ file: 'amira/custom_system_prompt.txt', icon: '\U0001f4dd', title: T.config_prompt_title || 'Custom System Prompt', desc: 'custom_system_prompt.txt', formBased: 'prompt' }},
             {{ file: 'amira/memory/MEMORY.md', icon: '\U0001f9e0', title: T.config_memory_title || 'Memory (MEMORY.md)', desc: 'memory/MEMORY.md', formBased: 'memory' }},
+            {{ file: 'amira/fallback_config.json', icon: '\U0001f504', title: T.config_llm_title || 'LLM Priority', desc: 'fallback_config.json', formBased: 'llm_priority' }},
+            {{ file: 'amira/settings.json', icon: '\u2699\ufe0f', title: T.config_settings_title || 'Settings', desc: 'settings.json', formBased: 'settings' }},
         ];
         let configActiveFile = null;
         let configOriginalContent = '';
@@ -3599,6 +3887,14 @@ def get_chat_ui():
             }}
             if (cf.formBased === 'memory') {{
                 await openEnhancedTextEditor(cf, 'memory');
+                return;
+            }}
+            if (cf.formBased === 'llm_priority') {{
+                await openLlmPriorityUI();
+                return;
+            }}
+            if (cf.formBased === 'settings') {{
+                await openSettingsUI();
                 return;
             }}
 
@@ -4135,6 +4431,18 @@ def get_chat_ui():
             if (!filePanelContentEl) return;
             filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
 
+            // Load current MCP settings (enable_mcp + mcp_config_file)
+            let mcpEnabled = true;
+            let mcpFilePath = '/config/amira/mcp_config.json';
+            try {{
+                const sResp = await fetch(apiUrl('api/settings'), {{credentials:'same-origin'}});
+                const sData = await sResp.json();
+                if (sData.success) {{
+                    mcpEnabled = sData.settings.enable_mcp !== false;
+                    mcpFilePath = sData.settings.mcp_config_file || mcpFilePath;
+                }}
+            }} catch(e) {{}}
+
             let mcpConfig = {{}};
             try {{
                 const resp = await fetch(apiUrl('api/config/read') + '?file=amira/mcp_config.json', {{credentials:'same-origin'}});
@@ -4173,24 +4481,89 @@ def get_chat_ui():
             hdr.appendChild(addBtn);
             wrap.appendChild(hdr);
 
+            // ── MCP Settings bar (enable toggle + config path) ──
+            const mcpBar = document.createElement('div');
+            mcpBar.className = 'mcp-settings-bar';
+            mcpBar.style.cssText = 'padding:10px 14px;border-bottom:1px solid #eee;';
+            // Toggle row
+            const toggleRow = document.createElement('div');
+            toggleRow.className = 'settings-row';
+            const toggleLbl = document.createElement('label');
+            toggleLbl.className = 'settings-label';
+            toggleLbl.textContent = T.settings_enable_mcp || 'MCP Servers';
+            toggleRow.appendChild(toggleLbl);
+            const toggleSw = document.createElement('label');
+            toggleSw.className = 'settings-toggle';
+            const toggleInp = document.createElement('input');
+            toggleInp.type = 'checkbox';
+            toggleInp.checked = mcpEnabled;
+            const toggleSl = document.createElement('span');
+            toggleSl.className = 'settings-slider';
+            toggleSw.appendChild(toggleInp);
+            toggleSw.appendChild(toggleSl);
+            toggleRow.appendChild(toggleSw);
+            mcpBar.appendChild(toggleRow);
+            const toggleDesc = document.createElement('div');
+            toggleDesc.className = 'settings-desc';
+            toggleDesc.textContent = T.settings_desc_enable_mcp || 'Enable MCP (Model Context Protocol) support.';
+            mcpBar.appendChild(toggleDesc);
+            // File path row
+            const pathRow = document.createElement('div');
+            pathRow.className = 'settings-row';
+            pathRow.style.marginTop = '6px';
+            const pathLbl = document.createElement('label');
+            pathLbl.className = 'settings-label';
+            pathLbl.textContent = T.mcp_config_path || 'Config File';
+            pathRow.appendChild(pathLbl);
+            const pathInp = document.createElement('input');
+            pathInp.type = 'text';
+            pathInp.className = 'settings-input';
+            pathInp.value = mcpFilePath;
+            pathInp.style.width = '260px';
+            pathRow.appendChild(pathInp);
+            mcpBar.appendChild(pathRow);
+            const pathDesc = document.createElement('div');
+            pathDesc.className = 'settings-desc';
+            pathDesc.textContent = T.settings_desc_mcp_config_file || 'Path to MCP configuration JSON file';
+            mcpBar.appendChild(pathDesc);
+            // Dim server list when MCP off
+            function _updateMcpDim() {{
+                const on = toggleInp.checked;
+                listWrap.style.opacity = on ? '1' : '0.45';
+                listWrap.style.pointerEvents = on ? 'auto' : 'none';
+                addBtn.style.opacity = on ? '1' : '0.45';
+                addBtn.style.pointerEvents = on ? 'auto' : 'none';
+            }}
+            toggleInp.addEventListener('change', _updateMcpDim);
+            wrap.appendChild(mcpBar);
+
             const listWrap = document.createElement('div');
             listWrap.style.cssText = 'flex:1;overflow-y:auto;padding:8px;';
             _renderMcpCards(listWrap, servers);
             wrap.appendChild(listWrap);
+            _updateMcpDim();
 
             // Footer with save
             const footer = document.createElement('div');
-            footer.className = 'agent-form-actions';
-            footer.style.cssText = 'padding:12px;';
+            footer.className = 'config-editor-footer';
             footer.innerHTML = '<span id="mcpStatus" class="config-status"></span>';
             const saveBtn = document.createElement('button');
             saveBtn.className = 'config-save-btn';
             saveBtn.textContent = T.config_save || 'Save';
             saveBtn.addEventListener('click', async () => {{
-                // Collect data from cards
-                const result = _collectMcpData(listWrap);
-                const json = JSON.stringify({{ mcpServers: result }}, null, 2);
+                const st = document.getElementById('mcpStatus');
                 try {{
+                    // 1. Save enable_mcp + mcp_config_file via settings API
+                    const settResp = await fetch(apiUrl('api/settings'), {{
+                        method: 'POST', headers: {{'Content-Type':'application/json'}},
+                        credentials: 'same-origin',
+                        body: JSON.stringify({{ enable_mcp: toggleInp.checked, mcp_config_file: pathInp.value }})
+                    }});
+                    const settData = await settResp.json();
+                    if (!settData.success) throw new Error(settData.error || 'Settings save failed');
+                    // 2. Save MCP servers JSON to config file
+                    const result = _collectMcpData(listWrap);
+                    const json = JSON.stringify({{ mcpServers: result }}, null, 2);
                     const resp = await fetch(apiUrl('api/config/save'), {{
                         method: 'POST', headers: {{'Content-Type':'application/json'}},
                         credentials: 'same-origin',
@@ -4198,11 +4571,10 @@ def get_chat_ui():
                     }});
                     const d = await resp.json();
                     if (!d.success) throw new Error(d.error || 'Save failed');
-                    const st = document.getElementById('mcpStatus');
                     if (st) {{ st.textContent = T.config_saved || 'Saved!'; st.className = 'config-status success'; }}
                     setTimeout(() => {{ if (st) {{ st.textContent = ''; st.className = 'config-status'; }} }}, 3000);
+                    await _askRestartAddon(st);
                 }} catch(err) {{
-                    const st = document.getElementById('mcpStatus');
                     if (st) {{ st.textContent = (T.config_save_error || 'Error') + ': ' + err.message; st.className = 'config-status error'; }}
                 }}
             }});
@@ -4390,6 +4762,474 @@ def get_chat_ui():
 
             filePanelContentEl.appendChild(wrap);
             updateStats();
+        }}
+
+        // ── LLM Priority UI ──────────────────────────────────────────
+        async function openLlmPriorityUI() {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            let fbData = {{ enabled: true, providers: [] }};
+            try {{
+                const resp = await fetch(apiUrl('api/fallback_config'), {{credentials:'same-origin'}});
+                const data = await resp.json();
+                if (data.success) fbData = data;
+            }} catch(e) {{ console.warn('Failed to load fallback config', e); }}
+
+            filePanelContentEl.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            // Header
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>\U0001f504 ' + (T.config_llm_title || 'LLM Priority') + '</h3>';
+            wrap.appendChild(hdr);
+
+            const body = document.createElement('div');
+            body.style.cssText = 'flex:1;overflow-y:auto;padding:12px 14px;';
+
+            // Toggle row
+            const toggleRow = document.createElement('div');
+            toggleRow.className = 'llm-toggle-row';
+            const toggleLabel = document.createElement('div');
+            toggleLabel.className = 'llm-toggle-label';
+            toggleLabel.textContent = T.llm_fallback_label || 'Auto Fallback';
+            const toggleDesc = document.createElement('div');
+            toggleDesc.className = 'llm-toggle-desc';
+            toggleDesc.textContent = fbData.enabled
+                ? (T.llm_fallback_on || 'ON \u2013 if primary fails, try next provider')
+                : (T.llm_fallback_off || 'OFF \u2013 only the selected provider is used');
+            const toggleSwitch = document.createElement('label');
+            toggleSwitch.style.cssText = 'position:relative;display:inline-block;width:42px;height:24px;flex-shrink:0;';
+            const toggleInput = document.createElement('input');
+            toggleInput.type = 'checkbox';
+            toggleInput.checked = fbData.enabled;
+            toggleInput.style.cssText = 'opacity:0;width:0;height:0;';
+            const slider = document.createElement('span');
+            slider.style.cssText = 'position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:'
+                + (fbData.enabled ? '#667eea' : '#ccc')
+                + ';border-radius:24px;transition:.3s;';
+            const knob = document.createElement('span');
+            knob.style.cssText = 'position:absolute;content:"";height:18px;width:18px;left:'
+                + (fbData.enabled ? '20px' : '3px')
+                + ';bottom:3px;background:#fff;border-radius:50%;transition:.3s;';
+            slider.appendChild(knob);
+            toggleSwitch.appendChild(toggleInput);
+            toggleSwitch.appendChild(slider);
+            toggleInput.addEventListener('change', () => {{
+                const on = toggleInput.checked;
+                slider.style.background = on ? '#667eea' : '#ccc';
+                knob.style.left = on ? '20px' : '3px';
+                toggleDesc.textContent = on
+                    ? (T.llm_fallback_on || 'ON \u2013 if primary fails, try next provider')
+                    : (T.llm_fallback_off || 'OFF \u2013 only the selected provider is used');
+                listEl.style.opacity = on ? '1' : '0.45';
+                listEl.style.pointerEvents = on ? 'auto' : 'none';
+            }});
+            const toggleTop = document.createElement('div');
+            toggleTop.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;';
+            toggleTop.appendChild(toggleLabel);
+            toggleTop.appendChild(toggleSwitch);
+            toggleRow.appendChild(toggleTop);
+            toggleRow.appendChild(toggleDesc);
+            body.appendChild(toggleRow);
+
+            // Priority label
+            const priLabel = document.createElement('div');
+            priLabel.style.cssText = 'font-size:12px;font-weight:600;color:#888;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.5px;';
+            priLabel.textContent = T.llm_priority_label || 'Priority order';
+            body.appendChild(priLabel);
+
+            // Provider list
+            const listEl = document.createElement('ul');
+            listEl.className = 'llm-priority-list';
+            listEl.style.opacity = fbData.enabled ? '1' : '0.45';
+            listEl.style.pointerEvents = fbData.enabled ? 'auto' : 'none';
+
+            let providers = fbData.providers || [];
+
+            function renderList() {{
+                listEl.innerHTML = '';
+                providers.forEach((p, i) => {{
+                    const li = document.createElement('li');
+                    li.className = 'llm-priority-item';
+                    const num = document.createElement('span');
+                    num.style.cssText = 'font-size:11px;color:#999;width:18px;text-align:center;flex-shrink:0;';
+                    num.textContent = (i + 1) + '.';
+                    const dot = document.createElement('span');
+                    dot.className = 'llm-dot ' + (p.configured ? 'on' : 'off');
+                    const name = document.createElement('span');
+                    name.className = 'llm-name';
+                    const provLabel = PROVIDER_LABELS[p.id] || p.label || p.id;
+                    name.textContent = provLabel;
+                    if (!p.configured) {{
+                        const nokey = document.createElement('span');
+                        nokey.className = 'llm-nokey';
+                        nokey.textContent = ' (' + (T.llm_no_key || 'no key') + ')';
+                        name.appendChild(nokey);
+                    }}
+                    const btnWrap = document.createElement('span');
+                    btnWrap.style.cssText = 'display:flex;gap:2px;flex-shrink:0;';
+                    const upBtn = document.createElement('button');
+                    upBtn.className = 'llm-priority-btn';
+                    upBtn.textContent = '\u25B2';
+                    upBtn.disabled = (i === 0);
+                    upBtn.addEventListener('click', () => {{
+                        if (i === 0) return;
+                        [providers[i - 1], providers[i]] = [providers[i], providers[i - 1]];
+                        renderList();
+                    }});
+                    const downBtn = document.createElement('button');
+                    downBtn.className = 'llm-priority-btn';
+                    downBtn.textContent = '\u25BC';
+                    downBtn.disabled = (i === providers.length - 1);
+                    downBtn.addEventListener('click', () => {{
+                        if (i >= providers.length - 1) return;
+                        [providers[i], providers[i + 1]] = [providers[i + 1], providers[i]];
+                        renderList();
+                    }});
+                    btnWrap.appendChild(upBtn);
+                    btnWrap.appendChild(downBtn);
+                    li.appendChild(num);
+                    li.appendChild(dot);
+                    li.appendChild(name);
+                    li.appendChild(btnWrap);
+                    listEl.appendChild(li);
+                }});
+            }}
+            renderList();
+            body.appendChild(listEl);
+
+            // Save button
+            const saveRow = document.createElement('div');
+            saveRow.style.cssText = 'margin-top:16px;display:flex;align-items:center;gap:10px;';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'agent-add-btn';
+            saveBtn.style.cssText = 'padding:8px 22px;font-size:13px;';
+            saveBtn.textContent = '\U0001f4be ' + (T.config_save || 'Save');
+            const saveStatus = document.createElement('span');
+            saveStatus.style.cssText = 'font-size:12px;color:#4caf50;';
+            saveBtn.addEventListener('click', async () => {{
+                saveBtn.disabled = true;
+                saveBtn.textContent = '\u23F3 ...';
+                try {{
+                    const payload = {{
+                        enabled: toggleInput.checked,
+                        priority: providers.map(p => p.id)
+                    }};
+                    const resp = await fetch(apiUrl('api/fallback_config'), {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        credentials: 'same-origin',
+                        body: JSON.stringify(payload)
+                    }});
+                    const data = await resp.json();
+                    if (!data.success) throw new Error(data.error || 'Save failed');
+                    saveStatus.textContent = '\u2705 ' + (T.llm_saved || 'Saved!');
+                    setTimeout(() => {{ saveStatus.textContent = ''; }}, 3000);
+                }} catch(e) {{
+                    saveStatus.textContent = '\u274C ' + (e.message || 'Error');
+                    saveStatus.style.color = '#f44336';
+                    setTimeout(() => {{ saveStatus.textContent = ''; saveStatus.style.color = '#4caf50'; }}, 4000);
+                }} finally {{
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '\U0001f4be ' + (T.config_save || 'Save');
+                }}
+            }});
+            saveRow.appendChild(saveBtn);
+            saveRow.appendChild(saveStatus);
+            body.appendChild(saveRow);
+
+            wrap.appendChild(body);
+            filePanelContentEl.appendChild(wrap);
+        }}
+
+        async function openSettingsUI() {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            let settingsData = {{ settings: {{}}, sections: [] }};
+            try {{
+                const resp = await fetch(apiUrl('api/settings'), {{credentials:'same-origin'}});
+                const data = await resp.json();
+                if (data.success) settingsData = data;
+            }} catch(e) {{ console.warn('Failed to load settings', e); }}
+
+            filePanelContentEl.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            // Header
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>\u2699\ufe0f ' + (T.config_settings_title || 'Settings') + '</h3>';
+            wrap.appendChild(hdr);
+
+            const body = document.createElement('div');
+            body.style.cssText = 'flex:1;overflow-y:auto;padding:12px 14px;';
+
+            const values = {{ ...settingsData.settings }};
+
+            // i18n labels for setting keys
+            const LABELS = {{
+                language: T.settings_language || 'Language',
+                enable_memory: T.settings_enable_memory || 'Memory',
+                enable_file_access: T.settings_enable_file_access || 'File Access',
+                enable_file_upload: T.settings_enable_file_upload || 'File Upload',
+                enable_voice_input: T.settings_enable_voice_input || 'Voice Input',
+                enable_rag: T.settings_enable_rag || 'RAG',
+                enable_chat_bubble: T.settings_enable_chat_bubble || 'Chat Bubble',
+                enable_amira_card_button: T.settings_enable_amira_card_button || 'Amira Card Button',
+                enable_mcp: T.settings_enable_mcp || 'MCP Servers',
+                fallback_enabled: T.settings_fallback_enabled || 'Auto Fallback',
+                anthropic_extended_thinking: T.settings_anthropic_thinking || 'Anthropic Thinking',
+                anthropic_prompt_caching: T.settings_anthropic_caching || 'Prompt Caching',
+                openai_extended_thinking: T.settings_openai_thinking || 'OpenAI Thinking',
+                nvidia_thinking_mode: T.settings_nvidia_thinking || 'NVIDIA Thinking',
+                tts_voice: T.settings_tts_voice || 'TTS Voice',
+                telegram_bot_token: T.settings_telegram_token || 'Telegram Bot Token',
+                twilio_account_sid: T.settings_twilio_sid || 'Twilio Account SID',
+                twilio_auth_token: T.settings_twilio_token || 'Twilio Auth Token',
+                twilio_whatsapp_from: T.settings_twilio_from || 'WhatsApp From Number',
+                timeout: T.settings_timeout || 'Timeout (s)',
+                max_retries: T.settings_max_retries || 'Max Retries',
+                max_conversations: T.settings_max_conversations || 'Max Conversations',
+                max_snapshots_per_file: T.settings_max_snapshots || 'Max Snapshots/File',
+                cost_currency: T.settings_cost_currency || 'Currency',
+            }};
+
+            // i18n descriptions for setting keys
+            const DESCS = {{}};
+            Object.keys(LABELS).forEach(k => {{
+                const tKey = 'settings_desc_' + k;
+                if (T[tKey]) DESCS[k] = T[tKey];
+            }});
+
+            // Section labels
+            const SECTION_LABELS = {{
+                language: T.settings_section_language || 'Language',
+                features: T.settings_section_features || 'Features',
+                ai: T.settings_section_ai || 'AI',
+                voice: T.settings_section_voice || 'Voice',
+                messaging: T.settings_section_messaging || 'Messaging',
+                advanced: T.settings_section_advanced || 'Advanced',
+                costs: T.settings_section_costs || 'Costs',
+            }};
+
+            (settingsData.sections || []).forEach(section => {{
+                const sec = document.createElement('div');
+                sec.className = 'settings-section';
+
+                const secHeader = document.createElement('div');
+                secHeader.className = 'settings-section-header';
+                const secTitle = document.createElement('span');
+                secTitle.textContent = section.icon + ' ' + (SECTION_LABELS[section.id] || section.id).toUpperCase();
+                secHeader.appendChild(secTitle);
+                const arrow = document.createElement('span');
+                arrow.className = 'settings-section-arrow';
+                arrow.textContent = '\u25BC';
+                secHeader.appendChild(arrow);
+
+                const secBody = document.createElement('div');
+                secBody.className = 'settings-section-body';
+
+                secHeader.addEventListener('click', () => {{
+                    const isOpen = secBody.style.display !== 'none';
+                    secBody.style.display = isOpen ? 'none' : 'block';
+                    arrow.textContent = isOpen ? '\u25B6' : '\u25BC';
+                }});
+
+                (section.fields || []).forEach(field => {{
+                    const row = document.createElement('div');
+                    row.className = 'settings-row';
+                    const lbl = document.createElement('label');
+                    lbl.className = 'settings-label';
+                    lbl.textContent = LABELS[field.key] || field.key;
+                    row.appendChild(lbl);
+
+                    if (field.type === 'toggle') {{
+                        const sw = document.createElement('label');
+                        sw.className = 'settings-toggle';
+                        const inp = document.createElement('input');
+                        inp.type = 'checkbox';
+                        inp.checked = !!values[field.key];
+                        inp.addEventListener('change', () => {{ values[field.key] = inp.checked; }});
+                        const sl = document.createElement('span');
+                        sl.className = 'settings-slider';
+                        sw.appendChild(inp);
+                        sw.appendChild(sl);
+                        row.appendChild(sw);
+                    }} else if (field.type === 'select') {{
+                        const sel = document.createElement('select');
+                        sel.className = 'settings-select';
+                        (field.options || []).forEach(opt => {{
+                            const o = document.createElement('option');
+                            o.value = opt.value;
+                            o.textContent = opt.label;
+                            if (String(values[field.key]).toLowerCase() === String(opt.value).toLowerCase()) o.selected = true;
+                            sel.appendChild(o);
+                        }});
+                        sel.addEventListener('change', () => {{ values[field.key] = sel.value; }});
+                        row.appendChild(sel);
+                    }} else if (field.type === 'number') {{
+                        const inp = document.createElement('input');
+                        inp.type = 'number';
+                        inp.className = 'settings-input';
+                        inp.value = values[field.key] != null ? values[field.key] : (field.min || 0);
+                        if (field.min !== undefined) inp.min = field.min;
+                        if (field.max !== undefined) inp.max = field.max;
+                        if (field.step !== undefined) inp.step = field.step;
+                        inp.addEventListener('change', () => {{ values[field.key] = parseInt(inp.value) || 0; }});
+                        row.appendChild(inp);
+                    }} else if (field.type === 'password') {{
+                        const pwWrap = document.createElement('div');
+                        pwWrap.className = 'settings-pw-wrap';
+                        const inp = document.createElement('input');
+                        inp.type = 'password';
+                        inp.className = 'settings-input settings-password';
+                        inp.value = values[field.key] || '';
+                        inp.placeholder = '\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022';
+                        inp.addEventListener('input', () => {{ values[field.key] = inp.value; }});
+                        const eyeBtn = document.createElement('button');
+                        eyeBtn.type = 'button';
+                        eyeBtn.className = 'settings-eye-btn';
+                        eyeBtn.textContent = '\U0001f441\ufe0f';
+                        eyeBtn.addEventListener('click', () => {{
+                            inp.type = inp.type === 'password' ? 'text' : 'password';
+                        }});
+                        pwWrap.appendChild(eyeBtn);
+                        pwWrap.appendChild(inp);
+                        row.appendChild(pwWrap);
+                    }} else {{
+                        const inp = document.createElement('input');
+                        inp.type = 'text';
+                        inp.className = 'settings-input';
+                        inp.value = values[field.key] || '';
+                        inp.addEventListener('input', () => {{ values[field.key] = inp.value; }});
+                        row.appendChild(inp);
+                    }}
+
+                    secBody.appendChild(row);
+                    if (DESCS[field.key]) {{
+                        const desc = document.createElement('div');
+                        desc.className = 'settings-desc';
+                        desc.textContent = DESCS[field.key];
+                        secBody.appendChild(desc);
+                    }}
+                }});
+
+                sec.appendChild(secHeader);
+                sec.appendChild(secBody);
+                body.appendChild(sec);
+            }});
+
+            // Save button
+            const saveRow = document.createElement('div');
+            saveRow.style.cssText = 'margin-top:16px;display:flex;align-items:center;gap:10px;padding-bottom:20px;';
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'agent-add-btn';
+            saveBtn.style.cssText = 'padding:8px 22px;font-size:13px;';
+            saveBtn.textContent = '\U0001f4be ' + (T.config_save || 'Save');
+            const saveStatus = document.createElement('span');
+            saveStatus.style.cssText = 'font-size:12px;color:#4caf50;';
+            saveBtn.addEventListener('click', async () => {{
+                saveBtn.disabled = true;
+                saveBtn.textContent = '\u23F3 ...';
+                try {{
+                    const resp = await fetch(apiUrl('api/settings'), {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        credentials: 'same-origin',
+                        body: JSON.stringify(values)
+                    }});
+                    const data = await resp.json();
+                    if (!data.success) throw new Error(data.error || 'Save failed');
+                    saveStatus.textContent = '\u2705 ' + (T.settings_saved || 'Settings saved!');
+                    setTimeout(() => {{ saveStatus.textContent = ''; }}, 3000);
+                    await _askRestartAddon(saveStatus);
+                }} catch(e) {{
+                    saveStatus.textContent = '\u274C ' + (e.message || 'Error');
+                    saveStatus.style.color = '#f44336';
+                    setTimeout(() => {{ saveStatus.textContent = ''; saveStatus.style.color = '#4caf50'; }}, 4000);
+                }} finally {{
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '\U0001f4be ' + (T.config_save || 'Save');
+                }}
+            }});
+            saveRow.appendChild(saveBtn);
+            saveRow.appendChild(saveStatus);
+            body.appendChild(saveRow);
+
+            // ---- Bubble Diagnostics panel ----
+            const diagSec = document.createElement('div');
+            diagSec.className = 'settings-section';
+            const diagHdr = document.createElement('div');
+            diagHdr.className = 'settings-section-header';
+            const diagTitle = document.createElement('span');
+            diagTitle.textContent = '\U0001f50d BUBBLE DIAGNOSTICS';
+            diagHdr.appendChild(diagTitle);
+            const diagArrow = document.createElement('span');
+            diagArrow.className = 'settings-section-arrow';
+            diagArrow.textContent = '\u25B6';
+            diagHdr.appendChild(diagArrow);
+            const diagBody = document.createElement('div');
+            diagBody.className = 'settings-section-body';
+            diagBody.style.display = 'none';
+            diagHdr.addEventListener('click', async () => {{
+                const isVis = diagBody.style.display !== 'none';
+                diagBody.style.display = isVis ? 'none' : 'block';
+                diagArrow.textContent = isVis ? '\u25B6' : '\u25BC';
+                if (!isVis) {{
+                    diagBody.innerHTML = '<div style="padding:8px;color:#999;">Loading...</div>';
+                    try {{
+                        const r = await fetch(apiUrl('api/bubble/status'), {{credentials:'same-origin'}});
+                        const d = await r.json();
+                        let html = '<div style="padding:8px;font-size:12px;font-family:monospace;line-height:1.8;">';
+                        const ok = '\u2705', no = '\u274C', warn = '\u26A0\uFE0F';
+                        html += '<div>' + (d.bubble_enabled ? ok : no) + ' Chat Bubble: <b>' + (d.bubble_enabled ? 'ON' : 'OFF') + '</b></div>';
+                        html += '<div>' + (d.card_button_enabled ? ok : no) + ' Card Button: <b>' + (d.card_button_enabled ? 'ON' : 'OFF') + '</b></div>';
+                        html += '<div>' + (d.registered_flag ? ok : warn) + ' Registered flag: <b>' + d.registered_flag + '</b></div>';
+                        html += '<div>' + (d.ingress_url && d.ingress_url !== '(empty)' ? ok : no) + ' Ingress URL: <b>' + (d.ingress_url || '(empty)') + '</b></div>';
+                        const js = d.js_file || {{}};
+                        html += '<div>' + (js.exists ? ok : no) + ' JS file: <b>' + (js.exists ? (js.size_bytes + ' bytes') : 'NOT FOUND') + '</b></div>';
+                        const lr = d.lovelace_resource || {{}};
+                        if (lr.error) {{
+                            html += '<div>' + warn + ' Lovelace: <b>' + lr.error + '</b></div>';
+                        }} else {{
+                            html += '<div>' + (lr.registered ? ok : no) + ' Lovelace: <b>' + (lr.registered ? 'Registered' : 'NOT registered') + '</b>';
+                            if (lr.entries && lr.entries.length) {{
+                                lr.entries.forEach(e => {{ html += '<br>&nbsp;&nbsp;id=' + e.id + ' url=' + e.url; }});
+                            }}
+                            html += '</div>';
+                        }}
+                        html += '<div style="margin-top:8px;color:var(--secondary-text-color,#888);">' + (d.hint || '') + '</div>';
+                        html += '<div style="margin-top:10px;"><button id="_diagReRegBtn" style="padding:6px 14px;font-size:12px;cursor:pointer;border:1px solid var(--divider-color,#ddd);border-radius:6px;background:var(--primary-color,#03a9f4);color:#fff;">Force Re-Register</button></div>';
+                        html += '</div>';
+                        diagBody.innerHTML = html;
+                        const reRegBtn = document.getElementById('_diagReRegBtn');
+                        if (reRegBtn) {{
+                            reRegBtn.addEventListener('click', async () => {{
+                                reRegBtn.disabled = true;
+                                reRegBtn.textContent = '...';
+                                try {{
+                                    const rr = await fetch(apiUrl('api/bubble/register'), {{method:'POST', credentials:'same-origin'}});
+                                    const rd = await rr.json();
+                                    reRegBtn.textContent = rd.ok ? '\u2705 Done — reload HA page' : '\u274C Failed';
+                                }} catch(ex) {{ reRegBtn.textContent = '\u274C ' + ex.message; }}
+                            }});
+                        }}
+                    }} catch(ex) {{
+                        diagBody.innerHTML = '<div style="padding:8px;color:#f44336;">Error: ' + ex.message + '</div>';
+                    }}
+                }}
+            }});
+            diagSec.appendChild(diagHdr);
+            diagSec.appendChild(diagBody);
+            body.appendChild(diagSec);
+
+            wrap.appendChild(body);
+            filePanelContentEl.appendChild(wrap);
         }}
 
         function setConfigStatus(text, cls) {{
@@ -4864,6 +5704,26 @@ def get_chat_ui():
                 ? (window.location.pathname || '/')
                 : ((window.location.pathname || '/') + '/');
             return window.location.origin.replace(/\\/$/, '') + basePath + cleanPath;
+        }}
+
+        async function _askRestartAddon(statusEl) {{
+            if (!confirm(T.restart_confirm || 'Some changes require a restart to take effect. Restart the add-on now?')) return;
+            if (statusEl) {{
+                statusEl.textContent = '\u267b\ufe0f ' + (T.restart_in_progress || 'Restarting add-on...');
+                statusEl.style.color = '#ff9800';
+            }}
+            try {{
+                await fetch(apiUrl('api/addon/restart'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type':'application/json'}},
+                    credentials: 'same-origin'
+                }});
+            }} catch(e) {{
+                if (statusEl) {{
+                    statusEl.textContent = '\u274c ' + (T.restart_failed || 'Restart failed');
+                    statusEl.style.color = '#f44336';
+                }}
+            }}
         }}
 
         function setStopMode(active) {{
@@ -5553,6 +6413,11 @@ def get_chat_ui():
                                 const msg = evt.message || evt.content || evt.status || evt.text || '';
                                 updateThinkingBaseText('\u23f3 ' + msg);
                                 addThinkingStep(msg);
+                            }} else if (evt.type === 'fallback_notice') {{
+                                // Provider fallback notification — show system message
+                                const origProv = (PROVIDER_LABELS[evt.original_provider] || evt.original_provider || '?');
+                                const actualProv = (PROVIDER_LABELS[evt.actual_provider] || evt.actual_provider || '?');
+                                addMessage('\u26A0\uFE0F ' + (T.fallback_notice || 'Fallback: {{from}} \u2192 {{to}}').replace('{{from}}', origProv).replace('{{to}}', actualProv), 'system');
                             }} else if (evt.type === 'token') {{
                                 if (!gotAnyToken) {{
                                     gotAnyToken = true;
@@ -5597,6 +6462,22 @@ def get_chat_ui():
                                                 if (tabIdx === fileActiveTabIdx) renderActivePanelContent(); }});
                                     }}
                                 }}
+                            }} else if (evt.type === 'diff_html') {{
+                                // Formatted write-tool response with side-by-side diff view
+                                if (!gotAnyToken) {{
+                                    gotAnyToken = true;
+                                    try {{
+                                        pendingSteps = (_thinkingSteps && _thinkingSteps.length) ? _thinkingSteps.slice(0) : null;
+                                    }} catch (e) {{ pendingSteps = null; }}
+                                    removeThinking();
+                                }}
+                                hasTools = false;
+                                if (!div) {{ div = document.createElement('div'); div.className = 'message assistant'; chat.appendChild(div); }}
+                                fullText += evt.content + '\\n\\n';
+                                const prefix = (pendingSteps && pendingSteps.length)
+                                    ? ('<div class="progress-steps">' + renderStepLines(pendingSteps) + '</div>')
+                                    : '';
+                                div.innerHTML = prefix + formatMarkdown(fullText);
                             }} else if (evt.type === 'error') {{
                                 removeThinking();
                                 addMessage('\u274c ' + evt.message, 'system');
@@ -6335,6 +7216,8 @@ def get_chat_ui():
             'dashscope': '☁️ DashScope (Qwen)',
             'moonshot': '🌙 Moonshot (Kimi)',
             'zhipu': '🧬 Zhipu (GLM)',
+            'perplexity': '🔎 Perplexity',
+            'custom': '🛠️ Custom Endpoint',
             'github_copilot': '⚠️ GitHub Copilot (Web)',
             'openai_codex': '⚠️ OpenAI Codex (Web)',
             'claude_web': '⚠️ Claude.ai (Web)',
@@ -6516,6 +7399,8 @@ def get_chat_ui():
                         opt.value = a.id;
                         const ident = a.identity || {{}};
                         opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
+                        // Show agent ID in tooltip so user knows which agent is which
+                        opt.title = `Agent ID: ${{a.id}}`;
                         if (data.active_agent && a.id === data.active_agent) opt.selected = true;
                         agentSel.appendChild(opt);
                     }});

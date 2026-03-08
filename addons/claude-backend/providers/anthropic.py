@@ -4,6 +4,7 @@ Extends EnhancedProvider for automatic retry, caching, and MCP auth support.
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Optional, Generator
 
 from .enhanced import EnhancedProvider
@@ -11,6 +12,28 @@ from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
 
 logger = logging.getLogger(__name__)
+
+# Anthropic requires tool IDs to match ^[a-zA-Z0-9_-]+$
+_TOOL_ID_CLEAN_RE = re.compile(r'[^a-zA-Z0-9_-]')
+_tool_id_seq = 0
+
+
+def _sanitize_tool_id(raw_id: str, fallback_name: str = "unknown") -> str:
+    """Sanitize a tool ID to match Anthropic's required pattern ^[a-zA-Z0-9_-]+$.
+
+    Replaces invalid characters with underscores.  Generates a unique fallback
+    when the ID is empty or entirely composed of invalid characters.
+    """
+    global _tool_id_seq
+    if raw_id:
+        sanitized = _TOOL_ID_CLEAN_RE.sub('_', raw_id)
+        # Ensure the result has at least one alphanumeric character
+        if sanitized and any(c.isalnum() for c in sanitized):
+            return sanitized
+    # Generate a unique fallback ID
+    _tool_id_seq += 1
+    safe_name = (_TOOL_ID_CLEAN_RE.sub('_', fallback_name) or "unknown")[:20]
+    return f"toolu_{safe_name}_{_tool_id_seq}"
 
 
 class AnthropicProvider(EnhancedProvider):
@@ -67,15 +90,154 @@ class AnthropicProvider(EnhancedProvider):
 
     @staticmethod
     def _split_system(messages: List[Dict[str, Any]]):
-        """Split system messages from conversation messages."""
+        """Split system messages and convert OpenAI-style tool messages to Anthropic format.
+        
+        Anthropic doesn't accept role="tool" messages. Tool results must be sent as:
+        - User message with content=[{"type": "tool_result", "tool_use_id": ..., "content": ...}]
+        
+        This method:
+        1. Extracts system messages into separate string
+        2. Converts OpenAI assistant+tool_calls to Anthropic assistant+tool_use
+        3. Converts OpenAI tool messages to Anthropic user+tool_result messages
+        """
+        import json as _json
         system = ""
         conv_msgs = []
-        for m in messages:
-            if m.get("role") == "system":
+        i = 0
+
+        # Map original tool_call IDs → sanitized IDs so that tool_use and
+        # tool_result blocks always reference the *same* Anthropic-safe ID.
+        # Key = original ID string (may be ""), Value = sanitized ID.
+        # When the original ID is empty we need positional disambiguation,
+        # so we use a list of IDs generated from the most recent assistant
+        # tool_calls block, consumed in order by the following tool messages.
+        _tc_id_map: dict = {}        # original_id → sanitized_id
+        _pending_tc_ids: list = []   # positional queue for empty-ID fallback
+
+        while i < len(messages):
+            m = messages[i]
+            role = m.get("role", "")
+
+            if role == "system":
+                # Extract system content
                 c = m.get("content", "")
                 system += (c if isinstance(c, str) else "") + "\n"
+                i += 1
+            elif role == "assistant" and m.get("tool_calls"):
+                # OpenAI format: assistant with tool_calls
+                # Convert to Anthropic format: assistant with tool_use blocks
+                text_content = m.get("content") or ""
+                content_blocks = []
+                if text_content:
+                    content_blocks.append({"type": "text", "text": text_content})
+
+                _pending_tc_ids = []  # reset queue for this assistant block
+                for tc in m.get("tool_calls", []):
+                    fn = tc.get("function", {})
+                    args_str = fn.get("arguments", "{}")
+                    try:
+                        args = _json.loads(args_str) if isinstance(args_str, str) else args_str
+                    except Exception:
+                        args = {}
+                    orig_id = tc.get("id", "") or ""
+                    sanitized = _sanitize_tool_id(orig_id, fn.get("name", "unknown"))
+                    # Store mapping so tool_result can look it up
+                    if orig_id:
+                        _tc_id_map[orig_id] = sanitized
+                    _pending_tc_ids.append(sanitized)
+                    content_blocks.append({
+                        "type": "tool_use",
+                        "id": sanitized,
+                        "name": fn.get("name", ""),
+                        "input": args,
+                    })
+
+                conv_msgs.append({"role": "assistant", "content": content_blocks})
+                i += 1
+            elif role == "tool":
+                # OpenAI format: tool response message
+                # Convert to Anthropic format: user message with tool_result
+                # Re-use the same sanitized ID that was assigned to the tool_use
+                def _resolve_tool_id(orig_id: str, fallback_name: str) -> str:
+                    """Resolve a tool_call_id to its matching tool_use ID."""
+                    if orig_id and orig_id in _tc_id_map:
+                        return _tc_id_map[orig_id]
+                    if _pending_tc_ids:
+                        return _pending_tc_ids.pop(0)
+                    # Last resort: generate a new sanitized ID
+                    return _sanitize_tool_id(orig_id, fallback_name)
+
+                tool_result = {
+                    "type": "tool_result",
+                    "tool_use_id": _resolve_tool_id(m.get("tool_call_id", ""), m.get("name", "unknown")),
+                    "content": m.get("content", ""),
+                }
+                # Collect consecutive tool messages into a single user message
+                tool_results = [tool_result]
+                i += 1
+                while i < len(messages) and messages[i].get("role") == "tool":
+                    next_tool = messages[i]
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": _resolve_tool_id(next_tool.get("tool_call_id", ""), next_tool.get("name", "unknown")),
+                        "content": next_tool.get("content", ""),
+                    })
+                    i += 1
+
+                conv_msgs.append({"role": "user", "content": tool_results})
             else:
+                # Regular user/assistant message - keep as is
                 conv_msgs.append(m)
+                i += 1
+
+        # Validate: ensure every user message with tool_result blocks is
+        # preceded by an assistant message whose tool_use IDs match.
+        # Drop orphaned tool_result user messages that would cause 400 errors.
+        validated = []
+        for idx, cm in enumerate(conv_msgs):
+            content = cm.get("content", "")
+            if cm.get("role") == "user" and isinstance(content, list):
+                has_tool_result = any(
+                    isinstance(c, dict) and c.get("type") == "tool_result"
+                    for c in content
+                )
+                if has_tool_result:
+                    # Check that the previous message is an assistant with matching tool_use IDs
+                    if not validated:
+                        logger.warning("Dropping orphaned tool_result at start of conversation")
+                        continue
+                    prev = validated[-1]
+                    prev_content = prev.get("content", "")
+                    if prev.get("role") == "assistant" and isinstance(prev_content, list):
+                        prev_tool_use_ids = {
+                            c.get("id") for c in prev_content
+                            if isinstance(c, dict) and c.get("type") == "tool_use"
+                        }
+                        result_ids = {
+                            c.get("tool_use_id") for c in content
+                            if isinstance(c, dict) and c.get("type") == "tool_result"
+                        }
+                        if result_ids.issubset(prev_tool_use_ids):
+                            validated.append(cm)
+                        else:
+                            logger.warning(
+                                f"Dropping tool_result with mismatched IDs: "
+                                f"result_ids={result_ids}, tool_use_ids={prev_tool_use_ids}"
+                            )
+                            # Also remove the preceding orphaned assistant+tool_use
+                            if validated and prev.get("role") == "assistant":
+                                _prev_has_only_tool_use = isinstance(prev_content, list) and all(
+                                    isinstance(c, dict) and c.get("type") == "tool_use"
+                                    for c in prev_content
+                                )
+                                if _prev_has_only_tool_use:
+                                    validated.pop()
+                    else:
+                        logger.warning("Dropping tool_result not preceded by assistant+tool_use")
+                    continue
+            validated.append(cm)
+        conv_msgs = validated
+
         return system.strip(), conv_msgs
 
     def _do_stream(

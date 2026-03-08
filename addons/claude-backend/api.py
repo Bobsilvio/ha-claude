@@ -189,6 +189,7 @@ ENABLE_VOICE_INPUT = os.getenv("ENABLE_VOICE_INPUT", "True").lower() == "true"
 TTS_VOICE = os.getenv("TTS_VOICE", "female").lower().strip()
 ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
+ENABLE_AMIRA_CARD_BUTTON = True
 COST_CURRENCY = os.getenv("COST_CURRENCY", "USD").upper()
 
 # Last usage data captured by synchronous chat functions (chat_openai/anthropic/google)
@@ -210,6 +211,156 @@ AGENT_INSTRUCTIONS = ""
 HTML_DASHBOARD_FOOTER = ""
 MAX_CONVERSATIONS = max(1, min(100, int(os.getenv("MAX_CONVERSATIONS", "10") or "10")))
 MAX_SNAPSHOTS_PER_FILE = max(1, min(50, int(os.getenv("MAX_SNAPSHOTS_PER_FILE", "5") or "5")))
+
+# New globals for settings previously read only inline
+TIMEOUT = int(os.getenv("TIMEOUT", "30") or "30")
+MAX_RETRIES = int(os.getenv("MAX_RETRIES", "3") or "3")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
+TWILIO_WHATSAPP_FROM = os.getenv("TWILIO_WHATSAPP_FROM", "")
+# Clean bashio 'null' values for messaging tokens
+for _msg_key in ("TELEGRAM_BOT_TOKEN", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM"):
+    if globals()[_msg_key] in ("null", "None", "none", "NULL"):
+        globals()[_msg_key] = ""
+ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() not in ("false", "0", "")
+MCP_CONFIG_FILE = os.getenv("MCP_CONFIG_FILE", "/config/amira/mcp_config.json")
+FALLBACK_ENABLED = os.getenv("FALLBACK_ENABLED", "true").lower() not in ("false", "0", "no")
+
+# ── Settings overlay (runtime-configurable via chat UI) ──────────────
+SETTINGS_FILE = "/config/amira/settings.json"
+
+SETTINGS_DEFAULTS = {
+    "language": "en",
+    "enable_memory": False,
+    "enable_file_access": False,
+    "enable_file_upload": True,
+    "enable_voice_input": True,
+    "enable_rag": False,
+    "enable_chat_bubble": True,
+    "enable_amira_card_button": True,
+    "enable_mcp": False,
+    "fallback_enabled": False,
+    "anthropic_extended_thinking": False,
+    "anthropic_prompt_caching": False,
+    "openai_extended_thinking": False,
+    "nvidia_thinking_mode": False,
+    "tts_voice": "female",
+    "telegram_bot_token": "",
+    "twilio_account_sid": "",
+    "twilio_auth_token": "",
+    "twilio_whatsapp_from": "",
+    "timeout": 30,
+    "max_retries": 3,
+    "max_conversations": 10,
+    "max_snapshots_per_file": 5,
+    "cost_currency": "USD",
+    "mcp_config_file": "/config/amira/mcp_config.json",
+}
+
+# Maps settings key → Python global variable name
+_SETTINGS_GLOBAL_MAP = {
+    "language": "LANGUAGE",
+    "enable_memory": "ENABLE_MEMORY",
+    "enable_file_access": "ENABLE_FILE_ACCESS",
+    "enable_file_upload": "ENABLE_FILE_UPLOAD",
+    "enable_voice_input": "ENABLE_VOICE_INPUT",
+    "enable_rag": "ENABLE_RAG",
+    "enable_chat_bubble": "ENABLE_CHAT_BUBBLE",
+    "enable_amira_card_button": "ENABLE_AMIRA_CARD_BUTTON",
+    "enable_mcp": "ENABLE_MCP",
+    "fallback_enabled": "FALLBACK_ENABLED",
+    "anthropic_extended_thinking": "ANTHROPIC_EXTENDED_THINKING",
+    "anthropic_prompt_caching": "ANTHROPIC_PROMPT_CACHING",
+    "openai_extended_thinking": "OPENAI_EXTENDED_THINKING",
+    "nvidia_thinking_mode": "NVIDIA_THINKING_MODE",
+    "tts_voice": "TTS_VOICE",
+    "telegram_bot_token": "TELEGRAM_BOT_TOKEN",
+    "twilio_account_sid": "TWILIO_ACCOUNT_SID",
+    "twilio_auth_token": "TWILIO_AUTH_TOKEN",
+    "twilio_whatsapp_from": "TWILIO_WHATSAPP_FROM",
+    "timeout": "TIMEOUT",
+    "max_retries": "MAX_RETRIES",
+    "max_conversations": "MAX_CONVERSATIONS",
+    "max_snapshots_per_file": "MAX_SNAPSHOTS_PER_FILE",
+    "cost_currency": "COST_CURRENCY",
+    "mcp_config_file": "MCP_CONFIG_FILE",
+}
+
+
+def _load_settings() -> dict:
+    """Load settings.json, return empty dict if file missing or invalid."""
+    try:
+        if os.path.isfile(SETTINGS_FILE):
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        logging.getLogger(__name__).warning(f"Failed to load settings.json: {e}")
+    return {}
+
+
+def _save_settings(data: dict) -> None:
+    """Atomic write to settings.json."""
+    os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
+    tmp = SETTINGS_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, SETTINGS_FILE)
+
+
+def _apply_settings(settings: dict) -> None:
+    """Apply settings values to Python globals and os.environ."""
+    _g = globals()
+    for key, value in settings.items():
+        gvar = _SETTINGS_GLOBAL_MAP.get(key)
+        if not gvar:
+            continue
+        default = SETTINGS_DEFAULTS.get(key)
+        # Parse value to match default type
+        if isinstance(default, bool):
+            if isinstance(value, str):
+                value = value.lower() in ("true", "1", "yes")
+            else:
+                value = bool(value)
+        elif isinstance(default, int):
+            try:
+                value = int(value)
+            except (ValueError, TypeError):
+                value = default
+            # Clamp specific ranges
+            if key == "max_conversations":
+                value = max(1, min(100, value))
+            elif key == "max_snapshots_per_file":
+                value = max(1, min(50, value))
+            elif key == "timeout":
+                value = max(5, min(300, value))
+            elif key == "max_retries":
+                value = max(0, min(10, value))
+        else:
+            value = str(value)
+        # Normalize specific string values
+        if key == "language":
+            value = str(value).lower()
+        elif key == "cost_currency":
+            value = str(value).upper()
+        elif key == "tts_voice":
+            value = str(value).lower().strip()
+        # Set Python global
+        _g[gvar] = value
+        # Set os.environ for inline os.getenv() calls
+        if isinstance(value, bool):
+            os.environ[gvar] = "true" if value else "false"
+        else:
+            os.environ[gvar] = str(value)
+
+
+# Override env vars with settings.json if present (startup overlay)
+# Merge SETTINGS_DEFAULTS first so that any key not yet in settings.json
+# still gets its correct default (env vars from run script may disagree).
+_startup_settings = _load_settings()
+_merged_startup = {k: v for k, v in SETTINGS_DEFAULTS.items() if k in _SETTINGS_GLOBAL_MAP}
+_merged_startup.update(_startup_settings)  # user-saved values win
+_apply_settings(_merged_startup)
 
 # Persist system prompt override across restarts
 CUSTOM_SYSTEM_PROMPT_FILE = "/config/amira/custom_system_prompt.txt"
@@ -342,129 +493,38 @@ if _persisted_prompt:
 
 
 def load_agents_config() -> Optional[Dict]:
-    """Load agent profiles from /config/amira/agents.json.
+    """Reload agent config via AgentManager and sync globals.
 
-    Updates AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS globals.
-    Returns the full config dict or None if file doesn't exist.
-
-    Supports multiple JSON formats:
-    1. Canonical array: {"agents": [{id, identity, model, ...}], "defaults": {...}}
-    2. Legacy dict: {"agents": {"home": {...}, "coder": {...}}, "active": "home"}
-    3. Flat dict (README shorthand): {"home": {...}, "coder": {...}}
+    Updates AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS from the active agent.
+    All format parsing (canonical array, legacy dict, flat dict) is handled
+    by AgentManager._parse_config() — no duplicate logic here.
     """
     global AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS
+    if not AGENT_CONFIG_AVAILABLE:
+        return None
     try:
-        if not os.path.isfile(AGENTS_FILE):
-            return None
-        with open(AGENTS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f) or {}
-
-        # Also reload AgentManager (canonical agent system) if available
-        if AGENT_CONFIG_AVAILABLE:
+        mgr = agent_config.get_agent_manager()
+        mgr.reload_config()
+        active = mgr.get_active_agent()
+        if active:
+            AGENT_NAME = (active.identity.name or active.name or "Amira").strip()
+            AGENT_AVATAR = (active.identity.emoji or "\U0001f916").strip()
+            AGENT_INSTRUCTIONS = (active.system_prompt_override or "").strip()
             try:
-                mgr = agent_config.get_agent_manager()
-                mgr.reload_config()
-                active = mgr.get_active_agent()
-                if active:
-                    AGENT_NAME = (active.identity.name or active.name or "Amira").strip()
-                    AGENT_AVATAR = (active.identity.emoji or "\U0001f916").strip()
-                    AGENT_INSTRUCTIONS = (active.system_prompt_override or "").strip()
-                    try:
-                        import tools as _tools_mod
-                        _tools_mod.AI_SIGNATURE = AGENT_NAME
-                    except Exception:
-                        pass
-                    logger.info(
-                        f"Loaded agent '{active.id}' via AgentManager: "
-                        f"name={AGENT_NAME}, avatar={AGENT_AVATAR}"
-                    )
-                    return data
-            except Exception as e:
-                logger.warning(f"AgentManager reload failed, trying legacy parse: {e}")
-
-        # Legacy fallback: parse agents dict format
-        agents_raw = data.get("agents")
-        agent = None
-        active_key = "default"
-
-        if isinstance(agents_raw, dict) and agents_raw:
-            # Format 2: {"agents": {"home": {...}}, "active": "home"}
-            active_key = data.get("active", "default")
-            agent = agents_raw.get(active_key)
-            if not agent:
-                agent = next(iter(agents_raw.values()))
-                active_key = next(iter(agents_raw.keys()))
-        elif isinstance(agents_raw, list) and agents_raw:
-            # Format 1: canonical array — take the default or first
-            for a in agents_raw:
-                if a.get("default") or a.get("is_default"):
-                    agent = a
-                    active_key = a.get("id", "default")
-                    break
-            if not agent:
-                agent = agents_raw[0]
-                active_key = agent.get("id", "default")
-        else:
-            # Format 3: flat dict — top-level keys are agent IDs
-            _meta = {"defaults", "active", "channel_agents", "agents"}
-            for key, val in data.items():
-                if key in _meta or not isinstance(val, dict):
-                    continue
-                if val.get("is_default") or val.get("default") or agent is None:
-                    agent = val
-                    active_key = key
-
-        if not agent:
-            logger.warning("agents.json: no valid agent found in any format")
-            return None
-
-        # Extract identity fields (support both nested identity.name and flat name)
-        identity = agent.get("identity") or {}
-        AGENT_NAME = (identity.get("name") or agent.get("name") or "Amira").strip()
-        AGENT_AVATAR = (identity.get("emoji") or agent.get("avatar") or "\U0001f916").strip()
-        AGENT_INSTRUCTIONS = (agent.get("system_prompt_override") or agent.get("system_prompt") or agent.get("instructions") or "").strip()
-
-        try:
-            import tools as _tools_mod
-            _tools_mod.AI_SIGNATURE = AGENT_NAME
-        except Exception:
-            pass
-
-        logger.info(
-            f"Loaded agent '{active_key}': name={AGENT_NAME}, avatar={AGENT_AVATAR}, "
-            f"instructions={len(AGENT_INSTRUCTIONS)} chars"
-        )
-        return data
-    except json.JSONDecodeError as e:
-        logger.warning(f"agents.json: invalid JSON — {e}")
+                import tools as _tools_mod
+                _tools_mod.AI_SIGNATURE = AGENT_NAME
+            except Exception:
+                pass
+            logger.info(
+                f"Agent '{active.id}': name={AGENT_NAME}, avatar={AGENT_AVATAR}"
+            )
+        # Return raw config data for callers that need it
+        if os.path.isfile(AGENTS_FILE):
+            with open(AGENTS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
         return None
     except Exception as e:
-        logger.warning(f"Could not load agents.json: {e}")
-        return None
-
-
-def get_channel_agent(channel: str) -> Optional[Dict]:
-    """Resolve the agent assigned to a messaging channel (telegram, whatsapp).
-
-    Reads agents.json -> channel_agents -> {channel} -> agent key.
-    Returns the agent dict or None if no channel-specific agent is configured.
-    """
-    try:
-        if not os.path.isfile(AGENTS_FILE):
-            return None
-        with open(AGENTS_FILE, "r", encoding="utf-8") as f:
-            data = json.load(f) or {}
-        channel_agents = data.get("channel_agents", {})
-        agent_key = channel_agents.get(channel)
-        if not agent_key:
-            return None
-        agents = data.get("agents", {})
-        agent = agents.get(agent_key)
-        if agent:
-            logger.debug(f"Channel '{channel}' -> agent '{agent_key}': {agent.get('name', '?')}")
-        return agent
-    except Exception as e:
-        logger.warning(f"get_channel_agent('{channel}'): {e}")
+        logger.warning(f"Could not reload agents config: {e}")
         return None
 
 
@@ -681,9 +741,12 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
         if tpl:
             return tpl.format(date=date_str) if date_str else tpl
         return f"❌ API usage limits reached. Access will be restored on {date_str or '?'}. Switch to another provider in the meantime."
-    if code == 402 or "insufficient credits" in low or "insufficient balance" in low or "out of credits" in low:
+    if code == 402 or "insufficient credits" in low or "insufficient balance" in low or "out of credits" in low or "credit balance is too low" in low or "credit balance" in low:
         base = get_lang_text("err_http_402") or "❌ Insufficient balance. Top up your account credits for this provider."
         url = _CREDITS_URLS.get(provider)
+        # Preserve original message if it contains specific details
+        if remote_msg and ("credit" in remote_msg.lower() or "balance" in remote_msg.lower() or "billing" in remote_msg.lower()):
+            return f"❌ {remote_msg}\n⚠️ {url}" if url else f"❌ {remote_msg}"
         return f"{base}\n⚠️ {url}" if url else base
     if code == 401:
         return get_lang_text("err_http_401") or "Authentication failed (401)."
@@ -822,6 +885,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_model_removed": "NVIDIA model {reason}: {model_id}. Removed from model list.",
         "err_response_blocked": "{provider}: response blocked by safety filters. Try rephrasing your request.",
 
+        "status_analyzing": "Analyzing",
         "status_image_processing": "Processing image...",
         "status_context_preloaded": "Context preloaded...",
         "status_nvidia_model_removed": "⚠️ NVIDIA model not available (404). Removed from model list.",
@@ -896,6 +960,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_model_removed": "Modello NVIDIA {reason}: {model_id}. Rimosso dalla lista.",
         "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
+        "status_analyzing": "Analisi in corso",
         "status_image_processing": "Elaboro immagine...",
         "status_context_preloaded": "Contesto precaricato...",
         "status_nvidia_model_removed": "⚠️ Modello NVIDIA non disponibile (404). Rimosso dalla lista modelli.",
@@ -969,6 +1034,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_model_removed": "Modèle NVIDIA {reason}: {model_id}. Eliminado de la lista.",
         "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
+        "status_analyzing": "Analizando",
         "status_image_processing": "Procesando imagen...",
         "status_context_preloaded": "Contesto precargado...",
         "status_nvidia_model_removed": "⚠️ Modèle NVIDIA non disponible (404). Eliminado de la liste des modèles.",
@@ -1043,6 +1109,7 @@ LANGUAGE_TEXT = {
         "err_nvidia_model_removed": "Modèle NVIDIA {reason} : {model_id}. Retiré de la liste.",
         "err_response_blocked": "{provider}: risposta bloccata dai filtri di sicurezza. Prova a riformulare la richiesta.",
 
+        "status_analyzing": "Analyse en cours",
         "status_image_processing": "Procesando imagen...",
         "status_context_preloaded": "Contesto precargado...",
         "status_nvidia_model_removed": "⚠️ Modèle NVIDIA non disponible (404). Retiré de la liste des modèles.",
@@ -1947,33 +2014,36 @@ def get_addon_ingress_url() -> str:
     Returns the ingress_url (e.g., '/api/hassio_ingress/<token>') that can be
     used as prefix for iframe URLs so HA frontend proxies to the addon.
     Result is cached since it doesn't change at runtime.
+    Retries up to 3 times with 2s delay if the Supervisor isn't ready yet.
     """
     global _ingress_url_cache
     if _ingress_url_cache is not None:
         return _ingress_url_cache
 
-    try:
-        resp = requests.get(
-            "http://supervisor/addons/self/info",
-            headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
-            timeout=10
-        )
-        if resp.status_code == 200:
-            data = resp.json()
-            ingress_url = data.get("data", {}).get("ingress_url", "")
-            if ingress_url:
-                # Remove trailing slash if present
-                _ingress_url_cache = ingress_url.rstrip("/")
-                logger.info(f"🔗 Addon Ingress URL: {_ingress_url_cache}")
-                return _ingress_url_cache
+    import time as _time
+    for attempt in range(3):
+        try:
+            resp = requests.get(
+                "http://supervisor/addons/self/info",
+                headers={"Authorization": f"Bearer {SUPERVISOR_TOKEN}"},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                ingress_url = data.get("data", {}).get("ingress_url", "")
+                if ingress_url:
+                    _ingress_url_cache = ingress_url.rstrip("/")
+                    logger.info(f"🔗 Addon Ingress URL: {_ingress_url_cache}")
+                    return _ingress_url_cache
+                else:
+                    logger.warning("⚠️ ingress_url not found in Supervisor addon info")
             else:
-                logger.warning("⚠️ ingress_url not found in Supervisor addon info")
-        else:
-            logger.error(f"❌ Supervisor API returned {resp.status_code}: {resp.text[:200]}")
-    except Exception as e:
-        logger.error(f"❌ Failed to get addon ingress URL: {e}")
+                logger.error(f"❌ Supervisor API returned {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            logger.error(f"❌ Failed to get addon ingress URL (attempt {attempt + 1}/3): {e}")
+        if attempt < 2:
+            _time.sleep(2)
 
-    # Fallback: empty string (URL will be relative, may 404)
     _ingress_url_cache = ""
     return _ingress_url_cache
 
@@ -2407,6 +2477,14 @@ def save_conversations():
                 # Preserve tool_calls and other metadata
                 if "tool_calls" in msg:
                     cleaned_msg["tool_calls"] = msg["tool_calls"]
+
+                # Preserve tool_call_id and name for tool response messages
+                # (required for pairing with assistant tool_calls on reload)
+                if msg.get("role") == "tool":
+                    if "tool_call_id" in msg:
+                        cleaned_msg["tool_call_id"] = msg["tool_call_id"]
+                    if "name" in msg:
+                        cleaned_msg["name"] = msg["name"]
 
                 # Preserve model/provider/usage info for assistant messages
                 if msg.get("role") == "assistant":
@@ -2894,16 +2972,14 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
         role = m.get("role", "")
         skip = False
 
-        # Skip tool-role messages for Anthropic (it uses tool_result inside user messages)
-        if AI_PROVIDER == "anthropic" and role == "tool":
-            skip = True
-
-        # Skip assistant messages with tool_calls format (OpenAI format) for Anthropic
-        elif AI_PROVIDER == "anthropic" and role == "assistant" and m.get("tool_calls"):
-            skip = True
+        # NOTE: Anthropic provider now handles tool message conversion internally
+        # (see AnthropicProvider._split_system), so we no longer skip tool messages
+        # or assistant+tool_calls messages here. The provider converts them to
+        # the correct Anthropic format (user+tool_result, assistant+tool_use).
 
         # For Anthropic: Skip assistant messages with tool_use blocks if not followed by tool_result
-        elif AI_PROVIDER == "anthropic" and role == "assistant":
+        # (only applies to orphaned Anthropic-native tool_use blocks, not OpenAI-format)
+        if AI_PROVIDER == "anthropic" and role == "assistant":
             content = m.get("content", "")
             if isinstance(content, list):
                 has_tool_use = any(isinstance(c, dict) and c.get("type") == "tool_use" for c in content)
@@ -2928,8 +3004,8 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
         elif role == "tool" and m.get("tool_call_id") in _skip_tool_ids:
             skip = True
 
-        # For non-Anthropic providers: Skip assistant messages with tool_calls if tool responses are missing
-        elif AI_PROVIDER != "anthropic" and role == "assistant" and m.get("tool_calls"):
+        # For ALL providers: Skip assistant messages with tool_calls if tool responses are missing
+        elif role == "assistant" and m.get("tool_calls"):
             tool_call_ids = {tc.get("id") or (tc.get("function", {}).get("name", "")) for tc in m.get("tool_calls", []) if isinstance(tc, dict)}
             # Look ahead for matching tool responses
             found_ids = set()
@@ -2996,6 +3072,25 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
             validated.append(m)
     clean = validated
 
+    # Reconstruct missing tool_call_id on tool messages from the preceding
+    # assistant+tool_calls message.  Older versions of save_conversations()
+    # dropped tool_call_id, causing 400 errors on all providers.
+    _tc_id_queue: list = []
+    for m in clean:
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            _tc_id_queue = [
+                tc.get("id") or f"call_{tc.get('function', {}).get('name', 'tool')}_{j}"
+                for j, tc in enumerate(m.get("tool_calls", []))
+            ]
+        elif m.get("role") == "tool":
+            if not m.get("tool_call_id"):
+                if _tc_id_queue:
+                    m["tool_call_id"] = _tc_id_queue.pop(0)
+                else:
+                    m["tool_call_id"] = f"call_reconstructed_{id(m)}"
+        else:
+            _tc_id_queue = []
+
     # Truncate OLD messages to save tokens (keep last 2 messages full)
     MAX_OLD_MSG = 1500
     for i in range(len(clean) - 2):
@@ -3031,12 +3126,34 @@ def _validate_entity_ids_in_response(text: str) -> str:
         "input_datetime", "button", "number", "select", "text", "lock",
         "alarm_control_panel", "camera", "vacuum", "water_heater", "humidifier",
         "weather", "device_tracker", "timer", "counter", "update", "siren",
-        "remote", "notify",
+        "remote",
+        # NOTE: notify, tts, persistent_notification are SERVICES, not entities
     )
+    # HA service verbs — patterns like switch.turn_off are service calls, not entity IDs
+    _SERVICE_VERBS = {
+        "turn_on", "turn_off", "toggle", "reload", "trigger", "press",
+        "open_cover", "close_cover", "stop_cover", "lock", "unlock",
+        "set_temperature", "set_humidity", "set_hvac_mode", "set_fan_mode",
+        "set_value", "set_speed", "set_datetime", "set_position",
+        "set_tilt_position", "set_preset_mode", "set_swing_mode",
+        "select_option", "select_first", "select_last", "select_next",
+        "select_previous", "increment", "decrement",
+        "play_media", "media_play", "media_pause", "media_stop",
+        "media_next_track", "media_previous_track",
+        "volume_up", "volume_down", "volume_mute", "volume_set",
+        "start", "stop", "pause", "resume", "open", "close",
+        "enable", "disable", "activate", "deactivate",
+        "send_message", "notify", "install", "skip",
+    }
     domain_pattern = "|".join(re.escape(d) for d in HA_DOMAINS)
     entity_re = re.compile(rf'\b({domain_pattern})\.[a-z0-9][a-z0-9_]*\b')
 
-    found_full = set(m.group(0) for m in entity_re.finditer(text))
+    found_full = set()
+    for m in entity_re.finditer(text):
+        candidate = m.group(0)
+        suffix = candidate.split(".", 1)[1]
+        if suffix not in _SERVICE_VERBS:
+            found_full.add(candidate)
     if not found_full or len(found_full) < 2:
         return text
 
@@ -3317,29 +3434,6 @@ def _build_side_by_side_diff_html(old_yaml: str, new_yaml: str) -> str:
     return "".join(h)
 
 
-def _inject_proposal_diff(text: str, cached_originals: dict) -> str:
-    """For config_edit proposal phase: replace ```yaml blocks with side-by-side diff views.
-    Returns the display text (for streaming to user). The caller should keep the original
-    text intact in message history so the model can reference the proposed YAML later.
-    Only replaces when a non-empty original exists (i.e. editing, not creating a new file)."""
-    import re as _re
-    if not cached_originals:
-        return text
-    original = list(cached_originals.values())[-1]
-    if not original.strip():
-        return text  # New file — show full code, no diff
-    yaml_block_re = _re.compile(r'```yaml\n([\s\S]*?)\n?```')
-    matches = list(yaml_block_re.finditer(text))
-    if not matches:
-        return text
-    result = text
-    for match in reversed(matches):
-        proposed_yaml = match.group(1).strip()
-        diff_html = _build_side_by_side_diff_html(original, proposed_yaml)
-        if diff_html:
-            result = result[:match.start()] + f"<!--DIFF-->{diff_html}<!--/DIFF-->" + result[match.end():]
-    return result
-
 
 def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     """Format a human-readable response from a successful write tool result.
@@ -3389,6 +3483,24 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
 
     if snapshot_id and snapshot_id != "N/A (REST API)":
         parts.append(tr("write_snapshot_created", snapshot_id=snapshot_id))
+
+    # Add link to entity in HA UI
+    _entity_link_id = result_data.get("automation_id") or result_data.get("script_id") or ""
+    if _entity_link_id:
+        if tool_name in ("create_automation", "update_automation"):
+            _link_url = f"/config/automation/edit/{_entity_link_id}"
+            _link_label = "Apri automazione"
+        elif tool_name in ("create_script", "update_script"):
+            _link_url = f"/config/script/edit/{_entity_link_id}"
+            _link_label = "Apri script"
+        else:
+            _link_url = None
+        if _link_url:
+            parts.append(
+                f'\n<!--DIFF--><a class="ha-entity-link" '
+                f"onclick=\"window.top.location.href='{_link_url}'\" "
+                f'href="javascript:void(0)">\U0001f517 {_link_label} \u2197</a><!--/DIFF-->'
+            )
 
     return "\n".join(parts)
 
@@ -3747,14 +3859,17 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             logger.info(f"Injected document/RAG context ({len(''.join(context_sections))} chars)")
 
     try:
-        # Remember current conversation length to avoid duplicates
-        conv_length_before = len(conversations[session_id])
         last_usage = None  # Will capture usage from done event
         _streamed_text_parts: list = []  # accumulate streamed tokens for saving
 
         # Clean messages for all providers: remove orphaned tool_calls / tool
         # responses that would cause 400 errors on OpenAI-compatible APIs.
         messages = sanitize_messages_for_provider(messages)
+
+        # Remember conversation length AFTER sanitize so new messages
+        # appended during the tool loop are captured correctly, even
+        # when sanitize truncated the array below the original length.
+        conv_length_before = len(messages)
 
         # Inject tool schemas into intent_info so providers can pass them to the API.
         # This enables tool calling for all OpenAI-compatible providers (Mistral, Groq, etc.)
@@ -4219,12 +4334,16 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
                 # For native-tool providers: after 2 consecutive duplicate rounds
                 # the model is truly stuck — force-break as well.
+                # text_so_far was already streamed to the client — don't re-yield it.
                 elif _duplicate_count >= 2:
                     logger.warning("Native provider: 2nd duplicate → breaking loop")
-                    if text_so_far:
-                        yield {"type": "token", "content": text_so_far}
                     yield {"type": "done"}
                     break
+
+                # Assign stable IDs before building dedup messages
+                for _dd_idx, _dd_tc in enumerate(_pending_tool_calls):
+                    if not _dd_tc.get("id"):
+                        _dd_tc["id"] = f"call_{_dd_tc.get('name', 'tool')}_{_dd_idx}"
 
                 # Append assistant message so the conversation stays well-formed
                 messages.append({
@@ -4232,21 +4351,21 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     "content": text_so_far or None,
                     "tool_calls": [
                         {
-                            "id": tc.get("id", f"call_{i}"),
+                            "id": tc["id"],
                             "type": "function",
                             "function": {
                                 "name": tc.get("name", ""),
                                 "arguments": tc.get("arguments", "{}"),
                             },
                         }
-                        for i, tc in enumerate(_pending_tool_calls)
+                        for tc in _pending_tool_calls
                     ],
                 })
                 # Append synthetic tool results telling the model to stop
                 for tc in _pending_tool_calls:
                     messages.append({
                         "role": "tool",
-                        "tool_call_id": tc.get("id", f"call_{tc.get('name', '')}"),
+                        "tool_call_id": tc["id"],
                         "name": tc.get("name", ""),
                         "content": (
                             "[DUPLICATE] You already called this tool with the same arguments. "
@@ -4256,11 +4375,20 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     })
                 # Let the loop continue so the model sees the synthetic result
                 # and produces a final answer (no tool calls).
+                yield {"type": "clear"}
+                yield {"type": "status", "message": f"🤖 {tr('status_analyzing')}..."}
                 continue
 
             # Record all current tool calls in history
             for tc in _pending_tool_calls:
                 _tool_call_history.add(f"{tc.get('name', '')}:{tc.get('arguments', '{}')}")
+
+            # Assign stable IDs to pending tool calls BEFORE building messages.
+            # Both the assistant message and tool result messages must reference
+            # the same ID — otherwise providers reject the mismatch.
+            for _tc_idx, _tc_item in enumerate(_pending_tool_calls):
+                if not _tc_item.get("id"):
+                    _tc_item["id"] = f"call_{_tc_item.get('name', 'tool')}_{_tc_idx}"
 
             # Append assistant message with tool_calls (OpenAI format)
             messages.append({
@@ -4268,14 +4396,14 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 "content": text_so_far or None,
                 "tool_calls": [
                     {
-                        "id": tc.get("id", f"call_{i}"),
+                        "id": tc["id"],
                         "type": "function",
                         "function": {
                             "name": tc.get("name", ""),
                             "arguments": tc.get("arguments", "{}"),
                         },
                     }
-                    for i, tc in enumerate(_pending_tool_calls)
+                    for tc in _pending_tool_calls
                 ],
             })
 
@@ -4343,9 +4471,22 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 _log_result = result[:300] + ('...' if len(result) > 300 else '')
                 logger.info(f"Tool result [{fn_name}]: {_log_result}")
 
+                # For write tools, emit a formatted diff view to the UI
+                _WRITE_TOOLS = {"create_automation", "update_automation", "create_script",
+                                "update_script", "write_config_file", "update_dashboard"}
+                if fn_name in _WRITE_TOOLS:
+                    try:
+                        _wr_obj = json.loads(result) if isinstance(result, str) else result
+                        if isinstance(_wr_obj, dict):
+                            _formatted = _format_write_tool_response(fn_name, _wr_obj)
+                            if _formatted:
+                                yield {"type": "diff_html", "content": _formatted}
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": tc.get("id", f"call_{fn_name}"),
+                    "tool_call_id": tc["id"],
                     "name": fn_name,
                     "content": result,
                 })
@@ -4380,6 +4521,11 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             "Do NOT call any tool. Do NOT use <tool_call>."
                         ),
                     })
+
+            # Signal the UI to reset display and re-show thinking indicator
+            # before the next provider API call (which may take time due to rate limits)
+            yield {"type": "clear"}
+            yield {"type": "status", "message": f"🤖 {tr('status_analyzing')}..."}
 
         # Sync new assistant messages to conversation history.
         # New-path providers (Mistral, Groq, openai_compatible, etc.) stream text as
@@ -4541,9 +4687,17 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 # have been removed. No-tool providers now use the universal Tool Simulator
                 # (<tool_call> XML blocks) which are handled by the streaming loop above.
 
-        # Trim and save
+        # Trim and save (respect tool_call/tool boundaries)
         if len(conversations[session_id]) > 50:
-            conversations[session_id] = conversations[session_id][-40:]
+            trimmed = conversations[session_id][-40:]
+            # Don't start with orphaned tool messages
+            while trimmed and trimmed[0].get("role") == "tool":
+                trimmed = trimmed[1:]
+            # Don't start with assistant+tool_calls whose tool responses were cut
+            if trimmed and trimmed[0].get("role") == "assistant" and trimmed[0].get("tool_calls"):
+                if len(trimmed) < 2 or trimmed[1].get("role") != "tool":
+                    trimmed = trimmed[1:]
+            conversations[session_id] = trimmed
         save_conversations()
         
         # Save to persistent memory if enabled
@@ -4852,8 +5006,11 @@ def setup_chat_bubble():
     """
     global _chat_bubble_registered
     if _chat_bubble_registered:
+        logger.debug("Chat bubble: Already registered, skipping")
         return
-    if not ENABLE_CHAT_BUBBLE:
+    logger.info(f"Chat bubble setup: ENABLE_CHAT_BUBBLE={ENABLE_CHAT_BUBBLE}, ENABLE_AMIRA_CARD_BUTTON={ENABLE_AMIRA_CARD_BUTTON}")
+    if not ENABLE_CHAT_BUBBLE and not ENABLE_AMIRA_CARD_BUTTON:
+        logger.info("Chat bubble: Both bubble and card button disabled, cleaning up")
         cleanup_chat_bubble()
         return
 
@@ -4868,7 +5025,8 @@ def setup_chat_bubble():
         js_content = chat_bubble.get_chat_bubble_js(
             ingress_url=ingress_url,
             language=LANGUAGE,
-
+            show_bubble=ENABLE_CHAT_BUBBLE,
+            show_card_button=ENABLE_AMIRA_CARD_BUTTON,
         )
 
         # Save to /config/www/ (served by HA at /local/)
@@ -4880,57 +5038,81 @@ def setup_chat_bubble():
         logger.info(f"Chat bubble: JS saved to {js_path} ({len(js_content)} chars)")
 
         # Register as Lovelace resource via websocket
-        # Use timestamp for aggressive cache-busting (browser ignores ?v=version)
         import hashlib
         content_hash = hashlib.md5(js_content.encode()).hexdigest()[:8]
         resource_url = "/local/ha-claude-chat-bubble.js"
         cache_bust_url = f"{resource_url}?v={VERSION}&h={content_hash}"
+        registration_ok = False
         try:
             ws_result = call_ha_websocket("lovelace/resources/list")
-            # WS returns {"type":"result","success":true,"result":[...]}
-            resources = ws_result
-            if isinstance(ws_result, dict):
-                resources = ws_result.get("result", [])
-            already_registered = False
-            duplicates = []
-            if isinstance(resources, list):
-                for res in resources:
-                    if isinstance(res, dict) and res.get("url", "").startswith("/local/ha-claude-chat-bubble"):
-                        if not already_registered:
-                            already_registered = True
-                            logger.info(f"Chat bubble: Found existing resource id={res.get('id')}, url={res.get('url')}")
-                            try:
-                                call_ha_websocket(
-                                    "lovelace/resources/update",
-                                    resource_id=res["id"],
-                                    url=cache_bust_url,
-                                    res_type="js",
-                                )
-                                logger.info(f"Chat bubble: Updated Lovelace resource ({cache_bust_url})")
-                            except Exception as e:
-                                logger.warning(f"Chat bubble: Could not update resource: {e}")
-                        else:
-                            duplicates.append(res)
-                # Clean up duplicate registrations
-                for dup in duplicates:
-                    try:
-                        call_ha_websocket("lovelace/resources/delete", resource_id=dup["id"])
-                        logger.info(f"Chat bubble: Removed duplicate resource id={dup.get('id')}")
-                    except Exception:
-                        pass
+            # Check if WS call succeeded
+            if isinstance(ws_result, dict) and ws_result.get("success") is False:
+                logger.warning(f"Chat bubble: lovelace/resources/list failed: {ws_result}")
+                # Might be YAML mode — still set registered to avoid retrying every request
+                logger.info(f"Chat bubble: If using YAML mode, add to configuration.yaml: resources: [{{ url: '{resource_url}', type: js }}]")
+                registration_ok = True  # JS file is saved, user can add manually
+            else:
+                resources = ws_result
+                if isinstance(ws_result, dict):
+                    resources = ws_result.get("result", [])
+                already_registered = False
+                duplicates = []
+                if isinstance(resources, list):
+                    for res in resources:
+                        if isinstance(res, dict) and res.get("url", "").startswith("/local/ha-claude-chat-bubble"):
+                            if not already_registered:
+                                already_registered = True
+                                logger.info(f"Chat bubble: Found existing resource id={res.get('id')}, url={res.get('url')}")
+                                try:
+                                    upd = call_ha_websocket(
+                                        "lovelace/resources/update",
+                                        resource_id=res["id"],
+                                        url=cache_bust_url,
+                                        res_type="js",
+                                    )
+                                    if isinstance(upd, dict) and upd.get("success") is False:
+                                        logger.warning(f"Chat bubble: resource update failed: {upd}")
+                                    else:
+                                        logger.info(f"Chat bubble: Updated Lovelace resource ({cache_bust_url})")
+                                        registration_ok = True
+                                except Exception as e:
+                                    logger.warning(f"Chat bubble: Could not update resource: {e}")
+                            else:
+                                duplicates.append(res)
+                    for dup in duplicates:
+                        try:
+                            call_ha_websocket("lovelace/resources/delete", resource_id=dup["id"])
+                            logger.info(f"Chat bubble: Removed duplicate resource id={dup.get('id')}")
+                        except Exception:
+                            pass
 
-            if not already_registered:
-                create_result = call_ha_websocket(
-                    "lovelace/resources/create",
-                    url=cache_bust_url,
-                    res_type="js",
-                )
-                logger.info(f"Chat bubble: Registered Lovelace resource ({cache_bust_url}) -> {create_result}")
+                if not already_registered:
+                    create_result = call_ha_websocket(
+                        "lovelace/resources/create",
+                        url=cache_bust_url,
+                        res_type="js",
+                    )
+                    if isinstance(create_result, dict) and create_result.get("success") is False:
+                        logger.error(f"Chat bubble: Failed to create Lovelace resource: {create_result}")
+                        logger.info(f"Chat bubble: Add manually in HA -> Settings -> Dashboards -> Resources: {resource_url}")
+                        # JS file is saved, user can add manually
+                        registration_ok = True
+                    else:
+                        logger.info(f"Chat bubble: Registered Lovelace resource ({cache_bust_url}) -> {create_result}")
+                        registration_ok = True
+                elif not registration_ok:
+                    # already_registered but update might have failed
+                    registration_ok = True
         except Exception as e:
             logger.warning(f"Chat bubble: Could not register Lovelace resource: {e}")
             logger.info(f"Chat bubble: Add manually in HA -> Settings -> Dashboards -> Resources: {resource_url}")
 
-        _chat_bubble_registered = True
+        # Only mark as registered if we succeeded or the file is at least written
+        if registration_ok:
+            _chat_bubble_registered = True
+            logger.info(f"Chat bubble: Setup complete (bubble={ENABLE_CHAT_BUBBLE}, card_btn={ENABLE_AMIRA_CARD_BUTTON})")
+        else:
+            logger.warning("Chat bubble: JS file saved but Lovelace registration may have failed — will retry on next call")
 
     except Exception as e:
         logger.error(f"Chat bubble setup failed: {e}")
@@ -4967,6 +5149,57 @@ def cleanup_chat_bubble():
             logger.info("Chat bubble cleanup: Done")
     except Exception as e:
         logger.warning(f"Chat bubble cleanup failed: {e}")
+
+
+@app.route('/api/bubble/status', methods=['GET'])
+def api_bubble_status():
+    """Diagnostic endpoint: check chat bubble registration status."""
+    js_path = os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.js")
+    js_exists = os.path.isfile(js_path)
+    js_size = os.path.getsize(js_path) if js_exists else 0
+
+    ingress_url = get_addon_ingress_url()
+
+    # Check Lovelace resource registration
+    resource_info = None
+    try:
+        ws_result = call_ha_websocket("lovelace/resources/list")
+        if isinstance(ws_result, dict) and ws_result.get("success") is False:
+            resource_info = {"error": "resources API unavailable (YAML mode?)", "raw": str(ws_result)}
+        else:
+            resources = ws_result
+            if isinstance(ws_result, dict):
+                resources = ws_result.get("result", [])
+            found = []
+            if isinstance(resources, list):
+                for res in resources:
+                    if isinstance(res, dict) and "ha-claude-chat-bubble" in res.get("url", ""):
+                        found.append({"id": res.get("id"), "url": res.get("url"), "type": res.get("type")})
+            resource_info = {"registered": len(found) > 0, "entries": found, "total_resources": len(resources) if isinstance(resources, list) else 0}
+    except Exception as e:
+        resource_info = {"error": str(e)}
+
+    return jsonify({
+        "bubble_enabled": ENABLE_CHAT_BUBBLE,
+        "card_button_enabled": ENABLE_AMIRA_CARD_BUTTON,
+        "registered_flag": _chat_bubble_registered,
+        "ingress_url": ingress_url or "(empty)",
+        "js_file": {"path": js_path, "exists": js_exists, "size_bytes": js_size},
+        "lovelace_resource": resource_info,
+        "hint": "After registering, do a FULL browser refresh (Ctrl+Shift+R) on your HA dashboard.",
+    })
+
+
+@app.route('/api/bubble/register', methods=['POST'])
+def api_bubble_register():
+    """Force re-registration of the chat bubble Lovelace resource."""
+    global _chat_bubble_registered
+    _chat_bubble_registered = False
+    # Clear ingress URL cache so it's fetched fresh
+    global _ingress_url_cache
+    _ingress_url_cache = None
+    setup_chat_bubble()
+    return jsonify({"ok": _chat_bubble_registered, "message": "Re-registration attempted. Check /api/bubble/status for details."})
 
 
 @app.route('/api/set_model', methods=['POST'])
@@ -5160,7 +5393,8 @@ def api_bubble_devices_register():
         devices = load_device_config()
         
         # If device doesn't exist yet, add it with default enabled state based on mode
-        if device_id not in devices:
+        is_new_device = device_id not in devices
+        if is_new_device:
             # Device always enabled by default (management from UI)
             devices[device_id] = {
                 "name": device_name or f"{device_type.capitalize()}",
@@ -5176,7 +5410,10 @@ def api_bubble_devices_register():
                 devices[device_id]["name"] = device_name
         
         save_device_config(devices)
-        logger.info(f"Device registered: {device_id} ({device_type})")
+        if is_new_device:
+            logger.info(f"Device registered: {device_id} ({device_type})")
+        else:
+            logger.debug(f"Device updated: {device_id}")
         
         # Return whether bubble should be enabled for this device
         is_enabled = devices[device_id].get("enabled", False)
@@ -5378,7 +5615,7 @@ def api_chat():
     session_id = data.get("session_id", "default")
     if not message:
         return jsonify({"error": "Empty message"}), 400
-    logger.info(f"Chat [{AI_PROVIDER}]: {_strip_context_for_log(message)}")
+    logger.chat(f"📩 [{AI_PROVIDER}]: {_strip_context_for_log(message)}")
     global _last_sync_usage
     _last_sync_usage = {}  # Reset before call
     response_text = chat_with_ai(message, session_id)
@@ -8632,8 +8869,8 @@ def initialize_mcp() -> None:
         return
 
     # Skip entirely if MCP is disabled via config toggle
-    if os.getenv("ENABLE_MCP", "true").lower() in ("false", "0", ""):
-        logger.info("🔌 MCP disabled (enable_mcp: false in addon config)")
+    if not ENABLE_MCP:
+        logger.info("🔌 MCP disabled (enable_mcp: false)")
         return
 
     try:
@@ -8648,9 +8885,9 @@ def initialize_mcp() -> None:
             except json.JSONDecodeError as e:
                 logger.warning(f"⚠️ MCP_SERVERS env var is invalid JSON: {e}")
 
-        # Priority 2: /config/amira/mcp_config.json (user-editable file on HA)
+        # Priority 2: mcp_config_file path (user-editable via UI)
         if not mcp_config:
-            mcp_json_path = "/config/amira/mcp_config.json"
+            mcp_json_path = MCP_CONFIG_FILE or "/config/amira/mcp_config.json"
             if os.path.isfile(mcp_json_path):
                 try:
                     with open(mcp_json_path, encoding="utf-8") as f:
@@ -8752,6 +8989,254 @@ def api_config_save():
         return jsonify({"success": True, "file": filepath, "size": len(content)})
     except Exception as e:
         logger.error(f"api_config_save error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Fallback configuration endpoint ─────────────────────────────────
+_FALLBACK_CONFIG_FILE = os.path.join(HA_CONFIG_DIR, "amira", "fallback_config.json")
+
+# Default provider priority (same as providers/manager.py)
+_FALLBACK_PRIORITY_DEFAULT = [
+    "anthropic", "openai", "google", "deepseek", "github",
+    "groq", "mistral", "openrouter", "nvidia", "perplexity",
+    "minimax", "aihubmix", "siliconflow", "volcengine",
+    "dashscope", "moonshot", "zhipu", "ollama", "custom",
+]
+
+# Maps provider → env var for API key detection
+_FALLBACK_KEY_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY",
+    "google": "GOOGLE_API_KEY", "github": "GITHUB_TOKEN",
+    "nvidia": "NVIDIA_API_KEY", "groq": "GROQ_API_KEY",
+    "mistral": "MISTRAL_API_KEY", "openrouter": "OPENROUTER_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
+    "minimax": "MINIMAX_API_KEY", "aihubmix": "AIHUBMIX_API_KEY",
+    "siliconflow": "SILICONFLOW_API_KEY", "volcengine": "VOLCENGINE_API_KEY",
+    "dashscope": "DASHSCOPE_API_KEY", "moonshot": "MOONSHOT_API_KEY",
+    "zhipu": "ZHIPU_API_KEY", "custom": "CUSTOM_API_KEY",
+    "ollama": "OLLAMA_BASE_URL",
+}
+
+
+@app.route('/api/fallback_config', methods=['GET'])
+def api_fallback_config_get():
+    """Return current fallback configuration: enabled state and provider priority."""
+    enabled = os.getenv("FALLBACK_ENABLED", "true").lower() not in ("false", "0", "no")
+
+    # Load custom priority or use default
+    custom_priority = []
+    try:
+        if os.path.isfile(_FALLBACK_CONFIG_FILE):
+            with open(_FALLBACK_CONFIG_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            custom_priority = data.get("priority", [])
+            if "enabled" in data:
+                enabled = bool(data["enabled"])
+    except Exception:
+        pass
+
+    priority = custom_priority if custom_priority else _FALLBACK_PRIORITY_DEFAULT
+
+    # Build provider list with status
+    providers = []
+    seen = set()
+    for prov in priority:
+        env_var = _FALLBACK_KEY_ENV.get(prov, "")
+        has_key = bool(env_var and os.getenv(env_var, ""))
+        label = PROVIDER_DEFAULTS.get(prov, {}).get("name", prov)
+        providers.append({"id": prov, "configured": has_key, "label": label})
+        seen.add(prov)
+
+    # Add any configured providers not in the priority list
+    for prov in _FALLBACK_PRIORITY_DEFAULT:
+        if prov not in seen:
+            env_var = _FALLBACK_KEY_ENV.get(prov, "")
+            has_key = bool(env_var and os.getenv(env_var, ""))
+            label = PROVIDER_DEFAULTS.get(prov, {}).get("name", prov)
+            providers.append({"id": prov, "configured": has_key, "label": label})
+
+    return jsonify({"success": True, "enabled": enabled, "providers": providers})
+
+
+@app.route('/api/fallback_config', methods=['POST'])
+def api_fallback_config_post():
+    """Save fallback configuration (priority order and enabled flag)."""
+    data = request.get_json() or {}
+    priority = data.get("priority", [])
+    enabled = data.get("enabled", True)
+
+    if not isinstance(priority, list):
+        return jsonify({"success": False, "error": "priority must be a list"}), 400
+
+    # Validate provider names
+    valid_providers = set(_FALLBACK_PRIORITY_DEFAULT) | set(_FALLBACK_KEY_ENV.keys())
+    clean_priority = [p for p in priority if isinstance(p, str) and p in valid_providers]
+
+    config_data = {"priority": clean_priority, "enabled": bool(enabled)}
+
+    try:
+        os.makedirs(os.path.dirname(_FALLBACK_CONFIG_FILE), exist_ok=True)
+        with open(_FALLBACK_CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2)
+        logger.info(f"Fallback config saved: enabled={enabled}, priority={clean_priority}")
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Failed to save fallback config: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+# ── Settings API ─────────────────────────────────────────────────────
+@app.route('/api/settings', methods=['GET'])
+def api_settings_get():
+    """Return all runtime settings with current values (merged: file > env > defaults)."""
+    saved = _load_settings()
+    _g = globals()
+    current = {}
+    for key, default in SETTINGS_DEFAULTS.items():
+        # Priority: saved file value > current global > default
+        if key in saved:
+            current[key] = saved[key]
+        else:
+            gvar = _SETTINGS_GLOBAL_MAP.get(key)
+            if gvar and gvar in _g:
+                current[key] = _g[gvar]
+            else:
+                current[key] = default
+
+    # Section metadata for UI rendering
+    sections = [
+        {
+            "id": "language", "icon": "\U0001F30D", "fields": [
+                {"key": "language", "type": "select",
+                 "options": [
+                     {"value": "en", "label": "English"},
+                     {"value": "it", "label": "Italiano"},
+                     {"value": "es", "label": "Español"},
+                     {"value": "fr", "label": "Français"},
+                 ]},
+            ],
+        },
+        {
+            "id": "features", "icon": "\u26A1", "fields": [
+                {"key": "enable_memory", "type": "toggle"},
+                {"key": "enable_file_access", "type": "toggle"},
+                {"key": "enable_file_upload", "type": "toggle"},
+                {"key": "enable_voice_input", "type": "toggle"},
+                {"key": "enable_rag", "type": "toggle"},
+                {"key": "enable_chat_bubble", "type": "toggle"},
+                {"key": "enable_amira_card_button", "type": "toggle"},
+                {"key": "fallback_enabled", "type": "toggle"},
+            ],
+        },
+        {
+            "id": "ai", "icon": "\U0001F9E0", "fields": [
+                {"key": "anthropic_extended_thinking", "type": "toggle"},
+                {"key": "anthropic_prompt_caching", "type": "toggle"},
+                {"key": "openai_extended_thinking", "type": "toggle"},
+                {"key": "nvidia_thinking_mode", "type": "toggle"},
+            ],
+        },
+        {
+            "id": "voice", "icon": "\U0001F399\uFE0F", "fields": [
+                {"key": "tts_voice", "type": "select",
+                 "options": [
+                     {"value": "female", "label": "Female"},
+                     {"value": "male", "label": "Male"},
+                 ]},
+            ],
+        },
+        {
+            "id": "messaging", "icon": "\U0001F4F1", "fields": [
+                {"key": "telegram_bot_token", "type": "password"},
+                {"key": "twilio_account_sid", "type": "text"},
+                {"key": "twilio_auth_token", "type": "password"},
+                {"key": "twilio_whatsapp_from", "type": "text"},
+            ],
+        },
+        {
+            "id": "advanced", "icon": "\u2699\uFE0F", "fields": [
+                {"key": "timeout", "type": "number", "min": 5, "max": 300, "step": 5},
+                {"key": "max_retries", "type": "number", "min": 0, "max": 10, "step": 1},
+                {"key": "max_conversations", "type": "number", "min": 1, "max": 100, "step": 1},
+                {"key": "max_snapshots_per_file", "type": "number", "min": 1, "max": 50, "step": 1},
+            ],
+        },
+        {
+            "id": "costs", "icon": "\U0001F4B0", "fields": [
+                {"key": "cost_currency", "type": "select",
+                 "options": [
+                     {"value": "USD", "label": "USD ($)"},
+                     {"value": "EUR", "label": "EUR (\u20AC)"},
+                     {"value": "GBP", "label": "GBP (\u00A3)"},
+                     {"value": "JPY", "label": "JPY (\u00A5)"},
+                 ]},
+            ],
+        },
+    ]
+
+    return jsonify({"success": True, "settings": current, "sections": sections})
+
+
+@app.route('/api/addon/restart', methods=['POST'])
+def api_addon_restart():
+    """Restart this add-on via the HA Supervisor API."""
+    token = SUPERVISOR_TOKEN
+    if not token:
+        return jsonify({"success": False, "error": "No Supervisor token available"}), 500
+    try:
+        import requests as req_lib
+        resp = req_lib.post(
+            "http://supervisor/addons/self/restart",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "error": f"Supervisor returned {resp.status_code}"}), 502
+    except Exception as e:
+        logger.error(f"Addon restart failed: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/settings', methods=['POST'])
+def api_settings_post():
+    """Save runtime settings, apply immediately, persist to settings.json."""
+    data = request.get_json() or {}
+    if not data:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+
+    # Only accept known keys
+    clean = {}
+    for key in SETTINGS_DEFAULTS:
+        if key in data:
+            clean[key] = data[key]
+
+    try:
+        # Merge with existing saved settings (partial updates allowed)
+        existing = _load_settings()
+        existing.update(clean)
+        _save_settings(existing)
+        _apply_settings(existing)
+        logger.info(f"Settings saved and applied: {list(clean.keys())}")
+
+        # React to specific settings that need runtime actions
+        if "enable_chat_bubble" in clean or "enable_amira_card_button" in clean:
+            global _chat_bubble_registered
+            _chat_bubble_registered = False  # force re-generation with new flag
+            setup_chat_bubble()
+            if ENABLE_CHAT_BUBBLE:
+                logger.info("Chat bubble: activated via settings UI")
+            else:
+                logger.info("Chat bubble: deactivated via settings UI")
+            if ENABLE_AMIRA_CARD_BUTTON:
+                logger.info("Amira card button: activated via settings UI")
+            else:
+                logger.info("Amira card button: deactivated via settings UI")
+
+        return jsonify({"success": True})
+    except Exception as e:
+        logger.error(f"Failed to save settings: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 

@@ -190,7 +190,57 @@ class EnhancedProvider(BaseProvider):
 
         Always call super()._prepare_messages() to keep the base behaviour.
         """
-        return self._inject_intent_system_prompt(list(messages), intent_info)
+        prepared = self._inject_intent_system_prompt(list(messages), intent_info)
+        # Validate tool messages for OpenAI-compatible APIs
+        return self._validate_tool_messages(prepared)
+    
+    @staticmethod
+    def _validate_tool_messages(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Ensure all tool messages have required tool_call_id field.
+
+        OpenAI-compatible APIs require that every message with role="tool"
+        has a "tool_call_id" field that matches an id in the preceding
+        assistant message's tool_calls array.
+
+        When tool_call_id is missing (e.g. conversations saved by older
+        versions that didn't preserve it), reconstruct it from the
+        preceding assistant+tool_calls message.
+        """
+        validated = []
+        _tc_id_queue: list = []  # IDs from the most recent assistant+tool_calls
+
+        for m in messages:
+            role = m.get("role", "")
+            if role == "assistant" and m.get("tool_calls"):
+                # Build queue of tool_call IDs for the following tool messages
+                _tc_id_queue = []
+                for j, tc in enumerate(m.get("tool_calls", [])):
+                    tc_id = ""
+                    if isinstance(tc, dict):
+                        tc_id = tc.get("id") or ""
+                    if not tc_id:
+                        fn = tc.get("function", {}) if isinstance(tc, dict) else {}
+                        tc_id = f"call_{fn.get('name', 'tool')}_{j}"
+                    _tc_id_queue.append(tc_id)
+                validated.append(m)
+            elif role == "tool":
+                if not m.get("tool_call_id"):
+                    m = dict(m)  # Make a copy to avoid mutating original
+                    if _tc_id_queue:
+                        m["tool_call_id"] = _tc_id_queue.pop(0)
+                    else:
+                        tool_name = m.get("name", "unknown")
+                        m["tool_call_id"] = f"call_{tool_name}_{len(validated)}"
+                    logger.warning(
+                        f"Tool message missing tool_call_id, reconstructed: {m['tool_call_id']}"
+                    )
+                else:
+                    _tc_id_queue.pop(0) if _tc_id_queue else None  # consume matching entry
+                validated.append(m)
+            else:
+                _tc_id_queue = []  # reset on non-tool/non-assistant messages
+                validated.append(m)
+        return validated
 
     def _get_model(self) -> str:
         """Return the model identifier to use for the API call.
@@ -320,7 +370,13 @@ class EnhancedProvider(BaseProvider):
                         if captured_usage:
                             done_event["usage"] = captured_usage
                         if accumulated_tool_calls:
-                            done_event["tool_calls"] = list(accumulated_tool_calls.values())
+                            # Ensure every tool call has a non-empty id
+                            _tc_list = []
+                            for _idx, _tc in accumulated_tool_calls.items():
+                                if not _tc.get("id"):
+                                    _tc["id"] = f"call_{_tc.get('name', 'tool')}_{_idx}"
+                                _tc_list.append(_tc)
+                            done_event["tool_calls"] = _tc_list
                         _done_emitted = True
                         yield done_event
                     continue
@@ -388,7 +444,13 @@ class EnhancedProvider(BaseProvider):
                 if captured_usage:
                     done_event["usage"] = captured_usage
                 if final_finish_reason == "tool_calls" and accumulated_tool_calls:
-                    done_event["tool_calls"] = list(accumulated_tool_calls.values())
+                    # Ensure every tool call has a non-empty id
+                    _tc_list = []
+                    for _idx, _tc in accumulated_tool_calls.items():
+                        if not _tc.get("id"):
+                            _tc["id"] = f"call_{_tc.get('name', 'tool')}_{_idx}"
+                        _tc_list.append(_tc)
+                    done_event["tool_calls"] = _tc_list
                 yield done_event
 
     def _should_retry_error(self, error_msg: str) -> bool:

@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Quick smoke test for tool_registry.py — run standalone."""
 import json
+import os
 import sys
+
+# Allow running from tests/ directory by adding parent to path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from tool_registry import (
     ToolDefinition, ToolCategory, ToolRegistry,

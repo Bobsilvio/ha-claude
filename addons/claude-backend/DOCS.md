@@ -235,24 +235,55 @@ Create `/config/amira/agents.json` with one or more agent entries:
 
 ## Configuration
 
-### Optional Features
+Amira uses **two layers** of configuration:
+
+1. **`config.yaml`** (HA Add-on page → Configuration tab) — API keys and log settings only
+2. **Settings UI** (Amira chat → ⚙️ Settings) — All runtime features, with descriptions in 4 languages
+
+> 💡 After saving settings in the UI, you'll be prompted to restart the addon to apply changes.
+
+### config.yaml (API keys + logging)
+
+These settings are configured from the HA Add-on Configuration tab:
+
+| Setting | Description |
+|---------|-------------|
+| Provider API keys | `anthropic_api_key`, `openai_api_key`, `google_api_key`, `github_token`, etc. |
+| `ollama_base_url` | Ollama server URL (default: `http://localhost:11434`) |
+| `custom_api_key` / `custom_api_base` | Custom OpenAI-compatible endpoint |
+| `colored_logs` | Pretty-print add-on logs (default: true) |
+| `debug_mode` | Verbose logging (default: false) |
+| `log_level` | `normal` / `verbose` / `debug` |
+
+### Runtime Settings (managed via Settings UI)
+
+All feature toggles and runtime options are managed from the chat UI (⚙️ icon):
 
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `language` | `en` | UI language (en/it/es/fr) |
-| `enable_file_access` | `false` | Allow read/write `/config` files with snapshots |
-| `enable_file_upload` | `false` | Allow uploading documents (PDF, DOCX, TXT, etc.) |
-| `enable_memory` | `false` | Enable persistent conversation memory |
-| `enable_rag` | `false` | Enable RAG for document search |
-| `enable_chat_bubble` | `false` | Floating AI button on every HA page |
-| `nvidia_thinking_mode` | `false` | Extra reasoning tokens on NVIDIA models |
-| `colored_logs` | `true` | Pretty-print add-on logs |
-| `debug_mode` | `false` | Verbose logging for troubleshooting |
+| `enable_file_access` | OFF | Allow read/write `/config` files with snapshots |
+| `enable_file_upload` | **ON** | Allow uploading documents (PDF, DOCX, TXT, etc.) |
+| `enable_memory` | OFF | Enable persistent conversation memory |
+| `enable_rag` | OFF | Enable RAG for document search |
+| `enable_chat_bubble` | **ON** | Floating AI button on every HA page |
+| `enable_amira_card_button` | **ON** | 🤖 Amira button in the Lovelace card editor |
+| `enable_voice_input` | **ON** | Voice input in chat bubble |
+| `enable_mcp` | OFF | Enable MCP tool servers |
+| `fallback_enabled` | OFF | Provider fallback chain |
+| `tts_voice` | `female` | TTS voice gender (male/female) |
+| `anthropic_extended_thinking` | OFF | Extended thinking for Claude models |
+| `anthropic_prompt_caching` | OFF | Prompt caching for Claude |
+| `openai_extended_thinking` | OFF | Extended thinking for OpenAI o-series |
+| `nvidia_thinking_mode` | OFF | Extra reasoning tokens on NVIDIA models |
 | `timeout` | `30` | API request timeout (seconds) |
 | `max_retries` | `3` | Retry failed requests |
-| `log_level` | `normal` | Log verbosity: `normal`, `verbose`, `debug` |
 | `max_conversations` | `10` | Chat history depth (1–100) |
 | `max_snapshots_per_file` | `5` | Max backups per config file |
+| `cost_currency` | `USD` | Cost display currency (USD, EUR) |
+| `mcp_config_file` | `/config/amira/mcp_config.json` | MCP servers config path |
+
+Settings are stored in `/config/amira/settings.json` and persist across restarts.
 
 ## Using the Chat
 
@@ -269,13 +300,13 @@ Ask the AI about your smart home:
 - Automations: *"Show me my evening routine automation"*
 
 ### File Upload
-If `enable_file_upload: true`:
+When File Upload is enabled (ON by default in Settings → Features):
 1. Click the **file upload button** (in input area)
 2. Select a document (PDF, DOCX, TXT, MD, YAML)
 3. Documents are auto-injected into AI context (limit: 10MB)
 
 ### Persistent Memory
-If `enable_memory: true`, Amira uses a two-file system:
+When Memory is enabled (Settings → Features → Memory), Amira uses a two-file system:
 
 - **`MEMORY.md`** — Injected in every session. Write here what the AI should always know.
 - **`HISTORY.md`** — Append-only log of past sessions (for your reference).
@@ -288,10 +319,10 @@ nano /config/amira/memory/MEMORY.md
 ## Advanced Configuration
 
 ### File Access
-Requires `enable_file_access: true`. Snapshots stored in `/config/amira/snapshots/`.
+Requires File Access to be enabled in Settings → Features. Snapshots stored in `/config/amira/snapshots/`.
 
 ### MCP Tools
-Create `/config/amira/mcp_config.json` to add external tools:
+Enable MCP in Settings → Features → MCP, then configure the MCP config file (default: `/config/amira/mcp_config.json`):
 
 ```json
 {
@@ -317,9 +348,9 @@ Set `log_level`:
 | Chat UI doesn't load | Restart add-on, hard-refresh browser (Ctrl+F5) |
 | 401 API error | API key invalid — check format and account balance |
 | 429 Rate limit | Wait or upgrade to higher tier with provider |
-| File access not working | Enable `enable_file_access: true`, restart |
-| Memory not saving | Check `/config/amira/memory/` folder exists and is writable |
-| MCP not loading | Validate JSON at `/config/amira/mcp_config.json`; check logs |
+| File access not working | Enable File Access in Settings → Features, restart |
+| Memory not saving | Enable Memory in Settings → Features; check `/config/amira/memory/` exists and is writable |
+| MCP not loading | Enable MCP in Settings → Features; validate JSON at config path; check logs |
 | Module import errors | Restart the add-on (dependencies install on start) |
 
 ## API Reference
@@ -332,6 +363,8 @@ The add-on exposes a REST API accessible via HA Ingress or directly on port 5010
 | `/api/models` | GET | List available providers and models |
 | `/api/set_model` | POST | Change active provider/model |
 | `/api/status` | GET | System status (HA connection, features, version) |
+| `/api/settings` | GET | Get all runtime settings with current values |
+| `/api/settings` | POST | Save runtime settings |
 | `/api/conversations` | GET | List all conversations |
 | `/api/snapshots` | GET | List config file backups |
 | `/api/documents/upload` | POST | Upload document for analysis |
@@ -339,6 +372,12 @@ The add-on exposes a REST API accessible via HA Ingress or directly on port 5010
 | `/api/usage_stats` | GET | Usage summary (daily, per-model, per-provider) |
 | `/api/usage_stats/today` | GET | Today's token and cost totals |
 | `/api/usage_stats/reset` | POST | Reset all usage data |
+| `/api/agents` | GET/POST | List or create agents |
+| `/api/agents/<id>` | PUT/DELETE | Update or delete an agent |
+| `/api/agents/set` | POST | Switch the active agent |
+| `/api/addon/restart` | POST | Restart the addon |
+| `/api/transcribe` | POST | Transcribe audio (Whisper) |
+| `/api/tts` | POST | Text-to-speech (Edge TTS / Groq / OpenAI) |
 | `/health` | GET | Simple health check |
 
 ## Data Storage
@@ -347,10 +386,12 @@ All persistent data lives in **`/config/amira/`**:
 
 ```
 /config/amira/
+├── settings.json             # Runtime settings (managed via Settings UI)
 ├── conversations.json        # Chat history
 ├── runtime_selection.json    # Last selected model/provider
 ├── agents.json               # Multi-agent config (name, model, tools, fallback)
-├── mcp_config.json           # MCP servers (create manually)
+├── mcp_config.json           # MCP servers config
+├── custom_system_prompt.txt  # Custom system prompt override
 ├── scheduled_tasks.json      # Scheduled task definitions
 ├── snapshots/                # Config file backups (before edits)
 ├── documents/                # Uploaded files
@@ -358,6 +399,9 @@ All persistent data lives in **`/config/amira/`**:
 └── memory/
     ├── MEMORY.md             # Long-term facts (always in context)
     └── HISTORY.md            # Session log (append-only)
+
+/config/www/
+└── ha-claude-chat-bubble.js  # Floating chat bubble (auto-generated)
 
 /data/
 └── usage_stats.json          # Persistent cost/usage tracking (daily, per-model, per-provider)

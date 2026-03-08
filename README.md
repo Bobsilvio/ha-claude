@@ -53,7 +53,7 @@
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
-Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot (OAuth), OpenAI Codex (OAuth), Groq, Mistral, DeepSeek, Ollama and more. Chat via **Telegram** or **WhatsApp** in addition to the built-in web UI.
+Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot (OAuth), OpenAI Codex (OAuth), Groq, Mistral, DeepSeek, Ollama and more. Chat via **Telegram** or **WhatsApp** in addition to the built-in web UI.
 
 [![GitHub Release](https://img.shields.io/github/v/release/Bobsilvio/ha-claude)](https://github.com/Bobsilvio/ha-claude/releases)
 [![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm%20NC%201.0-blue)](LICENSE)
@@ -100,11 +100,14 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Copy Button**: One-click copy for all code blocks (YAML, JSON, Python)
 
 ### 🫧 Floating Chat Bubble
-- **Always Available**: AI chat bubble on every Home Assistant page
+- **Always Available**: AI chat bubble on every Home Assistant page (ON by default)
+- **Amira Card Editor Button**: 🤖 Amira button in the Lovelace card editor for inline AI help
+- **Independent Toggles**: Bubble and card button can be enabled/disabled separately
 - **Context-Aware**: Detects automations, scripts, and HTML dashboards
 - **HTML Dashboard Editing**: Modify dashboards in-place keeping same style
-- **Voice Input**: Built-in voice recognition
+- **Voice Input**: Built-in voice recognition with multi-provider TTS
 - **Agent Switching**: Change AI provider/model on the fly
+- **Tool Feedback**: Thinking indicator + step badges during multi-tool execution
 
 ### 🌍 Multilingual Support
 - **4 Languages**: English, Italian, Spanish, French
@@ -147,7 +150,7 @@ Supports **20+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 
 1. **Add repository** — Settings → Add-ons → Add-on Store → ⋮ → Repositories → add `https://github.com/Bobsilvio/ha-claude`
 2. **Install** — search "Amira" → click Install
-3. **Configure** — open **Configuration** tab, paste at least one API key, Save
+3. **Configure** — open **Configuration** tab, paste at least one API key, Save. Runtime features are managed from the Amira **Settings** UI (⚙️ icon in chat)
 4. **Start** — click Start, open **Amira** from the sidebar, pick a model
 
 ---
@@ -179,7 +182,7 @@ Amira supports **Telegram** (long polling, no public IP) and **WhatsApp** (via T
 
 ## 🔌 MCP (Model Context Protocol)
 
-Extend Amira with external tools. Create `/config/amira/mcp_config.json` and restart:
+Extend Amira with external tools. Enable MCP in **Settings → Features**, then configure `/config/amira/mcp_config.json`:
 
 ```json
 {
@@ -210,6 +213,7 @@ Extend Amira with external tools. Create `/config/amira/mcp_config.json` and res
 | Problem | Fix |
 |---------|-----|
 | Amira not in sidebar | Restart HA, clear browser cache |
+| Bubble not showing | Check Settings → Features → Chat Bubble is ON; hard-refresh browser |
 | Error 401 on HA API | Visit `/api/status`, restart addon |
 | API Key errors | Check format, verify account has credit |
 | Rate limits | Switch model or wait a few minutes |
@@ -236,46 +240,92 @@ Issues and pull requests welcome: [github.com/Bobsilvio/ha-claude/issues](https:
 
 ## 🤖 Custom Agents
 
-Define multiple AI assistant profiles, each with its own LLM, persona, and instructions. Create `/config/amira/agents.json`:
+Create specialized AI assistants, each with its own model, personality, tools, and fallback chain. Manage agents from the **Config** tab in the sidebar or by editing `/config/amira/agents.json`.
+
+**Why use multiple agents?**
+- **Different tasks, different models** — a home agent on Claude Sonnet, a quick-chat agent on Groq Llama (free & fast)
+- **Tool isolation** — only the "home" agent can control automations; the "coder" can only read/write files
+- **Cost optimization** — route expensive reasoning to premium models, simple Q&A to free tiers
+- **Custom personality** — each agent has its own name, emoji, and system prompt
+
+### Quick Start
 
 ```json
 {
-  "active": "default",
-  "agents": {
-    "default": {
-      "name": "Amira",
-      "avatar": "🤖",
-      "instructions": "",
-      "provider": "",
-      "model": ""
+  "agents": [
+    {
+      "id": "home",
+      "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+      "model": { "primary": "anthropic/claude-sonnet-4-6", "fallbacks": ["google/gemini-2.0-flash"] },
+      "default": true
     },
-    "energy": {
-      "name": "EcoBot",
-      "avatar": "🌱",
-      "instructions": "You are an energy efficiency expert. Always suggest ways to reduce consumption.",
-      "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514"
+    {
+      "id": "coder",
+      "identity": { "name": "CodeBot", "emoji": "💻" },
+      "model": { "primary": "anthropic/claude-opus-4-6" },
+      "tools": ["read_config_file", "write_config_file", "list_config_files"],
+      "system_prompt": "You are a coding expert. Always show code with comments.",
+      "temperature": 0.2
     }
-  },
+  ],
   "channel_agents": {
-    "telegram": "energy",
-    "whatsapp": "default"
+    "telegram": "home",
+    "whatsapp": "coder"
   }
 }
 ```
 
-| Field | Required | Description |
-|---|---|---|
-| `active` | Yes | Key of the currently active agent (web UI) |
-| `agents.*.name` | Yes | Display name in chat header |
-| `agents.*.avatar` | No | Emoji avatar (default: 🤖) |
-| `agents.*.instructions` | No | Extra system prompt instructions for persona |
-| `agents.*.provider` | No | LLM provider override (e.g. `anthropic`, `openai`) |
-| `agents.*.model` | No | Model override (e.g. `claude-sonnet-4-20250514`) |
-| `channel_agents.telegram` | No | Agent key to use for Telegram messages |
-| `channel_agents.whatsapp` | No | Agent key to use for WhatsApp messages |
+> **Shorthand format** — you can also use agent IDs as top-level keys (no `agents` array):
+> ```json
+> { "home": { "identity": { "name": "Amira", "emoji": "🏠" }, "default": true } }
+> ```
 
-Edit via the **Config** tab in the sidebar, or manually. If `provider`/`model` are empty, the agent uses the currently selected model. `channel_agents` allows assigning a specific agent per messaging channel.
+### Field Reference
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (lowercase, no spaces) |
+| `identity.name` | string | Display name in UI and messages |
+| `identity.emoji` | string | Icon shown in selector and chat |
+| `identity.description` | string | Tooltip text |
+| `model.primary` | string | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
+| `model.fallbacks` | string[] | Ordered fallback models if primary fails |
+| `tools` | string[] \| null | Allowed tools (`null` or omitted = all tools) |
+| `tools_blocked` | string[] | Explicitly blocked tools |
+| `system_prompt` | string \| null | Custom system prompt (replaces default) |
+| `temperature` | number \| null | 0.0 - 2.0 (null = provider default) |
+| `max_tokens` | number \| null | Max response length |
+| `thinking_level` | string \| null | `off`, `low`, `medium`, `high`, `adaptive` |
+| `default` | bool | Mark one agent as the default |
+| `enabled` | bool | Set `false` to hide without deleting |
+| `tags` | string[] | Arbitrary tags for organization |
+
+### Channel Routing
+
+Assign a specific agent per messaging channel. Each channel can have one agent:
+
+```json
+"channel_agents": {
+  "telegram": "home",
+  "whatsapp": "coder"
+}
+```
+
+When a message arrives on Telegram, Amira automatically switches to the `home` agent (with its model and personality). WhatsApp messages use `coder`. If no channel agent is configured, the currently active agent is used.
+
+### Agent API
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/agents` | List all agents |
+| `POST /api/agents` | Create a new agent |
+| `PUT /api/agents/<id>` | Update an agent |
+| `DELETE /api/agents/<id>` | Delete an agent |
+| `POST /api/agents/set` | Switch the active agent |
+| `GET /api/agents/channels` | Get channel assignments |
+| `PUT /api/agents/channels` | Update channel assignments |
+
+> No restart needed — config is hot-reloaded when `agents.json` changes.
 
 ---
 

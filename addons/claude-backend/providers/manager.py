@@ -30,12 +30,41 @@ _PROVIDER_KEY_ENV: Dict[str, str] = {
     "openrouter": "OPENROUTER_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
+    "minimax": "MINIMAX_API_KEY",
+    "aihubmix": "AIHUBMIX_API_KEY",
+    "siliconflow": "SILICONFLOW_API_KEY",
+    "volcengine": "VOLCENGINE_API_KEY",
+    "dashscope": "DASHSCOPE_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
+    "zhipu": "ZHIPU_API_KEY",
+    "custom": "CUSTOM_API_KEY",
+    "ollama": "OLLAMA_BASE_URL",
 }
 # Preferred fallback order (higher-quality providers first).
 _FALLBACK_PRIORITY = [
     "anthropic", "openai", "google", "deepseek", "github",
     "groq", "mistral", "openrouter", "nvidia", "perplexity",
+    "minimax", "aihubmix", "siliconflow", "volcengine",
+    "dashscope", "moonshot", "zhipu", "ollama", "custom",
 ]
+
+
+_FALLBACK_CONFIG_PATH = "/config/amira/fallback_config.json"
+
+
+def _load_fallback_config() -> dict:
+    """Load fallback config from /config/amira/fallback_config.json.
+
+    Returns dict with optional keys: 'priority' (list), 'enabled' (bool).
+    """
+    try:
+        if os.path.isfile(_FALLBACK_CONFIG_PATH):
+            import json as _json
+            with open(_FALLBACK_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return _json.load(f) or {}
+    except Exception as e:
+        logger.warning(f"Could not load fallback config: {e}")
+    return {}
 
 
 def _build_fallback_chain(primary: str) -> List[str]:
@@ -43,9 +72,28 @@ def _build_fallback_chain(primary: str) -> List[str]:
 
     Only providers that have an API key set in the environment are included.
     The primary provider is excluded from the chain.
+    Respects FALLBACK_ENABLED env var and fallback_config.json enabled flag.
+    Respects custom priority order from /config/amira/fallback_config.json.
     """
+    # Load custom config
+    fb_config = _load_fallback_config()
+
+    # Check if fallback is disabled (env var OR config file)
+    env_enabled = os.getenv("FALLBACK_ENABLED", "true").lower() not in ("false", "0", "no")
+    file_enabled = fb_config.get("enabled", True)
+    if not env_enabled or not file_enabled:
+        logger.info("Auto-fallback disabled (FALLBACK_ENABLED=false)")
+        return []
+
+    # Use custom priority order if available, otherwise use default
+    custom_order = fb_config.get("priority", [])
+    if isinstance(custom_order, list) and custom_order:
+        priority = [str(p) for p in custom_order if p]
+    else:
+        priority = _FALLBACK_PRIORITY
+
     chain: List[str] = []
-    for prov in _FALLBACK_PRIORITY:
+    for prov in priority:
         if prov == primary:
             continue
         env_var = _PROVIDER_KEY_ENV.get(prov, "")
@@ -237,18 +285,19 @@ class ProviderManager:
 
     @staticmethod
     def _sanitize_error_for_user(msg: str, provider: str = "generic") -> str:
-        """Translate raw error to a user-friendly message via ErrorTranslator.
+        """Extract clean error message from raw API response.
 
-        Strips JSON noise, classifies the error, and returns a localised
-        string using the centralized ErrorTranslator (error_handler.py).
+        Extracts the actual error message from JSON blobs and returns it
+        as-is, preserving important details like credit balance, quota info, etc.
+        The message is NOT translated to keep all original information visible.
         """
         if not msg:
-            return ErrorTranslator.translate_error("", provider=provider)
+            return f"{provider}: Unknown error"
 
         import re
         import json as _json
 
-        # Try to extract a cleaner message from embedded JSON blobs
+        # Try to extract the actual error message from embedded JSON blobs
         clean_msg = msg
         if "{" in msg:
             json_match = re.search(r'\{.*\}', msg, re.DOTALL)
@@ -257,15 +306,19 @@ class ProviderManager:
                     parsed = _json.loads(json_match.group())
                     error_obj = parsed.get("error", parsed)
                     if isinstance(error_obj, dict):
+                        # Get the message field (most important)
                         inner = error_obj.get("message") or error_obj.get("type") or ""
                         if inner:
                             clean_msg = inner
+                            # Add error type if available and different from message
+                            error_type = error_obj.get("type", "")
+                            if error_type and error_type not in inner:
+                                clean_msg = f"{error_type}: {inner}"
                 except (ValueError, TypeError):
                     pass
 
-        # Read language from env (same as api.py LANGUAGE)
-        language = os.getenv("LANGUAGE", "en").lower()
-        return ErrorTranslator.translate_error(clean_msg, provider=provider, language=language)
+        # Return the original detailed message prefixed with provider name
+        return f"{provider}: {clean_msg}"
 
     def _stream_with_provider(
         self,

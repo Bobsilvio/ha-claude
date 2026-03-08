@@ -2,6 +2,39 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
+## 4.5.2 — Settings UI, bubble/card button indipendenti, feedback tool, fix default
+
+### ⚙️ Settings migrati nella chat UI
+- **Tutti i settings runtime ora nella UI**: lingua, feature toggle, provider avanzati, timeout, ecc. — gestiti dalla sezione ⚙️ Settings della chat con descrizioni in 4 lingue (EN/IT/ES/FR)
+- **config.yaml semplificato**: contiene solo API key e impostazioni di log — tutti i toggle feature rimossi
+- **settings.json persistente**: le impostazioni sono salvate in `/config/amira/settings.json` e applicate all'avvio
+- **Restart addon dalla UI**: dopo il salvataggio dei settings, un dialog propone il riavvio automatico dell'addon
+- **MCP config editor nella UI**: abilitazione MCP + percorso file config gestiti dalla sezione Settings → Features
+
+### 🫧 Bubble e Card Button indipendenti
+- **Toggle separati**: `enable_chat_bubble` (bubble floating) e `enable_amira_card_button` (🤖 Amira nel card editor) sono ora indipendenti
+- **Default ON**: entrambi attivi al primo avvio — nessuna configurazione necessaria
+- **Iniezione intelligente**: lo script JS viene sempre registrato se almeno uno dei due è attivo; cleanup completo quando entrambi disabilitati
+
+### 🔄 Feedback tool nella bubble
+- **Indicatore "thinking" durante le tool round**: tra una chiamata tool e la successiva, la bubble mostra nuovamente l'indicatore di pensiero con timer
+- **Evento `clear` tra round**: il backend invia `clear` + `status` dopo ogni esecuzione tool, la bubble resetta il testo e i badge, e `_restoreThinking()` ricrea l'indicatore
+- **Fix testo troncato**: rimossa la ri-emissione di `text_so_far` sul break dedup nativo — il testo non si accumula più tra round
+
+### 🐛 Fix
+- **Fix Anthropic 400 "unexpected tool_use_id"**: 3 bug interagenti nella gestione della conversation history — tool_result orfani, tool_use_id duplicati, e iniezione sintetica con ID non corrispondente
+- **Fix default non applicati al primo avvio**: se `settings.json` non esisteva ancora, i valori env del run script sovrascrivevano i default corretti — ora `SETTINGS_DEFAULTS` viene sempre applicato come base, poi sovrascritto dai valori salvati
+- **Fix run script disallineato**: env var `ENABLE_CHAT_BUBBLE`, `ENABLE_FILE_UPLOAD`, `ENABLE_MCP`, `FALLBACK_ENABLED` ora allineati ai `SETTINGS_DEFAULTS`
+- **Fix 9 provider mancanti nel selettore**: Ollama, Custom, Perplexity, MiniMax, AiHubMix, SiliconFlow, VolcEngine, DashScope, Moonshot, Zhipu aggiunti al sistema di priorità LLM
+- **Fix posizione eye button password**: spostato prima del campo input per allineamento corretto
+- **Fix larghezza campi settings**: input da 120px→220px, password da 160px→260px
+- **Fix stile bottone save MCP**: classe cambiata da `agent-form-actions` a `config-editor-footer`
+
+### 📝 Documentazione
+- **README aggiornato**: architettura config a 2 livelli (config.yaml + Settings UI), tabella settings con default corretti, nuovi endpoint API
+- **DOCS.md aggiornato**: configurazione, MCP, troubleshooting, data storage aggiornati
+- **Descrizioni settings in 4 lingue**: ogni setting ha una descrizione contestuale visibile nella UI
+
 ## 4.5.1 — Fix conversazioni card/bubble + icona cestino + salvataggio agenti + anti-allucinazione entity
 
 ### 🧠 Anti-hallucination
