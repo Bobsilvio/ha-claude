@@ -22,12 +22,26 @@ from typing import Any, Dict, Optional
 MODEL_PRICING: Dict[str, Dict[str, float]] = {
     # ------------------------------------------------------------------ Anthropic
     # Anthropic cache: reads = 10% of input, writes = 125% of input
+    # --- Opus tier  ($15 / $75) ---
+    "claude-opus-4-6":            {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
+    "claude-opus-4-5-20251101":   {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
+    "claude-opus-4-5":            {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
+    "claude-opus-4-1-20250805":   {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
+    "claude-opus-4-1":            {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
     "claude-opus-4-20250514":     {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
     "claude-opus-4":              {"input": 15.00, "output": 75.00, "cache_read": 1.50,  "cache_write": 18.75},
+    # --- Sonnet tier  ($3 / $15) ---
+    "claude-sonnet-4-6":          {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
+    "claude-sonnet-4-5-20250929": {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
+    "claude-sonnet-4-5":          {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
     "claude-sonnet-4-20250514":   {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
     "claude-sonnet-4":            {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
+    # --- Haiku tier  ($0.80 / $4) ---
+    "claude-haiku-4-5-20251001":  {"input": 0.80,  "output": 4.00,  "cache_read": 0.08,  "cache_write": 1.00},
+    "claude-haiku-4-5":           {"input": 0.80,  "output": 4.00,  "cache_read": 0.08,  "cache_write": 1.00},
     "claude-haiku-4-20250514":    {"input": 0.80,  "output": 4.00,  "cache_read": 0.08,  "cache_write": 1.00},
     "claude-haiku-4":             {"input": 0.80,  "output": 4.00,  "cache_read": 0.08,  "cache_write": 1.00},
+    # --- Legacy 3.x ---
     "claude-3-5-sonnet-20241022": {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
     "claude-3-5-sonnet-20240620": {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
     "claude-3-5-sonnet":          {"input": 3.00,  "output": 15.00, "cache_read": 0.30,  "cache_write": 3.75},
@@ -98,6 +112,21 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "moonshot-v1-32k":  {"input": 1.60, "output": 3.00},
     "moonshot-v1-128k": {"input": 3.00, "output": 10.00},
     "kimi-k2.5":        {"input": 0.50, "output": 2.50},
+    "kimi-k2":          {"input": 0.50, "output": 2.50},
+    # ------------------------------------------------------------------ Perplexity
+    "sonar-pro":            {"input": 3.00,  "output": 15.00},
+    "sonar":                {"input": 1.00,  "output": 5.00},
+    "sonar-reasoning-pro":  {"input": 5.00,  "output": 20.00},
+    # ------------------------------------------------------------------ MiniMax
+    "MiniMax-M2.1":   {"input": 0.40, "output": 1.60},
+    "MiniMax-M2":     {"input": 0.40, "output": 1.60},
+    # ------------------------------------------------------------------ Zhipu
+    "glm-4-flash":    {"input": 0.01, "output": 0.01},
+    "glm-4-plus":     {"input": 0.70, "output": 0.70},
+    # ------------------------------------------------------------------ Dashscope (Qwen)
+    "qwen-max":       {"input": 1.60, "output": 6.40},
+    "qwen-plus":      {"input": 0.40, "output": 1.20},
+    "qwen-turbo":     {"input": 0.20, "output": 0.60},
 }
 
 FREE_PROVIDERS = {"nvidia", "ollama"}
