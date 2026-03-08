@@ -2,6 +2,12 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
+## 4.5.6 — Tool descriptions nell'agent form
+
+### ✨ UX
+- **Descrizioni leggibili per i tool nell'agent form**: le chip dei tool consentiti ora mostrano una descrizione chiara (es. "Modifica automazione", "Carica storico") invece del nome tecnico (`update_automation`, `get_history`). Il nome tecnico resta visibile al hover come tooltip
+- **i18n tool descriptions**: descrizioni tradotte in 4 lingue (EN/IT/ES/FR), coerenti con la lingua impostata nell'addon
+
 ## 4.5.5 — Fix modelli duplicati nel dropdown + pricing 120 modelli
 
 ### 🐛 Fix

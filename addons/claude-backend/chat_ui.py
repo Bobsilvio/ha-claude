@@ -1173,7 +1173,153 @@ def get_chat_ui():
     }
     ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
     ui_js_json = json.dumps(ui_js, ensure_ascii=False)
-    
+
+    # Tool descriptions for agent form (i18n)
+    _tool_descs_all = {
+        "en": {
+            "update_automation": "Edit automation",
+            "get_automations": "Load automations",
+            "trigger_automation": "Trigger automation",
+            "delete_automation": "Delete automation",
+            "create_automation": "Create automation",
+            "get_available_services": "Load available services",
+            "get_events": "Load events",
+            "get_history": "Load history",
+            "get_scenes": "Load scenes",
+            "activate_scene": "Activate scene",
+            "get_scripts": "Load scripts",
+            "run_script": "Run script",
+            "update_script": "Edit script",
+            "create_script": "Create script",
+            "delete_script": "Delete script",
+            "get_areas": "Load areas/rooms",
+            "manage_areas": "Manage areas/rooms",
+            "manage_entity": "Manage entity",
+            "get_devices": "Load devices",
+            "send_notification": "Send notification",
+            "get_dashboards": "Load dashboards",
+            "create_dashboard": "Create dashboard",
+            "delete_dashboard": "Delete dashboard",
+            "create_html_dashboard": "Create HTML dashboard",
+            "read_config_file": "Read config file",
+            "write_config_file": "Write config file",
+            "list_config_files": "List config files",
+            "manage_statistics": "Manage statistics",
+            "get_entities": "Load entities",
+            "get_entity_state": "Read entity state",
+            "call_service": "Call service",
+            "search_entities": "Search entities",
+            "get_integration_entities": "Search integration entities",
+        },
+        "it": {
+            "update_automation": "Modifica automazione",
+            "get_automations": "Carica automazioni",
+            "trigger_automation": "Avvia automazione",
+            "delete_automation": "Elimina automazione",
+            "create_automation": "Crea automazione",
+            "get_available_services": "Carica servizi disponibili",
+            "get_events": "Carica eventi",
+            "get_history": "Carica storico",
+            "get_scenes": "Carica scene",
+            "activate_scene": "Attiva scena",
+            "get_scripts": "Carica script",
+            "run_script": "Esegui script",
+            "update_script": "Modifica script",
+            "create_script": "Crea script",
+            "delete_script": "Elimina script",
+            "get_areas": "Carica stanze",
+            "manage_areas": "Gestisci stanze",
+            "manage_entity": "Gestisci entità",
+            "get_devices": "Carica dispositivi",
+            "send_notification": "Invia notifica",
+            "get_dashboards": "Carica dashboard",
+            "create_dashboard": "Crea dashboard",
+            "delete_dashboard": "Elimina dashboard",
+            "create_html_dashboard": "Crea dashboard HTML",
+            "read_config_file": "Leggi file config",
+            "write_config_file": "Salva file config",
+            "list_config_files": "Elenco file config",
+            "manage_statistics": "Gestisci statistiche",
+            "get_entities": "Carica dispositivi",
+            "get_entity_state": "Leggi stato dispositivo",
+            "call_service": "Esegui comando",
+            "search_entities": "Cerca dispositivi",
+            "get_integration_entities": "Cerca entità integrazione",
+        },
+        "es": {
+            "update_automation": "Editar automatización",
+            "get_automations": "Cargar automatizaciones",
+            "trigger_automation": "Ejecutar automatización",
+            "delete_automation": "Eliminar automatización",
+            "create_automation": "Crear automatización",
+            "get_available_services": "Cargar servicios disponibles",
+            "get_events": "Cargar eventos",
+            "get_history": "Cargar historial",
+            "get_scenes": "Cargar escenas",
+            "activate_scene": "Activar escena",
+            "get_scripts": "Cargar scripts",
+            "run_script": "Ejecutar script",
+            "update_script": "Editar script",
+            "create_script": "Crear script",
+            "delete_script": "Eliminar script",
+            "get_areas": "Cargar áreas/habitaciones",
+            "manage_areas": "Gestionar áreas",
+            "manage_entity": "Gestionar entidad",
+            "get_devices": "Cargar dispositivos",
+            "send_notification": "Enviar notificación",
+            "get_dashboards": "Cargar dashboards",
+            "create_dashboard": "Crear dashboard",
+            "delete_dashboard": "Eliminar dashboard",
+            "create_html_dashboard": "Crear dashboard HTML",
+            "read_config_file": "Leer archivo config",
+            "write_config_file": "Guardar archivo config",
+            "list_config_files": "Listar archivos config",
+            "manage_statistics": "Gestionar estadísticas",
+            "get_entities": "Cargar entidades",
+            "get_entity_state": "Leer estado entidad",
+            "call_service": "Llamar servicio",
+            "search_entities": "Buscar entidades",
+            "get_integration_entities": "Buscar entidades integración",
+        },
+        "fr": {
+            "update_automation": "Modifier automatisation",
+            "get_automations": "Charger automatisations",
+            "trigger_automation": "Déclencher automatisation",
+            "delete_automation": "Supprimer automatisation",
+            "create_automation": "Créer automatisation",
+            "get_available_services": "Charger services disponibles",
+            "get_events": "Charger événements",
+            "get_history": "Charger historique",
+            "get_scenes": "Charger scènes",
+            "activate_scene": "Activer scène",
+            "get_scripts": "Charger scripts",
+            "run_script": "Exécuter script",
+            "update_script": "Modifier script",
+            "create_script": "Créer script",
+            "delete_script": "Supprimer script",
+            "get_areas": "Charger pièces/zones",
+            "manage_areas": "Gérer pièces/zones",
+            "manage_entity": "Gérer entité",
+            "get_devices": "Charger appareils",
+            "send_notification": "Envoyer notification",
+            "get_dashboards": "Charger tableaux de bord",
+            "create_dashboard": "Créer tableau de bord",
+            "delete_dashboard": "Supprimer tableau de bord",
+            "create_html_dashboard": "Créer tableau de bord HTML",
+            "read_config_file": "Lire fichier config",
+            "write_config_file": "Écrire fichier config",
+            "list_config_files": "Lister fichiers config",
+            "manage_statistics": "Gérer statistiques",
+            "get_entities": "Charger entités",
+            "get_entity_state": "Lire état entité",
+            "call_service": "Appeler service",
+            "search_entities": "Rechercher entités",
+            "get_integration_entities": "Rechercher entités intégration",
+        },
+    }
+    _tool_descs = _tool_descs_all.get(api.LANGUAGE, _tool_descs_all["en"])
+    _tool_descs_json = json.dumps(_tool_descs, ensure_ascii=False)
+
     # Feature flags for UI elements
     file_upload_enabled = api.ENABLE_FILE_UPLOAD
     file_upload_display = "block" if file_upload_enabled else "none"
@@ -3820,19 +3966,8 @@ def get_chat_ui():
         let configActiveFile = null;
         let configOriginalContent = '';
 
-        // Known tool names for the agent form multi-select
-        const KNOWN_TOOLS = [
-            'get_entities', 'get_entity_state', 'call_service', 'search_entities',
-            'get_integration_entities', 'create_automation', 'update_automation',
-            'get_automations', 'trigger_automation', 'delete_automation',
-            'get_available_services', 'get_events', 'get_history', 'get_scenes',
-            'activate_scene', 'get_scripts', 'run_script', 'update_script',
-            'create_script', 'delete_script', 'get_areas', 'manage_areas',
-            'manage_entity', 'get_devices', 'send_notification', 'get_dashboards',
-            'create_dashboard', 'delete_dashboard', 'create_html_dashboard',
-            'read_config_file', 'write_config_file', 'list_config_files',
-            'manage_statistics',
-        ];
+        // Known tools with i18n descriptions for the agent form multi-select
+        const KNOWN_TOOLS = {_tool_descs_json};
         const AGENT_EMOJIS = ['\U0001f916', '\U0001f3e0', '\U0001f4bb', '\U0001f9e0', '\U0001f525', '\U0001f4a1', '\U0001f527', '\U0001f6e0\ufe0f', '\U0001f30d', '\U0001f3af', '\u2699\ufe0f', '\U0001f4ca', '\U0001f4dd', '\U0001f50d', '\U0001f680', '\U0001f6a8'];
         const THINKING_LEVELS = ['off', 'low', 'medium', 'high', 'adaptive'];
 
@@ -4286,10 +4421,12 @@ def get_chat_ui():
             const toolsGrid = document.getElementById('af_tools');
             const selectedTools = new Set(agentData && Array.isArray(agentData.tools) ? agentData.tools : []);
             const hasToolFilter = agentData && Array.isArray(agentData.tools);
-            KNOWN_TOOLS.forEach(t => {{
+            Object.entries(KNOWN_TOOLS).forEach(([t, desc]) => {{
                 const chip = document.createElement('span');
                 chip.className = 'agent-tool-chip' + (hasToolFilter && selectedTools.has(t) ? ' selected' : '');
-                chip.textContent = t;
+                chip.dataset.tool = t;
+                chip.textContent = desc;
+                chip.title = t;
                 chip.addEventListener('click', () => chip.classList.toggle('selected'));
                 toolsGrid.appendChild(chip);
             }});
@@ -4408,7 +4545,7 @@ def get_chat_ui():
             // Tools — only include if at least one chip selected
             const toolChips = document.querySelectorAll('#af_tools .agent-tool-chip.selected');
             if (toolChips.length > 0) {{
-                payload.tools = Array.from(toolChips).map(c => c.textContent);
+                payload.tools = Array.from(toolChips).map(c => c.dataset.tool);
             }}
 
             // Default + enabled
