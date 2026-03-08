@@ -81,11 +81,21 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **AI Suggestions**: AI analyzes issues and suggests concrete fixes
 - **Dismiss Issues**: Acknowledge and dismiss resolved repairs
 
+### � File Upload
+- **Multi-Format**: Upload PDF, DOCX, TXT, MD, YAML for AI analysis
+- **Drag & Drop**: Drop files directly into chat (ON by default)
+- **Context Injection**: Uploaded content is included in the AI conversation
+
 ### 👁️ Vision Support
 - **Image Upload**: Send screenshots, photos, or dashboard images
 - **Visual Analysis**: AI can see and understand images
 - **Card Recreation**: "Create cards like this image" — AI analyzes and recreates layouts
 - **Multi-Provider**: Works with Claude, GPT-4o, Gemini vision models
+
+### 🔍 RAG (Retrieval-Augmented Generation)
+- **Semantic Search**: Search over uploaded documents with vector embeddings
+- **Automatic Indexing**: Documents are indexed on upload
+- **Enable in Settings**: Settings → Features → RAG (OFF by default)
 
 ### 📝 Configuration File Access
 - **Read/Write YAML**: Access automations, scripts, scenes, and custom configs
@@ -114,6 +124,22 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Voice Input**: Built-in voice recognition with multi-provider TTS
 - **Agent Switching**: Change AI provider/model on the fly
 - **Tool Feedback**: Thinking indicator + step badges during multi-tool execution
+
+### 🔄 Provider Fallback
+- **Automatic Chain**: If primary provider fails, Amira tries the next one
+- **Configurable Order**: Set your preferred fallback sequence
+- **Enable in Settings**: Settings → Features → Auto Fallback (OFF by default)
+
+### 🤖 Multi-Agent System
+- **Custom Agents**: Create agents with their own model, provider, tools, and system prompt
+- **Agent Switching**: Select agents from the chat UI dropdown
+- **Channel Routing**: Assign different agents to Telegram/WhatsApp channels
+
+### 💰 Cost Tracking
+- **Per-Message Cost**: Tracks token usage and cost for every message
+- **Cache Breakdown**: Shows prompt caching savings
+- **Daily Aggregates**: Usage statistics over time
+- **Multi-Currency**: USD or EUR
 
 ### 🌍 Multilingual Support
 - **4 Languages**: English, Italian, Spanish, French
