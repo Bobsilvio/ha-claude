@@ -2,6 +2,20 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
+## 4.5.3 — Pricing engine: 100 modelli, fuzzy fix, nuovi provider
+
+### 💰 Cost Tracking
+- **100 modelli con pricing esplicito**: da 59 a 100 entries nella tabella `MODEL_PRICING` — copertura completa per tutti i provider supportati
+- **Nuovi modelli Anthropic**: Claude Opus 4.6, Sonnet 4.6, Haiku 4.5, Opus 4.5, Opus 4.1 con relativi alias datati
+- **Nuovi modelli OpenAI**: GPT-4.1 family (4.1, 4.1-mini, 4.1-nano), GPT-5.1, GPT-5-mini, GPT-4 legacy, GPT-3.5 Turbo
+- **Nuovi modelli Google**: Gemini 3.x (3.1-pro, 3-pro, 3-flash) con pricing preview
+- **Nuovi provider**: Perplexity (Sonar, Sonar Pro, Sonar Reasoning Pro), MiniMax (M2, M2.1), Zhipu (GLM-4 Flash/Plus), DashScope (Qwen Max/Plus/Turbo), Kimi K2
+- **GitHub Copilot gratuito**: aggiunto a `FREE_PROVIDERS` — i modelli usati via Copilot non generano costi token (subscription-based)
+- **Alias Copilot-specifici**: `gpt-41-copilot` → GPT-4.1 pricing, `gpt-4-o-preview` → GPT-4o pricing
+
+### 🐛 Fix
+- **Fix fuzzy matching pricing errato**: il lookup cercava il primo match per prefisso — `gpt-4o-mini-2024-07-18` matchava `gpt-4o` ($2.50) invece di `gpt-4o-mini` ($0.15). Ora preferisce il match più lungo (longest-key-wins)
+
 ## 4.5.2 — Settings UI, bubble/card button indipendenti, feedback tool, fix default
 
 ### ⚙️ Settings migrati nella chat UI

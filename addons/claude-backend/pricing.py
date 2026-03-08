@@ -66,6 +66,19 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "o1":               {"input": 15.00, "output": 60.00, "cache_read": 7.50},
     "o1-mini":          {"input": 1.10,  "output": 4.40,  "cache_read": 0.55},
     "o1-preview":       {"input": 15.00, "output": 60.00, "cache_read": 7.50},
+    # GPT-4.1 family
+    "gpt-4.1":          {"input": 2.00,  "output": 8.00,  "cache_read": 1.00},
+    "gpt-4.1-mini":     {"input": 0.40,  "output": 1.60,  "cache_read": 0.20},
+    "gpt-4.1-nano":     {"input": 0.10,  "output": 0.40,  "cache_read": 0.05},
+    # GPT-5.1 family
+    "gpt-5.1":          {"input": 2.00,  "output": 8.00,  "cache_read": 1.00},
+    "gpt-5-mini":       {"input": 0.40,  "output": 1.60,  "cache_read": 0.20},
+    # Legacy GPT-4 / GPT-3.5
+    "gpt-4":            {"input": 30.00, "output": 60.00},
+    "gpt-3.5-turbo":    {"input": 0.50,  "output": 1.50},
+    # Copilot-specific aliases
+    "gpt-41-copilot":   {"input": 2.00,  "output": 8.00,  "cache_read": 1.00},
+    "gpt-4-o-preview":  {"input": 2.50,  "output": 10.00, "cache_read": 1.25},
     # ------------------------------------------------------------------ Google
     # Gemini: context caching = 25% of input (free tier has no cache cost)
     "gemini-2.5-pro":              {"input": 1.25,  "output": 10.00, "cache_read": 0.3125},
@@ -76,6 +89,10 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "gemini-2.0-flash-lite":       {"input": 0.075, "output": 0.30},
     "gemini-1.5-pro":              {"input": 1.25,  "output": 5.00,  "cache_read": 0.3125},
     "gemini-1.5-flash":            {"input": 0.075, "output": 0.30,  "cache_read": 0.01875},
+    # Gemini 3.x (preview)
+    "gemini-3.1-pro":              {"input": 1.25,  "output": 10.00, "cache_read": 0.3125},
+    "gemini-3-pro":                {"input": 1.25,  "output": 10.00, "cache_read": 0.3125},
+    "gemini-3-flash":              {"input": 0.15,  "output": 0.60,  "cache_read": 0.0375},
     # ------------------------------------------------------------------ Groq
     "llama-3.3-70b-versatile":    {"input": 0.59, "output": 0.79},
     "llama-3.1-70b-versatile":    {"input": 0.59, "output": 0.79},
@@ -129,7 +146,7 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "qwen-turbo":     {"input": 0.20, "output": 0.60},
 }
 
-FREE_PROVIDERS = {"nvidia", "ollama"}
+FREE_PROVIDERS = {"nvidia", "ollama", "github_copilot"}
 
 CURRENCY_RATES = {"USD": 1.0, "EUR": 0.92}
 
@@ -233,12 +250,16 @@ def _lookup_pricing(model: str) -> Optional[Dict[str, float]]:
         p = MODEL_PRICING.get(bare)
         if p:
             return p
-    # Fuzzy: find a pricing key that the model name starts with
+    # Fuzzy: find the LONGEST pricing key that matches (prefix or substring)
     model_lower = bare.lower()
+    best_key = None
+    best_len = 0
     for key, val in MODEL_PRICING.items():
-        if model_lower.startswith(key.lower()) or key.lower() in model_lower:
-            return val
-    return None
+        kl = key.lower()
+        if (model_lower.startswith(kl) or kl in model_lower) and len(kl) > best_len:
+            best_key = key
+            best_len = len(kl)
+    return MODEL_PRICING[best_key] if best_key else None
 
 
 def calculate_cost_breakdown(
