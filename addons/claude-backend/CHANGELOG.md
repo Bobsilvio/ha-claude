@@ -1,6 +1,11 @@
 # Changelog
 
-> **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
+> **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+
+## 4.6.1 — Fix bubble auth
+
+### 🐛 Fix
+- **Fix bubble 401 (Ingress session)**: fix bubble autenticazione
 
 ## 4.6.0 — Fix bubble auth (Ingress session) + agent persistence + fix write tools
 
