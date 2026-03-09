@@ -2,6 +2,20 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze (`edge-tts`).
 
+## 4.6.0 — Fix bubble auth (Ingress session) + agent persistence + fix write tools
+
+### 🐛 Fix
+- **Fix bubble 401 (Ingress session)**: la bubble JS, caricata da `/local/`, non aveva il cookie di sessione Ingress — tutte le chiamate API fallivano con 401 e la bubble si auto-rimuoveva dal DOM. Ora crea la sessione Ingress via `POST /api/hassio/ingress/session` con il token HA prima di qualsiasi chiamata API
+- **Fix tool di scrittura bloccati (DuplicateCallHook)**: `_tool_call_history.add()` pre-registrava TUTTE le firme tool PRIMA dell'esecuzione — la prima chiamata di ogni write tool veniva bloccata come "duplicata". Spostato il recording a DOPO l'esecuzione
+- **Fix agent non visibili nella bubble**: `get_agents_for_api()` non restituiva il campo `identity` che il JS della bubble leggeva — aggiunto `identity: {name, emoji, description}` alla risposta API
+- **Health check meno aggressivo**: 401/403 (problemi auth Ingress) non contano più come failure — la bubble si rimuove solo per errori di rete o 5xx
+
+### ✨ UX
+- **Persistenza agente selezionato**: la selezione dell'agente viene salvata in localStorage e ripristinata al ricaricamento — sia in chat_ui che nella bubble
+- **Conferma per operazioni MODIFY**: il system prompt ora richiede conferma prima di modificare automazioni/script/dashboard (non solo per DELETE)
+- **Rimossa rotella agent per canale dalla bubble**: la gestione agent per canale è ora solo nelle impostazioni di chat_ui
+- **bubbleFetch() autenticato**: tutte le 21 chiamate fetch della bubble usano il wrapper `bubbleFetch()` che aggiunge automaticamente `Authorization: Bearer` con il token HA
+
 ## 4.5.9 — Fix copia card editor (shadow DOM) + tools grid ridimensionabile
 
 ### 🐛 Fix

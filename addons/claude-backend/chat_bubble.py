@@ -104,11 +104,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "messages_count": "messages",
             "load_error": "Error loading conversations",
             "back_to_chat": "Back to chat",
-            "channel_agents": "Channel Agents",
-            "channel_default": "Default (active)",
-            "channel_telegram": "Telegram",
-            "channel_whatsapp": "WhatsApp",
-            "channel_saved": "Saved",
             "copy_btn": "Copy",
             "copied": "Copied!",
         },
@@ -181,11 +176,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "messages_count": "messaggi",
             "load_error": "Errore nel caricamento conversazioni",
             "back_to_chat": "Torna alla chat",
-            "channel_agents": "Agent per canale",
-            "channel_default": "Predefinito (attivo)",
-            "channel_telegram": "Telegram",
-            "channel_whatsapp": "WhatsApp",
-            "channel_saved": "Salvato",
             "copy_btn": "Copia",
             "copied": "Copiato!",
         },
@@ -258,11 +248,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "messages_count": "mensajes",
             "load_error": "Error al cargar conversaciones",
             "back_to_chat": "Volver al chat",
-            "channel_agents": "Agentes por canal",
-            "channel_default": "Predeterminado (activo)",
-            "channel_telegram": "Telegram",
-            "channel_whatsapp": "WhatsApp",
-            "channel_saved": "Guardado",
             "copy_btn": "Copiar",
             "copied": "\u00a1Copiado!",
         },
@@ -335,11 +320,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "messages_count": "messages",
             "load_error": "Erreur de chargement des conversations",
             "back_to_chat": "Retour au chat",
-            "channel_agents": "Agents par canal",
-            "channel_default": "Par d\u00e9faut (actif)",
-            "channel_telegram": "Telegram",
-            "channel_whatsapp": "WhatsApp",
-            "channel_saved": "Enregistr\u00e9",
             "copy_btn": "Copier",
             "copied": "Copi\u00e9 !",
         },
@@ -399,6 +379,66 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   const API_BASE = INGRESS_URL;
   const T = {__import__('json').dumps(t, ensure_ascii=False)};
   const VOICE_LANG = '{voice_lang}';
+
+  // ---- HA auth helper: get access token from HA frontend ----
+  function _getHassToken() {{
+    try {{
+      const ha = document.querySelector('home-assistant');
+      return ha && ha.hass && ha.hass.auth && ha.hass.auth.data && ha.hass.auth.data.access_token || '';
+    }} catch(e) {{ return ''; }}
+  }}
+
+  // Create Ingress session cookie so subsequent fetch calls authenticate
+  let _ingressSessionOk = false;
+  let _ingressNextRetry = 0;   // timestamp (ms) of next allowed retry
+  let _ingressRetryDelay = 10; // current backoff in seconds (doubles on each failure, max 300)
+  async function _ensureIngressSession() {{
+    if (_ingressSessionOk) return true;
+    if (Date.now() < _ingressNextRetry) return false; // backoff not elapsed
+    const token = _getHassToken();
+    if (!token) {{
+      _ingressNextRetry = Date.now() + _ingressRetryDelay * 1000;
+      _ingressRetryDelay = Math.min(_ingressRetryDelay * 2, 300);
+      return false;
+    }}
+    try {{
+      const resp = await fetch('/api/hassio/ingress/session', {{
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {{ 'Authorization': 'Bearer ' + token }},
+      }});
+      if (resp.ok) {{
+        _ingressSessionOk = true;
+        _ingressRetryDelay = 10; // reset backoff on success
+        console.log('[Bubble] Ingress session created');
+        return true;
+      }}
+      // Backoff exponentially: 10s → 20s → 40s … → 300s
+      _ingressNextRetry = Date.now() + _ingressRetryDelay * 1000;
+      _ingressRetryDelay = Math.min(_ingressRetryDelay * 2, 300);
+      return false;
+    }} catch(e) {{
+      _ingressNextRetry = Date.now() + _ingressRetryDelay * 1000;
+      _ingressRetryDelay = Math.min(_ingressRetryDelay * 2, 300);
+      return false;
+    }}
+  }}
+
+  // Authenticated fetch wrapper for Ingress calls
+  function bubbleFetch(url, opts) {{
+    opts = opts || {{}};
+    const token = _getHassToken();
+    if (token) {{
+      opts.headers = opts.headers || {{}};
+      if (typeof opts.headers.set === 'function') {{
+        opts.headers.set('Authorization', 'Bearer ' + token);
+      }} else {{
+        opts.headers['Authorization'] = 'Bearer ' + token;
+      }}
+    }}
+    opts.credentials = 'same-origin';
+    return fetch(url, opts);
+  }}
   // ---- Device detection ----
   // Phone: small screen with touch (hide bubble — too small, accidental taps)
   // Tablet: larger touch screen (show bubble — usable screen size)
@@ -415,13 +455,15 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   // ---- HTML Dashboard names cache (for URL-based detection) ----
   let _htmlDashboardNames = null;
-  fetch(API_BASE + '/custom_dashboards', {{credentials:'same-origin'}})
+  function _loadDashboardNames() {{
+    bubbleFetch(API_BASE + '/custom_dashboards')
     .then(r => r.ok ? r.json() : null)
     .then(data => {{
       if (data && data.dashboards) {{
         _htmlDashboardNames = data.dashboards.map(d => d.name);
       }}
     }}).catch(() => {{}});
+  }}
 
   // ---- Persistence helpers ----
   const STORE_PREFIX = 'ha-claude-bubble-';
@@ -1425,21 +1467,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
         <select id="haAgentSelect" style="display:none"></select>
         <select id="haProviderSelect"></select>
         <select id="haModelSelect"></select>
-        <button id="haChannelAgentsBtn" title="${{T.channel_agents}}" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 4px;line-height:1;flex-shrink:0;opacity:0.6;">&#9881;</button>
-      </div>
-      <div id="haChannelAgentsPanel" style="display:none;padding:8px 12px;border-bottom:1px solid var(--divider-color,#e0e0e0);background:var(--secondary-background-color,#f5f5f5);flex-shrink:0;">
-        <div style="font-size:11px;font-weight:600;margin-bottom:6px;color:var(--primary-text-color,#333);">&#128225; ${{T.channel_agents}}</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--secondary-text-color,#666);flex:1;min-width:140px;">
-            ${{T.channel_telegram}}
-            <select id="haChannelTelegramAgent" style="flex:1;font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--divider-color,#ddd);background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);cursor:pointer;min-width:80px;"></select>
-          </label>
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--secondary-text-color,#666);flex:1;min-width:140px;">
-            ${{T.channel_whatsapp}}
-            <select id="haChannelWhatsappAgent" style="flex:1;font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--divider-color,#ddd);background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);cursor:pointer;min-width:80px;"></select>
-          </label>
-        </div>
-        <div id="haChannelAgentsSaved" style="display:none;font-size:10px;color:#4caf50;margin-top:4px;">&#10003; ${{T.channel_saved}}</div>
       </div>
       <div class="context-bar" id="haChatContext" style="display:none;"></div>
       <div class="quick-actions" id="haQuickActions" style="display:none;"></div>
@@ -1484,11 +1511,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   const providerSelect = document.getElementById('haProviderSelect');
   const modelSelect = document.getElementById('haModelSelect');
   const agentSelect = document.getElementById('haAgentSelect');
-  const channelAgentsBtn = document.getElementById('haChannelAgentsBtn');
-  const channelAgentsPanel = document.getElementById('haChannelAgentsPanel');
-  const channelTelegramSel = document.getElementById('haChannelTelegramAgent');
-  const channelWhatsappSel = document.getElementById('haChannelWhatsappAgent');
-  const channelSavedMsg = document.getElementById('haChannelAgentsSaved');
+
 
   let isOpen = false;
   let isStreaming = false;
@@ -1712,7 +1735,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   async function loadConversationList() {{
     historyList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--secondary-text-color,#999);">&#8987;</div>';
     try {{
-      const resp = await fetch(API_BASE + '/api/conversations', {{credentials:'same-origin'}});
+      const resp = await bubbleFetch(API_BASE + '/api/conversations');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       const convs = data.conversations || [];
@@ -1753,7 +1776,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   async function switchToConversation(sessionId) {{
     try {{
-      const resp = await fetch(API_BASE + '/api/conversations/' + encodeURIComponent(sessionId), {{credentials:'same-origin'}});
+      const resp = await bubbleFetch(API_BASE + '/api/conversations/' + encodeURIComponent(sessionId));
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       // Update session ID
@@ -2008,7 +2031,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     if (!msgsContainer) return;
     msgsContainer.innerHTML = '<div style="text-align:center;padding:16px;color:var(--secondary-text-color,#999);">⏳</div>';
     try {{
-      const resp = await fetch(API_BASE + '/api/conversations?source=card', {{credentials:'same-origin'}});
+      const resp = await bubbleFetch(API_BASE + '/api/conversations?source=card');
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
       const convs = data.conversations || [];
@@ -2057,7 +2080,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   async function _loadCardConversation(sessionId, msgsContainer) {{
     if (!msgsContainer) return;
     try {{
-      const resp = await fetch(API_BASE + '/api/conversations/' + encodeURIComponent(sessionId), {{credentials:'same-origin'}});
+      const resp = await bubbleFetch(API_BASE + '/api/conversations/' + encodeURIComponent(sessionId));
       if (!resp.ok) return;
       const data = await resp.json();
       if (data.messages && data.messages.length > 0) {{
@@ -2270,7 +2293,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       const prefix = buildContextPrefix(ctx);
       const fullMsg = prefix ? prefix + '\\n\\n' + text : text;
       const _session = getCardSessionId();
-      const response = await fetch(API_BASE + '/api/chat/stream', {{
+      const response = await bubbleFetch(API_BASE + '/api/chat/stream', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ message: fullMsg, session_id: _session }})
@@ -2549,10 +2572,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       const formData = new FormData();
       const ext = (audioBlob.type || '').includes('webm') ? 'webm' : 'wav';
       formData.append('file', audioBlob, `voice.${{ext}}`);
-      const resp = await fetch(API_BASE + '/api/voice/transcribe', {{
+      const resp = await bubbleFetch(API_BASE + '/api/voice/transcribe', {{
         method: 'POST',
         body: formData,
-        credentials: 'same-origin'
       }});
       const data = await resp.json();
       if (data.status === 'success' && data.text) {{
@@ -2620,7 +2642,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       // Check TTS providers when enabling voice mode
       if (voiceModeActive) {{
         try {{
-          const provResp = await fetch(API_BASE + '/api/voice/tts/providers');
+          const provResp = await bubbleFetch(API_BASE + '/api/voice/tts/providers');
           if (provResp.ok) {{
             const provData = await provResp.json();
             if (!provData.providers || provData.providers.length === 0) {{
@@ -2671,7 +2693,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     if (clean.length > 1000) clean = clean.substring(0, 1000) + '...';
     try {{
       if (speakingEl) speakingEl.style.display = 'flex';
-      const resp = await fetch(API_BASE + '/api/voice/tts', {{
+      const resp = await bubbleFetch(API_BASE + '/api/voice/tts', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ text: clean }})
@@ -2833,11 +2855,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   function abortStream() {{
     // Signal backend to abort
-    fetch(API_BASE + '/api/chat/abort', {{
+    bubbleFetch(API_BASE + '/api/chat/abort', {{
       method: 'POST',
       headers: {{ 'Content-Type': 'application/json' }},
       body: JSON.stringify({{ session_id: getSessionId() }}),
-      credentials: 'same-origin',
     }}).catch(() => {{}});
     // Also abort the fetch
     if (currentAbortController) currentAbortController.abort();
@@ -2924,7 +2945,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     // For HTML dashboards, fetch the actual HTML to pass as context
     if (ctx.type === 'html_dashboard' && ctx.id) {{
       try {{
-        const resp = await fetch(API_BASE + '/api/dashboard_html/' + encodeURIComponent(ctx.id), {{credentials:'same-origin'}});
+        const resp = await bubbleFetch(API_BASE + '/api/dashboard_html/' + encodeURIComponent(ctx.id));
         if (resp.ok) {{
           const data = await resp.json();
           if (data.html) {{
@@ -3017,7 +3038,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     currentAbortController = new AbortController();
 
     try {{
-      const response = await fetch(API_BASE + '/api/chat/stream', {{
+      const response = await bubbleFetch(API_BASE + '/api/chat/stream', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ message: fullMessage, session_id: getSessionId(), voice_mode: !!voiceModeActive }}),
@@ -3273,7 +3294,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     // localStorage empty — try loading from server for current session
     try {{
       const sid = getSessionId();
-      const resp = await fetch(API_BASE + '/api/conversations/' + encodeURIComponent(sid), {{credentials:'same-origin'}});
+      const resp = await bubbleFetch(API_BASE + '/api/conversations/' + encodeURIComponent(sid));
       if (resp.ok) {{
         const data = await resp.json();
         if (data.messages && data.messages.length > 0) {{
@@ -3293,39 +3314,42 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       console.warn('[Bubble] Could not restore from server:', e);
     }}
   }}
-  restoreHistory();
 
   // ---- Addon Health Check: Remove bubble if addon is down ----
   let addonHealthCheckFails = 0;
-  const MAX_FAILS = 2;
+  const MAX_FAILS = 3;
   async function checkAddonHealth() {{
     try {{
-      const resp = await fetch(API_BASE + '/api/status', {{
+      const resp = await bubbleFetch(API_BASE + '/api/status', {{
         method: 'GET',
-        credentials: 'same-origin',
-        timeout: 3000
       }});
       if (resp.ok) {{
-        addonHealthCheckFails = 0;  // Reset counter on success
-        console.log('[Bubble] Addon health: OK');
-      }} else {{
+        addonHealthCheckFails = 0;
+        console.debug('[Bubble] Addon health: OK');
+      }} else if (resp.status === 401 || resp.status === 403) {{
+        // Auth issue — try to re-create ingress session
+        _ingressSessionOk = false;
+        await _ensureIngressSession();
+        console.warn('[Bubble] Addon health: auth ' + resp.status + ' — recreated ingress session');
+        addonHealthCheckFails = 0;
+      }} else if (resp.status >= 500) {{
         addonHealthCheckFails++;
-        console.warn('[Bubble] Addon health check failed:', resp.status);
-        if (addonHealthCheckFails >= MAX_FAILS) {{
-          removeBubbleFromDOM();
-        }}
+        console.warn('[Bubble] Addon health check server error:', resp.status);
+        if (addonHealthCheckFails >= MAX_FAILS) removeBubbleFromDOM();
+      }} else {{
+        // Other client errors (404 etc) — don't count as down
+        console.warn('[Bubble] Addon health check:', resp.status);
       }}
     }} catch (error) {{
+      // Network error — addon truly unreachable
       addonHealthCheckFails++;
       console.warn('[Bubble] Addon health check error:', error);
-      if (addonHealthCheckFails >= MAX_FAILS) {{
-        removeBubbleFromDOM();
-      }}
+      if (addonHealthCheckFails >= MAX_FAILS) removeBubbleFromDOM();
     }}
   }}
 
   function removeBubbleFromDOM() {{
-    console.log('[Bubble] Addon unreachable, removing bubble from DOM');
+    console.log('[Bubble] Addon unreachable after ' + MAX_FAILS + ' failures, removing bubble from DOM');
     const root = document.getElementById('ha-claude-bubble');
     if (root) {{
       root.remove();
@@ -3335,7 +3359,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   // Start health check every 30 seconds
   const healthCheckInterval = setInterval(checkAddonHealth, 30000);
-  checkAddonHealth(); // Do first check immediately
+  checkAddonHealth();
 
   // ---- Multi-tab sync: listen for messages from other tabs ----
   if (bc) {{
@@ -3350,81 +3374,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     }};
   }}
 
-  // ---- Channel Agents Panel ----
-  let _channelAgentsVisible = false;
-
-  function _populateChannelAgentSelect(sel, agents, currentAgentId) {{
-    if (!sel) return;
-    sel.innerHTML = '';
-    const defOpt = document.createElement('option');
-    defOpt.value = '';
-    defOpt.textContent = T.channel_default;
-    sel.appendChild(defOpt);
-    if (Array.isArray(agents)) {{
-      agents.forEach(a => {{
-        const opt = document.createElement('option');
-        opt.value = a.id;
-        const ident = a.identity || {{}};
-        opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
-        if (a.id === currentAgentId) opt.selected = true;
-        sel.appendChild(opt);
-      }});
-    }}
-  }}
-
-  async function _loadChannelAgents() {{
-    try {{
-      const resp = await fetch(API_BASE + '/api/agents/channels', {{credentials:'same-origin'}});
-      if (!resp.ok) return;
-      const data = await resp.json();
-      if (!data.success) return;
-      const mapping = data.channel_agents || {{}};
-      const agents = agentData ? (agentData.agents || []) : [];
-      _populateChannelAgentSelect(channelTelegramSel, agents, (mapping.telegram || {{}}).agent_id || '');
-      _populateChannelAgentSelect(channelWhatsappSel, agents, (mapping.whatsapp || {{}}).agent_id || '');
-      // Show/hide gear button based on whether we have multiple agents
-      if (channelAgentsBtn) {{
-        channelAgentsBtn.style.display = agents.length >= 2 ? '' : 'none';
-      }}
-    }} catch(e) {{
-      console.warn('[Amira] Channel agents load error:', e);
-    }}
-  }}
-
-  async function _saveChannelAgent(channel, agentId) {{
-    try {{
-      const body = {{}};
-      body[channel] = agentId || null;
-      await fetch(API_BASE + '/api/agents/channels', {{
-        method: 'PUT',
-        headers: {{ 'Content-Type': 'application/json' }},
-        body: JSON.stringify(body),
-        credentials: 'same-origin',
-      }});
-      if (channelSavedMsg) {{
-        channelSavedMsg.style.display = '';
-        setTimeout(() => {{ if (channelSavedMsg) channelSavedMsg.style.display = 'none'; }}, 2000);
-      }}
-    }} catch(e) {{
-      console.warn('[Amira] Channel agent save error:', e);
-    }}
-  }}
-
-  if (channelAgentsBtn) {{
-    channelAgentsBtn.addEventListener('click', () => {{
-      _channelAgentsVisible = !_channelAgentsVisible;
-      if (channelAgentsPanel) channelAgentsPanel.style.display = _channelAgentsVisible ? '' : 'none';
-      channelAgentsBtn.style.opacity = _channelAgentsVisible ? '1' : '0.6';
-      if (_channelAgentsVisible) _loadChannelAgents();
-    }});
-  }}
-  if (channelTelegramSel) {{
-    channelTelegramSel.addEventListener('change', () => _saveChannelAgent('telegram', channelTelegramSel.value));
-  }}
-  if (channelWhatsappSel) {{
-    channelWhatsappSel.addEventListener('change', () => _saveChannelAgent('whatsapp', channelWhatsappSel.value));
-  }}
-
   // ---- Agent/Provider Selector ----
   let agentData = null; // cached response from /api/get_models
   let _syncProvider = '';  // last known provider (for cross-UI polling)
@@ -3432,23 +3381,34 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   async function loadAgents() {{
     try {{
-      const resp = await fetch(API_BASE + '/api/get_models', {{credentials:'same-origin'}});
-      if (!resp.ok) return;
+      const resp = await bubbleFetch(API_BASE + '/api/get_models');
+      if (!resp.ok) return false;
       agentData = await resp.json();
-      if (!agentData.success) return;
+      if (!agentData.success) return false;
 
       // Populate agent select if agents available
       if (agentSelect && Array.isArray(agentData.agents) && agentData.agents.length >= 1) {{
         agentSelect.innerHTML = '';
+        // Determine target agent: localStorage > server active
+        const storedAgent = localStorage.getItem('ha_claude_active_agent');
+        const targetAgent = storedAgent || agentData.active_agent;
         agentData.agents.forEach(a => {{
           const opt = document.createElement('option');
           opt.value = a.id;
           const ident = a.identity || {{}};
-          opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
-          if (agentData.active_agent && a.id === agentData.active_agent) opt.selected = true;
+          opt.textContent = (ident.emoji || a.emoji || '\U0001f916') + ' ' + (ident.name || a.name || a.id);
+          if (targetAgent && a.id === targetAgent) opt.selected = true;
           agentSelect.appendChild(opt);
         }});
         agentSelect.style.display = '';
+        // Sync server if localStorage selection differs
+        if (storedAgent && storedAgent !== agentData.active_agent && agentData.agents.some(a => a.id === storedAgent)) {{
+          bubbleFetch(API_BASE + '/api/agents/set', {{
+            method: 'POST',
+            headers: {{ 'Content-Type': 'application/json' }},
+            body: JSON.stringify({{ agent_id: storedAgent }}),
+          }}).catch(() => {{}});
+        }}
       }} else if (agentSelect) {{
         agentSelect.style.display = 'none';
       }}
@@ -3496,10 +3456,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       // Track for cross-UI sync polling
       _syncProvider = agentData.current_provider || '';
       _syncModel    = agentData.current_model_technical || '';
-      // Refresh channel agents dropdown (needs agentData.agents)
-      _loadChannelAgents();
+      return true;
     }} catch(e) {{
       console.warn('[Amira] Could not load agents:', e);
+      return false;
     }}
   }}
 
@@ -3531,11 +3491,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     const provider = providerSelect.value;
     populateModels(provider);
     try {{
-      await fetch(API_BASE + '/api/set_model', {{
+      await bubbleFetch(API_BASE + '/api/set_model', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ provider }}),
-        credentials: 'same-origin',
       }});
       // Refresh to get new current_model_technical
       await loadAgents();
@@ -3546,11 +3505,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     const model = modelSelect.value;
     const provider = providerSelect.value;
     try {{
-      await fetch(API_BASE + '/api/set_model', {{
+      await bubbleFetch(API_BASE + '/api/set_model', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ provider, model }}),
-        credentials: 'same-origin',
       }});
     }} catch(e) {{}}
   }});
@@ -3558,12 +3516,12 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   if (agentSelect) {{
     agentSelect.addEventListener('change', async () => {{
       const agentId = agentSelect.value;
+      localStorage.setItem('ha_claude_active_agent', agentId);
       try {{
-        await fetch(API_BASE + '/api/agents/set', {{
+        await bubbleFetch(API_BASE + '/api/agents/set', {{
           method: 'POST',
           headers: {{ 'Content-Type': 'application/json' }},
           body: JSON.stringify({{ agent_id: agentId }}),
-          credentials: 'same-origin',
         }});
         await loadAgents();
       }} catch(e) {{}}
@@ -3587,7 +3545,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       const devType = isPhone ? 'phone' : isTablet ? 'tablet' : 'desktop';
 
       // Send registration to backend
-      const resp = await fetch(API_BASE + '/api/bubble/devices', {{
+      const resp = await bubbleFetch(API_BASE + '/api/bubble/devices', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{
@@ -3595,7 +3553,6 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
           device_name: '',  // Will be set by user later
           device_type: devType,
         }}),
-        credentials: 'same-origin',
       }});
     }} catch(e) {{
       console.error('[Amira] Device registration error:', e);
@@ -3603,14 +3560,23 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   }}
 
   // Initial setup
-  registerDevice();
-  updateContextBar();
-  loadAgents();
+  (async () => {{
+    await _ensureIngressSession();
+    _loadDashboardNames();
+    restoreHistory();
+    registerDevice();
+    updateContextBar();
+    // Retry loadAgents once after 3s if the first attempt fails (HA may not be
+    // fully ready when the bubble JS executes right after page load).
+    const ok = await loadAgents();
+    if (!ok) setTimeout(loadAgents, 3000);
+  }})();
 
   // Poll every 10s for model/provider changes made from chat_ui or other tabs
   setInterval(async () => {{
     try {{
-      const r = await fetch(API_BASE + '/api/status', {{credentials:'same-origin'}});
+      if (!_ingressSessionOk) await _ensureIngressSession();
+      const r = await bubbleFetch(API_BASE + '/api/status');
       if (!r.ok) return;
       const d = await r.json();
       const sp = d.provider || '';

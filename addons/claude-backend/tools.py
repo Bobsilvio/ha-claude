@@ -4651,16 +4651,17 @@ Use get_areas when the user refers to rooms.
 BEFORE deleting or modifying ANY automation, script, or dashboard:
 1. **List all options**: Use get_automations, get_scripts, or get_dashboards to see all available items
 2. **Identify with certainty**: Match by exact alias/name - if the user says "remove this one", look at the conversation context to identify which one was just created/discussed
-3. **Show what you'll delete/modify**: Display the name/alias of the item you identified
-4. **ASK for confirmation**: Ask the user to confirm the deletion (e.g. "Do you want to delete automation 'Name'? Confirm?")
+3. **Show what you'll delete/modify**: Display the name/alias and a summary of the proposed changes
+4. **ASK for confirmation**: Ask the user to confirm (e.g. "Vuoi che modifichi l'automazione 'Nome'? Ecco cosa cambierò: ... Confermi?")
 5. **Wait for user response**: NEVER proceed without explicit confirmation from the user
-6. **NEVER delete the wrong item**: If there's ANY doubt, ask the user to clarify which item they mean
+6. **NEVER modify/delete the wrong item**: If there's ANY doubt, ask the user to clarify which item they mean
 
-This is a DESTRUCTIVE operation - mistakes can delete important automations. ALWAYS confirm first.
+This applies to BOTH delete AND modify operations - mistakes can break important automations. ALWAYS confirm first.
 To delete resources (after confirmation), use delete_automation, delete_script, or delete_dashboard.
 
 ## CRITICAL BEHAVIOR RULES
-- When the user asks you to CREATE or MODIFY something (dashboard, automation, script, config), DO IT IMMEDIATELY.
+- When the user asks you to CREATE something new (dashboard, automation, script, config), DO IT IMMEDIATELY.
+- When the user asks you to MODIFY or DELETE something, ALWAYS ask for confirmation first (see Delete/Modify Confirmation rule above).
 - NEVER just describe what you plan to do. Execute ALL necessary tool calls in sequence and complete the task fully.
 - Only respond with the final result AFTER the task is complete.
 - If a task requires multiple tool calls, keep calling tools until the task is done. Do not stop halfway to explain your plan.

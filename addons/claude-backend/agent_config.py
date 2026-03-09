@@ -394,6 +394,20 @@ class AgentManager:
             if ch and aid and aid in self._agents:
                 self._channel_agents[ch] = aid
 
+        # Safety: default Amira agent must always be present regardless of
+        # what the JSON file contains (e.g. corrupted or partial save).
+        if "amira" not in self._agents:
+            logger.warning("AgentManager: 'amira' missing from config — re-creating default agent")
+            self._agents["amira"] = AgentEntry(
+                id="amira",
+                name="Amira",
+                identity=AgentIdentity(
+                    name="Amira", emoji="🤖",
+                    description="Your AI assistant for Home Assistant"),
+                is_default=True,
+                enabled=True,
+            )
+
     def _create_default_config(self) -> None:
         """Create the default Amira agent."""
         default_agent = AgentEntry(
@@ -603,12 +617,11 @@ class AgentManager:
     # -- CRUD for agents --
 
     def list_agents(self, include_disabled: bool = False) -> List[AgentEntry]:
-        """Return all agents, always including Amira as enabled and default."""
+        """Return all agents. Ensures at least one agent exists (Amira fallback)."""
         with self._lock:
             agents = list(self._agents.values())
-            # Ensure Amira is always present, enabled, and default
-            amira = next((a for a in agents if a.id == "amira"), None)
-            if not amira:
+            # Safety net: if no agents at all, add Amira as fallback
+            if not agents:
                 amira = AgentEntry(
                     id="amira",
                     name="Amira",
@@ -617,12 +630,8 @@ class AgentManager:
                     enabled=True,
                 )
                 agents.append(amira)
-            else:
-                amira.enabled = True
-                amira.is_default = True
         if not include_disabled:
             agents = [a for a in agents if a.enabled]
-        # Always sort Amira first
         return sorted(agents, key=lambda a: (a.id != "amira", a.name or a.id))
 
     def get_agent(self, agent_id: str) -> Optional[AgentEntry]:
@@ -703,19 +712,23 @@ class AgentManager:
     # -- API response helpers --
 
     def get_agents_for_api(self) -> List[Dict[str, Any]]:
-        """Return agent list suitable for the API/UI. Amira is always present, enabled, and default."""
+        """Return agent list suitable for the API/UI."""
         agents = self.list_agents()
         result = []
         for a in agents:
-            # Force Amira always enabled/default in API
-            if a.id == "amira":
-                a.enabled = True
-                a.is_default = True
+            _name = a.identity.name or a.name or a.id
+            _emoji = a.identity.emoji or "🤖"
+            _desc = a.identity.description or a.description or ""
             d = {
                 "id": a.id,
-                "name": a.identity.name or a.name or a.id,
-                "emoji": a.identity.emoji,
-                "description": a.identity.description or a.description,
+                "name": _name,
+                "emoji": _emoji,
+                "description": _desc,
+                "identity": {
+                    "name": _name,
+                    "emoji": _emoji,
+                    "description": _desc,
+                },
                 "is_default": a.is_default,
                 "is_active": a.id == self._active_agent_id,
             }
@@ -728,8 +741,7 @@ class AgentManager:
             if a.tags:
                 d["tags"] = a.tags
             result.append(d)
-        # Always sort Amira first
-        return sorted(result, key=lambda d: (d["id"] != "amira", d["name"]))
+        return sorted(result, key=lambda d: (not d["is_default"], d["name"]))
 
     def get_defaults(self) -> AgentDefaults:
         """Return global defaults."""

@@ -7539,31 +7539,51 @@ def get_chat_ui():
                 const agentSel = document.getElementById('agentSelect');
                 if (agentSel && Array.isArray(data.agents) && data.agents.length >= 1) {{
                     agentSel.innerHTML = '';
+                    // Determine target agent: localStorage > explicit change > server active
+                    const storedAgent = localStorage.getItem('ha_claude_active_agent');
+                    const targetAgent = _lastExplicitAgent || storedAgent || data.active_agent;
                     data.agents.forEach(a => {{
                         const opt = document.createElement('option');
                         opt.value = a.id;
                         const ident = a.identity || {{}};
-                        opt.textContent = (ident.emoji || '\U0001f916') + ' ' + (ident.name || a.id);
+                        opt.textContent = (ident.emoji || a.emoji || '\U0001f916') + ' ' + (ident.name || a.name || a.id);
                         // Show agent ID in tooltip so user knows which agent is which
                         opt.title = `Agent ID: ${{a.id}}`;
-                        if (data.active_agent && a.id === data.active_agent) opt.selected = true;
+                        if (targetAgent && a.id === targetAgent) opt.selected = true;
                         agentSel.appendChild(opt);
                     }});
+                    // Sync server active agent if localStorage selection differs
+                    if (storedAgent && storedAgent !== data.active_agent && data.agents.some(a => a.id === storedAgent)) {{
+                        fetch(apiUrl('api/agents/set'), {{
+                            method: 'POST',
+                            headers: {{'Content-Type': 'application/json'}},
+                            body: JSON.stringify({{agent_id: storedAgent}})
+                        }}).catch(() => {{}});
+                    }}
                     agentSel.style.display = '';
                 }} else if (agentSel) {{
                     agentSel.style.display = 'none';
                 }}
 
-                // --- Update header identity from active agent ---
-                if (data.active_agent_identity) {{
-                    const ident = data.active_agent_identity;
-                    if (ident.name) {{
+                // --- Update header identity from selected agent ---
+                {{
+                    const selAgentId = agentSel ? agentSel.value : data.active_agent;
+                    const selAgentData = (data.agents || []).find(a => a.id === selAgentId);
+                    if (selAgentData) {{
                         const h1 = document.querySelector('.header h1');
-                        if (h1) h1.textContent = ident.name;
-                    }}
-                    if (ident.emoji) {{
+                        if (h1) h1.textContent = selAgentData.name || selAgentId;
                         const emojiSpan = document.querySelector('.header > span');
-                        if (emojiSpan) emojiSpan.textContent = ident.emoji;
+                        if (emojiSpan) emojiSpan.textContent = selAgentData.emoji || '\U0001f916';
+                    }} else if (data.active_agent_identity) {{
+                        const ident = data.active_agent_identity;
+                        if (ident.name) {{
+                            const h1 = document.querySelector('.header h1');
+                            if (h1) h1.textContent = ident.name;
+                        }}
+                        if (ident.emoji) {{
+                            const emojiSpan = document.querySelector('.header > span');
+                            if (emojiSpan) emojiSpan.textContent = ident.emoji;
+                        }}
                     }}
                 }}
 
@@ -7720,9 +7740,14 @@ def get_chat_ui():
             }}
         }}
 
+        // Track last explicitly selected agent (survives loadModels rebuilds)
+        let _lastExplicitAgent = null;
+
         // Change active agent
         async function changeAgent(agentId) {{
             if (!agentId) return;
+            _lastExplicitAgent = agentId;
+            localStorage.setItem('ha_claude_active_agent', agentId);
             try {{
                 const response = await fetch(apiUrl('api/agents/set'), {{
                     method: 'POST',

@@ -3103,7 +3103,16 @@ def sanitize_messages_for_provider(messages: List[Dict]) -> List[Dict]:
                 content = content.split("\n\n---\n\u26a0\ufe0f **CONTESTO PRE-CARICATO")[0]
             if len(content) > MAX_OLD_MSG:
                 content = content[:MAX_OLD_MSG] + "... [old message truncated]"
-            clean[i] = {"role": clean[i]["role"], "content": content}
+            truncated = {"role": clean[i]["role"], "content": content}
+            # Preserve tool_call_id / name for tool messages (required by all providers)
+            if clean[i].get("tool_call_id"):
+                truncated["tool_call_id"] = clean[i]["tool_call_id"]
+            if clean[i].get("name"):
+                truncated["name"] = clean[i]["name"]
+            # Preserve tool_calls for assistant messages
+            if clean[i].get("tool_calls"):
+                truncated["tool_calls"] = clean[i]["tool_calls"]
+            clean[i] = truncated
     
     return clean
 
@@ -4379,9 +4388,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 yield {"type": "status", "message": f"🤖 {tr('status_analyzing')}..."}
                 continue
 
-            # Record all current tool calls in history
-            for tc in _pending_tool_calls:
-                _tool_call_history.add(f"{tc.get('name', '')}:{tc.get('arguments', '{}')}")
+            # NOTE: tool call signatures are recorded in _tool_call_history
+            # AFTER each individual tool execution (see below), not here.
+            # Pre-recording would cause DuplicateCallHook to block the first call.
 
             # Assign stable IDs to pending tool calls BEFORE building messages.
             # Both the assistant message and tool result messages must reference
@@ -4455,6 +4464,10 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     result = tools.execute_tool(fn_name, tc_args)
                     if fn_name in _read_only_tools:
                         _tool_cache[_sig] = result
+
+                # Record this tool call in history AFTER execution so that
+                # DuplicateCallHook won't block the very first invocation.
+                _tool_call_history.add(_sig)
 
                 # Extract diff + modified filename for UI rendering (strip before feeding to model)
                 try:
