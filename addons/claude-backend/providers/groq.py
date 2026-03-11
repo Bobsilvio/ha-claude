@@ -28,6 +28,12 @@ class GroqProvider(EnhancedProvider):
     INCLUDE_USAGE = True
     # -------------------------
 
+    # Models that don't reliably emit native tool_calls via Groq —
+    # they will use the XML tool simulator instead.
+    _SIMULATOR_MODELS = {
+        "moonshotai/kimi-k2-instruct-0905",
+    }
+
     def __init__(self, api_key: str = "", model: str = ""):
         """Initialize Groq provider."""
         super().__init__(api_key, model)
@@ -92,6 +98,51 @@ class GroqProvider(EnhancedProvider):
             if content or role == "system":
                 safe_messages.append({"role": role, "content": content})
         return safe_messages
+
+    def uses_tool_simulator(self) -> bool:
+        """Return True if the active model uses the XML tool simulator.
+
+        Some Groq-hosted models (e.g. Kimi K2) accept tool schemas in the
+        request but respond with plain text instead of tool_call deltas.
+        For those models we fall back to the XML simulator so that tool
+        actions are still executed correctly.
+        """
+        return (self.model or self.DEFAULT_MODEL) in self._SIMULATOR_MODELS
+
+    def _do_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        intent_info: Optional[Dict[str, Any]] = None,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Stream with optional tool-simulator fallback for incompatible models."""
+        if self.uses_tool_simulator():
+            # Inject the XML tool simulator system prompt and strip native tool schemas
+            tool_schemas = self._get_intent_tools(intent_info)
+            msgs = self._prepare_messages(messages, intent_info)
+
+            if tool_schemas:
+                from providers.tool_simulator import get_simulator_system_prompt, flatten_tool_messages
+                sim_prompt = get_simulator_system_prompt(tool_schemas)
+                # _prepare_messages already injected the intent prompt — just append sim_prompt
+                if msgs and msgs[0].get("role") == "system":
+                    existing = msgs[0].get("content") or ""
+                    msgs[0] = {"role": "system", "content": existing + "\n\n" + sim_prompt}
+                else:
+                    msgs = [{"role": "system", "content": sim_prompt}] + msgs
+                # Flatten tool-role messages so Groq doesn't reject them
+                msgs = flatten_tool_messages(msgs)
+
+            yield from self._openai_compat_stream(
+                self.BASE_URL,
+                self.api_key,
+                self._get_model(),
+                msgs,
+                tools=None,  # no native tools — simulator handles them
+                include_usage=self.INCLUDE_USAGE,
+                max_tokens=self.MAX_TOKENS,
+            )
+        else:
+            yield from super()._do_stream(messages, intent_info)
 
     def stream_chat(
         self,

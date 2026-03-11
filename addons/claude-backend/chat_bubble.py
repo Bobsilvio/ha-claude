@@ -2989,6 +2989,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '', assistantText = '';
+      let pendingDiffHtml = '';  // accumulated diff_html content (separate so done/full_text can't overwrite it)
       let firstToken = true;
 
       const assistantEl = addMessage('assistant', '', false);
@@ -3005,15 +3006,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
               try {{
                 const evt = JSON.parse(line.slice(6));
                 if (evt.type === 'token') {{ assistantText += evt.content || ''; }}
+                else if (evt.type === 'diff_html') {{ pendingDiffHtml += (evt.content || '') + '\\n\\n'; }}
                 else if (evt.type === 'done') {{
                   if (evt.full_text) {{ assistantText = evt.full_text; }}
                   if (evt.usage) {{ _flushUsage = evt.usage; }}
                 }}
               }} catch(e) {{}}
             }}
-            if (assistantText) {{
+            if (pendingDiffHtml || assistantText) {{
               assistantEl.style.display = '';
-              assistantEl.innerHTML = renderMarkdown(assistantText);
+              assistantEl.innerHTML = renderMarkdown(pendingDiffHtml + assistantText);
             }}
             // Show cost from buffered done event
             if (_flushUsage && (_flushUsage.input_tokens || _flushUsage.output_tokens)) {{
@@ -3060,10 +3062,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
               assistantText += evt.content || '';
               const stepsHtml = assistantEl.querySelector('.progress-steps');
               const prefix = stepsHtml ? stepsHtml.outerHTML : '';
-              assistantEl.innerHTML = prefix + renderMarkdown(assistantText);
+              assistantEl.innerHTML = prefix + renderMarkdown(pendingDiffHtml + assistantText);
               messagesEl.scrollTop = messagesEl.scrollHeight;
             }} else if (evt.type === 'clear') {{
               assistantText = '';
+              pendingDiffHtml = '';
               assistantEl.style.display = 'none';
               assistantEl.innerHTML = '';
               if (toolBadgesEl) {{ toolBadgesEl.remove(); toolBadgesEl = null; }}
@@ -3076,7 +3079,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
               }}
               if (evt.full_text) {{
                 assistantText = evt.full_text;
-                assistantEl.innerHTML = renderMarkdown(assistantText);
+                assistantEl.innerHTML = renderMarkdown(pendingDiffHtml + assistantText);
               }}
               // Append token usage
               if (evt.usage && (evt.usage.input_tokens || evt.usage.output_tokens)) {{
@@ -3119,6 +3122,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
               toolBadgesEl.appendChild(badge);
               messagesEl.scrollTop = messagesEl.scrollHeight;
               if (RELOAD_TOOLS.has(evt.name)) writeToolCalled = true;
+            }} else if (evt.type === 'diff_html') {{
+              // Rich side-by-side HTML diff from write tools (preview_automation_change, update_automation, etc.)
+              if (firstToken) {{
+                firstToken = false;
+                _removeThinking();
+                assistantEl.style.display = '';
+              }}
+              pendingDiffHtml += (evt.content || '') + '\\n\\n';
+              const _stepsHtmlDiff = assistantEl.querySelector('.progress-steps');
+              const _prefixDiff = _stepsHtmlDiff ? _stepsHtmlDiff.outerHTML : '';
+              assistantEl.innerHTML = _prefixDiff + renderMarkdown(pendingDiffHtml + assistantText);
+              messagesEl.scrollTop = messagesEl.scrollHeight;
             }} else if (evt.type === 'diff') {{
               if (assistantEl && evt.content) {{
                 const wrapper = document.createElement('details');

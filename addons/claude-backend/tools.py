@@ -1046,6 +1046,26 @@ HA_TOOLS_DESCRIPTION = [
         }
     },
     {
+        "name": "preview_automation_change",
+        "description": (
+            "Preview a proposed change to an automation WITHOUT applying it. "
+            "Returns old_yaml and new_yaml so the user can see the diff before confirming. "
+            "ALWAYS call this before update_automation when the user has NOT yet explicitly confirmed the change. "
+            "After showing the preview, ask confirmation ONCE before update_automation. "
+            "If the user asks more tweaks before confirming, call preview_automation_change again directly with the updated changes "
+            "and ask confirmation only on the latest preview."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "automation_id": {"type": "string", "description": "The automation's 'id' field."},
+                "changes": {"type": "object", "description": "Fields to change: alias, description, trigger(s), condition(s), action(s), mode."},
+                "add_condition": {"type": "object", "description": "A single condition to ADD to the existing conditions."}
+            },
+            "required": ["automation_id"]
+        }
+    },
+    {
         "name": "trigger_automation",
         "description": "Manually trigger an existing automation.",
         "parameters": {
@@ -1422,7 +1442,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "manage_helpers",
-        "description": "Create, update, delete, or list Home Assistant helpers (input_boolean, input_number, input_select, input_text, input_datetime).",
+        "description": "Create, update, delete, or list Home Assistant helpers (input_boolean, input_number, input_select, input_text, input_datetime). Note: if helper_type is 'counter', this API maps it to input_number for compatibility.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -1433,7 +1453,7 @@ HA_TOOLS_DESCRIPTION = [
                 },
                 "helper_type": {
                     "type": "string",
-                    "enum": ["input_boolean", "input_number", "input_select", "input_text", "input_datetime"],
+                    "enum": ["input_boolean", "input_number", "input_select", "input_text", "input_datetime", "counter"],
                     "description": "Type of helper."
                 },
                 "helper_id": {
@@ -2494,6 +2514,101 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             if diff_unified:
                 result_obj["diff"] = diff_unified
             return json.dumps(result_obj, ensure_ascii=False, default=str)
+
+        elif tool_name == "preview_automation_change":
+            import yaml as _yaml
+            automation_id = tool_input.get("automation_id", "")
+            changes = tool_input.get("changes", {}) or {}
+            add_condition = tool_input.get("add_condition", None)
+
+            # Normalize top-level fields into changes (same as update_automation)
+            if not changes:
+                allowed_top_level = ("alias", "description", "trigger", "triggers",
+                                     "condition", "conditions", "action", "actions", "mode")
+                for k in allowed_top_level:
+                    if k in tool_input:
+                        changes[k] = tool_input.get(k)
+
+            if not automation_id:
+                return json.dumps({"error": "automation_id is required."})
+
+            old_yaml = ""
+            new_yaml = ""
+
+            # Try YAML file first
+            yaml_path = api.get_config_file_path("automation", "automations.yaml")
+            found_via = None
+            if os.path.isfile(yaml_path):
+                try:
+                    with open(yaml_path, "r", encoding="utf-8") as f:
+                        automations = _yaml.safe_load(f)
+                    if isinstance(automations, list):
+                        for auto in automations:
+                            if str(auto.get("id", "")) == str(automation_id):
+                                import copy
+                                auto_copy = copy.deepcopy(auto)
+                                old_yaml = _yaml.dump(auto_copy, default_flow_style=False, allow_unicode=True)
+                                # Normalize key variants
+                                trig_key = "triggers" if "triggers" in auto_copy else "trigger"
+                                cond_key = "conditions" if "conditions" in auto_copy else "condition"
+                                act_key = "actions" if "actions" in auto_copy else "action"
+                                if "trigger" in changes and trig_key == "triggers":
+                                    changes["triggers"] = changes.pop("trigger")
+                                elif "triggers" in changes and trig_key == "trigger":
+                                    changes["trigger"] = changes.pop("triggers")
+                                if "condition" in changes and cond_key == "conditions":
+                                    changes["conditions"] = changes.pop("condition")
+                                elif "conditions" in changes and cond_key == "condition":
+                                    changes["condition"] = changes.pop("conditions")
+                                if "action" in changes and act_key == "actions":
+                                    changes["actions"] = changes.pop("action")
+                                elif "actions" in changes and act_key == "action":
+                                    changes["action"] = changes.pop("actions")
+                                for key, value in changes.items():
+                                    auto_copy[key] = value
+                                if add_condition:
+                                    if cond_key not in auto_copy or not auto_copy[cond_key]:
+                                        auto_copy[cond_key] = []
+                                    if not isinstance(auto_copy[cond_key], list):
+                                        auto_copy[cond_key] = [auto_copy[cond_key]]
+                                    auto_copy[cond_key].append(add_condition)
+                                new_yaml = _yaml.dump(auto_copy, default_flow_style=False, allow_unicode=True)
+                                found_via = "yaml"
+                                break
+                except Exception as e:
+                    logger.warning(f"preview_automation_change YAML read failed: {e}")
+
+            # Fallback: REST API
+            if not found_via:
+                try:
+                    current = api.call_ha_api("GET", f"config/automation/config/{automation_id}")
+                    if isinstance(current, dict) and "error" not in current:
+                        import copy
+                        old_yaml = _yaml.dump(current, default_flow_style=False, allow_unicode=True)
+                        c = copy.deepcopy(current)
+                        for key, value in changes.items():
+                            c[key] = value
+                        if add_condition:
+                            cond_key = "conditions" if "conditions" in c else "condition"
+                            if cond_key not in c or not c[cond_key]:
+                                c[cond_key] = []
+                            c[cond_key].append(add_condition)
+                        new_yaml = _yaml.dump(c, default_flow_style=False, allow_unicode=True)
+                        found_via = "rest"
+                except Exception as e:
+                    logger.warning(f"preview_automation_change REST fallback failed: {e}")
+
+            if not old_yaml:
+                return json.dumps({"error": f"Automation '{automation_id}' not found."})
+
+            return json.dumps({
+                "status": "preview",
+                "automation_id": automation_id,
+                "old_yaml": old_yaml,
+                "new_yaml": new_yaml,
+                "message": "Anteprima della modifica. Conferma per applicare.",
+                "IMPORTANT": "The diff is already displayed to the user by the UI. Do NOT show the YAML again and do NOT re-describe the changes. Just ask for confirmation in one short sentence (e.g. 'Confermo per applicare?').",
+            }, ensure_ascii=False)
 
         elif tool_name == "trigger_automation":
             entity_id = tool_input.get("entity_id", "")
@@ -4067,14 +4182,21 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             action = tool_input.get("action", "list")
             helper_id = tool_input.get("helper_id", "")
 
-            valid_types = ("input_boolean", "input_number", "input_select", "input_text", "input_datetime")
+            valid_types = ("input_boolean", "input_number", "input_select", "input_text", "input_datetime", "counter")
             if helper_type not in valid_types:
                 return json.dumps({
                     "error": f"Invalid helper_type: {helper_type}. Must be one of: {', '.join(valid_types)}."
                 }, ensure_ascii=False)
 
+            # Home Assistant REST helper API doesn't expose counter create/update/delete
+            # endpoints on all channels. Map counter -> input_number to keep flows working.
+            api_helper_type = "input_number" if helper_type == "counter" else helper_type
+
             if action == "list":
                 states = api.get_all_states()
+                # For counter: list only counter.* entities (input_number fallbacks
+                # are an internal detail, listing all input_number.* is too noisy)
+                prefixes = [f"{helper_type}."]
                 helpers = [
                     {
                         "entity_id": s.get("entity_id"),
@@ -4082,7 +4204,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                         "friendly_name": s.get("attributes", {}).get("friendly_name", ""),
                     }
                     for s in states
-                    if s.get("entity_id", "").startswith(f"{helper_type}.")
+                    if any(s.get("entity_id", "").startswith(p) for p in prefixes)
                 ]
                 return json.dumps(
                     {"helpers": helpers, "count": len(helpers), "type": helper_type},
@@ -4095,6 +4217,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             # Clean the helper_id (remove domain prefix if provided)
             if helper_id.startswith(f"{helper_type}."):
                 helper_id = helper_id[len(helper_type) + 1:]
+            if helper_type == "counter" and helper_id.startswith("input_number."):
+                helper_id = helper_id[len("input_number."):]
 
             if action in ("create", "update"):
                 config = {}
@@ -4106,7 +4230,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     config["initial"] = tool_input["initial"]
 
                 # Type-specific fields
-                if helper_type == "input_number":
+                if api_helper_type == "input_number":
                     if tool_input.get("min") is not None:
                         config["min"] = tool_input["min"]
                     if tool_input.get("max") is not None:
@@ -4121,16 +4245,20 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     if "min" not in config:
                         config["min"] = 0
                     if "max" not in config:
-                        config["max"] = 100
-                elif helper_type == "input_select":
+                        config["max"] = 3 if helper_type == "counter" else 100
+                    if "step" not in config:
+                        config["step"] = 1 if helper_type == "counter" else 1
+                    if helper_type == "counter" and "mode" not in config:
+                        config["mode"] = "box"
+                elif api_helper_type == "input_select":
                     if tool_input.get("options"):
                         config["options"] = tool_input["options"]
-                elif helper_type == "input_datetime":
+                elif api_helper_type == "input_datetime":
                     if tool_input.get("has_date") is not None:
                         config["has_date"] = tool_input["has_date"]
                     if tool_input.get("has_time") is not None:
                         config["has_time"] = tool_input["has_time"]
-                elif helper_type == "input_text":
+                elif api_helper_type == "input_text":
                     if tool_input.get("min_length") is not None:
                         config["min"] = tool_input["min_length"]
                     if tool_input.get("max_length") is not None:
@@ -4138,26 +4266,155 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     if tool_input.get("pattern"):
                         config["pattern"] = tool_input["pattern"]
 
-                result = api.call_ha_api("POST", f"config/{helper_type}/config/{helper_id}", config)
+                def _ws_helper_write(_act: str, _hid: str, _cfg: dict):
+                    # HA WS API for UI helpers: "{type}/create", "{type}/update", "{type}/delete"
+                    # (not "config/{type}/create" which doesn't exist)
+                    msg_type = f"{api_helper_type}/{_act}"
+                    payload = dict(_cfg or {})
+                    # Never override websocket protocol "id" field (numeric request id).
+                    payload.pop("id", None)
+                    # For update/delete: specify which entity to target via "{type}_id"
+                    # For create: do NOT include the ID — HA auto-generates it from the name
+                    if _act == "update":
+                        payload[f"{api_helper_type}_id"] = _hid
+                    elif _act == "delete":
+                        payload = {f"{api_helper_type}_id": _hid}
+                    return api.call_ha_websocket(msg_type, **payload)
+
+                def _yaml_helper_write(_act: str, _hid: str, _cfg: dict):
+                    # Works when configuration.yaml has e.g. input_number: !include input_number.yaml
+                    if api_helper_type not in getattr(api, "CONFIG_INCLUDES", {}):
+                        return {
+                            "error": (
+                                f"No YAML include configured for '{api_helper_type}' in configuration.yaml. "
+                                f"Add `{api_helper_type}: !include {api_helper_type}.yaml` or create helper from HA UI."
+                            )
+                        }
+                    yaml_path = api.get_config_file_path(api_helper_type, f"{api_helper_type}.yaml")
+                    try:
+                        current = {}
+                        if os.path.isfile(yaml_path):
+                            with open(yaml_path, "r", encoding="utf-8") as f:
+                                loaded = yaml.safe_load(f)
+                            if isinstance(loaded, dict):
+                                current = loaded
+                        if _act in ("create", "update"):
+                            current[_hid] = _cfg
+                        elif _act == "delete":
+                            current.pop(_hid, None)
+                        with open(yaml_path, "w", encoding="utf-8") as f:
+                            yaml.dump(current, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                        reload_result = api.call_ha_api("POST", "services/homeassistant/reload_all", {})
+                        return {
+                            "status": "success",
+                            "updated_via": "yaml",
+                            "file": os.path.relpath(yaml_path, api.HA_CONFIG_DIR),
+                            "reload_result": reload_result,
+                        }
+                    except Exception as e:
+                        return {"error": f"YAML fallback failed: {str(e)}"}
+
+                # REST: create uses POST to /config/{type}/config with "id" in body;
+                # update uses PUT to /config/{type}/config/{id}
+                if action == "create":
+                    result = api.call_ha_api("POST", f"config/{api_helper_type}/config", {"id": helper_id, **config})
+                else:
+                    result = api.call_ha_api("PUT", f"config/{api_helper_type}/config/{helper_id}", config)
+                # Fallback 1: try websocket API if REST endpoint not available
+                if isinstance(result, dict) and "error" in result:
+                    ws_result = _ws_helper_write("create" if action == "create" else "update", helper_id, config)
+                    if isinstance(ws_result, dict) and ws_result.get("success"):
+                        result = ws_result
+                    elif isinstance(ws_result, dict) and "error" in ws_result and isinstance(result.get("error"), str):
+                        # Fallback 2: YAML include path if available
+                        if "404" in result.get("error", ""):
+                            yaml_result = _yaml_helper_write("create" if action == "create" else "update", helper_id, config)
+                            if isinstance(yaml_result, dict) and "error" not in yaml_result:
+                                result = yaml_result
+                            else:
+                                result = {"error": yaml_result.get("error", result.get("error")), "details": {"rest": result, "ws": ws_result}}
+                        else:
+                            result = {"error": result.get("error"), "details": {"rest": result, "ws": ws_result}}
+
                 if isinstance(result, dict) and "error" not in result:
                     created_yaml = yaml.dump(config, default_flow_style=False, allow_unicode=True, sort_keys=False)
                     verb = "created" if action == "create" else "updated"
-                    return json.dumps({
+                    response = {
                         "status": "success",
-                        "message": f"Helper {helper_type}.{helper_id} {verb}.",
-                        "entity_id": f"{helper_type}.{helper_id}",
+                        "message": f"Helper {api_helper_type}.{helper_id} {verb}.",
+                        "entity_id": f"{api_helper_type}.{helper_id}",
                         "yaml": created_yaml,
                         "IMPORTANT": f"Show the user the YAML code for the helper you {verb}."
-                    }, ensure_ascii=False, default=str)
+                    }
+                    if helper_type == "counter":
+                        response["status"] = "success_with_fallback"
+                        response["requested_entity_id"] = f"counter.{helper_id}"
+                        response["message"] = (
+                            f"Counter helpers are not supported via this API channel. "
+                            f"Created {api_helper_type}.{helper_id} {verb} as a compatible fallback."
+                        )
+                        response["compatibility_note"] = (
+                            "Use input_number.* conditions/services in automations. "
+                            "counter.increment/counter.reset are not available for this fallback entity."
+                        )
+                    return json.dumps(response, ensure_ascii=False, default=str)
                 return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
             elif action == "delete":
-                result = api.call_ha_api("DELETE", f"config/{helper_type}/config/{helper_id}")
+                def _ws_helper_delete(_hid: str):
+                    return api.call_ha_websocket(f"{api_helper_type}/delete", **{f"{api_helper_type}_id": _hid})
+
+                def _yaml_helper_delete(_hid: str):
+                    if api_helper_type not in getattr(api, "CONFIG_INCLUDES", {}):
+                        return {
+                            "error": (
+                                f"No YAML include configured for '{api_helper_type}' in configuration.yaml. "
+                                f"Add `{api_helper_type}: !include {api_helper_type}.yaml` or delete helper from HA UI."
+                            )
+                        }
+                    yaml_path = api.get_config_file_path(api_helper_type, f"{api_helper_type}.yaml")
+                    try:
+                        current = {}
+                        if os.path.isfile(yaml_path):
+                            with open(yaml_path, "r", encoding="utf-8") as f:
+                                loaded = yaml.safe_load(f)
+                            if isinstance(loaded, dict):
+                                current = loaded
+                        current.pop(_hid, None)
+                        with open(yaml_path, "w", encoding="utf-8") as f:
+                            yaml.dump(current, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                        reload_result = api.call_ha_api("POST", "services/homeassistant/reload_all", {})
+                        return {"status": "success", "updated_via": "yaml", "reload_result": reload_result}
+                    except Exception as e:
+                        return {"error": f"YAML fallback failed: {str(e)}"}
+
+                result = api.call_ha_api("DELETE", f"config/{api_helper_type}/config/{helper_id}")
+                if isinstance(result, dict) and "error" in result:
+                    ws_result = _ws_helper_delete(helper_id)
+                    if isinstance(ws_result, dict) and ws_result.get("success"):
+                        result = ws_result
+                    elif isinstance(result.get("error"), str) and "404" in result.get("error", ""):
+                        yaml_result = _yaml_helper_delete(helper_id)
+                        if isinstance(yaml_result, dict) and "error" not in yaml_result:
+                            result = yaml_result
+                        else:
+                            result = {"error": yaml_result.get("error", result.get("error")), "details": {"rest": result, "ws": ws_result}}
+                    else:
+                        result = {"error": result.get("error"), "details": {"rest": result, "ws": ws_result}}
+
                 if result is None or (isinstance(result, dict) and "error" not in result):
-                    return json.dumps({
+                    response = {
                         "status": "success",
-                        "message": f"Helper {helper_type}.{helper_id} deleted."
-                    }, ensure_ascii=False, default=str)
+                        "message": f"Helper {api_helper_type}.{helper_id} deleted."
+                    }
+                    if helper_type == "counter":
+                        response["status"] = "success_with_fallback"
+                        response["requested_entity_id"] = f"counter.{helper_id}"
+                        response["message"] = (
+                            f"Counter helpers are not supported via this API channel. "
+                            f"Deleted fallback helper {api_helper_type}.{helper_id}."
+                        )
+                    return json.dumps(response, ensure_ascii=False, default=str)
                 return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)
 
             return json.dumps({"error": f"Unknown action: {action}"}, ensure_ascii=False)
@@ -5083,4 +5340,3 @@ def get_tool_registry():
 
 
 # ---- Registry-aware tool functions (new API, backward-compatible) ----
-

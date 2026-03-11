@@ -2230,6 +2230,9 @@ _browser_console_errors: list = []
 
 # Last intent per session (for confirmation continuity)
 session_last_intent: Dict[str, str] = {}
+# Last preview signature per session (to ensure update matches shown preview)
+session_last_preview: Dict[str, Dict[str, Any]] = {}
+_PREVIEW_MATCH_TTL_SECONDS = 3600
 
 # Current session ID for thread-safe access in execute_tool (Flask sync workers)
 current_session_id: str = "default"
@@ -3181,6 +3184,17 @@ def _validate_entity_ids_in_response(text: str) -> str:
         if not invalid:
             return text
 
+        helper_domains = {
+            "input_boolean", "input_number", "input_select",
+            "input_text", "input_datetime", "counter",
+        }
+        invalid_domains = {eid.split(".", 1)[0] for eid in invalid if "." in eid}
+        # Helper IDs are often discussed in prose before creation (or mapped fallbacks).
+        # Avoid noisy warnings in these cases.
+        if invalid_domains and invalid_domains.issubset(helper_domains):
+            logger.info(f"Entity validation: skipping helper-only invalid IDs: {invalid}")
+            return text
+
         # Only warn if a significant portion are invalid (>= 2 or majority)
         if len(invalid) < 2 and len(invalid) / max(len(found_full), 1) < 0.5:
             return text
@@ -3319,6 +3333,44 @@ def _log_response_preview(response_text: str, session_id: str) -> None:
     logger.chat(f"📤 ({session_id}) ({len(response_text)} chars): {preview}")
 
 
+def _normalize_automation_change_args(raw_args: dict) -> dict:
+    """Normalize preview/update_automation arguments to a comparable payload."""
+    if not isinstance(raw_args, dict):
+        raw_args = {}
+
+    changes = raw_args.get("changes", {})
+    if not isinstance(changes, dict):
+        changes = {}
+
+    # Keep compatibility with top-level fields accepted by update_automation
+    if not changes:
+        allowed_top_level = (
+            "alias", "description", "trigger", "triggers",
+            "condition", "conditions", "action", "actions", "mode",
+        )
+        for key in allowed_top_level:
+            if key in raw_args:
+                changes[key] = raw_args.get(key)
+
+    # Canonicalize plural/singular aliases so trigger==triggers, action==actions, etc.
+    _aliases = {"trigger": "triggers", "condition": "conditions", "action": "actions"}
+    for singular, plural in _aliases.items():
+        if singular in changes and plural not in changes:
+            changes[plural] = changes.pop(singular)
+
+    return {
+        "automation_id": str(raw_args.get("automation_id", "")).strip(),
+        "changes": changes,
+        "add_condition": raw_args.get("add_condition", None),
+    }
+
+
+def _automation_change_signature(raw_args: dict) -> str:
+    """Stable signature for preview/update argument matching."""
+    norm = _normalize_automation_change_args(raw_args)
+    return json.dumps(norm, ensure_ascii=False, sort_keys=True, default=str)
+
+
 def chat_with_ai(user_message: str, session_id: str = "default") -> str:
     """Send a message to the configured AI provider with HA tools."""
     # Legacy providers use ai_client directly; manager.py providers have ai_client=None (normal).
@@ -3449,6 +3501,23 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     This avoids needing another API round just to format the response.
     For UPDATE operations, shows a side-by-side diff (red/green)."""
     parts = []
+    status = str(result_data.get("status", "")).lower().strip()
+    is_error = (
+        status in {"error", "failed", "invalid"}
+        or ("error" in result_data and result_data.get("error"))
+    )
+
+    if is_error:
+        _nested = result_data.get("result")
+        _nested_err = _nested.get("error") if isinstance(_nested, dict) else None
+        err_msg = (
+            result_data.get("message")
+            or result_data.get("error")
+            or _nested_err
+            or "Operazione non riuscita."
+        )
+        parts.append(f"❌ {err_msg}")
+        return "\n".join(parts)
 
     msg = result_data.get("message", "")
     if msg:
@@ -3460,19 +3529,19 @@ def _format_write_tool_response(tool_name: str, result_data: dict) -> str:
     old_yaml = result_data.get("old_yaml", "")
     new_yaml = result_data.get("new_yaml", "") or result_data.get("yaml", "")
 
-    update_tools = ("update_automation", "update_script", "update_dashboard", "write_config_file")
+    update_tools = ("update_automation", "update_script", "update_dashboard", "write_config_file",
+                    "preview_automation_change")
 
     if old_yaml and new_yaml and tool_name in update_tools:
         diff_html = _build_side_by_side_diff_html(old_yaml, new_yaml)
         if diff_html:
             # Wrap in marker so chat_ui.formatMarkdown passes it through as raw HTML
             parts.append(f"\n<!--DIFF-->{diff_html}<!--/DIFF-->")
+            # Diff already shows all changes — no need to repeat the full YAML
         else:
             parts.append(tr("write_no_changes"))
-
-        # Also show the updated YAML (required by show_yaml_rule)
-        parts.append(tr("write_yaml_updated"))
-        parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
+            # No diff (no changes): show the YAML so the user knows what's there
+            parts.append(f"```yaml\n{new_yaml[:2000]}\n```")
 
     elif new_yaml and tool_name not in update_tools:
         # For CREATE operations, show the new YAML
@@ -3925,6 +3994,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _duplicate_count = 0             # how many consecutive duplicate rounds
         _skip_tool_extraction = False    # after dedup, skip ToolSimulator next round
         _last_write_result = None        # last WRITE tool result (for fallback display)
+        _preview_round_done = False      # True after preview_automation_change executes
 
         # Build read-only tool set: from registry (categories) or static fallback
         if _tool_registry is not None:
@@ -4027,7 +4097,15 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # For no-tool providers (claude_web, chatgpt_web, github_copilot, openai_codex):
             # buffer the full response so we can run the tool simulator on it after done.
             _NO_TOOL_PROVIDERS = {"claude_web", "chatgpt_web", "github_copilot", "openai_codex"}
-            _is_no_tool_provider = AI_PROVIDER in _NO_TOOL_PROVIDERS
+            # Some models on native-tool providers also use the XML simulator
+            # (e.g. Kimi K2 on Groq — emits text instead of tool_call deltas).
+            _NO_NATIVE_TOOL_MODELS = {
+                "moonshotai/kimi-k2-instruct-0905",  # Groq: describes actions but skips tool_call deltas
+            }
+            _is_no_tool_provider = (
+                AI_PROVIDER in _NO_TOOL_PROVIDERS
+                or get_active_model().lower() in _NO_NATIVE_TOOL_MODELS
+            )
             _text_buffer: list = []
 
             # Stream events, intercepting 'done' to enrich with cost or detect tool calls
@@ -4392,14 +4470,115 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # AFTER each individual tool execution (see below), not here.
             # Pre-recording would cause DuplicateCallHook to block the first call.
 
+            # ── Preview confirmation guard ─────────────────────────────────
+            # Block update_automation / update_script if preview_automation_change
+            # was called in this round OR a previous round (same request).
+            # This prevents the model from auto-applying changes without user
+            # confirmation — which would look like "SI was typed automatically".
+            _PREVIEW_GUARDED_WRITES = {
+                "update_automation", "update_script", "write_config_file",
+                "update_dashboard", "create_automation", "create_script",
+            }
+            _cur_has_preview = any(tc.get("name") == "preview_automation_change"
+                                   for tc in _pending_tool_calls)
+            _cur_has_write = any(tc.get("name") in _PREVIEW_GUARDED_WRITES
+                                 for tc in _pending_tool_calls)
+            if (_cur_has_preview and _cur_has_write) or (_preview_round_done and _cur_has_write):
+                _pg_blocked = [tc for tc in _pending_tool_calls
+                               if tc.get("name") in _PREVIEW_GUARDED_WRITES]
+                _pending_tool_calls = [tc for tc in _pending_tool_calls
+                                       if tc.get("name") not in _PREVIEW_GUARDED_WRITES]
+                for _tc in _pg_blocked:
+                    _tc["_block_reason"] = (
+                        "[BLOCKED by preview confirmation guard] "
+                        "This write operation requires explicit user confirmation. "
+                        "A preview (preview_automation_change) was just shown. "
+                        "You MUST ask the user to confirm before applying "
+                        "(\"sì / yes / ok / procedi\"). "
+                        "Do NOT call this tool again until the user confirms."
+                    )
+                logger.warning(
+                    f"Preview guard: blocked {[t.get('name') for t in _pg_blocked]} "
+                    "— user confirmation required after preview_automation_change"
+                )
+            else:
+                _pg_blocked = []
+            if _cur_has_preview:
+                _preview_round_done = True
+
+            # Additional safety: update_automation must match the last shown preview
+            # in this session (prevents applying changes different from displayed diff).
+            _sig_blocked = []
+            _now = time.time()
+            _last_preview = session_last_preview.get(session_id)
+            if _last_preview and (_now - float(_last_preview.get("ts", 0))) > _PREVIEW_MATCH_TTL_SECONDS:
+                session_last_preview.pop(session_id, None)
+                _last_preview = None
+
+            for _tc in list(_pending_tool_calls):
+                if _tc.get("name") != "update_automation":
+                    continue
+                try:
+                    _ua_args = json.loads(_tc.get("arguments", "{}") or "{}")
+                except Exception:
+                    _ua_args = {}
+                if not isinstance(_ua_args, dict):
+                    _ua_args = {}
+
+                _update_sig = _automation_change_signature(_ua_args)
+                _update_norm = _normalize_automation_change_args(_ua_args)
+                _has_preview = bool(_last_preview and _last_preview.get("type") == "automation_preview")
+                _same_automation = bool(
+                    _has_preview and str(_last_preview.get("automation_id", "")) == _update_norm.get("automation_id", "")
+                )
+                _same_sig = bool(_has_preview and _last_preview.get("signature") == _update_sig)
+
+                if not (_has_preview and _same_automation and _same_sig):
+                    if _has_preview and _same_automation and not _same_sig:
+                        # User confirmed after seeing a preview for this automation.
+                        # The LLM regenerated slightly different changes — override with
+                        # the exact changes that were shown to the user.
+                        _stored_norm = _last_preview.get("norm", {})
+                        if _stored_norm:
+                            _tc["arguments"] = json.dumps({
+                                "automation_id": _stored_norm.get("automation_id", _update_norm.get("automation_id")),
+                                "changes": _stored_norm.get("changes", {}),
+                                **( {"add_condition": _stored_norm["add_condition"]} if _stored_norm.get("add_condition") else {} ),
+                            }, ensure_ascii=False)
+                            logger.info("Preview-match guard: overriding LLM args with stored preview changes (same_automation, sig mismatch)")
+                            continue  # allow the update with corrected args
+                    _pending_tool_calls.remove(_tc)
+                    _reason = (
+                        "[BLOCKED by preview-match guard] "
+                        "update_automation requires an up-to-date preview_automation_change "
+                        "with the SAME changes. Call preview_automation_change first and show the new diff, "
+                        "then ask for confirmation before applying."
+                    )
+                    _tc["_block_reason"] = _reason
+                    _sig_blocked.append(_tc)
+                    logger.warning(
+                        "Preview-match guard: blocked update_automation "
+                        f"(has_preview={_has_preview}, same_automation={_same_automation}, same_sig={_same_sig})"
+                    )
+            # ─────────────────────────────────────────────────────────────
+
             # Assign stable IDs to pending tool calls BEFORE building messages.
             # Both the assistant message and tool result messages must reference
             # the same ID — otherwise providers reject the mismatch.
             for _tc_idx, _tc_item in enumerate(_pending_tool_calls):
                 if not _tc_item.get("id"):
                     _tc_item["id"] = f"call_{_tc_item.get('name', 'tool')}_{_tc_idx}"
+            # Also assign IDs for blocked tool calls (needed for consistent history)
+            for _pb_idx, _pb_item in enumerate(_pg_blocked):
+                if not _pb_item.get("id"):
+                    _pb_item["id"] = f"call_{_pb_item.get('name', 'blocked')}_{_pb_idx}_pg"
+            for _sb_idx, _sb_item in enumerate(_sig_blocked):
+                if not _sb_item.get("id"):
+                    _sb_item["id"] = f"call_{_sb_item.get('name', 'blocked')}_{_sb_idx}_sig"
 
             # Append assistant message with tool_calls (OpenAI format)
+            # Include both executed and blocked tool calls so history stays well-formed
+            _all_tcs_for_msg = _pending_tool_calls + _pg_blocked + _sig_blocked
             messages.append({
                 "role": "assistant",
                 "content": text_so_far or None,
@@ -4412,11 +4591,23 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             "arguments": tc.get("arguments", "{}"),
                         },
                     }
-                    for tc in _pending_tool_calls
+                    for tc in _all_tcs_for_msg
                 ],
             })
+            # Add synthetic "blocked" results for write tools the guard prevented
+            for _pb_tc in (_pg_blocked + _sig_blocked):
+                messages.append({
+                    "role": "tool",
+                    "tool_call_id": _pb_tc["id"],
+                    "name": _pb_tc.get("name", ""),
+                    "content": _pb_tc.get("_block_reason") or (
+                        "[BLOCKED] This write operation was blocked by safety guards."
+                    ),
+                })
 
             # Execute each tool and append its result
+            _round_has_rich_diff = False
+            _any_successful_write_this_round = False
             for tc in _pending_tool_calls:
                 fn_name = tc.get("name", "")
                 try:
@@ -4469,14 +4660,46 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 # DuplicateCallHook won't block the very first invocation.
                 _tool_call_history.add(_sig)
 
+                _result_obj = None
+                try:
+                    _parsed = json.loads(result) if isinstance(result, str) else result
+                    if isinstance(_parsed, dict):
+                        _result_obj = _parsed
+                except Exception:
+                    _result_obj = None
+
+                if _result_obj is not None:
+                    _status = str(_result_obj.get("status", "")).lower().strip()
+                    _is_err = (
+                        _status in {"error", "failed", "invalid"}
+                        or bool(_result_obj.get("error"))
+                    )
+                    _is_ok = bool(_result_obj) and not _is_err
+
+                    if not _is_read_only_call(tc) and _is_ok:
+                        _any_successful_write_this_round = True
+
+                    if fn_name == "preview_automation_change" and _status == "preview":
+                        _norm = _normalize_automation_change_args(tc_args)
+                        session_last_preview[session_id] = {
+                            "type": "automation_preview",
+                            "automation_id": _norm.get("automation_id", ""),
+                            "signature": _automation_change_signature(tc_args),
+                            "norm": _norm,  # stored so guard can reuse exact changes on confirm
+                            "ts": time.time(),
+                        }
+                    elif fn_name == "update_automation" and _is_ok:
+                        # Clear only after successful apply
+                        session_last_preview.pop(session_id, None)
+
                 # Extract diff + modified filename for UI rendering (strip before feeding to model)
                 try:
-                    _result_obj = json.loads(result)
                     if isinstance(_result_obj, dict) and "diff" in _result_obj:
                         _diff_content = _result_obj.pop("diff")
                         _modified_file = _result_obj.get("file", "")  # relative path if set
                         result = json.dumps(_result_obj, ensure_ascii=False)
                         yield {"type": "diff", "content": _diff_content, "file": _modified_file}
+                        _round_has_rich_diff = True
                 except Exception:
                     pass
 
@@ -4486,7 +4709,8 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
                 # For write tools, emit a formatted diff view to the UI
                 _WRITE_TOOLS = {"create_automation", "update_automation", "create_script",
-                                "update_script", "write_config_file", "update_dashboard"}
+                                "update_script", "write_config_file", "update_dashboard",
+                                "preview_automation_change"}
                 if fn_name in _WRITE_TOOLS:
                     try:
                         _wr_obj = json.loads(result) if isinstance(result, str) else result
@@ -4494,6 +4718,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             _formatted = _format_write_tool_response(fn_name, _wr_obj)
                             if _formatted:
                                 yield {"type": "diff_html", "content": _formatted}
+                                _round_has_rich_diff = True
                     except (json.JSONDecodeError, TypeError):
                         pass
 
@@ -4509,17 +4734,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # ── <tool_call> block).  No-tool providers (Copilot) tend to re-call
             # ── the same tool after getting the write result instead of reporting.
             if _is_no_tool_provider:
-                _any_write = False
-                for tc in _pending_tool_calls:
-                    if not _is_read_only_call(tc):
-                        _any_write = True
-                        # Capture the last tool result for fallback display
-                        for m in reversed(messages):
-                            if m.get("role") == "tool":
-                                _last_write_result = m.get("content", "")
-                                break
-                        break
-                if _any_write:
+                if _any_successful_write_this_round:
+                    # Capture the last tool result for fallback display
+                    for m in reversed(messages):
+                        if m.get("role") == "tool":
+                            _last_write_result = m.get("content", "")
+                            break
                     _skip_tool_extraction = True
                     logger.info("Write tool executed — disabling ToolSimulator for next round")
                     # Inject a user message forcing the model to produce plain text,
@@ -4536,9 +4756,11 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     })
 
             # Signal the UI to reset display and re-show thinking indicator
-            # before the next provider API call (which may take time due to rate limits)
-            yield {"type": "clear"}
-            yield {"type": "status", "message": f"🤖 {tr('status_analyzing')}..."}
+            # before the next provider API call (which may take time due to rate limits).
+            # If a rich diff was just shown, don't clear it before the final assistant text.
+            if not _round_has_rich_diff:
+                yield {"type": "clear"}
+                yield {"type": "status", "message": f"🤖 {tr('status_analyzing')}..."}
 
         # Sync new assistant messages to conversation history.
         # New-path providers (Mistral, Groq, openai_compatible, etc.) stream text as

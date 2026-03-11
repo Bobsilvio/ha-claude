@@ -84,10 +84,14 @@ create_automation, update_automation, create_script, update_script):
   - First describe to the user what you plan to do and ask for confirmation \
 (sì / yes / ok / confirm).
   - Only emit the <tool_call> block AFTER the user explicitly confirms.
+  - If the user asks additional tweaks while waiting confirmation, update the plan/preview first.
+    Ask confirmation only for the latest final version.
 
 OTHER rules:
 - NEVER invent entity_ids — only use ids found in the CONTEXT or DATA sections.
 - ALWAYS respond in the user's language.
+- If the user asks for a counter helper, call manage_helpers with helper_type="counter".
+  Do NOT answer that counter is unsupported; backend maps it to input_number automatically.
 - Emit exactly ONE <tool_call> block per message. Do NOT combine multiple tool calls.
   Wait for the result before deciding the next action.
 """
@@ -154,13 +158,16 @@ def extract_tool_calls(text: str) -> List[Dict[str, Any]]:
         raw = match.group(1).strip()
         try:
             payload = json.loads(raw)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as _e0:
             # Try to repair common model mistakes: trailing commas, single quotes
             try:
                 repaired = _repair_json(raw)
                 payload = json.loads(repaired)
-            except Exception:
-                logger.warning(f"ToolSimulator: could not parse tool_call block #{i}: {raw[:200]}")
+            except json.JSONDecodeError as _e1:
+                logger.warning(
+                    f"ToolSimulator: could not parse tool_call block #{i} "
+                    f"(orig_err={_e0}, repair_err={_e1}): {raw[:1000]}"
+                )
                 continue
 
         name = payload.get("name", "")
@@ -287,11 +294,42 @@ def flatten_tool_messages(
 
 def _repair_json(raw: str) -> str:
     """Best-effort repair of slightly malformed JSON from LLMs."""
-    # Replace single quotes used as string delimiters
-    # (only outside already-valid double-quoted strings — simple heuristic)
     repaired = raw
     # Trailing commas before } or ]
     repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
     # Python-style True/False/None
     repaired = repaired.replace("True", "true").replace("False", "false").replace("None", "null")
+    # Escape literal newlines/tabs/carriage-returns inside JSON string values.
+    # LLMs often embed raw YAML multiline content without escaping them.
+    repaired = _escape_control_chars_in_strings(repaired)
     return repaired
+
+
+def _escape_control_chars_in_strings(raw: str) -> str:
+    """Scan JSON character by character; escape control chars inside string literals."""
+    result = []
+    in_string = False
+    i = 0
+    while i < len(raw):
+        c = raw[i]
+        if c == '\\' and in_string:
+            # Already-escaped sequence — pass both chars through unchanged
+            result.append(c)
+            i += 1
+            if i < len(raw):
+                result.append(raw[i])
+            i += 1
+            continue
+        if c == '"':
+            in_string = not in_string
+            result.append(c)
+        elif in_string and c == '\n':
+            result.append('\\n')
+        elif in_string and c == '\r':
+            result.append('\\r')
+        elif in_string and c == '\t':
+            result.append('\\t')
+        else:
+            result.append(c)
+        i += 1
+    return ''.join(result)

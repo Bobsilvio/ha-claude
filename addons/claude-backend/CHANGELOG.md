@@ -1,6 +1,62 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.2 — fix: manage_helpers API, preview guard, UI diff e costi panel
+- ** tools.py
+
+  - manage_helpers — 3 bug fix API:
+    - WS endpoint corretto: input_number/create (era
+  config/input_number/create — endpoint inesistente in HA)
+    - REST create: POST /config/{type}/config con id nel body (era POST con ID
+   nell'URL → 404)
+    - REST update: PUT /config/{type}/config/{id} (era POST)
+    - WS create: rimosso {type}_id dal payload (HA auto-genera l'ID dal nome)
+    - WS delete: stesso fix endpoint
+    - Rimosso import os dentro manage_helpers che rendeva os locale all'intera
+   funzione → crashava preview_automation_change con UnboundLocalError
+    - Counter list: mostra solo counter.*, non tutti gli input_number.*
+
+  api.py
+
+  - Preview confirmation guard (nuovo sistema):
+    - preview_automation_change → mostra diff → utente conferma →
+  update_automation
+    - Guard blocca update_automation se non c'è un preview valido nella
+  sessione
+    - Se stessa automation ma firma diversa (LLM rigenera changes leggermente
+  diverse): override con le changes esatte del preview mostrato → elimina il
+  doppio loop di conferma
+    - Normalizzazione trigger/triggers, action/actions, condition/conditions
+  in _normalize_automation_change_args per evitare falsi-positivi nel
+  sig-match
+  - _format_write_tool_response:
+    - Aggiunta gestione errori (era assente — AttributeError se
+  result["result"] non era dict)
+    - YAML completo rimosso quando il diff è già mostrato; mostrato solo per
+  CREATE o quando non ci sono differenze
+    - preview_automation_change aggiunto a _WRITE_TOOLS → genera il diff
+  rosso/verde in UI
+
+  intent.py
+
+  - preview_automation_change va chiamata immediatamente senza chiedere
+  "procedo?": eliminata la doppia conferma
+  - Exception per preview_automation_change aggiunta alla regola generale "ask
+   before executing"
+
+  providers/tool_simulator.py
+
+  - _repair_json: aggiunta _escape_control_chars_in_strings — converte
+  newline/tab letterali dentro stringhe JSON in \n/\t (causa frequente di
+  parse failure con YAML multilinea nei tool call)
+  - Log errore esteso da 200 a 1000 char, con posizione esatta dell'errore
+  JSON
+
+  chat_ui.py
+
+  - Costi panel: giorni raggruppati per mese con <details>/<summary>
+  collassabili; mese corrente aperto di default, precedenti chiusi; 35 giorni
+  invece di 7; giorno corrente evidenziato
 
 ## 4.6.1 — Fix bubble auth
 

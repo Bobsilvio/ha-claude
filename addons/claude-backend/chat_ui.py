@@ -1675,6 +1675,16 @@ def get_chat_ui():
         .costs-panel .cost-section-title {{ font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #eee; }}
         .costs-panel .cost-reset-btn {{ display: block; width: 100%; margin-top: 16px; padding: 8px; background: #fee2e2; color: #991b1b; border: none; border-radius: 8px; font-size: 12px; cursor: pointer; transition: background 0.2s; }}
         .costs-panel .cost-reset-btn:hover {{ background: #fecaca; }}
+        .costs-panel .cost-month-group {{ border: none; }}
+        .costs-panel .cost-month-summary {{ display: flex; justify-content: space-between; align-items: center; padding: 5px 0; cursor: pointer; list-style: none; border-bottom: 1px solid rgba(0,0,0,0.06); }}
+        .costs-panel .cost-month-summary::-webkit-details-marker {{ display: none; }}
+        .costs-panel .cost-month-summary::marker {{ display: none; }}
+        .costs-panel .cost-month-label {{ font-size: 12px; font-weight: 600; color: #444; display: flex; align-items: center; gap: 5px; }}
+        .costs-panel .cost-month-label::before {{ content: '▶'; font-size: 9px; color: #aaa; transition: transform 0.15s; display: inline-block; }}
+        .costs-panel details[open] > .cost-month-summary .cost-month-label::before {{ transform: rotate(90deg); }}
+        .costs-panel .cost-month-total {{ font-size: 12px; font-weight: 600; color: #333; }}
+        .costs-panel .cost-day-row {{ padding-left: 14px; }}
+        .costs-panel .cost-today-row .cost-row-name {{ color: #667eea; font-weight: 600; }}
         .undo-button {{ display: inline-block; background: #fef3c7; color: #92400e; border: none; padding: 6px 12px; border-radius: 12px; font-size: 12px; margin-top: 8px; cursor: pointer; transition: opacity 0.2s; }}
         .undo-button:hover {{ opacity: 0.9; }}
         .undo-button:disabled {{ opacity: 0.6; cursor: not-allowed; }}
@@ -2446,6 +2456,10 @@ def get_chat_ui():
         body.dark-mode .costs-panel .cost-section-title {{ color: #808080; border-bottom-color: #3a3a3a; }}
         body.dark-mode .costs-panel .cost-reset-btn {{ background: #3b1a1a; color: #fca5a5; }}
         body.dark-mode .costs-panel .cost-reset-btn:hover {{ background: #4a2020; }}
+        body.dark-mode .costs-panel .cost-month-summary {{ border-bottom-color: rgba(255,255,255,0.05); }}
+        body.dark-mode .costs-panel .cost-month-label {{ color: #c0c0c0; }}
+        body.dark-mode .costs-panel .cost-month-total {{ color: #e0e0e0; }}
+        body.dark-mode .costs-panel .cost-today-row .cost-row-name {{ color: #8ab4f8; }}
 
         body.dark-mode .entity-input {{
             background: #2a2a2a;
@@ -6713,7 +6727,7 @@ def get_chat_ui():
             if (!panel) return;
             panel.innerHTML = '<div style="padding:16px;text-align:center;color:#999;">' + T.files_loading + '</div>';
             try {{
-                const resp = await fetch(apiUrl('api/usage_stats?days=7'));
+                const resp = await fetch(apiUrl('api/usage_stats?days=35'));
                 if (!resp.ok) throw new Error(resp.statusText);
                 const data = await resp.json();
                 const sym = _currSym(COST_CURRENCY);
@@ -6774,17 +6788,42 @@ def get_chat_ui():
                     html += '</div>';
                 }}
 
-                // History (last 7 days) — dailyArr is already sorted ascending by date
+                // History — grouped by month, collapsible; current month open by default
                 if (dailyArr.length > 0) {{
+                    const currentMonth = todayStr.slice(0, 7);
+                    // Group days by YYYY-MM
+                    const byMonth = {{}};
+                    for (const d of dailyArr) {{
+                        const m = (d.date || '').slice(0, 7);
+                        if (!m) continue;
+                        if (!byMonth[m]) byMonth[m] = {{ days: [], total: 0 }};
+                        byMonth[m].days.push(d);
+                        byMonth[m].total += d.total_cost || 0;
+                    }}
+                    const sortedMonths = Object.keys(byMonth).sort().reverse();
                     html += '<div class="cost-section">';
                     html += '<div class="cost-section-title">' + T.costs_history + '</div>';
-                    const reversed = [...dailyArr].reverse();
-                    for (const dayObj of reversed) {{
-                        const dc = dayObj.total_cost || 0;
-                        html += '<div class="cost-row">';
-                        html += '<div class="cost-row-name">' + (dayObj.date || '?') + '</div>';
-                        html += '<div class="cost-row-value">' + (dc > 0 ? sym + _fmtCost(dc) : '—') + '</div>';
-                        html += '</div>';
+                    for (const month of sortedMonths) {{
+                        const mg = byMonth[month];
+                        const isOpen = month === currentMonth;
+                        const [yr, mo] = month.split('-');
+                        const monthLabel = new Date(+yr, +mo - 1, 1).toLocaleString(undefined, {{ month: 'long', year: 'numeric' }});
+                        html += '<details class="cost-month-group"' + (isOpen ? ' open' : '') + '>';
+                        html += '<summary class="cost-month-summary cost-row">';
+                        html += '<span class="cost-month-label">' + monthLabel + '</span>';
+                        html += '<span class="cost-month-total">' + (mg.total > 0 ? sym + _fmtCost(mg.total) : '—') + '</span>';
+                        html += '</summary>';
+                        const daysDesc = [...mg.days].sort((a, b) => (b.date > a.date ? 1 : -1));
+                        for (const dayObj of daysDesc) {{
+                            const dc = dayObj.total_cost || 0;
+                            const isToday = dayObj.date === todayStr;
+                            const dayNum = (dayObj.date || '').slice(8); // DD
+                            html += '<div class="cost-row cost-day-row' + (isToday ? ' cost-today-row' : '') + '">';
+                            html += '<div class="cost-row-name">' + dayNum + (isToday ? ' ●' : '') + '</div>';
+                            html += '<div class="cost-row-value">' + (dc > 0 ? sym + _fmtCost(dc) : '—') + '</div>';
+                            html += '</div>';
+                        }}
+                        html += '</details>';
                     }}
                     html += '</div>';
                 }}
