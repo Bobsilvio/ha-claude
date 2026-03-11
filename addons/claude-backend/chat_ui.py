@@ -2026,6 +2026,16 @@ def get_chat_ui():
         }}
         .mcp-server-header:hover {{ background: #ebebff; }}
         .mcp-server-name {{ flex: 1; font-weight: 600; font-size: 13px; color: #333; }}
+        .mcp-server-status-badge {{
+            font-size: 11px; color: #666; display: inline-flex;
+            align-items: center; gap: 5px; margin-right: 6px;
+        }}
+        .mcp-status-dot {{
+            width: 9px; height: 9px; border-radius: 999px; display: inline-block;
+            background: #9e9e9e;
+        }}
+        .mcp-status-dot.running {{ background: #2e7d32; }}
+        .mcp-status-dot.stopped {{ background: #9e9e9e; }}
         .mcp-server-toggle {{ font-size: 12px; color: #888; transition: transform 0.2s; }}
         .mcp-server-toggle.open {{ transform: rotate(90deg); }}
         .mcp-server-body {{ padding: 12px; display: none; border-top: 1px solid #e8e8f0; }}
@@ -2034,6 +2044,9 @@ def get_chat_ui():
         .mcp-server-actions button {{
             background: none; border: none; cursor: pointer; font-size: 14px;
             padding: 2px 4px; border-radius: 4px; opacity: 0.6;
+        }}
+        .mcp-server-actions button:disabled {{
+            opacity: 0.3; cursor: not-allowed;
         }}
         .mcp-server-actions button:hover {{ opacity: 1; background: rgba(0,0,0,0.05); }}
         .mcp-server-actions button.delete:hover {{ background: #fce8e8; }}
@@ -4612,6 +4625,31 @@ def get_chat_ui():
             }} catch(e) {{ console.warn('Failed to load MCP config', e); }}
 
             const servers = mcpConfig.mcpServers || mcpConfig.mcpservers || {{}};
+            let mcpRuntimeByName = {{}};
+
+            async function _refreshMcpRuntime() {{
+                try {{
+                    const resp = await fetch(apiUrl('api/mcp/servers'), {{ credentials: 'same-origin' }});
+                    const data = await resp.json();
+                    if (data.status === 'success' && Array.isArray(data.servers)) {{
+                        mcpRuntimeByName = {{}};
+                        data.servers.forEach(s => {{
+                            if (s && s.name) mcpRuntimeByName[s.name] = s;
+                        }});
+                    }}
+                }} catch (e) {{
+                    console.warn('Failed to load MCP runtime status', e);
+                }}
+            }}
+
+            function _renderAllMcpCards() {{
+                _renderMcpCards(listWrap, servers, mcpRuntimeByName, _refreshAndRenderMcpCards);
+            }}
+
+            async function _refreshAndRenderMcpCards() {{
+                await _refreshMcpRuntime();
+                _renderAllMcpCards();
+            }}
 
             filePanelContentEl.innerHTML = '';
             const wrap = document.createElement('div');
@@ -4629,7 +4667,7 @@ def get_chat_ui():
                 if (!newName || !newName.trim()) return;
                 const name = newName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
                 servers[name] = {{ command: '', args: [], env: {{}} }};
-                _renderMcpCards(listWrap, servers);
+                _renderAllMcpCards();
                 // auto expand the new one
                 const lastCard = listWrap.querySelector('.mcp-server-card:last-child');
                 if (lastCard) {{
@@ -4696,9 +4734,22 @@ def get_chat_ui():
             toggleInp.addEventListener('change', _updateMcpDim);
             wrap.appendChild(mcpBar);
 
+            // ── Sezione installa pacchetti pip ──────────────────────────────
+            const installSection = document.createElement('div');
+            installSection.style.cssText = 'padding:10px 14px;border-bottom:1px solid #eee;';
+            installSection.innerHTML =
+                '<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📦 ' + (T.mcp_pip_section || 'Installa pacchetti pip') + '</div>'
+                + '<div style="display:flex;gap:6px;align-items:flex-start;">'
+                + '<textarea id="mcpPipInput" rows="2" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;resize:vertical;" placeholder="mcp-server-sqlite&#10;un-altro-pacchetto"></textarea>'
+                + '<button id="mcpPipBtn" onclick="mcpInstallPkgs()" style="padding:5px 12px;font-size:12px;border:none;border-radius:6px;background:#4f6ef7;color:white;cursor:pointer;white-space:nowrap;">⬇ Installa</button>'
+                + '</div>'
+                + '<pre id="mcpPipLog" style="display:none;margin-top:6px;padding:8px;background:#1a1a2a;color:#a0d8a0;font-size:11px;border-radius:6px;white-space:pre-wrap;max-height:140px;overflow-y:auto;"></pre>';
+            wrap.appendChild(installSection);
+
             const listWrap = document.createElement('div');
             listWrap.style.cssText = 'flex:1;overflow-y:auto;padding:8px;';
-            _renderMcpCards(listWrap, servers);
+            await _refreshMcpRuntime();
+            _renderAllMcpCards();
             wrap.appendChild(listWrap);
             _updateMcpDim();
 
@@ -4743,7 +4794,7 @@ def get_chat_ui():
             filePanelContentEl.appendChild(wrap);
         }}
 
-        function _renderMcpCards(container, servers) {{
+        function _renderMcpCards(container, servers, runtimeByName, onRuntimeChanged) {{
             container.innerHTML = '';
             const names = Object.keys(servers);
             if (names.length === 0) {{
@@ -4753,6 +4804,9 @@ def get_chat_ui():
             }}
             names.forEach(name => {{
                 const srv = servers[name] || {{}};
+                const rt = (runtimeByName && runtimeByName[name]) || {{}};
+                const isRunning = rt.running === true || rt.connected === true || rt.state === 'running';
+                const autostart = !!rt.autostart;
                 const card = document.createElement('div');
                 card.className = 'mcp-server-card';
                 card.dataset.serverName = name;
@@ -4761,13 +4815,60 @@ def get_chat_ui():
                 header.className = 'mcp-server-header';
                 header.innerHTML = '<span class="mcp-server-toggle">\u25b6</span>'
                     + '<span class="mcp-server-name">' + _escHtml(name) + '</span>'
+                    + '<span class="mcp-server-status-badge">'
+                    + '<span class="mcp-status-dot ' + (isRunning ? 'running' : 'stopped') + '"></span>'
+                    + (isRunning ? 'attivo' : 'fermo')
+                    + (autostart ? ' • auto' : '')
+                    + '</span>'
                     + '<div class="mcp-server-actions">'
+                    + '<button class="mcp-start" title="Avvia" style="font-size:13px;background:none;border:none;cursor:pointer;padding:2px 5px;">▶</button>'
+                    + '<button class="mcp-stop" title="Ferma" style="font-size:13px;background:none;border:none;cursor:pointer;padding:2px 5px;">⏹</button>'
                     + '<button class="delete" title="Delete">\U0001f5d1\ufe0f</button></div>';
+                const startBtn = header.querySelector('.mcp-start');
+                const stopBtn = header.querySelector('.mcp-stop');
+                startBtn.disabled = isRunning;
+                stopBtn.disabled = !isRunning;
+
+                startBtn.addEventListener('click', async (e) => {{
+                    e.stopPropagation();
+                    startBtn.disabled = true;
+                    startBtn.textContent = '…';
+                    try {{
+                        const resp = await fetch(apiUrl('api/mcp/server/' + encodeURIComponent(name) + '/start'), {{
+                            method: 'POST', credentials: 'same-origin'
+                        }});
+                        const data = await resp.json();
+                        if (data.status !== 'success') throw new Error(data.message || 'errore');
+                        if (typeof onRuntimeChanged === 'function') await onRuntimeChanged();
+                    }} catch(err) {{
+                        alert('Start MCP fallito (' + name + '): ' + err.message);
+                    }} finally {{
+                        startBtn.textContent = '▶';
+                    }}
+                }});
+
+                stopBtn.addEventListener('click', async (e) => {{
+                    e.stopPropagation();
+                    stopBtn.disabled = true;
+                    stopBtn.textContent = '…';
+                    try {{
+                        const resp = await fetch(apiUrl('api/mcp/server/' + encodeURIComponent(name) + '/stop'), {{
+                            method: 'POST', credentials: 'same-origin'
+                        }});
+                        const data = await resp.json();
+                        if (data.status !== 'success') throw new Error(data.message || 'errore');
+                        if (typeof onRuntimeChanged === 'function') await onRuntimeChanged();
+                    }} catch(err) {{
+                        alert('Stop MCP fallito (' + name + '): ' + err.message);
+                    }} finally {{
+                        stopBtn.textContent = '⏹';
+                    }}
+                }});
 
                 header.querySelector('.delete').addEventListener('click', (e) => {{
                     e.stopPropagation();
                     delete servers[name];
-                    _renderMcpCards(container, servers);
+                    _renderMcpCards(container, servers, runtimeByName, onRuntimeChanged);
                 }});
 
                 // Toggle body
@@ -4784,7 +4885,7 @@ def get_chat_ui():
                 body.innerHTML = '<div class="agent-form-group"><label>'
                     + (T.mcp_command || 'Command') + _tipSpan('tip_mcp_command')
                     + '</label><input type="text" class="mcp-cmd" value="'
-                    + _escAttr(srv.command || '') + '" placeholder="python, uvx, npx..."></div>'
+                    + _escAttr(srv.command || '') + '" placeholder="python3, uvx, npx..."></div>'
                     + '<div class="agent-form-group"><label>'
                     + (T.mcp_args || 'Arguments') + _tipSpan('tip_mcp_args')
                     + '</label><textarea class="mcp-args" rows="2" placeholder="-m\\nmcp.server.stdio">'
@@ -4814,7 +4915,8 @@ def get_chat_ui():
                     const idx = line.indexOf('=');
                     if (idx > 0) env[line.substring(0, idx).trim()] = line.substring(idx + 1).trim();
                 }});
-                result[name] = {{ command: cmd.trim(), args: args, env: env }};
+                const entry = {{ command: cmd.trim(), args: args, env: env }};
+                result[name] = entry;
             }});
             return result;
         }}
@@ -6722,6 +6824,31 @@ def get_chat_ui():
             }}
         }}
 
+        async function mcpInstallPkgs() {{
+            const input = document.getElementById('mcpPipInput');
+            const btn   = document.getElementById('mcpPipBtn');
+            const log   = document.getElementById('mcpPipLog');
+            if (!input || !log) return;
+            const pkgs = input.value.split('\\n').map(s => s.trim()).filter(Boolean);
+            if (!pkgs.length) {{ log.style.display = 'block'; log.textContent = '⚠ Nessun pacchetto specificato.'; return; }}
+            log.style.display = 'block';
+            log.textContent = '⏳ Installazione in corso...';
+            if (btn) btn.disabled = true;
+            try {{
+                const resp = await fetch(apiUrl('api/mcp/install'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{packages: pkgs}})
+                }});
+                const data = await resp.json();
+                log.textContent = data.output || (resp.ok ? '✔ Fatto.' : '❌ Errore.');
+            }} catch(e) {{
+                log.textContent = '❌ ' + e.message;
+            }} finally {{
+                if (btn) btn.disabled = false;
+            }}
+        }}
+
         async function loadCostsPanel() {{
             const panel = document.getElementById('costsPanel');
             if (!panel) return;
@@ -8440,6 +8567,8 @@ def get_chat_ui():
         window.revokeCodexOAuth = revokeCodexOAuth;
         window.toggleDarkMode = toggleDarkMode;
         window.toggleReadOnly = toggleReadOnly;
+        // MCP exports
+        window.mcpInstallPkgs = mcpInstallPkgs;
         // File explorer exports
         window.loadFileTree = loadFileTree;
         window.openFileInPanel = openFileInPanel;

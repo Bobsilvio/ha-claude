@@ -9,6 +9,7 @@ Reference: https://modelcontextprotocol.io/
 import json
 import logging
 import subprocess
+import sys
 import threading
 import time
 import requests
@@ -375,9 +376,26 @@ class MCPServer:
             
             response = self._send_request_stdio(init_msg)
             if not response:
+                # Log stderr so we can see what the process printed
+                try:
+                    import select as _sel
+                    if self.process and _sel.select([self.process.stderr], [], [], 0.5)[0]:
+                        err_out = self.process.stderr.read(2000)
+                        if err_out:
+                            logger.warning(f"MCP {self.name}: process stderr: {err_out.strip()}")
+                except Exception:
+                    pass
                 logger.warning(f"MCP {self.name}: Initialize failed")
                 return False
-            
+
+            # MCP protocol: send 'initialized' notification before any further requests
+            initialized_notif = {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized",
+                "params": {}
+            }
+            self._send_notification_stdio(initialized_notif)
+
             # Send list_tools request
             tools_msg = {
                 "jsonrpc": "2.0",
@@ -385,7 +403,7 @@ class MCPServer:
                 "method": "tools/list",
                 "params": {}
             }
-            
+
             response = self._send_request_stdio(tools_msg)
             if response and "result" in response:
                 tools_list = response["result"].get("tools", [])
@@ -394,10 +412,20 @@ class MCPServer:
                         "description": tool.get("description", ""),
                         "inputSchema": tool.get("inputSchema", {})
                     }
-                
+
                 logger.info(f"MCP {self.name}: Discovered {len(self.tools)} tools")
                 return True
-            
+
+            # Log stderr and full response to help diagnose failures
+            try:
+                import select as _sel
+                if self.process and _sel.select([self.process.stderr], [], [], 0.3)[0]:
+                    err_out = self.process.stderr.read(2000)
+                    if err_out:
+                        logger.warning(f"MCP {self.name}: process stderr: {err_out.strip()}")
+            except Exception:
+                pass
+            logger.warning(f"MCP {self.name}: tools/list failed, response={response}")
             return False
         except Exception as e:
             logger.error(f"MCP {self.name}: Tool discovery failed: {e}")
@@ -437,12 +465,22 @@ class MCPServer:
             logger.error(f"MCP {self.name}: HTTP tool discovery failed: {e}")
             return False
     
+    def _send_notification_stdio(self, notification: Dict) -> None:
+        """Send a fire-and-forget notification via stdio (no response expected)."""
+        try:
+            if not self.process:
+                return
+            self.process.stdin.write(json.dumps(notification) + "\n")
+            self.process.stdin.flush()
+        except Exception as e:
+            logger.debug(f"MCP {self.name}: notification send failed: {e}")
+
     def _send_request_stdio(self, request: Dict) -> Optional[Dict]:
         """Send request via stdio and get response."""
         try:
             if not self.process:
                 return None
-            
+
             # Send request
             self.process.stdin.write(json.dumps(request) + "\n")
             self.process.stdin.flush()
@@ -679,6 +717,23 @@ class MCPManager:
                 logger.debug(f"MCP: Disconnecting '{server_name}'...")
                 server.disconnect()
             self.servers.clear()
+
+    def remove_server(self, name: str) -> bool:
+        """Disconnect and unregister a single server.
+
+        Returns:
+            True if the server existed and was removed, False otherwise.
+        """
+        with self._lock:
+            server = self.servers.get(name)
+            if not server:
+                return False
+            try:
+                logger.debug(f"MCP: Disconnecting '{name}'...")
+                server.disconnect()
+            finally:
+                self.servers.pop(name, None)
+            return True
     
     def stats(self) -> Dict[str, Any]:
         """Get manager statistics.
@@ -718,6 +773,122 @@ def get_mcp_manager() -> MCPManager:
     return _mcp_manager
 
 
+# ---------------------------------------------------------------------------
+# Persistent pip install path (survives addon restarts)
+# ---------------------------------------------------------------------------
+
+PERSISTENT_PIP_PREFIX = "/config/amira/pip_prefix"
+
+# Packages installed in this process session (avoids duplicate installs within a session)
+_pip_installed_this_session: set = set()
+
+
+def _persistent_site_packages() -> list[str]:
+    """Return all site-packages paths under the persistent pip prefix."""
+    import glob as _glob
+    return sorted(_glob.glob(f"{PERSISTENT_PIP_PREFIX}/lib/*/site-packages"))
+
+
+def setup_pip_packages_path() -> None:
+    """Add the persistent pip prefix to sys.path and PATH.
+
+    Called at module import time so that packages installed in previous
+    sessions (stored in /config/amira/pip_prefix/) are immediately importable
+    and their executables are findable via subprocess.
+    """
+    import os as _os
+
+    prefix = PERSISTENT_PIP_PREFIX
+    site_packages = _persistent_site_packages()
+
+    # Add site-packages to sys.path (current process)
+    for sp in site_packages:
+        if sp not in sys.path:
+            sys.path.insert(0, sp)
+
+    # Add bin to PATH so executables like mcp-server-sqlite are found
+    bin_dir = f"{prefix}/bin"
+    path_env = _os.environ.get("PATH", "")
+    if bin_dir not in path_env:
+        _os.environ["PATH"] = bin_dir + ":" + path_env
+
+    # Propagate persistent site-packages to child Python processes started via
+    # subprocess (e.g. mcp-server-* entrypoints in /config/amira/pip_prefix/bin)
+    py_path_parts = [p for p in _os.environ.get("PYTHONPATH", "").split(":") if p]
+    for sp in reversed(site_packages):
+        if sp not in py_path_parts:
+            py_path_parts.insert(0, sp)
+    if py_path_parts:
+        _os.environ["PYTHONPATH"] = ":".join(py_path_parts)
+
+    logger.debug(f"MCP: persistent pip prefix configured: {prefix}")
+
+
+# Run at import time so every restart finds previously-installed packages
+setup_pip_packages_path()
+
+
+def _is_pkg_installed(pkg_name: str) -> bool:
+    """Return True if the package is installed in the persistent prefix."""
+    import glob as _glob
+    # Normalise: hyphens and underscores are interchangeable in package dirs
+    variants = [pkg_name, pkg_name.replace("-", "_"), pkg_name.replace("_", "-")]
+    prefix = PERSISTENT_PIP_PREFIX
+    for v in variants:
+        if _glob.glob(f"{prefix}/lib/*/site-packages/{v}*"):
+            return True
+    return False
+
+
+def pip_install_packages(packages: list) -> dict:
+    """Install pip packages to the persistent prefix (survives addon restarts).
+
+    Returns {"success": bool, "output": str}
+    """
+    import os as _os
+    lines = []
+    all_ok = True
+    # Ensure the prefix directory exists
+    _os.makedirs(PERSISTENT_PIP_PREFIX, exist_ok=True)
+    for pkg in packages:
+        pkg = pkg.strip()
+        if not pkg:
+            continue
+        pkg_name = pkg.split("[")[0].strip()
+        if pkg in _pip_installed_this_session:
+            lines.append(f"✔ {pkg} già installato (sessione)")
+            continue
+        if _is_pkg_installed(pkg_name):
+            _pip_installed_this_session.add(pkg)
+            lines.append(f"✔ {pkg} già installato")
+            continue
+        lines.append(f"▶ pip install {pkg} ...")
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install",
+                 "--prefix", PERSISTENT_PIP_PREFIX,
+                 "--root-user-action=ignore", "--quiet", pkg],
+                capture_output=True, text=True, timeout=180
+            )
+            out = (result.stdout + result.stderr).strip()
+            if result.returncode != 0:
+                lines.append(f"✗ ERRORE:\n{out}")
+                all_ok = False
+            else:
+                _pip_installed_this_session.add(pkg)
+                # Refresh sys.path/PATH after install so the new package is usable immediately
+                setup_pip_packages_path()
+                summary = next(
+                    (l for l in reversed(out.splitlines()) if l.strip()),
+                    "OK"
+                )
+                lines.append(f"✔ {summary}")
+        except Exception as e:
+            lines.append(f"✗ Eccezione: {e}")
+            all_ok = False
+    return {"success": all_ok, "output": "\n".join(lines)}
+
+
 def initialize_mcp_servers(mcp_config: Dict[str, Dict]) -> int:
     """Initialize all MCP servers from configuration.
     
@@ -744,7 +915,7 @@ def initialize_mcp_servers(mcp_config: Dict[str, Dict]) -> int:
     for server_name, server_config in (mcp_config or {}).items():
         try:
             transport = server_config.get("transport", "stdio")
-            
+
             # Prepare transport-specific config
             if transport == "stdio":
                 config = {

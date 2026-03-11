@@ -229,6 +229,7 @@ FALLBACK_ENABLED = os.getenv("FALLBACK_ENABLED", "true").lower() not in ("false"
 
 # ── Settings overlay (runtime-configurable via chat UI) ──────────────
 SETTINGS_FILE = "/config/amira/settings.json"
+MCP_RUNTIME_FILE = "/config/amira/mcp_runtime.json"
 
 SETTINGS_DEFAULTS = {
     "language": "en",
@@ -306,6 +307,44 @@ def _save_settings(data: dict) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
     os.replace(tmp, SETTINGS_FILE)
+
+
+def _load_mcp_runtime_state() -> dict:
+    """Load MCP runtime state (autostart servers)."""
+    try:
+        if os.path.isfile(MCP_RUNTIME_FILE):
+            with open(MCP_RUNTIME_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f) or {}
+                servers = data.get("autostart_servers", [])
+                if isinstance(servers, list):
+                    data["autostart_servers"] = [str(s) for s in servers if isinstance(s, str) and s.strip()]
+                else:
+                    data["autostart_servers"] = []
+                return data
+    except (json.JSONDecodeError, OSError) as e:
+        logging.getLogger(__name__).warning(f"Failed to load MCP runtime state: {e}")
+    return {"autostart_servers": []}
+
+
+def _save_mcp_runtime_state(data: dict) -> None:
+    """Atomic write to MCP runtime state file."""
+    os.makedirs(os.path.dirname(MCP_RUNTIME_FILE), exist_ok=True)
+    tmp = MCP_RUNTIME_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    os.replace(tmp, MCP_RUNTIME_FILE)
+
+
+def _set_mcp_server_autostart(server_name: str, enabled: bool) -> None:
+    """Persist whether a specific MCP server should auto-start on addon boot."""
+    state = _load_mcp_runtime_state()
+    current = set(state.get("autostart_servers", []))
+    if enabled:
+        current.add(server_name)
+    else:
+        current.discard(server_name)
+    state["autostart_servers"] = sorted(current)
+    _save_mcp_runtime_state(state)
 
 
 def _apply_settings(settings: dict) -> None:
@@ -6011,6 +6050,20 @@ def api_memory_clear():
 
 # ============ MCP (Model Context Protocol) Endpoints ============
 
+def _load_mcp_config_servers() -> Dict[str, Dict[str, Any]]:
+    """Load MCP server config as a flat dict: {server_name: config}."""
+    mcp_json_path = MCP_CONFIG_FILE or "/config/amira/mcp_config.json"
+    if not os.path.isfile(mcp_json_path):
+        return {}
+    with open(mcp_json_path, encoding="utf-8") as f:
+        raw_cfg = json.load(f) or {}
+    if "mcpServers" in raw_cfg and isinstance(raw_cfg["mcpServers"], dict):
+        raw_cfg = raw_cfg["mcpServers"]
+    if not isinstance(raw_cfg, dict):
+        return {}
+    return {str(k): v for k, v in raw_cfg.items() if isinstance(v, dict)}
+
+
 @app.route('/api/mcp/servers', methods=['GET'])
 def api_mcp_servers_list():
     """List all configured MCP servers and their connection status."""
@@ -6022,15 +6075,44 @@ def api_mcp_servers_list():
             }), 501
         
         manager = mcp.get_mcp_manager()
+        configured = _load_mcp_config_servers()
+        autostart_set = set(_load_mcp_runtime_state().get("autostart_servers", []))
+
+        # Include every configured server (even if not started yet)
         servers = []
-        for name, server in manager.servers.items():
-            tools_count = len(server.tools) if server.is_connected() else 0
+        for name, cfg in configured.items():
+            running_server = manager.servers.get(name)
+            running = bool(running_server and running_server.is_connected())
+            tools = list(running_server.tools.keys()) if running_server and running else []
+            transport = "http" if cfg.get("url") else cfg.get("transport", "stdio")
             servers.append({
                 "name": name,
-                "connected": server.is_connected(),
+                "configured": True,
+                "running": running,
+                "connected": running,  # backward compatibility
+                "state": "running" if running else "stopped",
+                "transport": transport,
+                "autostart": name in autostart_set,
+                "tools_count": len(tools),
+                "tools": tools,
+            })
+
+        # Also include any currently-registered server not present in config file
+        for name, server in manager.servers.items():
+            if name in configured:
+                continue
+            running = server.is_connected()
+            tools = list(server.tools.keys()) if running else []
+            servers.append({
+                "name": name,
+                "configured": False,
+                "running": running,
+                "connected": running,
+                "state": "running" if running else "stopped",
                 "transport": server.transport_type,
-                "tools_count": tools_count,
-                "tools": list(server.tools.keys()) if server.is_connected() else [],
+                "autostart": name in autostart_set,
+                "tools_count": len(tools),
+                "tools": tools,
             })
         
         return jsonify({
@@ -6104,6 +6186,71 @@ def api_mcp_server_reconnect(server_name):
         }), 200
     except Exception as e:
         logger.error(f"MCP server reconnect error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/server/<server_name>/start', methods=['POST'])
+def api_mcp_server_start(server_name):
+    """Start a specific MCP server from the saved config file (no addon restart needed)."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({"status": "error", "message": "MCP support not available"}), 501
+
+        raw_cfg = _load_mcp_config_servers()
+        if not raw_cfg:
+            return jsonify({"status": "error", "message": "MCP config file not found"}), 404
+
+        if server_name not in raw_cfg:
+            return jsonify({"status": "error", "message": f"Server '{server_name}' not in config"}), 404
+
+        n = mcp.initialize_mcp_servers({server_name: raw_cfg[server_name]})
+        manager = mcp.get_mcp_manager()
+        server = manager.servers.get(server_name)
+        if n > 0 and server:
+            _set_mcp_server_autostart(server_name, True)
+            return jsonify({
+                "status": "success",
+                "connected": True,
+                "running": True,
+                "autostart": True,
+                "tools_count": len(server.tools),
+                "message": f"Server '{server_name}' avviato con {len(server.tools)} tool"
+            }), 200
+        else:
+            return jsonify({"status": "error", "message": f"Impossibile connettersi a '{server_name}'"}), 500
+    except Exception as e:
+        logger.error(f"MCP server start error: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/server/<server_name>/stop', methods=['POST'])
+def api_mcp_server_stop(server_name):
+    """Stop a specific MCP server and disable its autostart flag."""
+    try:
+        if not MCP_AVAILABLE:
+            return jsonify({"status": "error", "message": "MCP support not available"}), 501
+
+        manager = mcp.get_mcp_manager()
+        removed = manager.remove_server(server_name)
+        _set_mcp_server_autostart(server_name, False)
+
+        if removed:
+            return jsonify({
+                "status": "success",
+                "running": False,
+                "autostart": False,
+                "message": f"Server '{server_name}' fermato"
+            }), 200
+
+        # Not running is still a valid "stopped" target state.
+        return jsonify({
+            "status": "success",
+            "running": False,
+            "autostart": False,
+            "message": f"Server '{server_name}' era già fermo"
+        }), 200
+    except Exception as e:
+        logger.error(f"MCP server stop error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
@@ -6239,6 +6386,20 @@ def api_mcp_test_tool(server_name, tool_name):
     except Exception as e:
         logger.error(f"MCP test tool error: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route('/api/mcp/install', methods=['POST'])
+def api_mcp_install():
+    """Install pip packages for MCP servers (called manually from UI)."""
+    try:
+        data = request.get_json() or {}
+        packages = data.get("packages", [])
+        if not packages:
+            return jsonify({"success": False, "output": "Nessun pacchetto specificato."}), 400
+        result = mcp.pip_install_packages(packages)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"success": False, "output": f"Errore: {e}"}), 500
 
 
 @app.route('/api/mcp/server/<server_name>/tools', methods=['GET'])
@@ -9151,10 +9312,28 @@ def initialize_mcp() -> None:
             except Exception as e:
                 logger.debug(f"MCP config.yaml fallback skipped: {e}")
 
-        # Initialize servers
+        # Initialize only servers that were manually started and left running
+        # by the user (persisted in MCP runtime state).
         if mcp_config and isinstance(mcp_config, dict) and mcp_config:
-            connected = mcp.initialize_mcp_servers(mcp_config)
-            logger.info(f"🔌 MCP: Initialized {connected} server(s)")
+            if "mcpServers" in mcp_config and isinstance(mcp_config["mcpServers"], dict):
+                mcp_config = mcp_config["mcpServers"]
+            autostart = set(_load_mcp_runtime_state().get("autostart_servers", []))
+            start_cfg = {
+                name: cfg
+                for name, cfg in mcp_config.items()
+                if isinstance(cfg, dict) and name in autostart
+            }
+            # Keep runtime state clean if config changed and some names disappeared.
+            missing = autostart.difference(set(mcp_config.keys()))
+            if missing:
+                state = _load_mcp_runtime_state()
+                state["autostart_servers"] = sorted(set(state.get("autostart_servers", [])) - missing)
+                _save_mcp_runtime_state(state)
+            if start_cfg:
+                connected = mcp.initialize_mcp_servers(start_cfg)
+                logger.info(f"🔌 MCP: Initialized {connected}/{len(start_cfg)} autostart server(s)")
+            else:
+                logger.info("🔌 MCP: No server marked for autostart")
         else:
             logger.debug("MCP servers not configured (no mcp_config.json or MCP_SERVERS env var)")
     except Exception as e:

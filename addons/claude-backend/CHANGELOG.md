@@ -1,6 +1,31 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.3 — MCP UX/runtime: stato server, stop, autostart persistente manuale
+- **MCP UI (chat_ui)**
+  - Aggiunto badge stato per ogni server MCP con pallino:
+    - verde = attivo
+    - grigio = fermo
+  - Aggiunto pulsante **Stop** accanto a **Start**
+  - Pulsanti Start/Stop disabilitati dinamicamente in base allo stato corrente
+  - Stato live letto da `/api/mcp/servers` per mostrare anche i server configurati ma non avviati
+
+- **MCP API/runtime (api.py + mcp.py)**
+  - Nuovo endpoint: `POST /api/mcp/server/<name>/stop`
+  - `POST /api/mcp/server/<name>/start` ora salva il server in autostart runtime
+  - `GET /api/mcp/servers` ora restituisce anche:
+    - `running`
+    - `state` (`running`/`stopped`)
+    - `autostart`
+    - server configurati ma non avviati
+  - Aggiunta persistenza runtime su `/config/amira/mcp_runtime.json`:
+    - se avvii manualmente un server e lo lasci attivo, al riavvio addon riparte
+    - se lo stoppi, viene rimosso dall’autostart
+  - Avvio MCP al boot limitato ai soli server marcati autostart (non tutti quelli nel config)
+
+- **MCP manager**
+  - Nuovo metodo `remove_server(name)` per disconnettere e deregistrare un singolo server
+
 ## 4.6.2 — fix: manage_helpers API, preview guard, UI diff e costi panel
 - ** tools.py
 
