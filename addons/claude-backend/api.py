@@ -3410,6 +3410,37 @@ def _automation_change_signature(raw_args: dict) -> str:
     return json.dumps(norm, ensure_ascii=False, sort_keys=True, default=str)
 
 
+def _is_mcp_data_request(text: str) -> bool:
+    """Heuristic: detect requests that likely require MCP-backed external data/tools."""
+    try:
+        t = (text or "").lower()
+        if not t:
+            return False
+        markers = (
+            "mcp",
+            "sqlite",
+            "sqlite3",
+            "sqlite_master",
+            ".db",
+            "database",
+            "filesystem",
+            "repo",
+            "github",
+            "slack",
+            "postgres",
+            "mysql",
+            "sql query",
+            "query sql",
+            "interroga il database",
+        )
+        if any(m in t for m in markers):
+            return True
+        # Weak fallback for plain "sql"
+        return " sql " in f" {t} "
+    except Exception:
+        return False
+
+
 def chat_with_ai(user_message: str, session_id: str = "default") -> str:
     """Send a message to the configured AI provider with HA tools."""
     # Legacy providers use ai_client directly; manager.py providers have ai_client=None (normal).
@@ -4024,6 +4055,71 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         if t.get("function", {}).get("name") in _allowed
                     ]
 
+            # Ensure dynamic MCP tools are always visible to the model, even when
+            # ToolRegistry is active (registry is initialized from legacy static tools
+            # and does not include runtime-discovered MCP tools by default).
+            try:
+                if MCP_AVAILABLE:
+                    _schemas = intent_info.get("tool_schemas") or []
+                    _existing_names = {
+                        t.get("function", {}).get("name", "")
+                        for t in _schemas
+                    }
+                    _mcp_dynamic = []
+                    _mgr = mcp.get_mcp_manager()
+                    for _tool_name, _tool_info in (_mgr.get_all_tools() or {}).items():
+                        if _tool_name in _existing_names:
+                            continue
+                        _mcp_dynamic.append({
+                            "type": "function",
+                            "function": {
+                                "name": _tool_name,
+                                "description": f"{_tool_info.get('description', '')} (MCP: {_tool_info.get('server', 'unknown')})",
+                                "parameters": _tool_info.get("inputSchema", {"type": "object", "properties": {}}),
+                            }
+                        })
+                    if _mcp_dynamic:
+                        intent_info["tool_schemas"] = _schemas + _mcp_dynamic
+                        logger.info(f"MCP tools injected into tool_schemas: +{len(_mcp_dynamic)}")
+            except Exception as _mcp_inject_err:
+                logger.warning(f"MCP tool schema injection failed: {_mcp_inject_err}")
+
+            # MCP guidance boost (generic): keep full toolset, but add a strict
+            # instruction when the user clearly asks for external data/actions
+            # typically served by MCP servers (DB/filesystem/repo/etc.).
+            if _is_mcp_data_request(user_message):
+                _all_schemas = intent_info.get("tool_schemas") or []
+                _mcp_tool_names = [
+                    t.get("function", {}).get("name", "")
+                    for t in _all_schemas
+                    if t.get("function", {}).get("name", "").startswith("mcp_")
+                ]
+                if _mcp_tool_names:
+                    _mcp_rule = (
+                        "CRITICAL MCP RULE:\n"
+                        "- This request likely needs external data/actions via MCP tools.\n"
+                        "- Call the relevant MCP tool(s) first, then answer using real tool results.\n"
+                        "- Do NOT refuse without attempting MCP tools.\n"
+                        f"- Available MCP tools now: {', '.join(_mcp_tool_names[:12])}"
+                    )
+                    _cur_prompt = (intent_info.get("prompt") or "").strip()
+                    intent_info["prompt"] = (_cur_prompt + "\n\n" + _mcp_rule).strip() if _cur_prompt else _mcp_rule
+                    logger.info(f"MCP guidance boost active ({len(_mcp_tool_names)} MCP tool(s) available)")
+
+        # MCP guard: if a request clearly targets MCP-backed data/actions,
+        # allow one internal retry when the model answers without any tool call.
+        _mcp_guard_maybe_needed = _is_mcp_data_request(user_message)
+        _mcp_guard_retry_used = False
+        _mcp_tool_count = 0
+        try:
+            _mcp_tool_count = len([
+                t for t in (intent_info or {}).get("tool_schemas", [])
+                if (t.get("function", {}).get("name", "").startswith("mcp_"))
+            ])
+        except Exception:
+            _mcp_tool_count = 0
+        _mcp_guard_enabled = _mcp_guard_maybe_needed and _mcp_tool_count > 0
+
         # Tool execution loop: providers surface tool_calls in the done event;
         # we execute them here and loop until the model produces a final answer.
         _MAX_TOOL_ROUNDS = 8
@@ -4146,6 +4242,14 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 or get_active_model().lower() in _NO_NATIVE_TOOL_MODELS
             )
             _text_buffer: list = []
+            _mcp_guard_triggered_this_round = False
+            _buffer_for_mcp_guard = (
+                _mcp_guard_enabled
+                and not _mcp_guard_retry_used
+                and not _is_no_tool_provider
+                and _tool_round == 1
+            )
+            _mcp_guard_stream_buffer: list = []
 
             # Stream events, intercepting 'done' to enrich with cost or detect tool calls
             for event in provider_gen:
@@ -4303,7 +4407,33 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                     yield {"type": "token", "content": buffered_chunk}
                             _text_buffer = []
 
+                        # MCP guard retry (generic, one-shot):
+                        # if this looks like an MCP-oriented request and the model
+                        # ended without tool calls, retry once with stronger instruction.
+                        if _buffer_for_mcp_guard and not _pending_tool_calls:
+                            _mcp_guard_retry_used = True
+                            _mcp_guard_triggered_this_round = True
+                            _mcp_guard_stream_buffer = []  # discard first plain-text attempt
+                            _streamed_text_parts = []      # keep only post-retry output
+                            _retry_rule = (
+                                "MCP RETRY RULE:\n"
+                                "- You must call relevant MCP tool(s) before answering.\n"
+                                "- Do not refuse without attempting MCP tools.\n"
+                                "- Base the final answer on tool results."
+                            )
+                            _cur_prompt = ((intent_info or {}).get("prompt") or "").strip()
+                            if intent_info is not None:
+                                intent_info["prompt"] = (_cur_prompt + "\n\n" + _retry_rule).strip() if _cur_prompt else _retry_rule
+                            logger.info("MCP guard retry: model answered without tool_calls, retrying once")
+                            break
+
                         # Normal completion — enrich with cost and forward to client
+                        if _buffer_for_mcp_guard and _mcp_guard_stream_buffer:
+                            _joined = "".join(_mcp_guard_stream_buffer)
+                            _streamed_text_parts.append(_joined)
+                            yield {"type": "token", "content": _joined}
+                            _mcp_guard_stream_buffer = []
+
                         if event.get("usage"):
                             raw_usage = event["usage"]
                             logger.debug(f"💰 Usage received from provider: {raw_usage}")
@@ -4394,6 +4524,8 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     _streamed_text_parts.append(chunk)
                     if _is_html_dash or _is_no_tool_provider:
                         _text_buffer.append(chunk)  # buffer: process after done
+                    elif _buffer_for_mcp_guard:
+                        _mcp_guard_stream_buffer.append(chunk)  # hold until done decision
                     else:
                         yield {"type": "token", "content": chunk}
                 elif event.get("type") == "token":
@@ -4402,10 +4534,15 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     _streamed_text_parts.append(content)
                     if _is_html_dash or _is_no_tool_provider:
                         _text_buffer.append(content)  # buffer: process after done
+                    elif _buffer_for_mcp_guard:
+                        _mcp_guard_stream_buffer.append(content)  # hold until done decision
                     else:
                         yield event
                 else:
                     yield event
+
+            if _mcp_guard_triggered_this_round:
+                continue  # run one internal retry with stronger MCP instruction
 
             if not _pending_tool_calls:
                 break  # No tool calls → conversation complete
@@ -4670,6 +4807,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 if fn_name in _read_only_tools and _sig in _tool_cache:
                     logger.debug(f"Tool cache hit: {fn_name}")
                     result = _tool_cache[_sig]
+                elif fn_name.startswith("mcp_"):
+                    # MCP tools are runtime-dynamic and are not part of the static
+                    # ToolRegistry catalog: execute via direct MCP dispatcher.
+                    result = tools.execute_tool(fn_name, tc_args)
+                    if fn_name in _read_only_tools:
+                        _tool_cache[_sig] = result
                 elif _tool_registry is not None:
                     # === OpenClaw-style execution with hooks ===
                     # The registry applies before/after hooks:

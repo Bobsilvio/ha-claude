@@ -1,6 +1,16 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.4 — MCP LLM-first fix: tool dinamici nel prompt + esecuzione corretta
+- **MCP in LLM-first (ToolRegistry attivo)**
+  - I tool MCP dinamici runtime ora vengono sempre iniettati in `tool_schemas` (`+N`), anche quando il ToolRegistry è inizializzato da catalogo statico legacy
+  - Risolto caso in cui il modello vedeva e chiamava `mcp_*` ma il backend rispondeva `Unknown tool` perché l'esecuzione passava dal registry statico
+  - I tool `mcp_*` ora vengono eseguiti via dispatcher MCP diretto nel tool loop
+
+- **Affidabilità richiesta MCP**
+  - Regola prompt MCP generica su richieste DB/filesystem/repo (senza hardcode SQLite-only)
+  - Retry interno one-shot se il modello chiude senza tool_call su richiesta chiaramente MCP-oriented
+
 ## 4.6.3 — MCP UX/runtime: stato server, stop, autostart persistente manuale
 - **MCP UI (chat_ui)**
   - Aggiunto badge stato per ogni server MCP con pallino:
@@ -22,7 +32,6 @@
     - se avvii manualmente un server e lo lasci attivo, al riavvio addon riparte
     - se lo stoppi, viene rimosso dall’autostart
   - Avvio MCP al boot limitato ai soli server marcati autostart (non tutti quelli nel config)
-
 - **MCP manager**
   - Nuovo metodo `remove_server(name)` per disconnettere e deregistrare un singolo server
 
