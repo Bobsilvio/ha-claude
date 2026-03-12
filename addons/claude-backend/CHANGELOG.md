@@ -1,6 +1,9 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.6 - Fix create dashboard
+-- **Fix create dashboard**
+
 ## 4.6.5 — HTML dashboard reliability, auth hardening, quality guardrails
 - **HTML dashboard generation reliability**
   - Fixed chunked `create_html_dashboard` loop handling and improved draft auto-finalization path

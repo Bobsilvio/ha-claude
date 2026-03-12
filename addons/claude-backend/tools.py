@@ -3815,24 +3815,25 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
-            # Quality gate for raw HTML dashboards: avoid saving KPI-only layouts.
+            # Quality gate (non-blocking): detect KPI-only layouts, but still save.
+            _quality_warning = None
             if raw_html is not None:
                 _q = _dashboard_quality_report(html_content)
                 _has_charts_kw = any(k in (raw_html or "").lower() for k in ("chart", "grafic", "trend"))
                 if _has_charts_kw and not _q.get("has_visible_charts"):
+                    _quality_warning = (
+                        "Visible charts appear to be missing. Expected at least 2 always-visible charts "
+                        "in main layout (one line/area trend + one bar/doughnut comparative chart)."
+                    )
+                    logger.warning(f"QUALITY_GATE_WARNING: {_quality_warning} quality={_q}")
                     _record_dashboard_generation_metric(
                         name=name,
-                        status="rejected",
-                        details={"reason": "missing_visible_charts", **_q},
+                        status="success",
+                        details={
+                            "warning": "missing_visible_charts",
+                            **_q,
+                        },
                     )
-                    return json.dumps({
-                        "error": (
-                            "QUALITY_GATE: Dashboard rejected because visible charts are missing. "
-                            "Include at least 2 always-visible charts in the main page "
-                            "(one line/area trend + one bar/doughnut comparative chart)."
-                        ),
-                        "quality": _q,
-                    }, ensure_ascii=False, default=str)
 
             try:
                 # Save HTML to /config/www/dashboards/ - served by HA at /local/dashboards/
@@ -3947,6 +3948,8 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "sections_count": len(sections) if isinstance(sections, list) else 0,
                     "IMPORTANT": f"✨ Dashboard '{title}' is ready! Reply with ONE short sentence confirming it was created. Do NOT include any HTML code in your reply.",
                 }
+                if _quality_warning:
+                    result["quality_warning"] = _quality_warning
                 # Compute diff if we overwrote an existing file
                 if _old_html and _old_html != html_content:
                     import difflib as _difflib
