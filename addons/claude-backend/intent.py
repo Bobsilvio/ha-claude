@@ -332,6 +332,15 @@ UI RULES:
 - The dashboard is for END USERS, not developers — show only useful data: entity values, labels, charts, status indicators
 - A small colored dot (green=live, grey=offline) in the header is OK, but do NOT label it "WebSocket"/"REST"
 
+CHART REQUIREMENTS (MANDATORY):
+- Include at least 2 always-visible charts in the MAIN page (not only in a modal):
+  1) one time-series line/area chart (trend over time)
+  2) one comparative chart (bar OR doughnut/pie)
+- Do NOT build dashboards with only numeric cards/tables.
+- Mix sections: KPI cards + charts + grouped insights in the same page.
+- Correlate metrics when possible (e.g. production vs consumption vs grid import/export).
+- Modal history charts are allowed, but they do NOT count as the required visible charts.
+
 ENTITY CLICK — MORE INFO DIALOG:
 When the user clicks on a sensor/entity card, show a detail popup with history chart.
 Use this pattern:

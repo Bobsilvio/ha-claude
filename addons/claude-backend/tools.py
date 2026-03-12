@@ -414,11 +414,24 @@ _VUE_BOILERPLATE = """
 const ENTITIES = __ENTITIES_JSON__;
 const {createApp, ref, reactive, computed, onMounted, onUnmounted} = Vue;
 createApp({
+  template: `
+    <div style="max-width:1100px;margin:24px auto;padding:0 16px 24px 16px;font-family:Arial,sans-serif">
+      <h1 style="margin:0 0 8px 0">{{ title }}</h1>
+      <div style="margin:0 0 16px 0;color:#64748b;font-size:13px">Live mode: {{ conn.mode }} • {{ nowText }}</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px">
+        <div v-for="eid in quickEntities" :key="eid" style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.05)">
+          <div style="font-size:12px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ entityName(eid) }}</div>
+          <div style="font-size:20px;font-weight:700;line-height:1.2;margin-top:4px">{{ sv(eid) }}</div>
+        </div>
+      </div>
+    </div>
+  `,
   setup() {
     const states = reactive({});
     const conn = reactive({ok: false, mode: 'connecting'});
     const title = __TITLE_JSON__;
     const nowText = ref('');
+    const quickEntities = computed(() => ENTITIES.slice(0, 24));
 
     const sv = (eid) => (states[eid]||{}).state || '';
     const nv = (eid) => parseFloat(sv(eid)) || 0;
@@ -552,7 +565,7 @@ createApp({
     return {
       states, conn, title, nowText, sv, nv, fmt, entityName, powerText,
       solarW, gridW, battW, battSoc, price, solarShare, solarTodayKwh,
-      ENTITIES
+      ENTITIES, quickEntities
     };
   }
 }).mount('#app');
@@ -565,32 +578,292 @@ def _autocomplete_truncated_html(html: str, entities: list) -> str:
     GPT-5.2 often hits output token limits before writing the JS section."""
     import re
 
-    # Strip any trailing incomplete tags/attributes
-    # Find the last complete closing tag
-    last_close = max(html.rfind('>'), html.rfind('\n'))
-    if last_close > 0 and last_close < len(html) - 1:
-        html = html[:last_close + 1]
+    out = str(html or "")
 
-    # Close unclosed divs/sections
-    open_divs = html.lower().count('<div') - html.lower().count('</div')
-    open_sections = html.lower().count('<section') - html.lower().count('</section')
-    closers = '</div>' * max(0, open_divs)
-    closers += '</section>' * max(0, open_sections)
+    # Drop obviously malformed start-tags missing '>' before line end
+    # (common truncation artifact: "<div id=    const tok ...").
+    out = re.sub(r'<[A-Za-z][^>\n]*\n', '\n', out)
 
-    # Check if we need to close body/html
-    has_body_close = '</body>' in html.lower()
-    has_html_close = '</html>' in html.lower()
+    # Remove trailing body/html closes so we can safely append runtime boilerplate.
+    out = re.sub(r'</body>\s*$', '', out, flags=re.IGNORECASE)
+    out = re.sub(r'</html>\s*$', '', out, flags=re.IGNORECASE)
 
-    # Build the completion
-    completion = closers
-    if not has_body_close:
-        completion += '\n<footer style="margin-top:16px;color:rgba(255,255,255,.4);font-size:12px;text-align:center">__FOOTER__</footer>\n'
-        completion += _VUE_BOILERPLATE
-        completion += '</body>'
-    if not has_html_close:
-        completion += '</html>'
+    # Remove extra orphan closing </script> tags (without matching opening tag).
+    _opens = len(re.findall(r'<script\b', out, flags=re.IGNORECASE))
+    _closes = len(re.findall(r'</script>', out, flags=re.IGNORECASE))
+    _extra = max(0, _closes - _opens)
+    for _ in range(_extra):
+        out = re.sub(r'</script>\s*', '', out, count=1, flags=re.IGNORECASE)
 
-    return html + completion
+    # Ensure a Vue mount node exists before app script.
+    if 'id="app"' not in out.lower() and "id='app'" not in out.lower():
+        if re.search(r'</body>', out, flags=re.IGNORECASE):
+            out = re.sub(r'</body>', '<div id="app"></div>\n</body>', out, count=1, flags=re.IGNORECASE)
+        else:
+            out += '\n<div id="app"></div>\n'
+
+    # Ensure footer exists once.
+    if "__FOOTER__" not in out and "dashboard by amira" not in out.lower():
+        out += '\n<footer style="margin-top:16px;color:rgba(255,255,255,.4);font-size:12px;text-align:center">__FOOTER__</footer>\n'
+
+    # Always append Vue runtime/autoupdate script for truncated raw HTML.
+    out += _VUE_BOILERPLATE
+
+    # Guarantee closing tags.
+    if '</body>' not in out.lower():
+        out += '\n</body>'
+    if '</html>' not in out.lower():
+        out += '\n</html>'
+
+    return out
+
+
+def _is_likely_truncated_html(html: str) -> bool:
+    """Heuristic: detect incomplete/truncated HTML that needs repair."""
+    import re
+
+    src = str(html or "")
+    low = src.lower()
+    if not src.strip():
+        return True
+
+    # Missing core closes strongly suggests truncation.
+    if "</body>" not in low or "</html>" not in low:
+        return True
+
+    # Unbalanced script tags.
+    opens = len(re.findall(r"<script\b", low))
+    closes = len(re.findall(r"</script>", low))
+    if opens != closes:
+        return True
+
+    # Ends in the middle of a tag/attribute/template string.
+    tail = src[-300:]
+    if re.search(r"<[a-zA-Z][^>\n\r]*$", tail):
+        return True
+    if tail.count("`") % 2 == 1:
+        return True
+    if tail.count('"') % 2 == 1 and tail.count("'") % 2 == 1:
+        # Conservative check: both quote types odd in the tail usually means broken JS/HTML string.
+        return True
+
+    return False
+
+
+def _ensure_vue_runtime_contract(html: str) -> str:
+    """Ensure raw AI HTML has the minimum runtime contract for Vue dashboards.
+
+    Some model outputs include `createApp(...).mount('#app')` but forget:
+    - `<div id="app"></div>` in body
+    - Vue 3 global script include
+    """
+    import re
+
+    out = str(html or "")
+    low = out.lower()
+    uses_vue_app = ("createapp(" in low) or (".mount('#app')" in low) or ('.mount("#app")' in low)
+    if not uses_vue_app:
+        return out
+
+    # 1) Ensure Vue runtime script is loaded
+    has_vue_runtime = (
+        "vue.global.prod.js" in low
+        or "unpkg.com/vue@3" in low
+        or "cdn.jsdelivr.net/npm/vue@3" in low
+    )
+    if not has_vue_runtime:
+        vue_cdn = '<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>\n'
+        if "</head>" in low:
+            out = re.sub(r"</head>", vue_cdn + "</head>", out, count=1, flags=re.IGNORECASE)
+        elif "<body" in low:
+            out = re.sub(r"<body([^>]*)>", r"<body\1>\n" + vue_cdn, out, count=1, flags=re.IGNORECASE)
+        else:
+            out = vue_cdn + out
+        logger.info("create_html_dashboard: injected missing Vue runtime script")
+        low = out.lower()
+
+    # 2) Ensure mount target exists
+    has_app_mount = ('id="app"' in low) or ("id='app'" in low)
+    if not has_app_mount:
+        app_div = '<div id="app"></div>\n'
+        if "<body" in low:
+            out = re.sub(r"<body([^>]*)>", r"<body\1>\n" + app_div, out, count=1, flags=re.IGNORECASE)
+        else:
+            # Fallback for malformed fragments
+            out = app_div + out
+        logger.info("create_html_dashboard: injected missing #app mount node")
+
+    return out
+
+
+def _ensure_visible_charts(html: str, entities: list) -> str:
+    """Ensure at least one always-visible chart section exists.
+
+    Some generated dashboards include only a modal history chart (no visible charts
+    in the main layout). This injects a lightweight visible chart panel when needed.
+    """
+    import re
+    import json as _json
+
+    out = str(html or "")
+    low = out.lower()
+    if "amira_auto_charts_panel" in low:
+        return out
+
+    canvas_ids = [m.group(1).strip().lower() for m in re.finditer(r'<canvas[^>]*id=["\']([^"\']+)["\']', out, flags=re.IGNORECASE)]
+    visible_canvas_count = len(canvas_ids)
+    # Treat "history-only" chart IDs as non-visible dashboard charts.
+    history_like = {"historychart", "histchart", "history-chart", "hist-chart"}
+    has_only_history_canvas = bool(canvas_ids) and all(cid in history_like for cid in canvas_ids)
+
+    has_chart_lib_or_usage = ("chart.js" in low) or ("new chart(" in low)
+    needs_injection = (visible_canvas_count == 0) or has_only_history_canvas
+    if not needs_injection:
+        return out
+
+    ids = [e for e in (entities or []) if isinstance(e, str)][:10]
+    ids_json = _json.dumps(ids, ensure_ascii=False)
+
+    panel_html = (
+        '\n<section id="amira_auto_charts_panel" '
+        'style="margin-top:16px;padding:14px;border-radius:14px;'
+        'border:1px solid rgba(120,160,220,.35);background:rgba(10,18,34,.45)">\n'
+        '<div style="font-size:13px;font-weight:700;letter-spacing:.3px;opacity:.9;margin-bottom:10px">'
+        'Live Charts</div>\n'
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px">'
+        '<div style="padding:10px;border-radius:10px;border:1px solid rgba(120,160,220,.25)"><canvas id="amira_auto_chart_bar"></canvas></div>'
+        '<div style="padding:10px;border-radius:10px;border:1px solid rgba(120,160,220,.25)"><canvas id="amira_auto_chart_doughnut"></canvas></div>'
+        '</div>\n'
+        '</section>\n'
+    )
+    panel_script = (
+        '<script>(function(){\n'
+        'if(typeof Chart==="undefined"){return;}\n'
+        f'const _ids={ids_json};\n'
+        'if(!_ids.length){return;}\n'
+        'async function _getTok(){\n'
+        '  try{ if(typeof _getTokenAsync==="function"){ return await _getTokenAsync(); } }catch(e){}\n'
+        '  try{ const s=localStorage.getItem("hassTokens"); if(s){ return (JSON.parse(s||"{}").access_token)||""; } }catch(e){}\n'
+        '  return "";\n'
+        '}\n'
+        'function _num(v){ const n=parseFloat(v); return Number.isFinite(n)?n:0; }\n'
+        'async function _load(){\n'
+        '  const tok=await _getTok();\n'
+        '  const h=tok?{"Authorization":"Bearer "+tok}:{};\n'
+        '  const rows=[];\n'
+        '  for(const id of _ids){\n'
+        '    try{\n'
+        '      const r=await fetch("/api/states/"+id,{headers:h});\n'
+        '      if(!r.ok) continue;\n'
+        '      const s=await r.json();\n'
+        '      rows.push({\n'
+        '        id:id,\n'
+        '        name:(s&&s.attributes&&s.attributes.friendly_name)||id,\n'
+        '        val:_num(s&&s.state)\n'
+        '      });\n'
+        '    }catch(e){}\n'
+        '  }\n'
+        '  if(!rows.length){return;}\n'
+        '  const top=rows.slice(0,6);\n'
+        '  const labels=top.map(x=>x.name.length>18?x.name.slice(0,18)+"…":x.name);\n'
+        '  const data=top.map(x=>Math.abs(x.val));\n'
+        '  const bg=["#5ea1ff","#37d6ff","#9d7bff","#33d17a","#ffd166","#ff5d73"];\n'
+        '  new Chart(document.getElementById("amira_auto_chart_bar"),{\n'
+        '    type:"bar",\n'
+        '    data:{labels:labels,datasets:[{data:data,backgroundColor:bg,borderWidth:0}]},\n'
+        '    options:{plugins:{legend:{display:false}},scales:{x:{ticks:{maxRotation:0,minRotation:0}},y:{beginAtZero:true}}}\n'
+        '  });\n'
+        '  new Chart(document.getElementById("amira_auto_chart_doughnut"),{\n'
+        '    type:"doughnut",\n'
+        '    data:{labels:labels,datasets:[{data:data,backgroundColor:bg,borderWidth:0}]},\n'
+        '    options:{plugins:{legend:{position:"bottom"}}}\n'
+        '  });\n'
+        '}\n'
+        '_load();\n'
+        '})();</script>\n'
+    )
+
+    # Ensure Chart.js is present if the model omitted it.
+    if "chart.js" not in low:
+        chart_lib = '<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>\n'
+        if re.search(r"</head>", out, flags=re.IGNORECASE):
+            out = re.sub(r"</head>", chart_lib + "</head>", out, count=1, flags=re.IGNORECASE)
+        else:
+            out = chart_lib + out
+
+    if re.search(r"</body>", out, flags=re.IGNORECASE):
+        out = re.sub(r"</body>", panel_html + panel_script + "</body>", out, count=1, flags=re.IGNORECASE)
+    else:
+        out += panel_html + panel_script
+
+    logger.info("create_html_dashboard: injected visible chart section (bar + doughnut)")
+    return out
+
+
+def _dashboard_quality_report(html: str) -> dict:
+    """Return lightweight quality signals for generated dashboard HTML."""
+    import re
+
+    src = str(html or "")
+    low = src.lower()
+    canvas_ids = [m.group(1).strip().lower() for m in re.finditer(r'<canvas[^>]*id=["\']([^"\']+)["\']', src, flags=re.IGNORECASE)]
+    chart_ctor_count = len(re.findall(r"new\s+chart\s*\(", low))
+    has_chart_lib = ("chart.js" in low) or ("new chart(" in low)
+    has_main_grid = bool(re.search(r'id=["\'](?:dashboard|cards|grid|kpi|app)["\']', low))
+    has_body_close = "</body>" in low
+    has_html_close = "</html>" in low
+    visible_canvas_count = len(canvas_ids)
+    history_like = {"historychart", "histchart", "history-chart", "hist-chart"}
+    only_history_canvas = bool(canvas_ids) and all(cid in history_like for cid in canvas_ids)
+    has_visible_charts = has_chart_lib and chart_ctor_count >= 2 and visible_canvas_count >= 2 and not only_history_canvas
+    return {
+        "has_chart_lib": has_chart_lib,
+        "chart_ctor_count": chart_ctor_count,
+        "visible_canvas_count": visible_canvas_count,
+        "only_history_canvas": only_history_canvas,
+        "has_visible_charts": has_visible_charts,
+        "has_main_grid": has_main_grid,
+        "has_body_close": has_body_close,
+        "has_html_close": has_html_close,
+    }
+
+
+def _record_dashboard_generation_metric(name: str, status: str, details: dict | None = None) -> None:
+    """Persist minimal generation telemetry for troubleshooting quality by provider/model."""
+    try:
+        metrics_path = os.path.join(api.HA_CONFIG_DIR, "amira", "dashboard_generation_metrics.json")
+        os.makedirs(os.path.dirname(metrics_path), exist_ok=True)
+        data = {"total": 0, "success": 0, "rejected": 0, "last": []}
+        if os.path.isfile(metrics_path):
+            try:
+                with open(metrics_path, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    data.update(loaded)
+            except Exception:
+                pass
+        data["total"] = int(data.get("total", 0)) + 1
+        if status == "success":
+            data["success"] = int(data.get("success", 0)) + 1
+        else:
+            data["rejected"] = int(data.get("rejected", 0)) + 1
+        row = {
+            "ts": datetime.now().isoformat(),
+            "name": name,
+            "status": status,
+            "provider": getattr(api, "AI_PROVIDER", ""),
+            "model": getattr(api, "AI_MODEL", "") or getattr(api, "SELECTED_MODEL", ""),
+            "details": details or {},
+        }
+        last = data.get("last", [])
+        if not isinstance(last, list):
+            last = []
+        last.append(row)
+        data["last"] = last[-30:]
+        with open(metrics_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 def _fill_html_placeholders(
@@ -731,6 +1004,9 @@ def _fix_auth_redirect(html: str) -> str:
         "done('');\n"
         "}})};\n"
         "function _authHeader(){return tok?{'Authorization':'Bearer '+tok,'Content-Type':'application/json'}:{'Content-Type':'application/json'}}\n"
+        "async function _authFetch(url,opts){await _getTokenAsync();opts=opts||{};"
+        "var h=(opts.headers&&typeof opts.headers==='object')?opts.headers:{};"
+        "opts.headers=Object.assign({},_authHeader(),h);return fetch(url,opts)}\n"
         "/* ── end auth patch ── */\n"
     )
 
@@ -747,9 +1023,8 @@ def _fix_auth_redirect(html: str) -> str:
         if not needs_patch:
             return m.group(0)
 
-        # Already patched
-        if "_getTokenAsync" in body or "Amira auth patch" in body:
-            return m.group(0)
+        # If helper already exists, avoid reinjecting it, but still sanitize headers/calls.
+        _has_helper = ("_getTokenAsync" in body or "Amira auth patch" in body)
 
         # Remove stale sync token declarations
         body = re.sub(
@@ -771,6 +1046,48 @@ def _fix_auth_redirect(html: str) -> str:
             r"(?:const|let|var)\s+headers\s*=\s*\{[^}]*Authorization[^}]*\+\s*tok[^}]*\}\s*;\s*\n?",
             "", body, flags=re.IGNORECASE
         )
+        # Remove any other static auth-header objects based on tok (e.g. const H = {...Bearer + tok...})
+        _stale_header_vars = re.findall(
+            r"(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*\{[^}]*Authorization[^}]*\+\s*tok[^}]*\}\s*;\s*",
+            body,
+            flags=re.IGNORECASE,
+        )
+        body = re.sub(
+            r"(?:const|let|var)\s+[A-Za-z_]\w*\s*=\s*\{[^}]*Authorization[^}]*\+\s*tok[^}]*\}\s*;\s*\n?",
+            "",
+            body,
+            flags=re.IGNORECASE,
+        )
+        # Rewrite fetch option objects to use dynamic auth header resolver.
+        for _var in set(_stale_header_vars):
+            body = re.sub(
+                rf"headers\s*:\s*{re.escape(_var)}\b",
+                "headers:_authHeader()",
+                body,
+                flags=re.IGNORECASE,
+            )
+        body = re.sub(
+            r"headers\s*:\s*\{[^{}]*Authorization\s*:\s*['\"]Bearer['\"]\s*\+\s*tok[^{}]*\}",
+            "headers:_authHeader()",
+            body,
+            flags=re.IGNORECASE,
+        )
+        # Extra-normalization for compact patterns frequently produced by LLMs.
+        body = re.sub(
+            r"headers\s*:\s*\{\s*['\"]?Authorization['\"]?\s*:\s*['\"]Bearer['\"]\s*\+\s*tok\s*\}",
+            "headers:_authHeader()",
+            body,
+            flags=re.IGNORECASE,
+        )
+        body = body.replace("headers:{Authorization:'Bearer '+tok}", "headers:_authHeader()")
+        body = body.replace('headers:{Authorization:\"Bearer \"+tok}', "headers:_authHeader()")
+        # Route HA state/history calls through auth-aware fetch wrapper.
+        body = re.sub(
+            r"\bfetch\(\s*([\"'`]/api/(?:states|history))",
+            r"_authFetch(\1",
+            body,
+            flags=re.IGNORECASE,
+        )
 
         # Wrap entry-point calls in _getTokenAsync().then(...)
         # Use prefix matching: "load" matches loadBatteries(), loadSensors(), etc.
@@ -789,6 +1106,8 @@ def _fix_auth_redirect(html: str) -> str:
             body, flags=re.MULTILINE
         )
 
+        if _has_helper:
+            return script_tag + body + closing
         return script_tag + "\n" + _GETTOKEN_HELPER + body + closing
 
     patched = re.sub(
@@ -1501,7 +1820,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nCRITICAL — ENTITIES: The pre-loaded context (## ENTITÀ TROVATE) already contains the correct entity_ids. You MUST:\n1. Copy ALL entity_ids from ## ENTITÀ TROVATE into the entities[] parameter of this tool call\n2. Use __ENTITIES_JSON__ placeholder in the HTML — the server replaces it with the validated list\n3. In JS, iterate over ENTITIES array (from __ENTITIES_JSON__) — NEVER filter /api/states by device_class or any attribute. The ENTITIES array IS the correct filtered list.\n4. NEVER hardcode entity_ids — use __ENTITIES_JSON__ so the server controls the list\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nCRITICAL — ENTITIES: The pre-loaded context (## ENTITÀ TROVATE) already contains the correct entity_ids. You MUST:\n1. Copy ALL entity_ids from ## ENTITÀ TROVATE into the entities[] parameter of this tool call\n2. Use __ENTITIES_JSON__ placeholder in the HTML — the server replaces it with the validated list\n3. In JS, iterate over ENTITIES array (from __ENTITIES_JSON__) — NEVER filter /api/states by device_class or any attribute. The ENTITIES array IS the correct filtered list.\n4. NEVER hardcode entity_ids — use __ENTITIES_JSON__ so the server controls the list\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.\n\nCHART REQUIREMENTS (MANDATORY): include at least 2 always-visible charts in the main page (not only modal history): one time-series chart (line/area) and one comparative chart (bar or doughnut/pie). Do not return KPI-only layouts.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -3098,14 +3417,36 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             name = tool_input.get("name", "dashboard")
             icon = tool_input.get("icon", "mdi:web")
             entities = tool_input.get("entities", [])
+            if isinstance(entities, str):
+                _parsed_entities = None
+                try:
+                    _tmp = json.loads(entities)
+                    if isinstance(_tmp, list):
+                        _parsed_entities = _tmp
+                except Exception:
+                    try:
+                        import ast as _ast
+                        _tmp = _ast.literal_eval(entities)
+                        if isinstance(_tmp, list):
+                            _parsed_entities = _tmp
+                    except Exception:
+                        _parsed_entities = None
+                if _parsed_entities is not None:
+                    entities = _parsed_entities
+                else:
+                    entities = [entities] if "." in entities else []
             theme = tool_input.get("theme", "auto")
             accent_color = tool_input.get("accent_color", "#667eea")
             sections = tool_input.get("sections", [])
             lang = tool_input.get("lang")
-            footer_text = tool_input.get("footer_text")
+            # Keep footer branding consistent across generated dashboards.
+            _FORCED_FOOTER = "Dashboard by Amira"
+            footer_text = _FORCED_FOOTER
             raw_html = tool_input.get("html")
             return_html = bool(tool_input.get("return_html", False))
             is_draft = bool(tool_input.get("draft", False))
+            _raw_html_original = None
+            _html_debug_enabled = str(getattr(api, "LOG_LEVEL", "normal")).lower() in ("verbose", "debug")
 
             # --- Draft (chunked) mode ---
             if is_draft and raw_html:
@@ -3125,7 +3466,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     _html_drafts[name] = {
                         "html": raw_html, "title": title, "icon": icon,
                         "entities": entities, "theme": theme, "accent_color": accent_color,
-                        "lang": lang, "footer_text": footer_text, "chunks": 1
+                        "lang": lang, "footer_text": _FORCED_FOOTER, "chunks": 1
                     }
                     logger.info(f"📝 Draft started for '{name}': {len(raw_html)} chars, {len(entities)} entities")
                     return json.dumps({
@@ -3155,22 +3496,121 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     accent_color = draft["accent_color"]
                 if not lang and draft.get("lang"):
                     lang = draft["lang"]
-                if not footer_text and draft.get("footer_text"):
-                    footer_text = draft["footer_text"]
+                footer_text = _FORCED_FOOTER
                 chunks = draft.get("chunks", 1) + (1 if tool_input.get("html") else 0)
                 logger.info(f"📝 Draft finalized for '{name}': {chunks} chunks, {len(raw_html)} chars total")
+            if raw_html is not None and _html_debug_enabled:
+                _raw_html_original = str(raw_html)
+                try:
+                    _dbg_dir = os.path.join(api.HA_CONFIG_DIR, "amira", "debug_html")
+                    os.makedirs(_dbg_dir, exist_ok=True)
+                    _dbg_stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+                    _dbg_base = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+                    _in_path = os.path.join(_dbg_dir, f"{_dbg_stamp}-{_dbg_base}-incoming.html")
+                    with open(_in_path, "w", encoding="utf-8") as _dbg_f:
+                        _dbg_f.write(_raw_html_original)
+                    logger.info(f"create_html_dashboard debug: incoming raw HTML saved: {_in_path} ({len(_raw_html_original)} chars)")
+                except Exception as _dbg_err:
+                    logger.warning(f"create_html_dashboard debug: incoming raw HTML save failed: {_dbg_err}")
 
             if raw_html is not None:
                 if not isinstance(raw_html, str) or not raw_html.strip():
                     return json.dumps({"error": "html must be a non-empty string when provided."}, default=str)
                 if len(raw_html) > 900_000:
                     return json.dumps({"error": f"html is too large ({len(raw_html)} chars). Please reduce size."}, default=str)
+                # Normalize escaped payloads (common with chunked model outputs).
+                # Example: "<!DOCTYPE html>\\n<html>..." must become real newlines.
+                _raw_before = raw_html
+                _looks_escaped_html = (
+                    "<!DOCTYPE html>\\n" in raw_html
+                    or "<html>\\n" in raw_html
+                    or "<head>\\n" in raw_html
+                    or raw_html.count("\\n") >= 4
+                )
+                if _looks_escaped_html:
+                    for _ in range(3):
+                        _decoded = (
+                            raw_html.replace("\\r\\n", "\n")
+                            .replace("\\n", "\n")
+                            .replace("\\t", "\t")
+                            .replace('\\"', '"')
+                            .replace("\\'", "'")
+                        )
+                        if _decoded == raw_html:
+                            break
+                        raw_html = _decoded
+                if raw_html != _raw_before:
+                    logger.info("create_html_dashboard: normalized escaped sequences in raw HTML")
+
+                # Repair frequent malformed head fragments from truncated chunks.
+                try:
+                    import re as _re_html_fix
+                    _fixed = _re_html_fix.sub(
+                        r"<meta\s+charset\s*=\s*<style>",
+                        '<meta charset="UTF-8">\n<style>',
+                        raw_html,
+                        flags=_re_html_fix.IGNORECASE,
+                    )
+                    _fixed = _re_html_fix.sub(
+                        r"<meta\s+charset\s*=\s*([^\s\">]+)",
+                        r'<meta charset="\1">',
+                        _fixed,
+                        flags=_re_html_fix.IGNORECASE,
+                    )
+                    raw_html = _fixed
+                except Exception:
+                    pass
                 # Auto-complete truncated HTML: GPT-5.2 often hits output token limit
                 # before writing the Vue.createApp script section
                 html_lower = raw_html.lower()
+                if "<html" not in html_lower and "<!doctype" not in html_lower:
+                    _css_like = (
+                        ":root" in html_lower
+                        or "body {" in html_lower
+                        or ".card {" in html_lower
+                    )
+                    if _css_like:
+                        raw_html = (
+                            "<!DOCTYPE html>\n"
+                            "<html lang=\"__LANG__\">\n"
+                            "<head>\n"
+                            "<meta charset=\"UTF-8\">\n"
+                            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+                            "<title>__TITLE__</title>\n"
+                            "<style>\n"
+                            f"{raw_html}\n"
+                            "</style>\n"
+                            "</head>\n"
+                            "<body>\n"
+                            "<div id=\"app\"></div>\n"
+                            "<footer style=\"margin-top:16px;color:rgba(255,255,255,.4);font-size:12px;text-align:center\">__FOOTER__</footer>\n"
+                            "</body>\n"
+                            "</html>"
+                        )
+                        logger.warning("create_html_dashboard: wrapped CSS-like fragment into full HTML")
+                    else:
+                        raw_html = (
+                            "<!DOCTYPE html>\n"
+                            "<html lang=\"__LANG__\">\n"
+                            "<head>\n"
+                            "<meta charset=\"UTF-8\">\n"
+                            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n"
+                            "<title>__TITLE__</title>\n"
+                            "</head>\n"
+                            "<body>\n"
+                            f"{raw_html}\n"
+                            "<footer style=\"margin-top:16px;color:rgba(255,255,255,.4);font-size:12px;text-align:center\">__FOOTER__</footer>\n"
+                            "</body>\n"
+                            "</html>"
+                        )
+                        logger.warning("create_html_dashboard: wrapped fragment into full HTML")
+                    html_lower = raw_html.lower()
                 if "createapp" not in html_lower:
-                    raw_html = _autocomplete_truncated_html(raw_html, entities)
-                    logger.info(f"Auto-completed truncated HTML (no createApp): added Vue boilerplate ({len(raw_html)} chars total)")
+                    if _is_likely_truncated_html(raw_html):
+                        raw_html = _autocomplete_truncated_html(raw_html, entities)
+                        logger.info(f"Auto-completed truncated HTML (no createApp): repaired structure + injected runtime ({len(raw_html)} chars total)")
+                    else:
+                        logger.info("create_html_dashboard: raw HTML has no createApp but appears complete — skipping autocomplete")
                 elif ".mount(" not in raw_html:
                     # createApp exists but script is truncated (no .mount call)
                     # The HTML is too large for a single call — force chunked mode
@@ -3309,6 +3749,27 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     lang=lang,
                     footer_text=footer_text,
                 )
+                # Keep browser tab title aligned with the saved dashboard title.
+                try:
+                    import re as _re_title_fix
+                    import html as _html_mod
+                    _safe_title = _html_mod.escape(str(title))
+                    if _re_title_fix.search(r"<title\b[^>]*>[\s\S]*?</title>", html_content, flags=_re_title_fix.IGNORECASE):
+                        html_content = _re_title_fix.sub(
+                            f"<title>{_safe_title}</title>",
+                            html_content,
+                            count=1,
+                            flags=_re_title_fix.IGNORECASE,
+                        )
+                    elif _re_title_fix.search(r"</head>", html_content, flags=_re_title_fix.IGNORECASE):
+                        html_content = _re_title_fix.sub(
+                            f"<title>{_safe_title}</title>\n</head>",
+                            html_content,
+                            count=1,
+                            flags=_re_title_fix.IGNORECASE,
+                        )
+                except Exception:
+                    pass
             else:
                 # Build HTML from structured sections spec
                 html_content = _build_dashboard_html(
@@ -3325,8 +3786,53 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             html_content = _fix_css_var_in_js(html_content)
             html_content = _fix_auth_redirect(html_content)
             html_content = _inject_entity_filter_fallback(html_content, entities)
+            html_content = _ensure_vue_runtime_contract(html_content)
+            try:
+                import re as _re_dash
+                html_content = _re_dash.sub(
+                    r"Dashboard by [^<\n\r]*",
+                    _FORCED_FOOTER,
+                    html_content,
+                    flags=_re_dash.IGNORECASE,
+                )
+                if "dashboard by amira" not in html_content.lower():
+                    _footer_html = (
+                        '<footer style="margin-top:16px;color:rgba(255,255,255,.4);font-size:12px;'
+                        'text-align:center">Dashboard by Amira</footer>'
+                    )
+                    if "</body>" in html_content.lower():
+                        html_content = _re_dash.sub(
+                            r"</body>",
+                            _footer_html + "\n</body>",
+                            html_content,
+                            count=1,
+                            flags=_re_dash.IGNORECASE,
+                        )
+                    else:
+                        html_content += "\n" + _footer_html
+            except Exception:
+                pass
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
+
+            # Quality gate for raw HTML dashboards: avoid saving KPI-only layouts.
+            if raw_html is not None:
+                _q = _dashboard_quality_report(html_content)
+                _has_charts_kw = any(k in (raw_html or "").lower() for k in ("chart", "grafic", "trend"))
+                if _has_charts_kw and not _q.get("has_visible_charts"):
+                    _record_dashboard_generation_metric(
+                        name=name,
+                        status="rejected",
+                        details={"reason": "missing_visible_charts", **_q},
+                    )
+                    return json.dumps({
+                        "error": (
+                            "QUALITY_GATE: Dashboard rejected because visible charts are missing. "
+                            "Include at least 2 always-visible charts in the main page "
+                            "(one line/area trend + one bar/doughnut comparative chart)."
+                        ),
+                        "quality": _q,
+                    }, ensure_ascii=False, default=str)
 
             try:
                 # Save HTML to /config/www/dashboards/ - served by HA at /local/dashboards/
@@ -3354,6 +3860,26 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     f.write(html_content)
 
                 logger.info(f"✅ HTML dashboard file saved: {file_path}")
+                _record_dashboard_generation_metric(
+                    name=name,
+                    status="success",
+                    details={"chars": len(html_content), "raw_mode": raw_html is not None},
+                )
+                if raw_html is not None and _html_debug_enabled:
+                    try:
+                        _dbg_dir = os.path.join(api.HA_CONFIG_DIR, "amira", "debug_html")
+                        os.makedirs(_dbg_dir, exist_ok=True)
+                        _dbg_stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+                        _dbg_base = name.lower().replace(" ", "-").replace("_", "-").replace(".", "-")
+                        _out_path = os.path.join(_dbg_dir, f"{_dbg_stamp}-{_dbg_base}-final.html")
+                        with open(_out_path, "w", encoding="utf-8") as _dbg_f:
+                            _dbg_f.write(html_content)
+                        logger.info(
+                            f"create_html_dashboard debug: final saved HTML snapshot: {_out_path} "
+                            f"(incoming={len(_raw_html_original or '')} chars, final={len(html_content)} chars)"
+                        )
+                    except Exception as _dbg_err:
+                        logger.warning(f"create_html_dashboard debug: final HTML snapshot save failed: {_dbg_err}")
 
                 # URL for iframe - /local/ is HA's static file server (no Ingress token needed)
                 dashboard_url = f"/local/dashboards/{safe_filename}"
@@ -3471,12 +3997,110 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
         # ===== DELETE OPERATIONS (WebSocket) =====
         elif tool_name == "delete_dashboard":
-            dashboard_id = tool_input.get("dashboard_id", "")
-            result = api.call_ha_websocket("lovelace/dashboards/delete", dashboard_id=dashboard_id)
-            if result.get("success"):
-                return json.dumps({"status": "success", "message": f"Dashboard '{dashboard_id}' deleted."}, ensure_ascii=False)
-            error_msg = result.get("error", {}).get("message", str(result))
-            return json.dumps({"error": f"Failed to delete dashboard: {error_msg}"}, default=str)
+            import re as _re_dash_del
+
+            dashboard_id = str(tool_input.get("dashboard_id", "") or "").strip()
+            if not dashboard_id:
+                return json.dumps({"error": "dashboard_id is required."}, ensure_ascii=False)
+            if dashboard_id.lower().endswith(".html"):
+                dashboard_id = dashboard_id[:-5].strip()
+            if dashboard_id.lower() in {"lovelace", "default"}:
+                return json.dumps({"error": "Refusing to delete the default Lovelace dashboard."}, ensure_ascii=False)
+
+            def _slugify(v: str) -> str:
+                s = str(v or "").strip().lower()
+                if s.endswith(".html"):
+                    s = s[:-5].strip()
+                s = s.replace("_", "-").replace(".", "-").replace(" ", "-")
+                s = _re_dash_del.sub(r"[^a-z0-9-]+", "", s)
+                s = _re_dash_del.sub(r"-{2,}", "-", s).strip("-")
+                return s
+
+            # Resolve best candidate from existing HA dashboards.
+            resolved = None
+            ws_list = api.call_ha_websocket("lovelace/dashboards/list")
+            dashboards = ws_list.get("result", []) if isinstance(ws_list, dict) else []
+            q = dashboard_id.lower()
+            q_slug = _slugify(dashboard_id)
+
+            if isinstance(dashboards, list):
+                # 1) exact by id/url_path/title
+                for d in dashboards:
+                    did = str(d.get("id", "") or "")
+                    up = str(d.get("url_path", "") or "")
+                    tt = str(d.get("title", "") or "")
+                    if q in {did.lower(), up.lower(), tt.lower()}:
+                        resolved = d
+                        break
+                # 2) normalized match (handles hyphen/underscore differences)
+                if resolved is None:
+                    for d in dashboards:
+                        did = str(d.get("id", "") or "")
+                        up = str(d.get("url_path", "") or "")
+                        tt = str(d.get("title", "") or "")
+                        keys = {_slugify(did), _slugify(up), _slugify(tt)}
+                        if q_slug and q_slug in keys:
+                            resolved = d
+                            break
+                # 3) partial/contains fallback
+                if resolved is None and q_slug:
+                    for d in dashboards:
+                        did = str(d.get("id", "") or "")
+                        up = str(d.get("url_path", "") or "")
+                        tt = str(d.get("title", "") or "")
+                        keys = [_slugify(did), _slugify(up), _slugify(tt)]
+                        if any(q_slug in k or k in q_slug for k in keys if k):
+                            resolved = d
+                            break
+
+            target_id = str((resolved or {}).get("id", "") or dashboard_id)
+            target_url = str((resolved or {}).get("url_path", "") or "")
+
+            ws_delete = api.call_ha_websocket("lovelace/dashboards/delete", dashboard_id=target_id)
+            ws_ok = bool(isinstance(ws_delete, dict) and ws_delete.get("success"))
+
+            # Also remove matching HTML file (for custom /local/dashboards/*.html pages).
+            html_removed = False
+            html_deleted_path = ""
+            candidate_slugs = set()
+            for x in (dashboard_id, target_id, target_url):
+                sx = _slugify(x)
+                if sx:
+                    candidate_slugs.add(sx)
+                    candidate_slugs.add(sx.replace("_", "-"))
+                    candidate_slugs.add(sx.replace("-", "_"))
+            html_dir = os.path.join(api.HA_CONFIG_DIR, "www", "dashboards")
+            for slug in list(candidate_slugs):
+                fpath = os.path.join(html_dir, slug + ".html")
+                if os.path.isfile(fpath):
+                    try:
+                        os.remove(fpath)
+                        html_removed = True
+                        html_deleted_path = fpath
+                        break
+                    except Exception:
+                        pass
+
+            if ws_ok or html_removed:
+                msg = f"Dashboard '{target_id}' deleted."
+                if resolved and dashboard_id != target_id:
+                    msg += f" (resolved from '{dashboard_id}')"
+                if html_removed:
+                    msg += f" HTML file removed: {html_deleted_path}"
+                return json.dumps({
+                    "status": "success",
+                    "message": msg,
+                    "deleted_dashboard_id": target_id,
+                    "deleted_url_path": target_url,
+                    "deleted_html_file": html_deleted_path or None,
+                }, ensure_ascii=False, default=str)
+
+            error_msg = ws_delete.get("error", {}).get("message", str(ws_delete)) if isinstance(ws_delete, dict) else str(ws_delete)
+            return json.dumps({
+                "error": f"Failed to delete dashboard: {error_msg}",
+                "input": dashboard_id,
+                "attempted_dashboard_id": target_id,
+            }, default=str)
 
         elif tool_name == "delete_automation":
             import yaml

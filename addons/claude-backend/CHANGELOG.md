@@ -1,6 +1,36 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.5 — HTML dashboard reliability, auth hardening, quality guardrails
+- **HTML dashboard generation reliability**
+  - Fixed chunked `create_html_dashboard` loop handling and improved draft auto-finalization path
+  - Improved truncated/escaped HTML normalization and malformed `<head>` repair
+  - Added stricter detection to avoid unnecessary autocomplete on complete raw HTML
+  - Enforced dashboard page `<title>` alignment with saved sidebar title (`Amira — ...`)
+
+- **Auth + data loading fixes for generated dashboards**
+  - Hardened auth patch to sanitize stale static headers (`Authorization: Bearer + tok`) even when helper is already present
+  - Added `_authFetch(...)` wrapper injection for HA `/api/states` and `/api/history` calls to reduce token race issues
+  - Result: generated dashboards are less likely to show persistent `n/d` due to early token resolution timing
+
+- **Quality guardrails (non-template)**
+  - Removed backend prebuilt chart auto-injection to keep layouts model-driven
+  - Added mandatory chart requirements in both intent prompt and `create_html_dashboard` tool description:
+    - at least 2 always-visible charts in main layout
+    - one trend (line/area) + one comparative (bar/doughnut/pie)
+  - Added raw HTML quality gate: reject KPI-only outputs when charts are expected
+
+- **Dashboard generation telemetry**
+  - Added minimal generation metrics persistence in `/config/amira/dashboard_generation_metrics.json`
+  - Tracks success/rejection and recent quality details for troubleshooting provider/model behavior
+
+- **Delete dashboard robustness**
+  - `delete_dashboard` now resolves by id/url_path/title with slug normalization and `.html` tolerance
+  - Also removes matching file under `/config/www/dashboards/*.html` when present
+
+- **Runtime UX/i18n consistency**
+  - Replaced newly introduced hardcoded Italian runtime status strings with neutral messages in tool-loop paths
+
 ## 4.6.4 — MCP LLM-first fix: tool dinamici nel prompt + esecuzione corretta
 - **MCP in LLM-first (ToolRegistry attivo)**
   - I tool MCP dinamici runtime ora vengono sempre iniettati in `tool_schemas` (`+N`), anche quando il ToolRegistry è inizializzato da catalogo statico legacy
@@ -10,6 +40,10 @@
 - **Affidabilità richiesta MCP**
   - Regola prompt MCP generica su richieste DB/filesystem/repo (senza hardcode SQLite-only)
   - Retry interno one-shot se il modello chiude senza tool_call su richiesta chiaramente MCP-oriented
+
+- **HTML dashboard draft fail-safe**
+  - Fix caso `create_html_dashboard` in chunked mode: se il modello si ferma su `draft_started/draft_appended`
+    e poi risponde “creata” senza chiamata finale, il backend ora finalizza automaticamente la bozza
 
 ## 4.6.3 — MCP UX/runtime: stato server, stop, autostart persistente manuale
 - **MCP UI (chat_ui)**

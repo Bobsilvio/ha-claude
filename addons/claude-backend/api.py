@@ -448,6 +448,7 @@ class _ColorFormatter(logging.Formatter):
         "CRITICAL": "🟣",
     }
     RESET = "\x1b[0m"
+    BOLD = "\x1b[1m"
 
     def format(self, record: logging.LogRecord) -> str:
         # Timestamp
@@ -475,8 +476,10 @@ class _ColorFormatter(logging.Formatter):
                 clevel = f"{color}{decorated}{self.RESET}"
             else:
                 clevel = decorated
-            # Format: [HH:MM:SS] [CONTEXT] 🟢 INFO:api: messaggio
-            return f"[{ts}] [{context}] {clevel}:{record.name}:{record.getMessage()}"
+            # Format: [HH:MM:SS] [CONTEXT] 🟢 INFO: providers.manager -> message
+            # logger name is bold for readability in dense logs.
+            _lname = f"{self.BOLD}{record.name}{self.RESET}"
+            return f"[{ts}] [{context}] {clevel}: {_lname} -> {record.getMessage()}"
         finally:
             record.levelname = original
 
@@ -3908,10 +3911,19 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 # For HTML dashboards: use all entity_ids directly — no tool-call instruction
                 # (web providers like claude_web/chatgpt_web have no tools and "ONE tool call"
                 #  confuses them into producing YAML instead of HTML)
+                _prov = (AI_PROVIDER or "").lower()
+                _provider_hint = ""
+                if _prov in {"nvidia", "github_copilot"}:
+                    _provider_hint = (
+                        "\nProvider hint: keep output compact and robust. "
+                        "Always include at least 2 visible charts in main layout "
+                        "(line/area + bar/doughnut), and avoid modal-only charts."
+                    )
                 api_content = (
                     f"{clean_user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\n"
                     "Use the entity_ids listed above directly in your HTML. "
                     "Output ONLY the complete <!DOCTYPE html>…</html> page, nothing else."
+                    f"{_provider_hint}"
                 )
             else:
                 api_content = f"{clean_user_message}\n\n---\nCONTEXT:\n{smart_context}\n---\nDo NOT re-request data already provided above."
@@ -4130,6 +4142,22 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _skip_tool_extraction = False    # after dedup, skip ToolSimulator next round
         _last_write_result = None        # last WRITE tool result (for fallback display)
         _preview_round_done = False      # True after preview_automation_change executes
+        _html_draft_pending_name = ""    # create_html_dashboard draft name pending finalize
+        _html_dashboard_saved_this_turn = False
+
+        def _pending_call_signature(_tc: dict) -> str:
+            """Build a stable signature for loop detection (name + canonical args)."""
+            _name = str(_tc.get("name", "") or "")
+            _raw_args = _tc.get("arguments", "{}")
+            try:
+                _obj = json.loads(_raw_args or "{}")
+            except Exception:
+                _obj = _raw_args
+            if isinstance(_obj, dict):
+                _args_sig = json.dumps(_obj, sort_keys=True, ensure_ascii=False)
+            else:
+                _args_sig = str(_raw_args)
+            return f"{_name}:{_args_sig}"
 
         # Build read-only tool set: from registry (categories) or static fallback
         if _tool_registry is not None:
@@ -4359,31 +4387,31 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                             if _fb_msg:
                                                 _fb_parts.append(f"✅ {_fb_msg}")
                                             elif _fb_status == "success":
-                                                _fb_parts.append("✅ Operazione completata con successo.")
+                                                _fb_parts.append("✅ Operation completed successfully.")
                                             if _fb_removed:
                                                 _ids = [r if isinstance(r, str) else r.get('statistic_id', str(r)) for r in _fb_removed]
                                                 _fb_parts.append(
-                                                    f'<details><summary>📊 {len(_ids)} entità rimosse (click per espandere)</summary><div>'
+                                                    f'<details><summary>📊 {len(_ids)} entities removed (click to expand)</summary><div>'
                                                     + '<br>'.join(f'<code>{eid}</code>' for eid in _ids)
                                                     + '</div></details>'
                                                 )
                                             if _fb_fixed:
                                                 _fids = [f.get('statistic_id', str(f)) if isinstance(f, dict) else str(f) for f in _fb_fixed]
                                                 _fb_parts.append(
-                                                    f'<details><summary>🔧 {len(_fids)} entità corrette (click per espandere)</summary><div>'
+                                                    f'<details><summary>🔧 {len(_fids)} entities fixed (click to expand)</summary><div>'
                                                     + '<br>'.join(f'<code>{eid}</code>' for eid in _fids)
                                                     + '</div></details>'
                                                 )
                                             if _fb_parts:
                                                 yield {"type": "token", "content": '\n'.join(_fb_parts)}
                                             else:
-                                                yield {"type": "token", "content": f"✅ Operazione completata. Risultato: {_last_write_result[:500]}"}
+                                                yield {"type": "token", "content": f"✅ Operation completed. Result: {_last_write_result[:500]}"}
                                         else:
                                             yield {"type": "token", "content": f"✅ {_last_write_result[:500]}"}
                                     except Exception:
                                         yield {"type": "token", "content": f"✅ {_last_write_result[:500]}"}
                                 else:
-                                    yield {"type": "token", "content": "✅ Operazione completata con successo."}
+                                    yield {"type": "token", "content": "✅ Operation completed successfully."}
                             _text_buffer = []
 
                         # Flush buffer for html dashboard (no tool call → clarifying question)
@@ -4399,7 +4427,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             ))
                             if _is_no_tool_provider and _has_html:
                                 # Emit a short confirmation — the full HTML will be auto-saved
-                                yield {"type": "token", "content": "✨ Dashboard salvata!"}
+                                yield {"type": "token", "content": "✨ Dashboard saved!"}
                             else:
                                 # No HTML found → clarifying question or tool-capable provider;
                                 # flush the buffer normally so the user sees the response.
@@ -4544,6 +4572,34 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             if _mcp_guard_triggered_this_round:
                 continue  # run one internal retry with stronger MCP instruction
 
+            # Fail-safe for chunked HTML dashboard creation:
+            # if the model stopped after draft_* calls, finalize automatically.
+            if (
+                not _pending_tool_calls
+                and intent_name == "create_html_dashboard"
+                and _html_draft_pending_name
+                and not _html_dashboard_saved_this_turn
+            ):
+                try:
+                    yield {"type": "status", "message": "💾 Auto-finalizing HTML draft dashboard..."}
+                    _auto_final = tools.execute_tool("create_html_dashboard", {"name": _html_draft_pending_name})
+                    _auto_obj = json.loads(_auto_final) if isinstance(_auto_final, str) else _auto_final
+                    if isinstance(_auto_obj, dict) and str(_auto_obj.get("status", "")).lower() == "success":
+                        _html_dashboard_saved_this_turn = True
+                        _html_draft_pending_name = ""
+                        _saved_url = _auto_obj.get("dashboard_url") or _auto_obj.get("url") or ""
+                        if _saved_url:
+                            yield {"type": "status", "message": f"✅ Dashboard saved: {_saved_url}"}
+                        else:
+                            yield {"type": "status", "message": "✅ HTML dashboard saved successfully."}
+                        logger.info("HTML draft auto-finalized successfully")
+                    else:
+                        logger.warning(f"HTML draft auto-finalize failed: {_auto_final}")
+                        yield {"type": "status", "message": "⚠️ Draft dashboard was not auto-finalized."}
+                except Exception as _df_err:
+                    logger.warning(f"HTML draft auto-finalize error: {_df_err}")
+                    yield {"type": "status", "message": f"⚠️ Draft auto-finalize error: {_df_err}"}
+
             if not _pending_tool_calls:
                 break  # No tool calls → conversation complete
 
@@ -4563,11 +4619,51 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # Inject a synthetic tool result telling it to stop and answer.
             _all_dupes = True
             for tc in _pending_tool_calls:
-                _sig_dedup = f"{tc.get('name', '')}:{tc.get('arguments', '{}')}"
+                _sig_dedup = _pending_call_signature(tc)
                 if _sig_dedup not in _tool_call_history:
                     _all_dupes = False
                     break
             if _all_dupes and _pending_tool_calls:
+                # Special-case breaker: HTML dashboard draft loop.
+                # Some models keep calling create_html_dashboard with draft=true forever.
+                try:
+                    _draft_calls = []
+                    for _tc in _pending_tool_calls:
+                        if _tc.get("name") != "create_html_dashboard":
+                            _draft_calls = []
+                            break
+                        _a = json.loads(_tc.get("arguments", "{}") or "{}")
+                        if not isinstance(_a, dict) or not bool(_a.get("draft", False)):
+                            _draft_calls = []
+                            break
+                        _draft_calls.append(_a)
+                    if _draft_calls:
+                        _draft_name = str((_draft_calls[0].get("name") or _html_draft_pending_name or "")).strip()
+                        if _draft_name:
+                            logger.warning(
+                                f"HTML draft loop detected for '{_draft_name}' "
+                                f"(round {_tool_round}) — forcing finalize now"
+                            )
+                            yield {"type": "status", "message": "💾 Draft loop detected: auto-finalizing HTML dashboard..."}
+                            _auto_final = tools.execute_tool("create_html_dashboard", {"name": _draft_name})
+                            _auto_obj = json.loads(_auto_final) if isinstance(_auto_final, str) else _auto_final
+                            if isinstance(_auto_obj, dict) and str(_auto_obj.get("status", "")).lower() == "success":
+                                _html_dashboard_saved_this_turn = True
+                                _html_draft_pending_name = ""
+                                _url = _auto_obj.get("dashboard_url") or _auto_obj.get("url") or ""
+                                _msg = (
+                                    f"HTML dashboard created successfully: {_url}"
+                                    if _url else
+                                    "HTML dashboard created successfully."
+                                )
+                                _streamed_text_parts.append(_msg)
+                                yield {"type": "token", "content": _msg}
+                                yield {"type": "done"}
+                                break
+                            logger.warning(f"Forced HTML draft finalize failed: {_auto_final}")
+                except Exception as _draft_loop_err:
+                    logger.warning(f"HTML draft loop breaker error: {_draft_loop_err}")
+
                 _duplicate_count += 1
                 logger.warning(
                     f"Tool loop detected (round {_tool_round}, dup #{_duplicate_count}): "
@@ -4873,6 +4969,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     elif fn_name == "update_automation" and _is_ok:
                         # Clear only after successful apply
                         session_last_preview.pop(session_id, None)
+                    elif fn_name == "create_html_dashboard":
+                        _dash_name = str((_result_obj.get("name") or tc_args.get("name") or "")).strip()
+                        if _status in {"draft_started", "draft_appended"} and _dash_name:
+                            _html_draft_pending_name = _dash_name
+                        elif _status == "success":
+                            _html_dashboard_saved_this_turn = True
+                            _html_draft_pending_name = ""
 
                 # Extract diff + modified filename for UI rendering (strip before feeding to model)
                 try:
