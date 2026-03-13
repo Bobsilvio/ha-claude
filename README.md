@@ -105,7 +105,7 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 
 ### 🧠 Memory
 - **Persistent Knowledge**: `MEMORY.md` injected in every conversation — the AI always remembers
-- **Dynamic Notes**: `memory_notes.json` for structured facts the AI can update itself
+- **Session Log**: `HISTORY.md` append-only log of past sessions
 - **Enable in Settings**: Settings → Features → Memory (OFF by default)
 - **Storage**: `/config/amira/memory/`
 
@@ -150,6 +150,8 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Custom Tools**: Connect external services via MCP servers
 - **Filesystem, Web Search, Git, Databases**: and any custom MCP-compatible server
 - **Multi-server**: Run multiple MCP servers simultaneously
+- **Start/Stop from UI**: Each server shows a live status badge — start and stop directly from Settings → MCP
+- **Auto-restart**: Servers you start manually are remembered and restarted on add-on reboot
 
 ### 📱 Messaging Integration
 - **Telegram Bot**: Long polling — no public IP needed, works out of the box
@@ -163,9 +165,10 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 
 ### 🛠️ Dashboard Creation
 - **Lovelace Dashboards**: Create custom dashboards with cards
-- **HTML Dashboards**: AI-generated Vue 3 interactive dashboards with real-time data
-- **11 Section Types**: Hero, pills, flow, gauge, gauges, kpi, chart, entities, controls, stats, value
-- **Live Data**: WebSocket real-time updates with automatic proxy fallback
+- **HTML Dashboards**: AI-generated interactive dashboards saved to `/config/www/dashboards/` and auto-added to the HA sidebar
+- **Domain-aware design**: color palettes and chart types chosen per domain (solar, batteries, lights, climate, security, water…)
+- **8 chart types**: bar, line/area, doughnut/pie, gauge, scatter, radar, mixed, stacked bar
+- **Live Data**: WebSocket + REST real-time updates with automatic HA authentication
 
 ---
 
@@ -216,19 +219,18 @@ Amira supports **Telegram** (long polling, no public IP) and **WhatsApp** (via T
 
 Extend Amira with external tools. Enable MCP in **Settings → Features**, then configure servers directly from the **Settings → MCP Config** editor in the chat UI.
 
-Example server configuration:
+Example server configuration (HTTP transport):
 
 ```json
 {
-  "web_search": {
-    "command": "python",
-    "args": ["-m", "mcp.server.brave_search"],
-    "env": { "BRAVE_API_KEY": "YOUR_KEY" }
+  "my_server": {
+    "transport": "http",
+    "url": "http://192.168.1.x:7660"
   }
 }
 ```
 
-The config is saved to `/config/amira/mcp_config.json` automatically.
+The config is saved to `/config/amira/mcp_config.json`. Start/stop servers directly from **Settings → MCP** in the chat UI.
 
 → Full guide: [docs/MCP.md](docs/MCP.md)
 
@@ -240,6 +242,8 @@ The config is saved to `/config/amira/mcp_config.json` automatically.
 - *"Create an automation that turns lights off at midnight"*
 - *"Show me the temperature history from yesterday"*
 - *"Create an HTML dashboard for my solar panels"*
+- *"Make a battery monitoring dashboard with charts"*
+- *"Build a lights control panel for my home"*
 - 📸 *Upload an image* → *"Recreate these cards for my sensors"*
 
 ---
@@ -250,6 +254,8 @@ The config is saved to `/config/amira/mcp_config.json` automatically.
 |---------|-----|
 | Amira not in sidebar | Restart HA, clear browser cache |
 | Bubble not showing | Check Settings → Features → Chat Bubble is ON; hard-refresh browser |
+| Dashboard shows blank page | Browser console may show a JS error — try regenerating with Claude or GPT-4o |
+| Dashboard shows 0 values | Auth issue — ask Amira to rebuild the dashboard |
 | Error 401 on HA API | Visit `/api/status`, restart addon |
 | API Key errors | Check format, verify account has credit |
 | Rate limits | Switch model or wait a few minutes |
@@ -288,53 +294,44 @@ Create specialized AI assistants, each with its own model, personality, tools, a
 
 ```json
 {
-  "agents": [
-    {
-      "id": "home",
-      "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
-      "model": { "primary": "anthropic/claude-sonnet-4-6", "fallbacks": ["google/gemini-2.0-flash"] },
-      "default": true
-    },
-    {
-      "id": "coder",
-      "identity": { "name": "CodeBot", "emoji": "💻" },
-      "model": { "primary": "anthropic/claude-opus-4-6" },
-      "tools": ["read_config_file", "write_config_file", "list_config_files"],
-      "system_prompt": "You are a coding expert. Always show code with comments.",
-      "temperature": 0.2
-    }
-  ],
-  "channel_agents": {
-    "telegram": "home",
-    "whatsapp": "coder"
+  "home": {
+    "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+    "model": "anthropic/claude-sonnet-4-6",
+    "fallback": ["google/gemini-2.0-flash"],
+    "is_default": true
+  },
+  "coder": {
+    "identity": { "name": "CodeBot", "emoji": "💻", "description": "Coding & config specialist" },
+    "model": "anthropic/claude-opus-4-6",
+    "tools": ["read_config_file", "write_config_file"],
+    "system_prompt_override": "You are a coding expert. Always show code with comments.",
+    "temperature": 0.2
+  },
+  "quick": {
+    "identity": { "name": "Flash", "emoji": "⚡", "description": "Fast answers, no tools" },
+    "model": "groq/llama-3.3-70b-versatile",
+    "tools": [],
+    "temperature": 0.7
   }
 }
 ```
-
-> **Shorthand format** — you can also use agent IDs as top-level keys (no `agents` array):
-> ```json
-> { "home": { "identity": { "name": "Amira", "emoji": "🏠" }, "default": true } }
-> ```
 
 ### Field Reference
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier (lowercase, no spaces) |
 | `identity.name` | string | Display name in UI and messages |
 | `identity.emoji` | string | Icon shown in selector and chat |
 | `identity.description` | string | Tooltip text |
-| `model.primary` | string | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
-| `model.fallbacks` | string[] | Ordered fallback models if primary fails |
-| `tools` | string[] \| null | Allowed tools (`null` or omitted = all tools) |
+| `model` | string | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
+| `fallback` | string[] | Ordered fallback models if primary fails |
+| `tools` | string[] \| null | Allowed tools (`null` = all, `[]` = none) |
 | `tools_blocked` | string[] | Explicitly blocked tools |
-| `system_prompt` | string \| null | Custom system prompt (replaces default) |
-| `temperature` | number \| null | 0.0 - 2.0 (null = provider default) |
-| `max_tokens` | number \| null | Max response length |
-| `thinking_level` | string \| null | `off`, `low`, `medium`, `high`, `adaptive` |
-| `default` | bool | Mark one agent as the default |
+| `system_prompt_override` | string | Custom system prompt (replaces default) |
+| `temperature` | number | 0.0–2.0 |
+| `thinking_level` | string | `off`, `low`, `medium`, `high`, `adaptive` |
+| `is_default` | bool | Pre-selected on load |
 | `enabled` | bool | Set `false` to hide without deleting |
-| `tags` | string[] | Arbitrary tags for organization |
 
 ### Channel Routing
 

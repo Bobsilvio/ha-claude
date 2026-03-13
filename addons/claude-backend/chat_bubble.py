@@ -379,6 +379,36 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   const API_BASE = INGRESS_URL;
   const T = {__import__('json').dumps(t, ensure_ascii=False)};
   const VOICE_LANG = '{voice_lang}';
+
+  // ---- Ingress session (needed for companion app / tablet WebView) ----
+  // The companion app does not automatically get a hassio_session cookie.
+  // We create one by calling /api/hassio/ingress/session with the HA Bearer token.
+  let _ingressSessionOk = false;
+  function _getHassToken() {{
+    try {{
+      const ha = document.querySelector('home-assistant');
+      return (ha && ha.hass && ha.hass.auth && ha.hass.auth.data && ha.hass.auth.data.access_token) || '';
+    }} catch(e) {{ return ''; }}
+  }}
+  async function _ensureIngressSession() {{
+    if (_ingressSessionOk) return true;
+    const token = _getHassToken();
+    if (!token) return false;
+    try {{
+      const resp = await fetch('/api/hassio/ingress/session', {{
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {{ 'Authorization': 'Bearer ' + token }},
+      }});
+      if (resp.ok) {{
+        _ingressSessionOk = true;
+        console.log('[Amira] Ingress session created (companion app / tablet)');
+        return true;
+      }}
+    }} catch(e) {{}}
+    return false;
+  }}
+
   // ---- Device detection ----
   // Phone: small screen with touch (hide bubble — too small, accidental taps)
   // Tablet: larger touch screen (show bubble — usable screen size)
@@ -3398,6 +3428,13 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       _syncModel    = agentData.current_model_technical || '';
     }} catch(e) {{
       console.warn('[Amira] Could not load agents:', e);
+      // Retry once after 2s (companion app may need time to establish ingress session)
+      if (!_ingressSessionOk) {{
+        setTimeout(async () => {{
+          await _ensureIngressSession();
+          loadAgents();
+        }}, 2000);
+      }}
     }}
   }}
 
@@ -3500,10 +3537,13 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     }}
   }}
 
-  // Initial setup
-  registerDevice();
-  updateContextBar();
-  loadAgents();
+  // Initial setup — ensure ingress session first (needed for companion app / tablet)
+  (async () => {{
+    await _ensureIngressSession();
+    registerDevice();
+    updateContextBar();
+    loadAgents();
+  }})();
 
   // Poll every 10s for model/provider changes made from chat_ui or other tabs
   setInterval(async () => {{

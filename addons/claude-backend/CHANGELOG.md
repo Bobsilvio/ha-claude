@@ -1,6 +1,45 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.14 — Fix: dashboard rotte con LLM deboli (Llama, NVIDIA, ecc.)
+- **Nuovo `_repair_malformed_html`**: ripara errori strutturali prodotti da modelli meno capaci prima del salvataggio
+  - Tag HTML malformati (`<div class=<div class=`) → rimossi
+  - `const tok = JSON.parse(localStorage...` troncato → rimosso (causa SyntaxError con auth patch)
+  - `getTokenAsync` duplicato dentro Vue setup() → rimosso (la versione globale dell'auth patch è sufficiente)
+- La funzione gira prima di tutti gli altri sanitizer nella pipeline
+
+## 4.6.13 — Dashboard: istruzioni generiche per tutti i domini HA
+- **Colori domain-aware**: palette adattiva per luci, batterie, tapparelle, clima, sicurezza, acqua, presenza, aria — non solo solare
+- **Inventiva per dominio**: elementi visivi specifici per tipo (fill-bar batterie, shutter CSS animato, room heat map, Sankey flow, occupancy grid, AQI scale, ecc.)
+- **Grafici contestualizzati**: ogni tipo di chart abbinato a esempi per tutti i domini (luci, batterie, tapparelle, clima, energia, sicurezza, acqua)
+
+## 4.6.12 — Dashboard: più varietà di grafici, colori e creatività
+- **Grafici**: l'IA ora riceve istruzioni esplicite su quando usare bar, line/area, donut/pie, gauge, scatter, mixed, stacked — sempre almeno 2 tipi diversi per dashboard
+- **Colori**: palette dominio-specifiche (solar=amber/green, clima=cyan, sicurezza=red, batterie=lime), gradienti per ogni card, mai layout monotone
+- **Inventiva**: suggerimenti su heatmap, sparkline, Sankey flow, contatori animati, pulse su valori live
+
+## 4.6.11 — Fix: valori sensori tutti 0 nelle dashboard
+- **Fix**: l'auth patch non sostituiva `fetch(\`${HA_URL}/api/...\`)` e `fetch(HA_URL + '/api/...')` con `_authFetch` — le chiamate HA restituivano 401 e i valori rimanevano 0. Aggiunto regex per template literal e concatenazione con variabile
+
+## 4.6.10 — Fix: HTML dashboard non appare nella cronologia chat
+- **Fix**: riaprendo una vecchia chat dopo aver creato una dashboard, non si vede più tutto il codice HTML — il messaggio in cronologia viene sostituito con una breve conferma testuale dopo il salvataggio del file
+
+## 4.6.9 — Dashboard design guidelines: tabs, popup, colori, effetto wow
+- **Rimosso quality gate bloccante**: nessuna rigenerazione forzata — l'LLM deve farlo bene al primo tentativo
+- **Nuove istruzioni di design** in `intent.py` (prompt principale, vale per tutti i provider inclusi LLM web), tool description e system prompt: focus su colori vibranti, gradient, tab navigation, modal/popup per dettagli, glassmorphism, animazioni CSS on load
+- **Tabs come default** per dashboard con 3+ argomenti — single-page tab router JS con nav bar stilizzata
+- **Grafici non obbligatori**: includere quando il dato lo giustifica, non su ogni dashboard
+- **Click-to-expand obbligatorio**: ogni card entità apre il pannello more-info HA o un modal con history chart
+
+## 4.6.8 — Dashboard quality enforcement: grafici e design ricco obbligatori
+- **Quality gate semi-bloccante**: se la dashboard non ha almeno 2 grafici Chart.js visibili nel layout principale (non in modali), l'LLM riceve un errore con istruzioni precise e deve rigenerare
+- **Sections mode quality check**: se le sezioni non includono nessun tipo visivo ricco (`trend`, `gauge`, `gauges`, `chart`, `flow`), la dashboard viene rigettata
+- **System prompt aggiornato**: aggiunta sezione "HTML Dashboard Visual Requirements" che elenca i requisiti obbligatori (grafici, gradienti, colori, CSS variables) — il server li fa rispettare
+- **Tool description aggiornata**: rimosso "PREFERRED/FALLBACK", aggiunto banner ⚠️ MANDATORY con i requisiti visuali specifici che verranno enforced server-side
+
+## 4.6.7 — Fix bubble companion app (tablet)
+- **Fix bubble su tablet/companion app**: ripristinato `_ensureIngressSession()` per creare il cookie `hassio_session` tramite Bearer token — necessario per la companion app che non ottiene il cookie automaticamente come il browser desktop. Aggiunto retry automatico di `loadAgents()` se la sessione non è ancora pronta.
+
 ## 4.6.6 - Fix create dashboard
 -- **Fix create dashboard**
 

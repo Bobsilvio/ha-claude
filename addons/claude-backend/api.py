@@ -5199,6 +5199,16 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                 f"(entities={len(_entities)}): {str(_save_result)[:200]}"
                             )
                             yield {"type": "status", "message": f"✅ Dashboard HTML '{_slug}.html' salvata!"}
+                            # Strip the raw HTML from conversation history so that
+                            # re-opening this chat shows only a short confirmation,
+                            # not walls of HTML code.
+                            _last_msg = (conversations.get(session_id) or [None])[-1]
+                            if (_last_msg and _last_msg.get("role") == "assistant"
+                                    and len(_last_msg.get("content", "")) > 500):
+                                conversations[session_id][-1]["content"] = (
+                                    f"✨ Dashboard **{_title}** creata! "
+                                    f"Aprila qui: `/local/dashboards/{_slug}.html`"
+                                )
                         except Exception as _e:
                             logger.warning(f"Auto-save HTML dashboard failed: {_e}")
                             yield {"type": "status", "message": f"⚠️ Salvataggio HTML fallito: {_e}"}

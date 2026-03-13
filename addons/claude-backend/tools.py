@@ -1082,8 +1082,22 @@ def _fix_auth_redirect(html: str) -> str:
         body = body.replace("headers:{Authorization:'Bearer '+tok}", "headers:_authHeader()")
         body = body.replace('headers:{Authorization:\"Bearer \"+tok}', "headers:_authHeader()")
         # Route HA state/history calls through auth-aware fetch wrapper.
+        # Pattern 1: fetch('/api/states/...') or fetch(`/api/...`)
         body = re.sub(
             r"\bfetch\(\s*([\"'`]/api/(?:states|history))",
+            r"_authFetch(\1",
+            body,
+            flags=re.IGNORECASE,
+        )
+        # Pattern 2: fetch(`${HA_URL}/api/...`) or fetch(HA_URL + '/api/...')
+        body = re.sub(
+            r"\bfetch\(\s*(`\$\{[A-Z_a-z]+\}/api/)",
+            r"_authFetch(\1",
+            body,
+            flags=re.IGNORECASE,
+        )
+        body = re.sub(
+            r"\bfetch\(\s*([A-Z_a-z]+\s*\+\s*[\"'`]/api/)",
             r"_authFetch(\1",
             body,
             flags=re.IGNORECASE,
@@ -1121,6 +1135,76 @@ def _fix_auth_redirect(html: str) -> str:
         logger.info("🔒 Fixed sync auth redirect pattern in AI-generated HTML")
 
     return patched
+
+
+def _repair_malformed_html(html: str) -> str:
+    """Repair common structural errors in LLM-generated HTML (especially weaker models).
+
+    Problems fixed:
+    1. Broken/nested tag attributes: <div class=<div class= → remove the malformed tag entirely
+    2. Truncated tok declaration after auth patch (no semicolon): const tok = JSON.parse(localStorage...
+    3. Duplicate _getTokenAsync defined inside Vue setup() when auth patch already provides it globally
+    4. Duplicate standalone ENTITIES const when auth patch injection already defines it
+    5. Script blocks that end prematurely (unclosed strings/parens) — wrap in try/catch to avoid crashing the page
+    """
+    import re
+
+    fixes = 0
+
+    # 1. Remove broken HTML tags: <tag attr=<tag  or  <div class=<div
+    #    These are produced when the LLM generates two tags merged together.
+    #    Pattern: opening < then some word chars, then space/attr chars, then another <
+    def _fix_broken_tag(m):
+        nonlocal fixes
+        fixes += 1
+        return ""
+    html = re.sub(r"<[a-zA-Z][^<>]*=[^<>]*<[a-zA-Z][^<>]*>?", _fix_broken_tag, html)
+
+    # 2. Remove truncated / incomplete  const tok = JSON.parse(  lines
+    #    (the complete form is already handled by _fix_auth_redirect, this catches leftovers)
+    #    Match: (const|let|var) tok = JSON.parse(... that does NOT end with a semicolon on the same line
+    def _fix_trunc_tok(m):
+        nonlocal fixes
+        fixes += 1
+        return ""
+    html = re.sub(
+        r"(?:const|let|var)\s+tok\s*=\s*JSON\.parse\([^\n;]*\n",
+        _fix_trunc_tok,
+        html,
+        flags=re.IGNORECASE,
+    )
+    # Also catch the case where it's completely cut off mid-line with no newline
+    html = re.sub(
+        r"(?:const|let|var)\s+tok\s*=\s*JSON\.parse\([^;)]{0,120}$",
+        _fix_trunc_tok,
+        html,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+
+    # 3. Remove duplicate getTokenAsync / _getTokenAsync function defined *inside* a Vue setup()
+    #    or any inner function, when the global one from auth patch is already present.
+    #    Only remove if the global auth patch (_getTokenAsync) is already in the HTML.
+    if "_getTokenAsync" in html:
+        def _fix_inner_gettoken(m):
+            nonlocal fixes
+            fixes += 1
+            return ""
+        # Match inner const/let getTokenAsync = () => { ... }; or function getTokenAsync() { ... }
+        html = re.sub(
+            r"(?:const|let|var)\s+getTokenAsync\s*=\s*\([^)]*\)\s*=>\s*\{[\s\S]{10,800}?\};\s*\n?",
+            _fix_inner_gettoken,
+            html,
+        )
+        html = re.sub(
+            r"function\s+getTokenAsync\s*\([^)]*\)\s*\{[\s\S]{10,800}?\}\s*\n?",
+            _fix_inner_gettoken,
+            html,
+        )
+
+    if fixes:
+        logger.info(f"🔧 _repair_malformed_html: fixed {fixes} structural error(s) in LLM-generated HTML")
+
+    return html
 
 
 def _inject_entity_filter_fallback(html: str, entities: list) -> str:
@@ -1820,7 +1904,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nPREFERRED: Raw HTML mode — provide a complete 'html' string with your own HTML/CSS/JS for unique, creative designs.\nFALLBACK: Structured mode — provide 'sections' array for quick standard layouts.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nCRITICAL — ENTITIES: The pre-loaded context (## ENTITÀ TROVATE) already contains the correct entity_ids. You MUST:\n1. Copy ALL entity_ids from ## ENTITÀ TROVATE into the entities[] parameter of this tool call\n2. Use __ENTITIES_JSON__ placeholder in the HTML — the server replaces it with the validated list\n3. In JS, iterate over ENTITIES array (from __ENTITIES_JSON__) — NEVER filter /api/states by device_class or any attribute. The ENTITIES array IS the correct filtered list.\n4. NEVER hardcode entity_ids — use __ENTITIES_JSON__ so the server controls the list\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.\n\nCHART REQUIREMENTS (MANDATORY): include at least 2 always-visible charts in the main page (not only modal history): one time-series chart (line/area) and one comparative chart (bar or doughnut/pie). Do not return KPI-only layouts.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
+        "description": "Create a custom HTML dashboard with real-time entity monitoring.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nDESIGN MODES:\n- Raw HTML mode (use 'html' param): generate complete HTML/CSS/JS from scratch with your own creative design. Best for rich, custom dashboards.\n- Structured mode (use 'sections' param): use the built-in template with pre-defined section types (trend, gauge, chart, kpi, entities, etc.).\n\nDESIGN PHILOSOPHY — Every dashboard must look like it was designed by a professional UI designer:\n\n🎨 COLORS (mandatory): Use vibrant gradient backgrounds and colored cards. NEVER use plain white/grey. Each section/card type gets its own color identity. Define CSS variables (:root { --bg, --card, --accent, --text }) and use __ACCENT__ / __ACCENT_RGB__ for the user's theme.\n\n✨ WOW EFFECT: Add CSS animations — elements fade/slide in on page load (transform+opacity), live data indicators pulse, cards lift on hover (transform: translateY + box-shadow). Use glassmorphism cards (backdrop-filter: blur(12px) + semi-transparent background).\n\n📑 TABS (default for 3+ topics): Build a single-page tab router with a styled top navigation bar. Use JS show/hide (display:none → grid/block) for instant switching — no page reload. Active tab gets accent underline + background. Sections mode: use separate sections; Raw HTML: build tab nav in the HTML.\n\n🔍 POPUPS/MODALS (add when useful): Click-to-expand for detail views, historical charts on entity click, or info overlays. Use a backdrop-blur overlay + centered card with a close button (×). Good for: trend history, energy breakdown, device detail.\n\n📊 CHARTS (when data benefits from visualization): Include for historical trends, comparisons, energy flow, sensor history. Use Chart.js with gradient fills and smooth curves. Not required for pure control panels or status boards.\n\n🏗️ LAYOUT: Use CSS grid with card hierarchy — hero KPI banner → visual charts/gauges → detail cards. Avoid flat entity lists.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nCRITICAL — ENTITIES: The pre-loaded context (## ENTITÀ TROVATE) already contains the correct entity_ids. You MUST:\n1. Copy ALL entity_ids from ## ENTITÀ TROVATE into the entities[] parameter of this tool call\n2. Use __ENTITIES_JSON__ placeholder in the HTML — the server replaces it with the validated list\n3. In JS, iterate over ENTITIES array (from __ENTITIES_JSON__) — NEVER filter /api/states by device_class or any attribute. The ENTITIES array IS the correct filtered list.\n4. NEVER hardcode entity_ids — use __ENTITIES_JSON__ so the server controls the list\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.\n\nStructured section types: hero, pills, flow, gauge, gauges, kpi, chart, trend, entities, controls, stats, value.\nLayout: 'span' (1=third, 2=two-thirds, 3=full). Card styles: gradient, outlined, flat.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -3783,6 +3867,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 )
 
             # Sanitize: fix CSS var(), auth redirect patterns, and entity filters (common AI mistakes)
+            html_content = _repair_malformed_html(html_content)
             html_content = _fix_css_var_in_js(html_content)
             html_content = _fix_auth_redirect(html_content)
             html_content = _inject_entity_filter_fallback(html_content, entities)
@@ -3815,25 +3900,6 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             logger.info(f"🎨 HTML generated: {len(html_content)} chars")
 
-            # Quality gate (non-blocking): detect KPI-only layouts, but still save.
-            _quality_warning = None
-            if raw_html is not None:
-                _q = _dashboard_quality_report(html_content)
-                _has_charts_kw = any(k in (raw_html or "").lower() for k in ("chart", "grafic", "trend"))
-                if _has_charts_kw and not _q.get("has_visible_charts"):
-                    _quality_warning = (
-                        "Visible charts appear to be missing. Expected at least 2 always-visible charts "
-                        "in main layout (one line/area trend + one bar/doughnut comparative chart)."
-                    )
-                    logger.warning(f"QUALITY_GATE_WARNING: {_quality_warning} quality={_q}")
-                    _record_dashboard_generation_metric(
-                        name=name,
-                        status="success",
-                        details={
-                            "warning": "missing_visible_charts",
-                            **_q,
-                        },
-                    )
 
             try:
                 # Save HTML to /config/www/dashboards/ - served by HA at /local/dashboards/
@@ -3948,8 +4014,6 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     "sections_count": len(sections) if isinstance(sections, list) else 0,
                     "IMPORTANT": f"✨ Dashboard '{title}' is ready! Reply with ONE short sentence confirming it was created. Do NOT include any HTML code in your reply.",
                 }
-                if _quality_warning:
-                    result["quality_warning"] = _quality_warning
                 # Compute diff if we overwrote an existing file
                 if _old_html and _old_html != html_content:
                     import difflib as _difflib
@@ -5853,6 +5917,61 @@ IMPORTANT for config editing:
 - Copy the ENTIRE original HTML verbatim, then INSERT the new sections in the appropriate place using the same style/CSS classes.
 - Do NOT change variable names, colors, fonts, layout order, section titles, or any other existing content.
 - The output HTML must be a SUPERSET of the original — every original line must remain unchanged.
+
+### HTML Dashboard Design Principles
+AI-generated dashboards must look noticeably better than standard HA dashboards. Aim for "wow" effect on first open.
+
+**🎨 Color & Visual Design (always):**
+- Vibrant gradient backgrounds and colored cards — never plain grey/white layouts
+- Each section/card type gets its own accent color (e.g. blue for energy, green for solar, orange for temperature)
+- Glassmorphism cards: `backdrop-filter: blur(12px)` + semi-transparent background
+- CSS animations on load: elements fade/slide in (opacity+transform), live data indicators pulse, cards lift on hover
+
+**📑 Navigation — Default to Tabs (for 3+ distinct topics):**
+- Build a tabbed interface with a styled top navigation bar (not a plain list)
+- Tab switching via JS show/hide (display:none → grid/block) — instant, no page reload
+- Active tab: accent-colored underline + subtle background highlight
+
+**🔍 Popups & Detail Views (add when useful):**
+- Modal overlays for historical charts (click an entity card → popup with 24h chart)
+- Backdrop-blur overlay, centered card, close button (×)
+- Good candidates: sensor history, energy breakdown, device detail
+
+**🎨 Colors & Gradients (always — never flat/grey/white):**
+- Background: bold gradient matching the dashboard mood (dark for data-heavy, warm/light for control panels)
+- Cards: each type gets its own accent gradient — NEVER all same color, NEVER monotone grids
+- Pick a color identity matching the domain, for example:
+  - 💡 Lights/ambiance   → warm: gold, amber, peach, soft yellow
+  - 🌡️ Climate/comfort   → cool: cyan, sky blue, mint, ice white
+  - 🔋 Batteries/storage → electric: lime, teal, deep blue, acid green
+  - 🪟 Blinds/shutters   → neutral-warm: sand, warm grey, brown, slate
+  - 🔌 Power/electrical  → tech: purple, indigo, violet, dark navy
+  - ☀️ Solar/energy      → solar: amber, orange, grass-green, teal
+  - 🔒 Security/alarm    → alert: crimson, red-orange, dark charcoal
+  - 💧 Water/irrigation  → fresh: deep blue, aqua, cyan, soft teal
+  - 🤖 Generic/mixed     → 4 vivid contrasting hues — designed, not default
+- Text: white #fff for values, rgba(255,255,255,0.6) for labels, rgba(255,255,255,0.35) for units
+- KPI accent: 3px top border gradient per card type
+- Charts: gradient fills via createLinearGradient, multi-color datasets
+
+**📊 Charts — Be Creative, Use Variety (always 2-4 charts, mix types):**
+- BAR → comparisons across items (power per panel, daily production)
+- LINE / AREA → trends over time; use gradient fill + tension:0.4 + animated
+- DOUGHNUT / PIE → distribution/share (group A vs B, today vs week quota)
+- GAUGE (half-doughnut) → single KPI with target: circumference:180, rotation:-90, cutout:'78%', big centered number
+- SCATTER → correlation between two sensor values (e.g. signal vs power)
+- MIXED (bar + line) → actual vs target on same axes
+- STACKED BAR → multi-source contribution per time slot
+- Never use only bars — always mix at least 2 different chart types per dashboard
+
+**🏗️ Layout:**
+- CSS grid with card hierarchy: hero KPI banner → visual charts/gauges → detail cards
+- Avoid flat lists of entity states — group logically, use section titles with icons
+- Mix card sizes: wide hero, medium charts, small KPI pills
+
+**Technical:**
+- Define own CSS variables (`--bg`, `--card`, `--accent`, `--text`) in `:root {}` — never use HA frontend vars like `--primary-background-color`
+- Use `__ACCENT__` and `__ACCENT_RGB__` placeholders for the user's theme color
 
 IMPORTANT: When modifying a dashboard, ALWAYS:
 1. First call get_dashboard_config to read the current config

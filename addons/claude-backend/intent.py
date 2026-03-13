@@ -332,35 +332,118 @@ UI RULES:
 - The dashboard is for END USERS, not developers — show only useful data: entity values, labels, charts, status indicators
 - A small colored dot (green=live, grey=offline) in the header is OK, but do NOT label it "WebSocket"/"REST"
 
-CHART REQUIREMENTS (MANDATORY):
-- Include at least 2 always-visible charts in the MAIN page (not only in a modal):
-  1) one time-series line/area chart (trend over time)
-  2) one comparative chart (bar OR doughnut/pie)
-- Do NOT build dashboards with only numeric cards/tables.
-- Mix sections: KPI cards + charts + grouped insights in the same page.
-- Correlate metrics when possible (e.g. production vs consumption vs grid import/export).
-- Modal history charts are allowed, but they do NOT count as the required visible charts.
+DESIGN PHILOSOPHY — Make every dashboard look like it was designed by a professional UI designer:
 
-ENTITY CLICK — MORE INFO DIALOG:
-When the user clicks on a sensor/entity card, show a detail popup with history chart.
-Use this pattern:
-  function openMoreInfo(entityId) {
-    const haEl = document.querySelector('home-assistant') || parent?.document?.querySelector('home-assistant');
-    if (haEl) {
-      haEl.dispatchEvent(new CustomEvent('hass-more-info',
-        { detail: { entityId }, bubbles: true, composed: true }));
-      return;
+🎨 COLORS & GRADIENTS (always — no flat/grey/white layouts ever):
+Background: always a bold multi-stop gradient matching the mood of the dashboard theme.
+Every card type gets its OWN accent gradient — NEVER a monotone grid of identical-looking cards.
+
+PICK A COLOR IDENTITY based on what the dashboard is about, then build 4-5 complementary card accents:
+  💡 Lights / ambiance   → warm: gold #f9ca24, amber #f0932b, peach #fd79a8, soft yellow
+  🌡️ Climate / comfort   → cool: cyan #74b9ff, sky #0984e3, ice #dfe6e9, mint #55efc4
+  🔋 Batteries / storage → electric: lime #badc58, green #6ab04c, teal #22a6b3, deep blue
+  🪟 Blinds / shutters   → neutral-warm: sand #f8b739, brown #e17055, slate #636e72, warm grey
+  🔌 Power / electrical  → tech: purple #6c5ce7, indigo #4834d4, violet #a29bfe, dark navy
+  ☀️ Solar / energy      → solar: amber #f9ca24, orange #f0932b, grass-green #00b894, teal
+  🔒 Security / alarm    → alert: crimson #d63031, orange-red #e17055, dark #2d3436, accent red
+  🏠 Presence / rooms    → cozy: warm rose #fd79a8, mauve #e84393, soft purple #6c5ce7
+  💧 Water / irrigation  → fresh: deep blue #0652DD, aqua #1289A7, cyan, soft teal
+  🌬️ Air / ventilation   → airy: sky blue #74b9ff, light cyan, white-blue gradients
+  🤖 Generic / mixed     → pick any 4 vivid contrasting hues — make it feel designed, not default
+
+Rules:
+- Background gradient: 2-3 stops, dark for dashboards with lots of data, lighter/warmer for control panels
+- Card accent: 3px top border or left border with domain gradient (border-image or ::before strip)
+- Chart colors: always multi-color datasets — never single-color bar charts
+- Text hierarchy: white #fff for values, rgba(255,255,255,0.6) for labels, rgba(255,255,255,0.35) for units
+- Use CSS variables: :root { --bg, --card, --accent, --text } and __ACCENT__ / __ACCENT_RGB__ placeholders
+
+✨ WOW EFFECT (always):
+- CSS animations on load: elements fade/slide in (opacity + transform), live values pulse, cards lift on hover
+- Glassmorphism cards: backdrop-filter: blur(12px) + semi-transparent background + subtle border
+- Smooth transitions on all interactive elements
+
+📑 TABS (default for dashboards with 3+ distinct topics):
+- Build a single-page tab router with a styled top navigation bar
+- JS show/hide (display:none → grid/block) for instant switching — no page reload
+- Active tab: accent-colored underline + highlighted background
+- Each tab = one thematic group (e.g. Energia | Clima | Luci | Sicurezza)
+
+🔍 POPUPS & DETAIL MODALS:
+- ALWAYS add click-to-expand on entity cards — clicking a card shows a detail modal
+- Use this pattern for HA native more-info:
+    function openMoreInfo(entityId) {
+      const haEl = document.querySelector('home-assistant') || parent?.document?.querySelector('home-assistant');
+      if (haEl) {
+        haEl.dispatchEvent(new CustomEvent('hass-more-info',
+          { detail: { entityId }, bubbles: true, composed: true }));
+        return;
+      }
+      showHistoryModal(entityId);  // fallback: custom modal with history chart
     }
-    showHistoryModal(entityId);
-  }
-Add cursor:pointer to all entity cards and call openMoreInfo(entityId) on click.
+- Add cursor:pointer to all entity cards and call openMoreInfo(entityId) on click
+- Custom modals (for history charts, breakdowns, etc.): backdrop-blur overlay + centered card with × close button
 
-DESIGN FREEDOM — be creative! Vary these across dashboards:
+📊 CHARTS — Be Creative, Use Variety:
+Always include 2-4 charts per dashboard. Mix different chart types — never use only bars.
+Choose the right chart for the data:
+
+  BAR chart         → comparisons across items or time
+                       e.g. power per panel, daily production, energy per room, water consumption per day
+  LINE / AREA chart → trends over time with gradient fill, tension:0.4
+                       e.g. temperature over 24h, battery charge curve, blinds usage frequency, light dimmer history
+  DOUGHNUT / PIE    → distribution and shares
+                       e.g. battery levels by device, light zones on/off share, circuit power split, room humidity split
+  GAUGE (half-doughnut) → single KPI vs target: circumference:180, rotation:-90, cutout:'78%', CSS-overlaid number
+                       e.g. battery %, HVAC efficiency, water tank level, overall security score, air quality index
+  SCATTER chart     → correlation between two sensor values
+                       e.g. temp vs humidity per room, signal vs battery level, brightness vs energy use
+  RADAR chart       → multi-attribute per entity — great for comparing rooms or devices
+                       e.g. rooms: temp/humidity/CO2/light/occupancy; devices: battery/signal/uptime/errors
+  MIXED (bar+line)  → actual vs target on same axes
+                       e.g. daily consumption bars + monthly goal line, production vs forecast
+  STACKED BAR       → multi-source contribution per slot
+                       e.g. solar+grid+battery per hour, room-by-room energy per day, device type breakdown
+
+Rules:
+- Always include at least one time-based LINE/AREA chart when history data is available (use /api/history/period/)
+- Add a GAUGE for any single "how good is this?" KPI (efficiency, fill level, charge %)
+- Add a DOUGHNUT for any "what's the share?" question
+- Use gradient fills, animated on load (animation:{duration:800,easing:'easeOutQuart'})
+- Dark backgrounds: use rgba colors with opacity for chart fills, bright solid for borders
+
+🏗️ LAYOUT:
+- CSS Grid with card hierarchy: hero KPI banner → visual charts/gauges → grouped detail cards
+- Avoid flat lists of entity states — group by topic, use section titles with emoji icons
+- Mix card sizes (wide hero, medium charts, small KPI pills)
+- Place the most visually impactful chart (large line/area or mixed) as the hero element
+
+INVENTIVENESS — Each dashboard should feel unique and purpose-built for its domain:
+Always pick creative visual elements that match what the dashboard is about. Examples:
+
+  💡 Lights:       color-swatch cards showing current RGB color, brightness slider visual, room map with lit/off overlay
+  🔋 Batteries:    vertical fill-bar per battery (CSS animated), donut gauge per device, low-battery alert strip
+  🪟 Blinds:       animated CSS shutter icon showing % open, grouped by room, one-click open-all/close-all buttons
+  🌡️ Climate:      color-gradient temperature scale, room-by-room heat map, dew point indicator, comfort zone band on chart
+  🔒 Security:     big status badge (ARMED/DISARMED) with color fill, door/window grid with open=red/closed=green dots
+  ☀️ Solar:        Sankey-style energy flow (CSS arrows: panels→inverter→house/grid), production curve area chart
+  🔌 Power/meters: live watt counter with pulse animation, stacked bar per circuit, cost estimate in real-time
+  💧 Water:        fill-level gauge, consumption line chart, leak sensor status as colored alert cards
+  🏠 Presence:     room occupancy grid (person icons, green=home/grey=away), last-seen timeline
+  🌬️ Air/HVAC:     wind speed compass, AQI color scale, CO₂ trend with danger threshold line
+  🤖 Mixed/general: hero summary strip + tabs per category + history charts per tab
+
+Always add:
+- Animated counters on KPI numbers (count up from 0 on load)
+- Pulse ring or glow on any "live" value that updates in real-time
+- Color-coded status dots (green=ok, amber=warning, red=alert) on every entity card
+- Sortable table with inline mini-bar for any sensor array with 5+ similar items
+
+DESIGN FREEDOM — vary these across dashboards:
 - Color schemes: warm, cool, neon, pastel, monochrome, earth tones, gradients
-- Card styles: glass morphism, neumorphism, flat material, outlined, floating shadows
+- Card styles: glassmorphism, neumorphism, flat material, outlined, floating shadows
 - Layouts: CSS Grid, masonry, bento grid, sidebar+main, full-width hero sections
 - Typography: large stat numbers, condensed labels, accent fonts via Google Fonts
-- Animations: smooth transitions, subtle pulse on live values, hover effects
 - Dark/light: use @media(prefers-color-scheme) or hardcode based on theme parameter
 
 Respond in the user's language."""

@@ -2,57 +2,132 @@
 
 ## Overview
 
-The **Amira add-on** brings enterprise-grade AI to your Home Assistant instance. It provides a web-based chat interface with multi-provider AI support (22+ providers, 60+ models), real-time cost tracking, multi-agent system, file access capabilities, persistent memory, document analysis, MCP tool integration, Telegram & WhatsApp messaging, and more.
+**Amira** is an AI-powered smart home assistant add-on for Home Assistant. It provides a web-based chat interface with multi-provider AI support (40+ models), real-time cost tracking, multi-agent system, HTML custom dashboard generation, MCP tool integration, Telegram & WhatsApp messaging, file access, voice input, and more.
 
-The add-on integrates seamlessly with Home Assistant's Supervisor API — no long-lived tokens required, just your AI provider API keys.
+No long-lived tokens required — Amira integrates directly with Home Assistant's Supervisor API.
+
+---
+
+## Quick Start
+
+1. **Add repository**: Settings → Add-ons → Add-on Store → ⋮ → Repositories → add `https://github.com/Bobsilvio/ha-claude`
+2. **Install**: Search "Amira" → Install
+3. **Add API key**: Add-on Configuration tab → add at least one provider key → Save
+4. **Start** the add-on
+5. **Open Amira** from the HA sidebar and start chatting
+
+---
+
+## Configuration: two layers
+
+Amira uses **two layers** of configuration. Most features are now managed directly from the chat UI — you rarely need to touch the add-on config tab.
+
+### Layer 1 — Add-on Configuration tab (API keys only)
+
+| Setting | Description |
+|---------|-------------|
+| `anthropic_api_key` | Anthropic Claude API key |
+| `openai_api_key` | OpenAI API key |
+| `google_api_key` | Google Gemini API key |
+| `github_token` | GitHub PAT (GitHub Models + GitHub Copilot OAuth) |
+| `nvidia_api_key` | NVIDIA NIM API key |
+| `groq_api_key` | Groq API key |
+| `mistral_api_key` | Mistral API key |
+| `openrouter_api_key` | OpenRouter API key |
+| `deepseek_api_key` | DeepSeek API key |
+| `perplexity_api_key` | Perplexity API key |
+| `minimax_api_key` | MiniMax API key |
+| `aihubmix_api_key` | AiHubMix API key |
+| `siliconflow_api_key` | SiliconFlow API key |
+| `volcengine_api_key` | VolcEngine API key |
+| `dashscope_api_key` | DashScope (Alibaba Qwen) API key |
+| `moonshot_api_key` | Moonshot (Kimi) API key |
+| `zhipu_api_key` | Zhipu GLM API key |
+| `custom_api_key` + `custom_api_base` + `custom_model_name` | Any OpenAI-compatible endpoint |
+| `ollama_base_url` | Ollama server URL (default: `http://localhost:11434`) |
+| `colored_logs` | Pretty-print add-on logs |
+| `debug_mode` / `log_level` | `normal` / `verbose` / `debug` |
+
+### Layer 2 — Settings UI (⚙️ icon in chat)
+
+All runtime features are configured from the chat interface. No restart needed for most changes.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| **language** | `en` | UI language: English, Italian, Spanish, French |
+| **enable_file_access** | OFF | Read/write `/config` files with automatic snapshots |
+| **enable_file_upload** | ON | Upload documents (PDF, DOCX, TXT, MD, YAML) for AI analysis |
+| **enable_memory** | OFF | Persistent AI memory across sessions (MEMORY.md) |
+| **enable_rag** | OFF | RAG semantic search over uploaded documents |
+| **enable_chat_bubble** | ON | Floating AI button on every HA page |
+| **enable_amira_card_button** | ON | 🤖 Amira button in the Lovelace card editor |
+| **enable_voice_input** | ON | Voice input in chat bubble |
+| **enable_mcp** | OFF | MCP tool server integration |
+| **fallback_enabled** | OFF | Auto fallback to next provider on error |
+| **tts_voice** | `female` | TTS voice gender |
+| **anthropic_extended_thinking** | OFF | Extended thinking for Claude models |
+| **anthropic_prompt_caching** | OFF | Prompt caching for Claude (reduces cost on repeated context) |
+| **openai_extended_thinking** | OFF | Extended thinking for OpenAI o-series |
+| **nvidia_thinking_mode** | OFF | Extra reasoning tokens on NVIDIA models |
+| **timeout** | `30` | API request timeout in seconds |
+| **max_retries** | `3` | Retry failed requests |
+| **max_conversations** | `10` | Chat history depth (1–100) |
+| **max_snapshots_per_file** | `5` | Max backups per config file |
+| **cost_currency** | `USD` | Cost display: USD or EUR |
+| **mcp_config_file** | `/config/amira/mcp_config.json` | MCP servers config path |
+
+Settings are stored in `/config/amira/settings.json` and persist across restarts.
+
+---
 
 ## Features
 
-### Core Features
+### Chat & AI
+
 - **Streaming chat UI** with real-time responses
-- **Multi-provider support**: 22+ AI providers, 60+ models
-- **Model switching**: Change AI providers and models on-the-fly without restarting
-- **Persistent model selection**: Your chosen agent is saved and restored after restart
-- **Multi-language UI**: English, Italian, Spanish, French
-- **Home Assistant integration**: Read device states, call services directly from chat
-- **Floating Chat Bubble**: AI accessible on every HA page
-- **MCP Tools**: Extend AI with external tools and APIs
+- **40+ AI models** from 12+ providers — switch without restarting
+- **Persistent model selection** — your chosen model is restored after restart
+- **Multi-language UI** — English, Italian, Spanish, French
+- **Voice input** — speak instead of type (in chat bubble)
+- **File upload** — PDF, DOCX, TXT, MD, YAML injected into AI context
+- **Image/vision** — send screenshots or photos to vision-capable models
+- **Conversation history** — multiple named chats, persistent across sessions
 
-### Cost & Usage Tracking
-- **Per-message cost**: Token count (input/output/cache) + dollar cost displayed on every AI response
-- **Cache token visibility**: Cache read (↓) and cache write (↑) tokens shown separately with tooltips
-- **Cost breakdown tooltip**: Hover to see input, output, cache read, cache write costs individually
-- **Session totals**: Running conversation cost in the UI footer
-- **Persistent daily tracking**: Usage aggregated by day, model, and provider in `/data/usage_stats.json`
-- **REST API**: `GET /api/usage_stats`, `GET /api/usage_stats/today`, `POST /api/usage_stats/reset`
-- **Cache-aware pricing**: Anthropic (cache reads 10% of input), OpenAI (50%), Google (25%), DeepSeek (10%)
-- **120+ models priced**: Anthropic, OpenAI, Google, Groq, Mistral, DeepSeek, Moonshot, Chinese providers
+### Home Assistant Integration
 
-### Dynamic Model Catalog
-- **Centralized metadata**: Every model has capabilities (vision, reasoning, code, tool_use), context window, max output tokens, pricing tier
-- **Capability enum**: TEXT, VISION, DOCUMENT, REASONING, TOOL_USE, CODE, STREAMING
-- **Pricing tiers**: FREE, CHEAP, STANDARD, PREMIUM — used by the fallback engine to pick cost-effective alternatives
-- **Runtime enrichment**: Static table + live `/v1/models` discovery from NVIDIA, Ollama, GitHub Copilot
-- **Programmatic queries**: `catalog.get_entry(provider, model)` → capabilities, context window, pricing
+Ask Amira in natural language:
+- *"Turn on the living room lights at 50% brightness"*
+- *"Create an automation that turns off all lights at midnight"*
+- *"What's the current temperature in the bedroom?"*
+- *"Show me the energy usage for today"*
+- *"Create a dashboard for my solar panels"*
+
+Amira can read device states, call services, create/edit automations and scripts, manage helpers, and more — all without you ever touching YAML.
+
+### HTML Custom Dashboards
+
+Amira can generate fully custom HTML dashboards saved to `/config/www/dashboards/` and accessible directly from the HA sidebar.
+
+Ask:
+- *"Create a dashboard for my solar panels with charts"*
+- *"Make a battery monitoring dashboard"*
+- *"Build a lights control panel for my home"*
+
+Each generated dashboard:
+- Connects to HA in real-time via WebSocket + REST API with automatic authentication
+- Auto-refreshes entity states
+- Includes domain-appropriate chart types (bar, line/area, donut, gauge, scatter, radar, stacked)
+- Uses a professional color palette matched to the domain (solar = amber/green, climate = cyan, security = red, etc.)
+- Supports click-to-expand cards that open the HA native more-info panel
+- Works on mobile and desktop
+
+Dashboards are saved at `/config/www/dashboards/<name>.html` and added to the HA sidebar automatically. You can also ask Amira to modify or delete any existing dashboard.
 
 ### Multi-Agent System
-- **Agent profiles**: Define agents with custom identity (name, emoji, description), preferred model, fallback chain, and tool whitelist
-- **JSON config**: `/config/amira/agents.json` — user-editable, hot-reloadable (no restart needed)
-- **Agent selector**: Switch agents from chat UI or bubble — model/provider auto-apply
-- **Model fallback**: Cascading chain (primary → agent fallbacks → global defaults) with intelligent error classification
-- **Error types**: Rate-limit (cooldown + probe), auth (permanent skip), billing (abort), context-overflow (abort)
-- **Provider health**: Automatic tracking with periodic probe recovery for rate-limited providers
 
-#### Why multiple agents?
-A single generic assistant works fine, but multiple agents unlock:
-1. **Task specialisation** — each agent has its own model, tools, temperature and system prompt
-2. **Cost control** — route expensive reasoning tasks to premium models, simple Q&A to free/cheap models
-3. **Tool isolation** — only the "home" agent can create automations; a "coder" agent can only read/write config files
-4. **Personality** — different name, emoji and response style per task
+Define multiple AI agents with different models, tools, and personalities. Switch between them from the chat UI.
 
-#### Agent configuration reference
-
-Create `/config/amira/agents.json` with one or more agent entries:
+**Configuration**: create `/config/amira/agents.json` (or use the Settings UI → Agents):
 
 ```json
 {
@@ -60,7 +135,7 @@ Create `/config/amira/agents.json` with one or more agent entries:
     "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
     "model": "anthropic/claude-sonnet-4-6",
     "fallback": ["google/gemini-2.0-flash", "groq/llama-3.3-70b-versatile"],
-    "tools": ["create_automation", "update_automation", "call_service", "get_entity"],
+    "tools": null,
     "is_default": true
   },
   "coder": {
@@ -69,8 +144,7 @@ Create `/config/amira/agents.json` with one or more agent entries:
     "fallback": ["openai/gpt-4o"],
     "tools": ["read_config_file", "write_config_file"],
     "system_prompt_override": "You are a coding expert. Always show code with comments.",
-    "temperature": 0.2,
-    "thinking_level": "high"
+    "temperature": 0.2
   },
   "quick": {
     "identity": { "name": "Flash", "emoji": "⚡", "description": "Fast answers, no tools" },
@@ -82,247 +156,25 @@ Create `/config/amira/agents.json` with one or more agent entries:
 }
 ```
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `identity.name` | string | `"Amira"` | Display name shown in UI and message prefix |
-| `identity.emoji` | string | `"🤖"` | Icon in agent selector and chat messages |
-| `identity.description` | string | `""` | Tooltip / short description |
-| `model` | string | — | `provider/model` format (e.g. `anthropic/claude-sonnet-4-6`) |
-| `fallback` | string[] | `[]` | Ordered fallback models if primary fails |
-| `tools` | string[] \| null | `null` | Allowed tool names. `null` = all tools, `[]` = no tools |
-| `tools_blocked` | string[] | `[]` | Explicitly blocked tool names (subtracted from allowed) |
-| `system_prompt_override` | string \| null | `null` | Replaces the default system prompt entirely |
-| `temperature` | number \| null | `null` | 0.0–2.0 (null uses provider default) |
-| `max_tokens` | number \| null | `null` | Max response tokens |
-| `thinking_level` | string \| null | `null` | `off`, `low`, `medium`, `high`, `adaptive` |
-| `is_default` | bool | `false` | If true, this agent is pre-selected on load |
-| `enabled` | bool | `true` | Set false to hide without deleting |
-| `tags` | string[] | `[]` | Arbitrary tags for organisation |
-
-#### How it works at runtime
-1. User selects an agent from the sidebar selector
-2. The agent's `model` field sets the active provider + model
-3. If the model fails, the `fallback` chain is tried in order
-4. If all agent fallbacks fail, the global fallback list is tried
-5. Only the tools listed in `tools` are exposed to the AI (or all if `null`)
-6. `tools_blocked` entries are always removed, even if `tools` is `null`
-7. `system_prompt_override` replaces the default prompt; `temperature`, `max_tokens`, `thinking_level` override globals
-
-### Automation Safety Guards
-- **Empty automation rejection**: `create_automation` returns an error if both triggers and actions are empty
-- **Duplicate alias detection**: Before creating, checks `automations.yaml` for similar names — suggests `update_automation`
-- **Improved tool schemas**: Parameter descriptions include concrete examples (`{'platform': 'time', 'at': '20:00'}`)
-- **System prompt rules**: AI is explicitly instructed to never use `create_automation` for modifying existing automations
-
-### Enhanced Logging
-- **Custom CHAT level** (25, between INFO and WARNING): Dedicated log level for user questions and AI responses
-- **Color-coded**: Blue color with 💬 icon in terminal logs
-- **All channels**: Web UI (📩/📤), Telegram, WhatsApp, Alexa — all use CHAT level
-- **Easy filtering**: `grep CHAT` in logs to see only conversations, not system noise
-
-### Advanced Features
-- **File Upload & Analysis**: Upload PDF, DOCX, TXT, MD, YAML files for AI analysis
-- **Persistent Memory**: AI remembers past conversations across sessions via MEMORY.md
-- **RAG (Retrieval-Augmented Generation)**: Semantic search over uploaded documents
-- **File Access**: Optional read/write access to `/config` directory with automatic snapshots
-- **Vision Support**: Image upload and analysis (screenshots, photos, dashboard images)
-- **Telegram Bot**: Long polling — no public IP needed
-- **WhatsApp**: Twilio integration with webhook support
-
-## AI Providers
-
-### Anthropic Claude
-- **Models**: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5, and more
-- **Cost**: ~$3–$15 per 1M tokens depending on model
-- **Setup**: Get API key from [console.anthropic.com](https://console.anthropic.com)
-- **Best for**: Complex reasoning, creative tasks, long context
-
-### OpenAI
-- **Models**: GPT-4o, GPT-4 Turbo, o1, o3-mini, and more
-- **Cost**: $5–$20 per 1M tokens (varies by model)
-- **Setup**: Create API key at [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-- **Best for**: Balanced performance, variety of models
-
-### Google Gemini
-- **Models**: Gemini 2.0 Flash, Gemini 1.5 Pro, and more
-- **Cost**: Free tier (1500 req/day), ~$7.50 per 1M tokens (paid)
-- **Setup**: Get API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-- **Best for**: Fast responses, vision capabilities, free tier users
-
-### NVIDIA NIM
-- **Models**: Llama 3.1 405B/70B, Mistral Large, Mixtral, Kimi K2.5, and more
-- **Cost**: Free tier (rate-limited)
-- **Setup**: Get API key from [build.nvidia.com](https://build.nvidia.com)
-- **Best for**: Open-source models, free inference, high throughput
-
-### GitHub Models
-- **Models**: GPT-4o, o1, o3-mini, Llama, Phi, and more
-- **Cost**: Free for GitHub users (rate limits apply)
-- **Setup**: GitHub PAT from [github.com/settings/tokens](https://github.com/settings/tokens) (no special permissions needed)
-- **Best for**: GitHub users, experimental models, free access
-
-### Groq
-- **Models**: Llama 3.1 70B/8B, Mixtral, and more
-- **Cost**: Free tier (generous limits)
-- **Setup**: Get API key from [console.groq.com](https://console.groq.com)
-- **Best for**: Very fast inference, free usage
-
-### Mistral
-- **Models**: Mistral Large, Medium, Small, and more
-- **Cost**: Pay per use (~$2–$8 per 1M tokens)
-- **Setup**: Get API key from [console.mistral.ai](https://console.mistral.ai)
-- **Best for**: European users, efficient models
-
-### Ollama (Local)
-- **Models**: Any model you pull locally (Llama, Qwen, Mistral, etc.)
-- **Cost**: Free (runs on your hardware)
-- **Setup**: Install [ollama.com](https://ollama.com), set `ollama_base_url` (e.g. `http://192.168.1.x:11434`)
-- **Best for**: Privacy, offline use, no API costs
-
-### DeepSeek
-- **Models**: DeepSeek Chat, DeepSeek Reasoner
-- **Cost**: Very low (~$0.14–$0.55 per 1M tokens)
-- **Setup**: Get API key from [platform.deepseek.com](https://platform.deepseek.com)
-- **Best for**: Cost-efficient inference, reasoning tasks
-
-### OpenRouter
-- **Models**: Access to 100+ models from multiple providers
-- **Cost**: Pay per use (varies by model)
-- **Setup**: Get API key from [openrouter.ai/keys](https://openrouter.ai/keys)
-- **Best for**: Switching between many providers with one key
-
-### GitHub Copilot (OAuth)
-- **Models**: GPT-4o, o3-mini, Claude 3.7 Sonnet, Gemini 2.0 Flash, and more
-- **Cost**: Requires active GitHub Copilot subscription
-- **Setup**: OAuth device flow — click "Connect GitHub Copilot" in the UI, enter the code at [github.com/login/device](https://github.com/login/device)
-- **Best for**: GitHub Copilot subscribers getting extra value
-
-### OpenAI Codex (OAuth)
-- **Models**: gpt-5.3-codex, gpt-5.2-codex, gpt-5.1-codex, gpt-5-codex, gpt-5-codex-mini and more
-- **Cost**: Included with **ChatGPT Plus** ($20/mo) or **Pro** ($200/mo) — no extra API charges
-- **Setup**: OAuth flow — click "Connect OpenAI Codex" in the UI; once logged in a green banner confirms the connection with expiry info
-- **Best for**: Users who already pay for ChatGPT Plus/Pro and want to use Codex models without a separate API key
-
-> 💡 **Already paying for ChatGPT?** Use this provider instead of the standard OpenAI API — it's included in your subscription at no extra cost. The Codex models (`gpt-5.3-codex`, etc.) are optimized for agentic coding tasks and work well for Home Assistant automations, scripts and dashboard generation.
-
-> ⚠️ Generic OpenAI reasoning models (o3, o4-mini) are **not** supported via this endpoint. Use the `openai` provider with an API key for those.
-
-### Other Providers
-- **Perplexity**: Real-time web search models — [perplexity.ai/api](https://www.perplexity.ai/api)
-- **MiniMax**: Chinese LLM with long context — [minimaxi.com](https://www.minimaxi.com)
-- **AiHubMix**: Aggregator with many models — [aihubmix.com](https://aihubmix.com)
-- **SiliconFlow**: Fast Chinese inference — [siliconflow.cn](https://siliconflow.cn)
-- **VolcEngine**: ByteDance AI — [volcengine.com](https://www.volcengine.com)
-- **DashScope**: Alibaba Qwen models — [dashscope.aliyun.com](https://dashscope.aliyun.com)
-- **Moonshot**: Kimi models — [platform.moonshot.cn](https://platform.moonshot.cn)
-- **Zhipu AI**: GLM models — [open.bigmodel.cn](https://open.bigmodel.cn)
-- **Custom**: Any OpenAI-compatible endpoint — set `custom_api_base` and `custom_api_key`
-
-## Installation
-
-1. **Add Repository**:
-   - Settings → Add-ons & Backups → Add-on Store → ⋮ → Repositories
-   - Add: `https://github.com/Bobsilvio/ha-claude`
-
-2. **Install Add-on**:
-   - Search for "Amira"
-   - Click **Amira Ai Assistant** → **Install**
-
-3. **Configure & Start**:
-   - Open the **Configuration** tab
-   - Add at least one provider API key
-   - Click **Save** and **Start**
-
-## Configuration
-
-Amira uses **two layers** of configuration:
-
-1. **`config.yaml`** (HA Add-on page → Configuration tab) — API keys and log settings only
-2. **Settings UI** (Amira chat → ⚙️ Settings) — All runtime features, with descriptions in 4 languages
-
-> 💡 After saving settings in the UI, you'll be prompted to restart the addon to apply changes.
-
-### config.yaml (API keys + logging)
-
-These settings are configured from the HA Add-on Configuration tab:
-
-| Setting | Description |
-|---------|-------------|
-| Provider API keys | `anthropic_api_key`, `openai_api_key`, `google_api_key`, `github_token`, etc. |
-| `ollama_base_url` | Ollama server URL (default: `http://localhost:11434`) |
-| `custom_api_key` / `custom_api_base` | Custom OpenAI-compatible endpoint |
-| `colored_logs` | Pretty-print add-on logs (default: true) |
-| `debug_mode` | Verbose logging (default: false) |
-| `log_level` | `normal` / `verbose` / `debug` |
-
-### Runtime Settings (managed via Settings UI)
-
-All feature toggles and runtime options are managed from the chat UI (⚙️ icon):
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `language` | `en` | UI language (en/it/es/fr) |
-| `enable_file_access` | OFF | Allow read/write `/config` files with snapshots |
-| `enable_file_upload` | **ON** | Allow uploading documents (PDF, DOCX, TXT, etc.) |
-| `enable_memory` | OFF | Enable persistent conversation memory |
-| `enable_rag` | OFF | Enable RAG for document search |
-| `enable_chat_bubble` | **ON** | Floating AI button on every HA page |
-| `enable_amira_card_button` | **ON** | 🤖 Amira button in the Lovelace card editor |
-| `enable_voice_input` | **ON** | Voice input in chat bubble |
-| `enable_mcp` | OFF | Enable MCP tool servers |
-| `fallback_enabled` | OFF | Provider fallback chain |
-| `tts_voice` | `female` | TTS voice gender (male/female) |
-| `anthropic_extended_thinking` | OFF | Extended thinking for Claude models |
-| `anthropic_prompt_caching` | OFF | Prompt caching for Claude |
-| `openai_extended_thinking` | OFF | Extended thinking for OpenAI o-series |
-| `nvidia_thinking_mode` | OFF | Extra reasoning tokens on NVIDIA models |
-| `timeout` | `30` | API request timeout (seconds) |
-| `max_retries` | `3` | Retry failed requests |
-| `max_conversations` | `10` | Chat history depth (1–100) |
-| `max_snapshots_per_file` | `5` | Max backups per config file |
-| `cost_currency` | `USD` | Cost display currency (USD, EUR) |
-| `mcp_config_file` | `/config/amira/mcp_config.json` | MCP servers config path |
-
-Settings are stored in `/config/amira/settings.json` and persist across restarts.
-
-## Using the Chat
-
-### First Launch
-1. Open **Amira** from the Home Assistant sidebar
-2. Click the **model dropdown** (top left of chat area)
-3. Select an agent/model (e.g., "Groq → Llama 3.1 70B")
-4. Start chatting
-
-### Home Assistant Integration
-Ask the AI about your smart home:
-- Device states: *"What's the current garage door status?"*
-- Services: *"Turn on the living room lights"*
-- Automations: *"Show me my evening routine automation"*
-
-### File Upload
-When File Upload is enabled (ON by default in Settings → Features):
-1. Click the **file upload button** (in input area)
-2. Select a document (PDF, DOCX, TXT, MD, YAML)
-3. Documents are auto-injected into AI context (limit: 10MB)
-
-### Persistent Memory
-When Memory is enabled (Settings → Features → Memory), Amira uses a two-file system:
-
-- **`MEMORY.md`** — Injected in every session. Write here what the AI should always know.
-- **`HISTORY.md`** — Append-only log of past sessions (for your reference).
-
-```bash
-# SSH into HA, then:
-nano /config/amira/memory/MEMORY.md
-```
-
-## Advanced Configuration
-
-### File Access
-Requires File Access to be enabled in Settings → Features. Snapshots stored in `/config/amira/snapshots/`.
+| Field | Type | Description |
+|-------|------|-------------|
+| `model` | string | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
+| `fallback` | string[] | Ordered fallback models if primary fails |
+| `tools` | string[] \| null | Allowed tool names. `null` = all, `[]` = none |
+| `tools_blocked` | string[] | Explicitly blocked tools |
+| `system_prompt_override` | string | Replaces default system prompt |
+| `temperature` | number | 0.0–2.0 |
+| `thinking_level` | string | `off`, `low`, `medium`, `high`, `adaptive` |
+| `is_default` | bool | Pre-selected on load |
+| `enabled` | bool | Hide without deleting |
 
 ### MCP Tools
-Enable MCP in Settings → Features → MCP, then open **Settings → MCP Config** in the chat UI to add servers (saved to `/config/amira/mcp_config.json`):
+
+Connect external tool servers to extend Amira's capabilities (databases, APIs, file systems, etc.).
+
+1. Enable MCP in **Settings → Features → MCP**
+2. Open **Settings → MCP Config** in the chat UI
+3. Add servers (saved to `/config/amira/mcp_config.json`):
 
 ```json
 {
@@ -333,91 +185,161 @@ Enable MCP in Settings → Features → MCP, then open **Settings → MCP Config
 }
 ```
 
-→ Full guide: [MCP.md](../../../docs/MCP.md)
+4. Start servers from **Settings → MCP** — each server shows a live status badge (green = running, grey = stopped)
+5. Servers you start manually are remembered and auto-restarted on add-on reboot
 
-### Logging
-Set `log_level`:
-- **`normal`** (default): Core messages only
-- **`verbose`**: Includes API request/response logs
-- **`debug`**: Maximum detail
+### Persistent Memory
 
-## Troubleshooting
+When enabled (Settings → Features → Memory), Amira remembers facts across sessions:
 
-| Problem | Solution |
-|---------|----------|
-| Chat UI doesn't load | Restart add-on, hard-refresh browser (Ctrl+F5) |
-| 401 API error | API key invalid — check format and account balance |
-| 429 Rate limit | Wait or upgrade to higher tier with provider |
-| File access not working | Enable File Access in Settings → Features, restart |
-| Memory not saving | Enable Memory in Settings → Features; check `/config/amira/memory/` exists and is writable |
-| MCP not loading | Enable MCP in Settings → Features; validate JSON at config path; check logs |
-| Module import errors | Restart the add-on (dependencies install on start) |
+- **`/config/amira/memory/MEMORY.md`** — injected in every session (write here what Amira should always know)
+- **`/config/amira/memory/HISTORY.md`** — append-only session log
 
-## API Reference
+Edit directly via SSH:
+```bash
+nano /config/amira/memory/MEMORY.md
+```
 
-The add-on exposes a REST API accessible via HA Ingress or directly on port 5010.
+### Telegram & WhatsApp
+
+- **Telegram**: long-polling bot — no public IP required. Configure bot token in Settings UI.
+- **WhatsApp**: Twilio integration with webhook on port 5010. Configure in Settings UI.
+
+### Cost Tracking
+
+Every AI response shows:
+- Token count (input / output / cache read / cache write)
+- Dollar cost with breakdown tooltip
+- Running session total
+
+Usage is aggregated by day, model, and provider in `/data/usage_stats.json`. Access via API or reset from Settings UI.
+
+---
+
+## AI Providers
+
+| Provider | Models | Cost | Notes |
+|----------|--------|------|-------|
+| **Anthropic** | Claude Opus/Sonnet/Haiku 4.x | $3–$15/1M tok | Best for complex reasoning, long context |
+| **OpenAI** | GPT-4o, o3, o4-mini | $5–$20/1M tok | Balanced performance |
+| **Google Gemini** | Gemini 2.0 Flash, 2.5 Pro | Free tier / $7.50/1M | Fast, free tier (1500 req/day) |
+| **NVIDIA NIM** | Llama 3.1 405B/70B, Mistral, Mixtral, Kimi | Free (rate-limited) | Open-source models |
+| **GitHub Models** | GPT-4o, o1, Llama, Phi | Free for GitHub users | Experimental models |
+| **GitHub Copilot** | GPT-4o, Claude 3.7, Gemini 2.0 | Copilot subscription | OAuth flow — no extra API key |
+| **OpenAI Codex** | gpt-5.x-codex series | ChatGPT Plus/Pro subscription | OAuth flow — no extra API key |
+| **Groq** | Llama 3.1, Mixtral | Free tier | Fastest inference |
+| **Mistral** | Mistral Large/Medium/Small | $2–$8/1M tok | European provider |
+| **DeepSeek** | DeepSeek Chat, Reasoner | $0.14–$0.55/1M tok | Very cost-efficient |
+| **OpenRouter** | 100+ models | Varies | One key for all providers |
+| **Perplexity** | Sonar models | Pay per use | Real-time web search |
+| **Ollama** | Any local model | Free | Privacy, offline, your hardware |
+| **MiniMax** | MiniMax models | Pay per use | Long context |
+| **AiHubMix** | Many models | Pay per use | Aggregator |
+| **SiliconFlow** | Fast inference | Pay per use | Chinese provider |
+| **VolcEngine** | ByteDance AI | Pay per use | Chinese provider |
+| **DashScope** | Alibaba Qwen | Pay per use | Qwen series |
+| **Moonshot** | Kimi models | Pay per use | Long context |
+| **Zhipu** | GLM models | Pay per use | Chinese provider |
+| **Custom** | Any OpenAI-compatible | — | Set `custom_api_base` + key |
+
+> **Already paying for ChatGPT Plus/Pro?** Use the **OpenAI Codex** provider — it's included in your subscription at no extra cost, no separate API key needed.
+
+> **GitHub Copilot subscriber?** Use the **GitHub Copilot** provider the same way.
+
+---
+
+## Data Storage
+
+All persistent data lives in `/config/amira/`:
+
+```
+/config/amira/
+├── settings.json              # All runtime settings (managed via Settings UI)
+├── conversations.json         # Chat history
+├── runtime_selection.json     # Last selected model/provider
+├── agents.json                # Multi-agent config
+├── mcp_config.json            # MCP servers config
+├── mcp_runtime.json           # MCP autostart state (servers started manually)
+├── custom_system_prompt.txt   # Custom system prompt override
+├── scheduled_tasks.json       # Scheduled task definitions
+├── snapshots/                 # Config file backups (before edits)
+├── documents/                 # Uploaded files
+├── rag/                       # RAG document index
+└── memory/
+    ├── MEMORY.md              # Long-term facts (always in context)
+    └── HISTORY.md             # Session log (append-only)
+
+/config/www/
+├── ha-claude-chat-bubble.js   # Floating chat bubble script (auto-generated)
+└── dashboards/                # Custom HTML dashboards (auto-generated)
+    └── <name>.html
+
+/data/
+└── usage_stats.json           # Cost/usage tracking (daily, per-model, per-provider)
+```
+
+---
+
+## REST API
+
+The add-on exposes a REST API on port 5010 (also via HA Ingress).
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/chat/stream` | POST | Streaming chat (SSE) |
 | `/api/models` | GET | List available providers and models |
 | `/api/set_model` | POST | Change active provider/model |
-| `/api/status` | GET | System status (HA connection, features, version) |
-| `/api/settings` | GET | Get all runtime settings with current values |
-| `/api/settings` | POST | Save runtime settings |
+| `/api/status` | GET | System status, features, version |
+| `/api/settings` | GET/POST | Get or save runtime settings |
 | `/api/conversations` | GET | List all conversations |
-| `/api/snapshots` | GET | List config file backups |
-| `/api/documents/upload` | POST | Upload document for analysis |
-| `/api/messaging/stats` | GET | Telegram & WhatsApp statistics |
-| `/api/usage_stats` | GET | Usage summary (daily, per-model, per-provider) |
-| `/api/usage_stats/today` | GET | Today's token and cost totals |
-| `/api/usage_stats/reset` | POST | Reset all usage data |
 | `/api/agents` | GET/POST | List or create agents |
 | `/api/agents/<id>` | PUT/DELETE | Update or delete an agent |
-| `/api/agents/set` | POST | Switch the active agent |
-| `/api/addon/restart` | POST | Restart the addon |
+| `/api/agents/set` | POST | Switch active agent |
+| `/api/snapshots` | GET | List config file backups |
+| `/api/documents/upload` | POST | Upload document for analysis |
+| `/api/mcp/servers` | GET | List MCP servers and status |
+| `/api/mcp/server/<name>/start` | POST | Start a MCP server |
+| `/api/mcp/server/<name>/stop` | POST | Stop a MCP server |
+| `/api/messaging/stats` | GET | Telegram & WhatsApp statistics |
+| `/api/usage_stats` | GET | Usage summary |
+| `/api/usage_stats/today` | GET | Today's token and cost totals |
+| `/api/usage_stats/reset` | POST | Reset all usage data |
+| `/api/addon/restart` | POST | Restart the add-on |
 | `/api/transcribe` | POST | Transcribe audio (Whisper) |
-| `/api/tts` | POST | Text-to-speech (Edge TTS / Groq / OpenAI) |
-| `/health` | GET | Simple health check |
+| `/api/tts` | POST | Text-to-speech |
+| `/health` | GET | Health check |
 
-## Data Storage
+---
 
-All persistent data lives in **`/config/amira/`**:
+## Troubleshooting
 
-```
-/config/amira/
-├── settings.json             # Runtime settings (managed via Settings UI)
-├── conversations.json        # Chat history
-├── runtime_selection.json    # Last selected model/provider
-├── agents.json               # Multi-agent config (name, model, tools, fallback)
-├── mcp_config.json           # MCP servers config
-├── custom_system_prompt.txt  # Custom system prompt override
-├── scheduled_tasks.json      # Scheduled task definitions
-├── snapshots/                # Config file backups (before edits)
-├── documents/                # Uploaded files
-├── rag/                      # RAG document index
-└── memory/
-    ├── MEMORY.md             # Long-term facts (always in context)
-    └── HISTORY.md            # Session log (append-only)
+| Problem | Solution |
+|---------|----------|
+| Chat UI doesn't load | Restart add-on, hard-refresh browser (Ctrl+F5) |
+| 401 API error | Check API key format and account balance |
+| 429 Rate limit | Wait or upgrade plan with provider |
+| Dashboard shows blank page | Check browser console; the model may have generated malformed HTML — try with Claude or GPT-4o |
+| Dashboard shows 0 values | Auth issue — the add-on auto-patches generated dashboards; rebuild if needed |
+| File access not working | Enable in Settings → Features → File Access, restart |
+| Memory not saving | Enable in Settings → Features → Memory; check `/config/amira/memory/` is writable |
+| MCP not loading | Enable in Settings → Features → MCP; validate JSON; check logs |
+| Module import errors | Restart the add-on (dependencies install on first start) |
+| Bubble not appearing | Enable in Settings → Features → Chat Bubble; hard-refresh HA |
 
-/config/www/
-└── ha-claude-chat-bubble.js  # Floating chat bubble (auto-generated)
+---
 
-/data/
-└── usage_stats.json          # Persistent cost/usage tracking (daily, per-model, per-provider)
-```
+## Security
 
-## Security Notes
+- **API keys** stored in HA configuration, never exposed to the UI
+- **File access** restricted to `/config` directory only
+- **Dashboard auth** — generated HTML dashboards use an automatic auth patch to connect securely to the HA API without exposing tokens
+- **Ingress** — all traffic via HA Ingress by default (no direct internet exposure)
+- **MCP config** — never commit `/config/amira/mcp_config.json` to git if it contains API keys
 
-- **API Keys**: Stored in HA configuration, never exposed to UI
-- **File Access**: Only reads/writes under `/config` directory
-- **Ingress**: All traffic through HA Ingress by default
-- **Memory**: Local only, no cloud sync
-- **MCP Config**: Never commit `/config/amira/mcp_config.json` to git if it contains API keys
+---
 
 ## Support
 
 - **Issues**: [github.com/Bobsilvio/ha-claude/issues](https://github.com/Bobsilvio/ha-claude/issues)
 - **Discussions**: [github.com/Bobsilvio/ha-claude/discussions](https://github.com/Bobsilvio/ha-claude/discussions)
 - **Repository**: [github.com/Bobsilvio/ha-claude](https://github.com/Bobsilvio/ha-claude)
-
