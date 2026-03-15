@@ -74,6 +74,11 @@ COPY usage_tracker.py .
 # Copy new providers module (v3.17.12+)
 COPY providers /app/providers
 
+# Copy modular sub-packages (v3.18+)
+COPY core /app/core
+COPY services /app/services
+COPY routes /app/routes
+
 # Copy rootfs (s6-overlay v3 service structure)
 COPY rootfs /
 
