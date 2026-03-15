@@ -71,14 +71,6 @@ _SETTINGS_GLOBAL_MAP = {
     "mcp_config_file": "MCP_CONFIG_FILE",
 }
 
-# Whitelist of config files editable via /api/config/save
-CONFIG_EDITABLE_FILES = {
-    "amira/agents.json",
-    "amira/mcp_config.json",
-    "amira/custom_system_prompt.txt",
-    "amira/memory/MEMORY.md",
-}
-
 
 def _load_settings() -> dict:
     """Load settings.json, return empty dict if file missing or invalid."""

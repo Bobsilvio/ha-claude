@@ -35,9 +35,14 @@ from services.model_service import (
 import services.settings_service as settings_service
 from services.settings_service import (
     RUNTIME_SELECTION_FILE, SETTINGS_FILE, MCP_RUNTIME_FILE,
-    SETTINGS_DEFAULTS, _SETTINGS_GLOBAL_MAP, CONFIG_EDITABLE_FILES,
+    SETTINGS_DEFAULTS, _SETTINGS_GLOBAL_MAP,
     _load_settings, _save_settings, _load_mcp_runtime_state, _save_mcp_runtime_state,
     _set_mcp_server_autostart
+)
+import services.prompt_service as prompt_service
+from services.prompt_service import (
+    CUSTOM_SYSTEM_PROMPT_FILE, AGENTS_FILE, CONFIG_EDITABLE_FILES,
+    _load_custom_system_prompt_from_disk, _persist_custom_system_prompt_to_disk
 )
 
 # Optional feature modules
@@ -377,34 +382,6 @@ logger.info(f"ENABLE_FILE_ACCESS parsed: {ENABLE_FILE_ACCESS}")
 logger.info(f"HA_CONFIG_DIR: /config")
 logger.info(f"LANGUAGE: {LANGUAGE}")
 
-
-def _load_custom_system_prompt_from_disk() -> Optional[str]:
-    try:
-        if not os.path.isfile(CUSTOM_SYSTEM_PROMPT_FILE):
-            return None
-        with open(CUSTOM_SYSTEM_PROMPT_FILE, "r", encoding="utf-8") as f:
-            prompt = (f.read() or "").strip()
-        # Guardrail: ignore absurdly large prompts
-        if len(prompt) > 200_000:
-            logger.warning(f"Custom system prompt file too large ({len(prompt)} chars) - ignoring")
-            return None
-        return prompt or None
-    except Exception as e:
-        logger.warning(f"Could not load custom system prompt from disk: {e}")
-        return None
-
-
-def _persist_custom_system_prompt_to_disk(prompt: Optional[str]) -> None:
-    try:
-        os.makedirs(os.path.dirname(CUSTOM_SYSTEM_PROMPT_FILE), exist_ok=True)
-        if not prompt:
-            if os.path.isfile(CUSTOM_SYSTEM_PROMPT_FILE):
-                os.remove(CUSTOM_SYSTEM_PROMPT_FILE)
-            return
-        with open(CUSTOM_SYSTEM_PROMPT_FILE, "w", encoding="utf-8") as f:
-            f.write(str(prompt))
-    except Exception as e:
-        logger.warning(f"Could not persist custom system prompt to disk: {e}")
 
 
 # Load persisted system prompt override (if any)
