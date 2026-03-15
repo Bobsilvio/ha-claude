@@ -1451,6 +1451,13 @@ def get_chat_ui():
         #copilotOAuthBanner {{ display:none; background:#dbeafe; border-bottom:2px solid #0969da; padding:10px 20px; font-size:13px; color:#0a3069; align-items:center; gap:10px; flex-wrap:wrap; }}
         #copilotOAuthBanner button {{ background:#0969da; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
         #copilotOAuthBanner button:hover {{ background:#0758b8; }}
+        #copilotOAuthConnectedBanner {{ display:none; background:#d4edda; border-bottom:2px solid #28a745; padding:8px 20px; font-size:13px; color:#155724; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #copilotOAuthConnectedBanner .copilot-conn-info {{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }}
+        #copilotOAuthConnectedBanner .copilot-conn-dot {{ width:8px; height:8px; border-radius:50%; background:#28a745; flex-shrink:0; }}
+        #copilotOAuthConnectedBanner .copilot-conn-text {{ font-weight:600; }}
+        #copilotOAuthConnectedBanner .copilot-conn-detail {{ opacity:0.75; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+        #copilotOAuthConnectedBanner button {{ background:transparent; color:#155724; border:1px solid #28a745; border-radius:8px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #copilotOAuthConnectedBanner button:hover {{ background:#c3e6cb; }}
         #copilotOAuthModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
         #copilotOAuthModal.open {{ display:flex; }}
         .copilot-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:480px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
@@ -1471,6 +1478,13 @@ def get_chat_ui():
         #claudeWebBanner {{ display:none; background:#fde8d8; border-bottom:2px solid #e07042; padding:10px 20px; font-size:13px; color:#7b3010; align-items:center; gap:10px; flex-wrap:wrap; }}
         #claudeWebBanner button {{ background:#e07042; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
         #claudeWebBanner button:hover {{ background:#c45e32; }}
+        #claudeWebConnectedBanner {{ display:none; background:#d4edda; border-bottom:2px solid #28a745; padding:8px 20px; font-size:13px; color:#155724; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #claudeWebConnectedBanner .cw-conn-info {{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }}
+        #claudeWebConnectedBanner .cw-conn-dot {{ width:8px; height:8px; border-radius:50%; background:#28a745; flex-shrink:0; }}
+        #claudeWebConnectedBanner .cw-conn-text {{ font-weight:600; }}
+        #claudeWebConnectedBanner .cw-conn-detail {{ opacity:0.75; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+        #claudeWebConnectedBanner button {{ background:transparent; color:#155724; border:1px solid #28a745; border-radius:8px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #claudeWebConnectedBanner button:hover {{ background:#c3e6cb; }}
         #claudeWebModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
         #claudeWebModal.open {{ display:flex; }}
         .claudeweb-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:520px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
@@ -2729,6 +2743,15 @@ def get_chat_ui():
         <button id="copilotOAuthDismissBtn" style="background:#c9d1fb;color:#0a3069;">Dismiss</button>
     </div>
 
+    <div id="copilotOAuthConnectedBanner">
+        <div class="copilot-conn-info">
+            <div class="copilot-conn-dot"></div>
+            <span class="copilot-conn-text">&#128273; GitHub Copilot</span>
+            <span class="copilot-conn-detail" id="copilotConnDetail">connected</span>
+        </div>
+        <button onclick="revokeCopilotOAuth()">Disconnect</button>
+    </div>
+
     <div id="copilotOAuthModal">
         <div class="copilot-modal-box">
             <h3>&#128273; Connect GitHub Copilot</h3>
@@ -2746,6 +2769,15 @@ def get_chat_ui():
         <span>&#9888;&#65039; <strong>Claude.ai Web [UNSTABLE]</strong> &mdash; session token required.</span>
         <button id="claudeWebConnectBtn">Set Session Token</button>
         <button id="claudeWebDismissBtn" style="background:#f0ded4;color:#7b3010;">Dismiss</button>
+    </div>
+
+    <div id="claudeWebConnectedBanner">
+        <div class="cw-conn-info">
+            <div class="cw-conn-dot"></div>
+            <span class="cw-conn-text">&#128279; Claude.ai Web</span>
+            <span class="cw-conn-detail" id="claudeWebConnDetail">connected</span>
+        </div>
+        <button onclick="disconnectClaudeWeb()">Disconnect</button>
     </div>
 
     <div id="claudeWebModal">
@@ -7031,7 +7063,7 @@ def get_chat_ui():
                 const item = document.createElement('div');
                 item.className = 'chat-item' + (conv.id === currentSessionId ? ' active' : '');
                 const left = document.createElement('div');
-                left.style.flex = '1';
+                left.style.cssText = 'flex:1;min-width:0;overflow:hidden;';
                 left.addEventListener('click', () => loadConversation(conv.id));
                 const title = document.createElement('div');
                 title.className = 'chat-item-title';
@@ -7877,28 +7909,22 @@ def get_chat_ui():
                     // Refresh dropdown state from server (ensures UI stays consistent)
                     loadModels();
                     // Show OAuth banners for providers that need authentication
+                    const _allSessionBanners = [
+                        'codexOAuthBanner','codexOAuthConnectedBanner',
+                        'copilotOAuthBanner','copilotOAuthConnectedBanner',
+                        'claudeWebBanner','claudeWebConnectedBanner',
+                        'chatgptWebBanner',
+                    ];
+                    // Hide all session banners, then show only the relevant ones
+                    _allSessionBanners.forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
                     if (parsed.provider === 'openai_codex') {{
                         checkCodexOAuth();
-                        const cb = document.getElementById('copilotOAuthBanner');
-                        if (cb) cb.style.display = 'none';
-                        ['claudeWebBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
                     }} else if (parsed.provider === 'github_copilot') {{
                         checkCopilotOAuth();
-                        ['codexOAuthBanner','codexOAuthConnectedBanner','claudeWebBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
                     }} else if (parsed.provider === 'claude_web') {{
                         checkClaudeWebSession();
-                        ['codexOAuthBanner','codexOAuthConnectedBanner','copilotOAuthBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
                     }} else if (parsed.provider === 'chatgpt_web') {{
                         checkChatGPTWebSession();
-                        ['codexOAuthBanner','codexOAuthConnectedBanner','copilotOAuthBanner','claudeWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
-                    }} else {{
-                        const codexBanner   = document.getElementById('codexOAuthBanner');
-                        const copilotBanner = document.getElementById('copilotOAuthBanner');
-                        const codexConnBanner = document.getElementById('codexOAuthConnectedBanner');
-                        if (codexBanner)     codexBanner.style.display = 'none';
-                        if (copilotBanner)   copilotBanner.style.display = 'none';
-                        if (codexConnBanner) codexConnBanner.style.display = 'none';
-                        ['claudeWebBanner','chatgptWebBanner'].forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
                     }}
                 }}
             }} catch (error) {{
@@ -8076,10 +8102,33 @@ def get_chat_ui():
             try {{
                 const r = await fetch(apiUrl('api/oauth/copilot/status'));
                 const d = await r.json();
-                const banner = document.getElementById('copilotOAuthBanner');
-                if (!banner) return;
-                banner.style.display = d.configured ? 'none' : 'flex';
+                const banner     = document.getElementById('copilotOAuthBanner');
+                const connBanner = document.getElementById('copilotOAuthConnectedBanner');
+                const connDetail = document.getElementById('copilotConnDetail');
+                if (d.configured) {{
+                    if (banner)     banner.style.display = 'none';
+                    if (connBanner) {{
+                        let detail = 'connected';
+                        if (d.age_days != null) detail = 'connected ' + d.age_days + 'd ago';
+                        if (connDetail) connDetail.textContent = detail;
+                        connBanner.style.display = 'flex';
+                    }}
+                }} else {{
+                    if (banner)     banner.style.display = 'flex';
+                    if (connBanner) connBanner.style.display = 'none';
+                }}
             }} catch (e) {{ /* ignore */ }}
+        }}
+
+        async function revokeCopilotOAuth() {{
+            if (!confirm('Disconnect GitHub Copilot? You will need to re-authenticate to use it.')) return;
+            try {{
+                await fetch(apiUrl('api/oauth/copilot/revoke'), {{ method: 'POST' }});
+            }} catch (e) {{ /* ignore */ }}
+            const connBanner = document.getElementById('copilotOAuthConnectedBanner');
+            if (connBanner) connBanner.style.display = 'none';
+            addMessage('\U0001F512 GitHub Copilot disconnected. Select Copilot provider to reconnect.', 'system');
+            checkCopilotOAuth();
         }}
 
         async function openCopilotOAuthModal() {{
@@ -8155,10 +8204,34 @@ def get_chat_ui():
             try {{
                 const r = await fetch(apiUrl('api/session/claude_web/status'));
                 const d = await r.json();
-                const banner = document.getElementById('claudeWebBanner');
-                if (!banner) return;
-                banner.style.display = d.configured ? 'none' : 'flex';
+                const banner     = document.getElementById('claudeWebBanner');
+                const connBanner = document.getElementById('claudeWebConnectedBanner');
+                const connDetail = document.getElementById('claudeWebConnDetail');
+                if (d.configured) {{
+                    if (banner)     banner.style.display = 'none';
+                    if (connBanner) {{
+                        let detail = 'connected';
+                        if (d.age_days != null) detail = 'connected ' + d.age_days + 'd ago';
+                        if (d.org_uuid) detail += ' \u00b7 org ' + d.org_uuid;
+                        if (connDetail) connDetail.textContent = detail;
+                        connBanner.style.display = 'flex';
+                    }}
+                }} else {{
+                    if (banner)     banner.style.display = 'flex';
+                    if (connBanner) connBanner.style.display = 'none';
+                }}
             }} catch (e) {{ /* ignore */ }}
+        }}
+
+        async function disconnectClaudeWeb() {{
+            if (!confirm('Disconnect Claude.ai Web? You will need to re-enter the session token to use it.')) return;
+            try {{
+                await fetch(apiUrl('api/session/claude_web/clear'), {{ method: 'POST' }});
+            }} catch (e) {{ /* ignore */ }}
+            const connBanner = document.getElementById('claudeWebConnectedBanner');
+            if (connBanner) connBanner.style.display = 'none';
+            addMessage('\U0001F512 Claude.ai Web disconnected.', 'system');
+            checkClaudeWebSession();
         }}
 
         function openClaudeWebModal() {{
@@ -8565,6 +8638,8 @@ def get_chat_ui():
         window.sendSuggestion = sendSuggestion;
         window.testNvidiaModel = testNvidiaModel;
         window.revokeCodexOAuth = revokeCodexOAuth;
+        window.revokeCopilotOAuth = revokeCopilotOAuth;
+        window.disconnectClaudeWeb = disconnectClaudeWeb;
         window.toggleDarkMode = toggleDarkMode;
         window.toggleReadOnly = toggleReadOnly;
         // MCP exports

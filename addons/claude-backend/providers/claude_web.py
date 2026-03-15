@@ -18,6 +18,7 @@ expires or is revoked.
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from typing import Any, Dict, Generator, List, Optional
@@ -277,6 +278,23 @@ class ClaudeWebProvider(EnhancedProvider):
             if intent_base_prompt:
                 combined = intent_base_prompt + "\n\n" + combined
             system_prompt = combined + ("\n\n" + system_prompt if system_prompt else "")
+
+        # ── Anti-artifact header — prepended FIRST so it overrides claude.ai training ─
+        # Claude on claude.ai aggressively generates <artifact> blocks. This header
+        # must appear at the absolute start of the system prompt to suppress that.
+        _anti_artifact = (
+            "⛔ MANDATORY OVERRIDE — YOU ARE NOT IN THE CLAUDE.AI WEB INTERFACE ⛔\n"
+            "You are running inside a Home Assistant integration called Amira.\n"
+            "ABSOLUTE RULES (violation breaks the system):\n"
+            "1. NEVER output <artifact> tags of any kind (code, react, html, svg, etc.).\n"
+            "2. NEVER output markdown code blocks (``` ... ```) as a substitute for tool calls.\n"
+            "3. For ALL Home Assistant operations use ONLY <tool_call> XML blocks.\n"
+            "4. Artifacts and code blocks are NOT rendered here — only <tool_call> blocks are parsed.\n"
+            "5. NEVER show YAML automation/script code in a code block — use preview_automation_change tool.\n"
+            "6. When the user confirms (sì/si/yes/ok), you MUST emit a <tool_call> block to execute.\n"
+            "   Writing 'done' or 'applied' WITHOUT a <tool_call> does NOT change anything in Home Assistant.\n\n"
+        )
+        system_prompt = _anti_artifact + system_prompt
         # ──────────────────────────────────────────────────────────────────────────────
 
         # Create conversation now that we have the system_prompt — pass it at creation
@@ -341,6 +359,12 @@ class ClaudeWebProvider(EnhancedProvider):
     ) -> Generator[Dict[str, Any], None, None]:
         headers = _make_headers(session_key)
         _timeout = httpx.Timeout(connect=10.0, read=120.0, write=10.0, pool=5.0)
+
+        # Buffer the full response so we can detect and convert <artifact> blocks.
+        # claude.ai models aggressively generate artifacts even when instructed not to;
+        # this post-processing converts YAML artifacts → preview_automation_change tool calls.
+        text_parts: List[str] = []
+
         with httpx.stream("POST", url, headers=headers, json=body, timeout=_timeout) as resp:
             if resp.status_code == 401:
                 clear_session()  # force banner to reappear
@@ -359,32 +383,86 @@ class ClaudeWebProvider(EnhancedProvider):
                     continue
                 try:
                     event = json.loads(data_str)
-                    # Classic SSE format: {"type": "completion", "completion": "..."}
                     ev_type = event.get("type")
                     if ev_type == "completion":
                         text = event.get("completion", "")
                         if text:
-                            yield {"type": "text", "text": text}
+                            text_parts.append(text)
                     elif ev_type == "message_delta":
-                        # Newer format
-                        delta = event.get("delta", {})
-                        text = delta.get("text", "")
+                        text = (event.get("delta") or {}).get("text", "")
                         if text:
-                            yield {"type": "text", "text": text}
+                            text_parts.append(text)
                     elif ev_type == "content_block_delta":
                         text = (event.get("delta") or {}).get("text", "")
                         if text:
-                            yield {"type": "text", "text": text}
+                            text_parts.append(text)
                     elif ev_type == "message_stop":
-                        yield {"type": "done", "finish_reason": "stop"}
-                        return
+                        break
                     elif ev_type == "error":
                         msg = event.get("error", {}).get("message", "Unknown error")
                         raise RuntimeError(f"Claude.ai error: {msg}")
                 except json.JSONDecodeError:
                     continue
 
+        full_text = "".join(text_parts)
+        processed = self._postprocess_artifacts(full_text)
+        if processed:
+            yield {"type": "text", "text": processed}
         yield {"type": "done", "finish_reason": "stop"}
+
+    # ------------------------------------------------------------------
+    _ARTIFACT_RE = re.compile(
+        r'<artifact[^>]*>([\s\S]*?)</artifact>',
+        re.IGNORECASE,
+    )
+
+    def _postprocess_artifacts(self, text: str) -> str:
+        """Convert <artifact> blocks to <tool_call> blocks for the ToolSimulator.
+
+        If the artifact contains a valid Home Assistant automation YAML (detected
+        by the presence of an 'id' field), it is wrapped in a
+        preview_automation_change tool call so the guard system can show a diff
+        and ask the user for confirmation before applying changes.
+        """
+        if "<artifact" not in text.lower():
+            return text
+
+        match = self._ARTIFACT_RE.search(text)
+        if not match:
+            # Malformed artifact — strip tags and return raw content
+            return re.sub(r'</?artifact[^>]*>', '', text, flags=re.IGNORECASE).strip()
+
+        artifact_content = match.group(1).strip()
+        pre_text = text[:match.start()].strip()
+
+        # Try to parse artifact content as a HA automation YAML
+        try:
+            import yaml as _yaml
+            auto_dict = _yaml.safe_load(artifact_content)
+        except Exception:
+            auto_dict = None
+
+        if isinstance(auto_dict, dict) and auto_dict.get("id"):
+            automation_id = str(auto_dict["id"]).strip()
+            # Build changes from all fields except 'id' (id is the lookup key, not a change)
+            changes = {k: v for k, v in auto_dict.items() if k != "id"}
+            tool_call_json = json.dumps(
+                {
+                    "name": "preview_automation_change",
+                    "arguments": {"automation_id": automation_id, "changes": changes},
+                },
+                ensure_ascii=False,
+            )
+            tool_call_block = f"<tool_call>\n{tool_call_json}\n</tool_call>"
+            logger.info(
+                f"claude_web: converted YAML artifact → preview_automation_change "
+                f"(id={automation_id}, changes_keys={list(changes.keys())})"
+            )
+            return (pre_text + "\n\n" if pre_text else "") + tool_call_block
+
+        # Artifact exists but is not a HA automation — strip tags, keep content
+        stripped = re.sub(r'</?artifact[^>]*>', '', text, flags=re.IGNORECASE).strip()
+        return stripped
 
     @staticmethod
     def _parse_http_error(status_code: int, raw_body: str) -> str:

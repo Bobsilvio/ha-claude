@@ -1222,6 +1222,12 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       align-self: center; background: var(--success-color, #4caf50);
       color: white; font-size: 12px; padding: 6px 12px;
     }}
+    #ha-claude-bubble .msg.system {{
+      align-self: center; background: var(--secondary-background-color, #f0f4ff);
+      color: var(--secondary-text-color, #555); font-size: 11px;
+      padding: 4px 10px; border-radius: 8px; max-width: 90%; text-align: center;
+      opacity: 0.85;
+    }}
     #ha-claude-bubble .chat-input-area {{
       display: flex; padding: 10px 12px;
       border-top: 1px solid var(--divider-color, #e0e0e0);
@@ -1377,6 +1383,27 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       outline: none; cursor: pointer;
     }}
     #ha-claude-bubble .agent-bar select:focus {{ border-color: var(--primary-color, #03a9f4); }}
+    #ha-claude-bubble .session-conn-bar {{
+      display: none; align-items: center; gap: 8px; padding: 5px 12px;
+      background: #d4edda; border-bottom: 1px solid #b8dac2;
+      font-size: 11px; color: #155724; flex-shrink: 0;
+    }}
+    #ha-claude-bubble .session-conn-bar .sc-dot {{
+      width: 7px; height: 7px; border-radius: 50%; background: #28a745; flex-shrink: 0;
+    }}
+    #ha-claude-bubble .session-conn-bar .sc-label {{
+      font-weight: 600; white-space: nowrap;
+    }}
+    #ha-claude-bubble .session-conn-bar .sc-detail {{
+      flex: 1; opacity: 0.75; font-size: 10px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }}
+    #ha-claude-bubble .session-conn-bar .sc-disc {{
+      background: transparent; color: #155724; border: 1px solid #28a745;
+      border-radius: 6px; padding: 2px 8px; cursor: pointer;
+      font-size: 10px; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+    }}
+    #ha-claude-bubble .session-conn-bar .sc-disc:hover {{ background: #c3e6cb; }}
     #ha-claude-bubble .tool-badges {{
       display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 0;
     }}
@@ -1435,6 +1462,12 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
         <select id="haAgentSelect" style="display:none"></select>
         <select id="haProviderSelect"></select>
         <select id="haModelSelect"></select>
+      </div>
+      <div class="session-conn-bar" id="haSessionConnBar">
+        <div class="sc-dot"></div>
+        <span class="sc-label" id="haSessionConnLabel"></span>
+        <span class="sc-detail" id="haSessionConnDetail"></span>
+        <button class="sc-disc" id="haSessionConnDisc">Disconnect</button>
       </div>
       <div class="context-bar" id="haChatContext" style="display:none;"></div>
       <div class="quick-actions" id="haQuickActions" style="display:none;"></div>
@@ -3192,6 +3225,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
                 wrapper.appendChild(pre);
                 assistantEl.appendChild(wrapper);
               }}
+            }} else if (evt.type === 'system_message') {{
+              // Warning injected by backend (e.g. hallucinated success with no tool call)
+              const sysMsg = evt.content || evt.message || '';
+              if (sysMsg) addMessage('system', sysMsg, false);
             }} else if (evt.type === 'status') {{
               const msg = evt.message || evt.content || '';
               // Use wrench for tool-related steps, hourglass for generic status
@@ -3462,18 +3499,108 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     }}
   }}
 
+  function _showTierWarning(resp) {{
+    if (!resp || !resp.tier_limited || !resp.tier_warning_msg) return;
+    addMessage('system', resp.tier_warning_msg, false);
+  }}
+
+  // ---- Session connected bar (claude_web, github_copilot, openai_codex) ----
+  const _scBar    = document.getElementById('haSessionConnBar');
+  const _scLabel  = document.getElementById('haSessionConnLabel');
+  const _scDetail = document.getElementById('haSessionConnDetail');
+  const _scDisc   = document.getElementById('haSessionConnDisc');
+  let   _scDiscHandler = null;
+
+  function _showSessionBar(label, detail, onDisconnect) {{
+    if (!_scBar) return;
+    if (_scLabel)  _scLabel.textContent  = label;
+    if (_scDetail) _scDetail.textContent = detail || '';
+    // Replace disconnect handler
+    if (_scDiscHandler) _scDisc.removeEventListener('click', _scDiscHandler);
+    _scDiscHandler = onDisconnect;
+    if (_scDisc) _scDisc.addEventListener('click', _scDiscHandler);
+    _scBar.style.display = 'flex';
+  }}
+
+  function _hideSessionBar() {{
+    if (_scBar) _scBar.style.display = 'none';
+  }}
+
+  async function checkAndShowSessionStatus(provider) {{
+    try {{
+      if (provider === 'claude_web' || provider === 'claude_web_native') {{
+        const r = await fetch(API_BASE + '/api/session/claude_web/status', {{credentials:'same-origin'}});
+        const d = await r.json();
+        if (d.configured) {{
+          const detail = d.age_days != null ? 'connesso da ' + d.age_days + 'g' : 'connesso';
+          _showSessionBar('\U0001F517 Claude Web', detail, async () => {{
+            if (!confirm('Disconnettere Claude Web? Dovrai reinserire la session key.')) return;
+            await fetch(API_BASE + '/api/session/claude_web/clear', {{method:'POST', credentials:'same-origin'}}).catch(()=>{{}});
+            _hideSessionBar();
+            addMessage('system', '\u274C Claude Web disconnesso.', false);
+          }});
+        }} else {{
+          _hideSessionBar();
+        }}
+      }} else if (provider === 'github_copilot') {{
+        const r = await fetch(API_BASE + '/api/oauth/copilot/status', {{credentials:'same-origin'}});
+        const d = await r.json();
+        if (d.configured) {{
+          const detail = d.age_days != null ? 'connesso da ' + d.age_days + 'g' : 'connesso';
+          _showSessionBar('\U0001F517 GitHub Copilot', detail, async () => {{
+            if (!confirm('Disconnettere GitHub Copilot?')) return;
+            await fetch(API_BASE + '/api/oauth/copilot/revoke', {{method:'POST', credentials:'same-origin'}}).catch(()=>{{}});
+            _hideSessionBar();
+            addMessage('system', '\u274C GitHub Copilot disconnesso.', false);
+          }});
+        }} else {{
+          _hideSessionBar();
+        }}
+      }} else if (provider === 'openai_codex') {{
+        const r = await fetch(API_BASE + '/api/oauth/codex/status', {{credentials:'same-origin'}});
+        const d = await r.json();
+        if (d.configured) {{
+          let detail = 'connesso';
+          if (d.account_id) detail = d.account_id;
+          if (d.expires_in_seconds != null) {{
+            const h = Math.floor(d.expires_in_seconds / 3600);
+            const m = Math.floor((d.expires_in_seconds % 3600) / 60);
+            const exp = h > 0 ? 'scade in ' + h + 'h ' + m + 'm' : 'scade in ' + m + 'm';
+            detail += (d.account_id ? ' \u00b7 ' : '') + exp;
+          }}
+          _showSessionBar('\U0001F511 OpenAI Codex', detail, async () => {{
+            if (!confirm('Disconnettere OpenAI Codex?')) return;
+            await fetch(API_BASE + '/api/oauth/codex/revoke', {{method:'POST', credentials:'same-origin'}}).catch(()=>{{}});
+            _hideSessionBar();
+            addMessage('system', '\u274C OpenAI Codex disconnesso.', false);
+          }});
+        }} else {{
+          _hideSessionBar();
+        }}
+      }} else {{
+        _hideSessionBar();
+      }}
+    }} catch(e) {{ _hideSessionBar(); }}
+  }}
+
   providerSelect.addEventListener('change', async () => {{
     const provider = providerSelect.value;
     populateModels(provider);
     try {{
-      await fetch(API_BASE + '/api/set_model', {{
+      const resp = await fetch(API_BASE + '/api/set_model', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ provider }}),
         credentials: 'same-origin',
-      }});
+      }}).then(r => r.json()).catch(() => ({{}}));
       // Refresh to get new current_model_technical
       await loadAgents();
+      // Show system message in chat
+      const provLabel = providerSelect.options[providerSelect.selectedIndex]?.textContent || provider;
+      const modLabel  = modelSelect.options[modelSelect.selectedIndex]?.textContent || modelSelect.value || '';
+      addMessage('system', '\U0001F504 ' + provLabel + (modLabel ? ' \u2192 ' + modLabel : ''), false);
+      _showTierWarning(resp);
+      await checkAndShowSessionStatus(provider);
     }} catch(e) {{}}
   }});
 
@@ -3481,12 +3608,17 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     const model = modelSelect.value;
     const provider = providerSelect.value;
     try {{
-      await fetch(API_BASE + '/api/set_model', {{
+      const resp = await fetch(API_BASE + '/api/set_model', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ provider, model }}),
         credentials: 'same-origin',
-      }});
+      }}).then(r => r.json()).catch(() => ({{}}));
+      // Show system message in chat
+      const provLabel = providerSelect.options[providerSelect.selectedIndex]?.textContent || provider;
+      const modLabel  = modelSelect.options[modelSelect.selectedIndex]?.textContent || model;
+      addMessage('system', '\U0001F504 ' + provLabel + ' \u2192 ' + modLabel, false);
+      _showTierWarning(resp);
     }} catch(e) {{}}
   }});
 
@@ -3501,6 +3633,9 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
           credentials: 'same-origin',
         }});
         await loadAgents();
+        // Show system message in chat
+        const agentLabel = agentSelect.options[agentSelect.selectedIndex]?.textContent || agentId;
+        addMessage('system', '\U0001F916 ' + agentLabel.trim(), false);
       }} catch(e) {{}}
     }});
   }}
@@ -3542,7 +3677,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     await _ensureIngressSession();
     registerDevice();
     updateContextBar();
-    loadAgents();
+    await loadAgents();
+    // Show session status for web/OAuth providers on first load
+    const initialProvider = providerSelect.value;
+    if (initialProvider) checkAndShowSessionStatus(initialProvider);
   }})();
 
   // Poll every 10s for model/provider changes made from chat_ui or other tabs

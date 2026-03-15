@@ -75,7 +75,11 @@ class GroqProvider(EnhancedProvider):
             content = m.get("content", "")
             # Pass through tool role and assistant-with-tool_calls when tools are active
             if has_tools and role == "tool":
-                safe_messages.append(m)
+                # Compress tool results to reduce token count (Groq TPM: 12k/min).
+                # Strip old_yaml / new_yaml from JSON results — they're the biggest
+                # token consumers and are not needed for follow-up decisions.
+                # The diff and status fields are kept so the model has full context.
+                safe_messages.append(self._compress_tool_result(m))
                 continue
             if has_tools and role == "assistant" and m.get("tool_calls"):
                 safe_messages.append(m)
@@ -99,6 +103,40 @@ class GroqProvider(EnhancedProvider):
                 safe_messages.append({"role": role, "content": content})
         return safe_messages
 
+    @staticmethod
+    def _compress_tool_result(msg: Dict[str, Any]) -> Dict[str, Any]:
+        """Strip large YAML fields from tool result messages to save Groq TPM tokens.
+
+        preview_automation_change and update_automation return old_yaml / new_yaml
+        which can each be 400-800 tokens.  The model does not need the full YAML
+        for follow-up decisions (confirm / cancel / next step) — it only needs
+        the diff, status, and a brief summary.
+
+        Fields removed: old_yaml, new_yaml
+        Fields kept:    status, message, automation_id, diff, script_id, …
+        """
+        import json as _json
+        content = msg.get("content", "")
+        if not isinstance(content, str) or not content.strip().startswith("{"):
+            return msg  # not JSON — leave as-is
+        try:
+            data = _json.loads(content)
+            # Remove the two biggest fields
+            compressed = {k: v for k, v in data.items() if k not in ("old_yaml", "new_yaml")}
+            # Hard-cap any remaining long string (e.g. very long diff)
+            for k, v in compressed.items():
+                if isinstance(v, str) and len(v) > 600:
+                    compressed[k] = v[:600] + "\n...[truncated for context length]"
+            new_content = _json.dumps(compressed, ensure_ascii=False)
+            if new_content == content:
+                return msg  # nothing changed
+            return {**msg, "content": new_content}
+        except Exception:
+            # Fallback: raw truncation if content is very long
+            if len(content) > 800:
+                return {**msg, "content": content[:800] + "\n...[truncated]"}
+            return msg
+
     def uses_tool_simulator(self) -> bool:
         """Return True if the active model uses the XML tool simulator.
 
@@ -109,6 +147,35 @@ class GroqProvider(EnhancedProvider):
         """
         return (self.model or self.DEFAULT_MODEL) in self._SIMULATOR_MODELS
 
+    def _stream_with_simulator(
+        self,
+        messages: List[Dict[str, Any]],
+        intent_info: Optional[Dict[str, Any]] = None,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Stream using the XML tool simulator (for models without native tool calling)."""
+        tool_schemas = self._get_intent_tools(intent_info)
+        msgs = self._prepare_messages(messages, intent_info)
+
+        if tool_schemas:
+            from providers.tool_simulator import get_simulator_system_prompt, flatten_tool_messages
+            sim_prompt = get_simulator_system_prompt(tool_schemas)
+            if msgs and msgs[0].get("role") == "system":
+                existing = msgs[0].get("content") or ""
+                msgs[0] = {"role": "system", "content": existing + "\n\n" + sim_prompt}
+            else:
+                msgs = [{"role": "system", "content": sim_prompt}] + msgs
+            msgs = flatten_tool_messages(msgs)
+
+        yield from self._openai_compat_stream(
+            self.BASE_URL,
+            self.api_key,
+            self._get_model(),
+            msgs,
+            tools=None,  # no native tools — simulator handles them
+            include_usage=self.INCLUDE_USAGE,
+            max_tokens=self.MAX_TOKENS,
+        )
+
     def _do_stream(
         self,
         messages: List[Dict[str, Any]],
@@ -116,33 +183,27 @@ class GroqProvider(EnhancedProvider):
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream with optional tool-simulator fallback for incompatible models."""
         if self.uses_tool_simulator():
-            # Inject the XML tool simulator system prompt and strip native tool schemas
-            tool_schemas = self._get_intent_tools(intent_info)
-            msgs = self._prepare_messages(messages, intent_info)
+            yield from self._stream_with_simulator(messages, intent_info)
+            return
 
-            if tool_schemas:
-                from providers.tool_simulator import get_simulator_system_prompt, flatten_tool_messages
-                sim_prompt = get_simulator_system_prompt(tool_schemas)
-                # _prepare_messages already injected the intent prompt — just append sim_prompt
-                if msgs and msgs[0].get("role") == "system":
-                    existing = msgs[0].get("content") or ""
-                    msgs[0] = {"role": "system", "content": existing + "\n\n" + sim_prompt}
-                else:
-                    msgs = [{"role": "system", "content": sim_prompt}] + msgs
-                # Flatten tool-role messages so Groq doesn't reject them
-                msgs = flatten_tool_messages(msgs)
+        # Try native tool calling; if the model doesn't support it, auto-fallback to simulator.
+        try:
+            items = list(super()._do_stream(messages, intent_info))
+        except Exception as e:
+            err_low = str(e).lower()
+            if "tool calling" in err_low and "not supported" in err_low:
+                model = self._get_model()
+                logger.warning(
+                    f"Groq: model '{model}' does not support native tool calling — "
+                    f"falling back to XML tool simulator"
+                )
+                # Remember for this session so future rounds skip the failed attempt
+                self._SIMULATOR_MODELS.add(model)
+                yield from self._stream_with_simulator(messages, intent_info)
+                return
+            raise
 
-            yield from self._openai_compat_stream(
-                self.BASE_URL,
-                self.api_key,
-                self._get_model(),
-                msgs,
-                tools=None,  # no native tools — simulator handles them
-                include_usage=self.INCLUDE_USAGE,
-                max_tokens=self.MAX_TOKENS,
-            )
-        else:
-            yield from super()._do_stream(messages, intent_info)
+        yield from items
 
     def stream_chat(
         self,
@@ -235,6 +296,8 @@ class GroqProvider(EnhancedProvider):
             return "Groq: API key invalid or missing. Check your Groq API key in the add-on settings."
         if self._is_rate_limit_error(error_msg):
             return "Groq: Rate limit exceeded. Please retry in a moment."
+        if "tool calling" in error_msg and "not supported" in error_msg:
+            return f"Groq: tool calling not supported by this model — switching to XML simulator"
         if "model_decommissioned" in error_msg or "decommissioned" in error_msg:
             return "Groq: This model has been decommissioned. Please select a different Groq model in the add-on settings."
         if "model" in error_msg and ("not found" in error_msg or "not available" in error_msg or "does not exist" in error_msg):

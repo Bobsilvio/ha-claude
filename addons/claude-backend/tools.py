@@ -2690,9 +2690,18 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             changes = tool_input.get("changes", {})
             add_condition = tool_input.get("add_condition", None)
 
-            # Compatibility: some models incorrectly pass fields at top-level
-            # instead of nesting under {changes:{...}}.
-            # Normalize top-level fields into changes.
+            # Compatibility: some models (e.g. Llama via NVIDIA NIM) pass changes
+            # as a JSON/YAML string instead of a dict — parse it.
+            if isinstance(changes, str) and changes.strip():
+                try:
+                    import json as _json_ch
+                    changes = _json_ch.loads(changes)
+                except Exception:
+                    try:
+                        import yaml as _yaml_ch
+                        changes = _yaml_ch.safe_load(changes)
+                    except Exception:
+                        changes = {}
             if not isinstance(changes, dict):
                 changes = {}
 
@@ -2924,6 +2933,22 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             changes = tool_input.get("changes", {}) or {}
             add_condition = tool_input.get("add_condition", None)
 
+            # Compatibility: some models (e.g. Llama via NVIDIA NIM) pass changes
+            # as a JSON/YAML string instead of a dict — parse it.
+            if isinstance(changes, str) and changes.strip():
+                try:
+                    import json as _json_ch
+                    changes = _json_ch.loads(changes)
+                except Exception:
+                    try:
+                        changes = _yaml.safe_load(changes)
+                    except Exception:
+                        changes = {}
+            if not isinstance(changes, dict):
+                changes = {}
+
+            logger.info(f"preview_automation_change: automation_id={automation_id!r}, changes_keys={list(changes.keys()) if changes else 'EMPTY'}, raw_changes={str(changes)[:300]}")
+
             # Normalize top-level fields into changes (same as update_automation)
             if not changes:
                 allowed_top_level = ("alias", "description", "trigger", "triggers",
@@ -3010,7 +3035,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 "old_yaml": old_yaml,
                 "new_yaml": new_yaml,
                 "message": "Anteprima della modifica. Conferma per applicare.",
-                "IMPORTANT": "The diff is already displayed to the user by the UI. Do NOT show the YAML again and do NOT re-describe the changes. Just ask for confirmation in one short sentence (e.g. 'Confermo per applicare?').",
+                "IMPORTANT": "The diff is displayed to the user by the UI when available. Briefly summarize in 1-2 sentences WHAT you changed and WHY (e.g. 'Ho sostituito l'orario fisso con un trigger al tramonto per adattarsi alle stagioni.'). Then ask for confirmation in one short sentence.",
             }, ensure_ascii=False)
 
         elif tool_name == "trigger_automation":
@@ -5636,6 +5661,12 @@ condition:
 
 This helps the user understand and verify the changes. Keep the diff focused on what changed, not the entire file.
 
+## CRITICAL — NEVER GENERATE CODE OR ARTIFACTS
+- NEVER generate React components, HTML widgets, Python scripts, or any code artifact to perform HA operations.
+- NEVER call external APIs (including api.anthropic.com) directly — you have dedicated HA tools for everything.
+- To modify/create automations, dashboards, or scripts: use the provided tools DIRECTLY (update_automation, preview_automation_change, create_automation, etc.).
+- Generating code that "would do" the operation is WRONG. Use the tools that actually do it.
+
 ## EFFICIENCY RULES (ABSOLUTELY CRITICAL - MAXIMUM 1-2 tool calls per task)
 - EVERY extra tool call wastes 5-20 seconds. Users WILL experience errors and timeouts with too many calls.
 - When context is pre-loaded in the user message, ALL that data is already available. NEVER re-fetch it.
@@ -5674,6 +5705,7 @@ def get_compact_prompt():
 When users ask about specific devices, use search_entities. Use get_history for past data.
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
 To create a CUSTOM HTML dashboard: use __ENTITIES_JSON__ placeholder in HTML. Copy ALL entity_ids from ## ENTITÀ TROVATE into entities[]. In JS iterate ENTITIES array — NEVER filter /api/states by device_class.
+IMPORTANT: If the user says no / annulla / cancel / nein / non / no thanks after a preview or confirmation request, do NOT call update_automation or any write tool. Just acknowledge and stop.
 {lang_instruction} Be concise."""
 
 
@@ -5765,6 +5797,31 @@ HA_TOOLS_COMPACT = [
             "icon": {"type": "string"},
             "views": {"type": "array", "items": {"type": "object"}}
         }, "required": ["title", "url_path", "views"]}
+    },
+    {
+        "name": "get_automations",
+        "description": "Find existing automations. Pass a query to search by alias/entity. Required before modifying an automation.",
+        "parameters": {"type": "object", "properties": {
+            "query": {"type": "string"}, "limit": {"type": "integer"}
+        }, "required": []}
+    },
+    {
+        "name": "preview_automation_change",
+        "description": "Preview changes to an existing automation before applying. Shows a diff. ALWAYS call this before update_automation.",
+        "parameters": {"type": "object", "properties": {
+            "automation_id": {"type": "string"},
+            "changes": {"type": "object", "description": "Fields to change (trigger, condition, action, alias, etc.)"},
+            "add_condition": {"type": "object"}
+        }, "required": ["automation_id"]}
+    },
+    {
+        "name": "update_automation",
+        "description": "Apply changes to an existing automation. MUST call preview_automation_change first and get user confirmation. If user says no/cancel/annulla, do NOT call this tool.",
+        "parameters": {"type": "object", "properties": {
+            "automation_id": {"type": "string"},
+            "changes": {"type": "object"},
+            "add_condition": {"type": "object"}
+        }, "required": ["automation_id"]}
     }
 ]
 
@@ -5826,7 +5883,8 @@ def _get_tool_tier() -> str:
     provider = api.AI_PROVIDER
     model = (api.get_active_model() or "").lower()
 
-    # Providers with known tight request-size / TPM limits
+    # Providers with known tight TPM / request-size limits
+    # Groq free tier: 12k TPM — full tool set (~15k tokens) exceeds that limit
     _TIGHT_PROVIDERS = {"github", "groq"}
 
     if provider in _TIGHT_PROVIDERS:

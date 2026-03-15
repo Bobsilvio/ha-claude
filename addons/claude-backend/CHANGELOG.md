@@ -1,6 +1,43 @@
 # Changelog
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
+## 4.6.15 — Fix provider: errori tool call, TPM Groq, hallucination claude_web; UI stato sessione bubble
+
+### Fix: provider Groq
+- **Errore messaggio sbagliato su tool call malformato**: quando il modello generava un nome funzione tipo `update_automation,{...}` il sistema mostrava erroneamente "tier limitation". Ora viene rilevato con regex `(\w+)[,{]` e mostrato il messaggio corretto "malformed tool call"
+- **`_TIER_MISSING` dict errato**: `update_automation` e `preview_automation_change` erano listati come mancanti dall'extended tier pur essendo già presenti — corretti
+- **429 TPM dopo preview**: il tool result di `preview_automation_change` conteneva `old_yaml`/`new_yaml` nella history, causando overflow del limite 12k token/min su Groq. Aggiunto `_compress_tool_result` in `groq.py` che rimuove quei campi dalla history prima di ogni richiesta
+- **Modello allam-2-7b**: rispondeva con output garbage — già gestito tramite `_SIMULATOR_MODELS` (fallback XML simulator)
+
+### Fix: `update_automation` eseguita dopo "no"
+- Aggiunta regola di cancellazione esplicita nel prompt compact: se l'utente dice no/annulla/cancel il modello non deve chiamare write tool
+- Aggiornata descrizione di `update_automation` in `HA_TOOLS_COMPACT` con istruzione "If user says no/cancel/annulla, do NOT call this tool"
+
+### Fix: claude_web hallucinated success
+- **Rilevamento runtime**: aggiunto tracciamento `_write_tools_executed` nell'agentic loop; se il provider è XML-simulator e la risposta contiene frasi di successo ("aggiornata", "applied", "✅", ecc.) senza aver chiamato nessun write tool → viene iniettato un evento `system_message` di avviso
+- **Prompt XML simulator rafforzato**: aggiunta sezione `CONFIRMATION HANDLING — MANDATORY` con regole esplicite su cosa fare quando l'utente conferma con sì/yes/ok
+- **Anti-artifact rules**: aggiunte regole 5 e 6 in `claude_web.py` per vietare YAML in code block e richiedere `<tool_call>` dopo conferma
+- Aggiunte chiavi `warn_no_tool_called` e `err_malformed_tool_call` nei dizionari EN/IT/ES/FR
+- Aggiunto handler `system_message` nel loop SSE di `chat_bubble.py`
+
+### Nuovo: provider sperimentale `claude_web_native`
+- Nuovo file `providers/claude_web_native.py`: prova i tre approcci possibili per usare la session key di claude.ai con l'API Messages nativa (x-api-key, Bearer, proxy claude.ai)
+- Nuovo file `test_claude_web_native.py`: script standalone per testare la compatibilità — include header browser-like per passare Cloudflare
+- Registrato in `providers/__init__.py` e `providers/manager.py`
+- **Risultato**: la session key `sk-ant-sid02-` NON è compatibile con l'API Messages; il provider rimane sperimentale/documentativo
+
+### UI bubble: barra verde stato sessione e disconnect
+- **Barra verde `session-conn-bar`**: banner fisso tra l'agent-bar e la context-bar del pannello bubble — identico allo stile del banner Codex nella chat_ui. Mostra dot verde, label provider, dettaglio (giorni connesso / scadenza token) e bottone Disconnect
+- **`checkAndShowSessionStatus(provider)`**: aggiorna la barra al cambio provider e all'apertura iniziale del pannello. Copre tre provider:
+  - `claude_web` / `claude_web_native` → "🔗 Claude Web · connesso da Xg" + disconnect via `POST /api/session/claude_web/clear`
+  - `github_copilot` → "🔗 GitHub Copilot · connesso da Xg" + disconnect via `POST /api/oauth/copilot/revoke`
+  - `openai_codex` → "🔑 OpenAI Codex · account_id · scade in Xh Ym" + disconnect via `POST /api/oauth/codex/revoke`
+- Per tutti gli altri provider la barra viene nascosta automaticamente
+- **`clear_token()` in `providers/github_copilot.py`**: svuota il token in memoria e cancella `/data/oauth_copilot.json`
+- **`POST /api/oauth/copilot/revoke`** aggiunto in `api.py`
+
+---
+
 ## 4.6.14 — Fix: dashboard rotte con LLM deboli (Llama, NVIDIA, ecc.)
 - **Nuovo `_repair_malformed_html`**: ripara errori strutturali prodotti da modelli meno capaci prima del salvataggio
   - Tag HTML malformati (`<div class=<div class=`) → rimossi
