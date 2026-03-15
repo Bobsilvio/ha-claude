@@ -22,7 +22,9 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -365,6 +367,9 @@ def _build_alias_index(entries: List[ModelCatalogEntry]) -> Dict[str, Tuple[str,
 # ModelCatalog class
 # ---------------------------------------------------------------------------
 
+_CATALOG_BLOCKLIST_FILE = "/config/amira/model_blocklist.json"
+
+
 class ModelCatalog:
     """Thread-safe model catalog with static + dynamic entries."""
 
@@ -378,7 +383,11 @@ class ModelCatalog:
             k: list(v) for k, v in _PROVIDER_MODELS.items()
         }
         self._dynamic_ts: float = 0.0  # last dynamic refresh timestamp
+        # Persistent blocklist: models removed at runtime (survive refreshes and restarts)
+        # keyed by "provider/model_id"
+        self._blocklisted: set = set()
         self._load_static()
+        self._restore_blocklist()  # re-apply blocklist persisted in previous sessions
 
     # -- bootstrap --
 
@@ -403,6 +412,73 @@ class ModelCatalog:
             f"ModelCatalog: {len(_STATIC_CATALOG)} rich + {auto} auto entries "
             f"across {len(self._provider_models)} providers"
         )
+
+    # -- blocklist persistence --
+
+    def _restore_blocklist(self) -> None:
+        """Re-apply the blocklist persisted from previous sessions.
+
+        Reads the shared /config/amira/model_blocklist.json file and,
+        for every provider key that is NOT "nvidia" (managed by api.py),
+        calls remove_model() to purge each entry from the catalog.
+        Safe to call at startup before any threads are active.
+        """
+        try:
+            if not os.path.isfile(_CATALOG_BLOCKLIST_FILE):
+                return
+            with open(_CATALOG_BLOCKLIST_FILE, "r") as fh:
+                data = json.load(fh) or {}
+            restored = 0
+            for provider, model_ids in data.items():
+                if provider == "nvidia":
+                    continue  # managed exclusively by api.py
+                if not isinstance(model_ids, list):
+                    continue
+                for mid in model_ids:
+                    if isinstance(mid, str) and mid.strip():
+                        self.remove_model(provider, mid.strip(), _persist=False)
+                        restored += 1
+            if restored:
+                logger.info(f"ModelCatalog: restored {restored} blocklisted model(s) from disk")
+        except Exception as exc:
+            logger.warning(f"ModelCatalog: could not restore blocklist: {exc}")
+
+    def _persist_blocklist(self) -> None:
+        """Write the in-memory blocklist (excluding nvidia) to disk.
+
+        Reads the existing file first so the nvidia section managed by
+        api.py is preserved.  Called under self._lock — must not block.
+        """
+        try:
+            # Build {provider: [model_id, ...]} from _blocklisted, skip nvidia
+            by_provider: Dict[str, List[str]] = {}
+            for key in self._blocklisted:
+                if "/" not in key:
+                    continue
+                provider, model_id = key.split("/", 1)
+                if provider == "nvidia":
+                    continue
+                by_provider.setdefault(provider, []).append(model_id)
+
+            # Load existing file to preserve the nvidia section
+            existing: Dict = {}
+            if os.path.isfile(_CATALOG_BLOCKLIST_FILE):
+                try:
+                    with open(_CATALOG_BLOCKLIST_FILE, "r") as fh:
+                        existing = json.load(fh) or {}
+                except Exception:
+                    pass
+
+            # Merge: keep nvidia unchanged, overwrite our providers
+            payload = dict(existing)
+            for provider, model_ids in by_provider.items():
+                payload[provider] = sorted(set(model_ids))
+
+            os.makedirs(os.path.dirname(_CATALOG_BLOCKLIST_FILE), exist_ok=True)
+            with open(_CATALOG_BLOCKLIST_FILE, "w") as fh:
+                json.dump(payload, fh, ensure_ascii=False, indent=2)
+        except Exception as exc:
+            logger.warning(f"ModelCatalog: could not persist blocklist: {exc}")
 
     # -- queries --
 
@@ -473,11 +549,14 @@ class ModelCatalog:
         """Replace the model list for a provider (e.g. after live /api/tags).
 
         Also creates minimal catalog entries for any new model IDs.
+        Blocklisted models are silently skipped so they are never re-added.
         """
         with self._lock:
-            self._provider_models[provider] = list(model_ids)
+            filtered = [mid for mid in model_ids
+                        if f"{provider}/{mid}" not in self._blocklisted]
+            self._provider_models[provider] = filtered
             added = 0
-            for mid in model_ids:
+            for mid in filtered:
                 key = f"{provider}/{mid}"
                 if key not in self._entries:
                     self._entries[key] = ModelCatalogEntry(
@@ -494,12 +573,14 @@ class ModelCatalog:
 
         Models already present keep their rich metadata.  New models get a
         minimal entry (capabilities = TEXT + STREAMING).  Returns count of
-        newly added entries.
+        newly added entries.  Blocklisted models are silently skipped.
         """
         added = 0
         with self._lock:
             for mid in model_ids:
                 key = f"{provider}/{mid}"
+                if key in self._blocklisted:
+                    continue
                 if key not in self._entries:
                     self._entries[key] = ModelCatalogEntry(
                         id=mid,
@@ -513,11 +594,28 @@ class ModelCatalog:
             logger.debug(f"ModelCatalog: added {added} dynamic entries for {provider}")
         return added
 
-    def remove_model(self, provider: str, model_id: str) -> bool:
-        """Remove a single model (e.g. after blocklisting)."""
+    def remove_model(self, provider: str, model_id: str, _persist: bool = True) -> bool:
+        """Remove a single model and add it to the persistent blocklist.
+
+        The blocklist ensures the model is not re-added by subsequent
+        merge_provider_models() or merge_dynamic() calls (e.g. auto-refresh).
+        Set _persist=False when called from _restore_blocklist() to avoid
+        a redundant disk write during startup.
+        """
         key = f"{provider}/{model_id}"
         with self._lock:
-            return self._entries.pop(key, None) is not None
+            self._blocklisted.add(key)
+            # Remove from the UI dropdown list
+            if provider in self._provider_models:
+                try:
+                    self._provider_models[provider].remove(model_id)
+                except ValueError:
+                    pass
+            removed = self._entries.pop(key, None) is not None
+            if _persist:
+                self._persist_blocklist()
+        logger.info(f"ModelCatalog: blocklisted {key} (will survive refreshes and restarts)")
+        return removed
 
     # -- thinking defaults --
 

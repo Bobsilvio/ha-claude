@@ -747,6 +747,31 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
     # alone may strip away important fields like "code": "insufficient_quota").
     low = raw.lower()
 
+    # Tool not available in the provider's tier (compact/extended mode)
+    if "not in request.tools" in low or "attempted to call tool" in low:
+        import re as _re
+        # Detect malformed tool call: model embedded JSON args in the function name
+        # e.g. "attempted to call tool 'update_automation,{"automation_id": ...}'"
+        malformed_match = _re.search(r"attempted to call tool ['\"](\w+)[,{]", raw)
+        if malformed_match:
+            tool_name = malformed_match.group(1)
+            tpl = get_lang_text("err_malformed_tool_call") or (
+                "\u26a0\ufe0f The model generated a malformed tool call for '{tool_name}'. "
+                "This is a model behavior issue \u2014 please try rephrasing your request or switch to a more capable model."
+            )
+            return tpl.format(tool_name=tool_name)
+        tool_match = _re.search(r"attempted to call tool ['\"](\w+)['\"]", raw)
+        tool_name = tool_match.group(1) if tool_match else None
+        try:
+            tier = tools._get_tool_tier()
+        except Exception:
+            tier = "unknown"
+        if tool_name:
+            tpl = get_lang_text("err_tool_not_in_tier") or "\u26a0\ufe0f Current model is in limited mode ({tier}) and does not support '{tool_name}'. Switch to a more powerful model (e.g. Claude, GPT-4o, Gemini)."
+            return tpl.format(tier=tier, tool_name=tool_name)
+        tpl = get_lang_text("err_tool_not_in_tier_generic") or "\u26a0\ufe0f Current model is in limited mode ({tier}) and does not support this feature. Switch to a more powerful model."
+        return tpl.format(tier=tier)
+
     if provider == "github" and code == 403 and ("budget limit" in low or "reached its budget" in low):
         return get_lang_text("err_github_budget_limit") or (
             "GitHub Models: budget limit reached. Increase budget/credit or switch model/provider."
@@ -798,7 +823,10 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
         base = get_lang_text("err_openai_quota") or "❌ Quota exceeded. Your account has run out of credits. Check your billing details."
         url = _CREDITS_URLS.get(provider)
         return f"{base}\n⚠️ {url}" if url else base
-    if code == 429 and provider == "google" and "resource_exhausted" in low:
+    if code == 429 and provider == "google":
+        # Pass through the original Google error message if it contains useful details (e.g. billing URL)
+        if remote_msg and ("ai.google.dev" in remote_msg or "billing" in remote_msg.lower() or "quota" in remote_msg.lower()):
+            return f"❌ {remote_msg}"
         return get_lang_text("err_google_quota") or "Google Gemini: quota exhausted (429). Wait a minute and retry, or switch to another model/provider."
     if code == 429:
         return get_lang_text("err_http_429") or "Rate limit (429)."
@@ -961,6 +989,12 @@ LANGUAGE_TEXT = {
         "dashboard_created_successfully": "Dashboard created successfully! Your ",
         "dashboard_sidebar_ready": "dashboard appears in the sidebar at /{path}",
         "dashboard_sidebar_failed": "HTML file is ready but sidebar integration failed",
+
+        "err_tool_not_in_tier": "\u26a0\ufe0f The current model is in limited mode ({tier}) and does not support '{tool_name}'. Switch to a more powerful model (e.g. Claude, GPT-4o, Gemini) to use this feature.",
+        "err_tool_not_in_tier_generic": "\u26a0\ufe0f The current model is in limited mode ({tier}) and does not support this feature. Switch to a more powerful model to access all features.",
+        "err_malformed_tool_call": "\u26a0\ufe0f The model generated a malformed call for '{tool_name}'. Try rephrasing your request or switch to a more capable model.",
+        "warn_tier_limited": "\u26a0\ufe0f Limited mode ({tier}): advanced features not available ({missing}). Switch to a more capable model.",
+        "warn_no_tool_called": "\u26a0\ufe0f The model described a change but did not actually apply it. Nothing was modified in Home Assistant. Please try again.",
     },
     "it": {
         "before": "Prima",
@@ -1035,6 +1069,12 @@ LANGUAGE_TEXT = {
         "dashboard_created_successfully": "Dashboard creata con successo! ",
         "dashboard_sidebar_ready": "Il dashboard appare nella sidebar a /{path}",
         "dashboard_sidebar_failed": "File HTML pronto ma integrazione sidebar fallita",
+
+        "err_tool_not_in_tier": "\u26a0\ufe0f Il modello attuale \u00e8 in modalit\u00e0 ridotta ({tier}) e non supporta '{tool_name}'. Passa a un modello pi\u00f9 potente (es. Claude, GPT-4o, Gemini) per usare questa funzione.",
+        "err_tool_not_in_tier_generic": "\u26a0\ufe0f Il modello attuale \u00e8 in modalit\u00e0 ridotta ({tier}) e non supporta questa funzione. Passa a un modello pi\u00f9 potente per accedere a tutte le funzionalit\u00e0.",
+        "err_malformed_tool_call": "\u26a0\ufe0f Il modello ha generato una chiamata malformata per '{tool_name}'. Prova a riformulare la richiesta o passa a un modello pi\u00f9 capace.",
+        "warn_tier_limited": "\u26a0\ufe0f Modalit\u00e0 ridotta ({tier}): funzioni avanzate non disponibili ({missing}). Seleziona un modello pi\u00f9 potente.",
+        "warn_no_tool_called": "\u26a0\ufe0f Il modello ha descritto una modifica ma non l'ha eseguita. Nessuna modifica \u00e8 stata applicata a Home Assistant. Riprova.",
     },
     "es": {
         "before": "Antes",
@@ -1110,6 +1150,12 @@ LANGUAGE_TEXT = {
         "dashboard_created_successfully": "Dashboard creata con successo! ",
         "dashboard_sidebar_ready": "Il dashboard appare nella sidebar a /{path}",
         "dashboard_sidebar_failed": "File HTML pronto ma integrazione sidebar fallita",
+
+        "err_tool_not_in_tier": "\u26a0\ufe0f El modelo actual est\u00e1 en modo reducido ({tier}) y no soporta '{tool_name}'. Cambia a un modelo m\u00e1s potente (ej. Claude, GPT-4o, Gemini) para usar esta funci\u00f3n.",
+        "err_tool_not_in_tier_generic": "\u26a0\ufe0f El modelo actual est\u00e1 en modo reducido ({tier}) y no soporta esta funci\u00f3n. Cambia a un modelo m\u00e1s potente para acceder a todas las funciones.",
+        "err_malformed_tool_call": "\u26a0\ufe0f El modelo gener\u00f3 una llamada malformada para '{tool_name}'. Intenta reformular tu solicitud o cambia a un modelo m\u00e1s capaz.",
+        "warn_tier_limited": "\u26a0\ufe0f Modo reducido ({tier}): funciones avanzadas no disponibles ({missing}). Selecciona un modelo m\u00e1s potente.",
+        "warn_no_tool_called": "\u26a0\ufe0f El modelo describi\u00f3 un cambio pero no lo aplic\u00f3. No se modific\u00f3 nada en Home Assistant. Inténtalo de nuevo.",
     },
     "fr": {
         "before": "Avant",
@@ -1184,6 +1230,12 @@ LANGUAGE_TEXT = {
         "dashboard_created_successfully": "Dashboard créé avec succès ! Ton ",
         "dashboard_sidebar_ready": "dashboard apparaît dans la barre latérale à /{path}",
         "dashboard_sidebar_failed": "Le fichier HTML est prêt mais l'intégration dans la barre latérale a échoué",
+
+        "err_tool_not_in_tier": "\u26a0\ufe0f Le mod\u00e8le actuel est en mode r\u00e9duit ({tier}) et ne supporte pas '{tool_name}'. Passe \u00e0 un mod\u00e8le plus puissant (ex. Claude, GPT-4o, Gemini) pour utiliser cette fonction.",
+        "err_tool_not_in_tier_generic": "\u26a0\ufe0f Le mod\u00e8le actuel est en mode r\u00e9duit ({tier}) et ne supporte pas cette fonction. Passe \u00e0 un mod\u00e8le plus puissant pour acc\u00e9der \u00e0 toutes les fonctionnalit\u00e9s.",
+        "err_malformed_tool_call": "\u26a0\ufe0f Le mod\u00e8le a g\u00e9n\u00e9r\u00e9 un appel malform\u00e9 pour '{tool_name}'. Essaie de reformuler ta demande ou passe \u00e0 un mod\u00e8le plus capable.",
+        "warn_tier_limited": "\u26a0\ufe0f Mode r\u00e9duit ({tier})\u00a0: fonctions avanc\u00e9es non disponibles ({missing}). S\u00e9lectionne un mod\u00e8le plus puissant.",
+        "warn_no_tool_called": "\u26a0\ufe0f Le mod\u00e8le a d\u00e9crit une modification mais ne l'a pas ex\u00e9cut\u00e9e. Rien n'a \u00e9t\u00e9 modifi\u00e9 dans Home Assistant. R\u00e9essaie.",
     }
 }
 
@@ -1381,14 +1433,19 @@ def blocklist_nvidia_model(model_id: str) -> None:
 
 
 def blocklist_model(provider: str, model_id: str) -> None:
-    """Add a model to the blocklist for a provider. Only NVIDIA is persisted."""
+    """Add a model to the blocklist for a provider.
+
+    NVIDIA: persisted via the dedicated NVIDIA_MODEL_BLOCKLIST mechanism.
+    All other providers: delegated to ModelCatalog.remove_model() which
+    handles in-memory removal, refresh-survival, and disk persistence.
+    """
     if not isinstance(model_id, str) or not model_id.strip():
         return
     model_id = model_id.strip()
     if provider == "nvidia":
         blocklist_nvidia_model(model_id)
     else:
-        logger.debug(f"blocklist_model: no blocklist for provider '{provider}'")
+        model_catalog.get_catalog().remove_model(provider, model_id)
 
 
 # Cache for NVIDIA /v1/models discovery (to keep UI in sync with what's available for the current key)
@@ -3381,6 +3438,16 @@ def _normalize_automation_change_args(raw_args: dict) -> dict:
         raw_args = {}
 
     changes = raw_args.get("changes", {})
+    # Some models (e.g. Llama via NVIDIA NIM) pass changes as a JSON/YAML string
+    if isinstance(changes, str) and changes.strip():
+        try:
+            changes = json.loads(changes)
+        except Exception:
+            try:
+                import yaml as _yaml_norm
+                changes = _yaml_norm.safe_load(changes)
+            except Exception:
+                changes = {}
     if not isinstance(changes, dict):
         changes = {}
 
@@ -4144,6 +4211,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _preview_round_done = False      # True after preview_automation_change executes
         _html_draft_pending_name = ""    # create_html_dashboard draft name pending finalize
         _html_dashboard_saved_this_turn = False
+        _write_tools_executed: list = []  # names of write tools actually called this turn
 
         def _pending_call_signature(_tc: dict) -> str:
             """Build a stable signature for loop detection (name + canonical args)."""
@@ -4799,6 +4867,22 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
                 _update_sig = _automation_change_signature(_ua_args)
                 _update_norm = _normalize_automation_change_args(_ua_args)
+
+                # Early reject: if changes are empty, there's nothing to apply.
+                if not _update_norm.get("changes") and not _update_norm.get("add_condition"):
+                    _pending_tool_calls.remove(_tc)
+                    _blocked_aid = _update_norm.get("automation_id", "")
+                    _reason = (
+                        "[BLOCKED] update_automation called with empty changes — nothing to apply. "
+                        f"First call preview_automation_change with automation_id={_blocked_aid!r} and "
+                        "the actual changes you want to make (e.g. changes={\"trigger\": [...]}), "
+                        "then ask for confirmation."
+                    )
+                    _tc["_block_reason"] = _reason
+                    _sig_blocked.append(_tc)
+                    logger.warning(f"Preview-match guard: blocked update_automation with empty changes (automation_id={_blocked_aid!r})")
+                    continue
+
                 _has_preview = bool(_last_preview and _last_preview.get("type") == "automation_preview")
                 _same_automation = bool(
                     _has_preview and str(_last_preview.get("automation_id", "")) == _update_norm.get("automation_id", "")
@@ -4811,20 +4895,27 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         # The LLM regenerated slightly different changes — override with
                         # the exact changes that were shown to the user.
                         _stored_norm = _last_preview.get("norm", {})
-                        if _stored_norm:
+                        _stored_changes = _stored_norm.get("changes", {}) if _stored_norm else {}
+                        if _stored_norm and _stored_changes:
+                            # Only allow override if the stored preview had actual (non-empty) changes.
                             _tc["arguments"] = json.dumps({
                                 "automation_id": _stored_norm.get("automation_id", _update_norm.get("automation_id")),
-                                "changes": _stored_norm.get("changes", {}),
+                                "changes": _stored_changes,
                                 **( {"add_condition": _stored_norm["add_condition"]} if _stored_norm.get("add_condition") else {} ),
                             }, ensure_ascii=False)
                             logger.info("Preview-match guard: overriding LLM args with stored preview changes (same_automation, sig mismatch)")
                             continue  # allow the update with corrected args
+                        else:
+                            logger.warning("Preview-match guard: stored preview has empty changes — treating as no valid preview")
                     _pending_tool_calls.remove(_tc)
+                    _blocked_changes = _update_norm.get("changes", {})
+                    _blocked_aid = _update_norm.get("automation_id", "")
                     _reason = (
                         "[BLOCKED by preview-match guard] "
-                        "update_automation requires an up-to-date preview_automation_change "
-                        "with the SAME changes. Call preview_automation_change first and show the new diff, "
-                        "then ask for confirmation before applying."
+                        "update_automation requires an up-to-date preview_automation_change first. "
+                        f"Call preview_automation_change with automation_id={_blocked_aid!r} and "
+                        f"changes={json.dumps(_blocked_changes, ensure_ascii=False)} — "
+                        "then ask for confirmation before calling update_automation."
                     )
                     _tc["_block_reason"] = _reason
                     _sig_blocked.append(_tc)
@@ -4956,6 +5047,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
                     if not _is_read_only_call(tc) and _is_ok:
                         _any_successful_write_this_round = True
+                        _write_tools_executed.append(fn_name)
 
                     if fn_name == "preview_automation_change" and _status == "preview":
                         _norm = _normalize_automation_change_args(tc_args)
@@ -5079,6 +5171,27 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             if _is_no_tool_provider and assembled:
                 from providers.tool_simulator import clean_display_text as _cdt_hist
                 assembled = _cdt_hist(assembled)
+
+            # ── Safety check: no-tool provider claimed success without calling any write tool ──
+            # Detects the "hallucinated success" pattern: the model wrote "aggiornata con successo"
+            # but never emitted a <tool_call> block (so nothing was actually executed).
+            _HALLUCINATED_SUCCESS_PHRASES = (
+                "aggiornata", "applicata", "modificata", "updated successfully", "applied",
+                "aggiornato", "creata", "salvata", "success", "✅", "completata", "eseguita",
+            )
+            if (
+                _is_no_tool_provider
+                and assembled
+                and not _write_tools_executed
+                and intent_name not in ("chat", "create_html_dashboard")
+                and any(p in assembled.lower() for p in _HALLUCINATED_SUCCESS_PHRASES)
+            ):
+                _warn = get_lang_text("warn_no_tool_called") or (
+                    "⚠️ Warning: the model described a change but did not actually execute it. "
+                    "No modifications were made to Home Assistant. "
+                    "Please try again and confirm when prompted."
+                )
+                yield {"type": "system_message", "content": _warn}
             if assembled:
                 # Log the AI response for debugging (truncate to 500 chars)
                 _log_resp = assembled[:500] + ('...' if len(assembled) > 500 else '')
@@ -5807,11 +5920,37 @@ def api_set_model():
         except Exception:
             pass
 
+    # Compute tool tier for the new provider/model so the UI can warn the user
+    try:
+        _tier = tools._get_tool_tier()
+        _TIER_MISSING = {
+            # compact: includes create/update/preview automation + create_dashboard, but lacks
+            # script management, dashboard editing, file access, delete ops, and many advanced tools
+            "compact": ["update_dashboard", "delete_automation", "create_script", "update_script",
+                        "list_config_files", "read_config_file", "get_scripts", "get_dashboards", "get_areas"],
+            # extended: adds file/listing tools over compact but still lacks write-heavy ops
+            "extended": ["update_dashboard", "delete_automation", "create_script", "update_script"],
+        }
+        _missing = _TIER_MISSING.get(_tier, [])
+        if _tier in ("compact", "extended") and _missing:
+            _tpl = get_lang_text("warn_tier_limited") or "\u26a0\ufe0f Limited mode ({tier}): advanced features not available ({missing}). Switch to a more capable model."
+            _tier_warning_msg = _tpl.format(tier=_tier, missing=", ".join(_missing))
+        else:
+            _tier_warning_msg = ""
+    except Exception:
+        _tier = "full"
+        _missing = []
+        _tier_warning_msg = ""
+
     # Build response with agent identity if available
     resp = {
         "success": True,
         "provider": AI_PROVIDER,
         "model": AI_MODEL,
+        "tier": _tier,
+        "tier_limited": _tier in ("compact", "extended"),
+        "tier_missing_tools": _missing,
+        "tier_warning_msg": _tier_warning_msg,
     }
     if AGENT_CONFIG_AVAILABLE:
         try:
@@ -9390,6 +9529,17 @@ def oauth_copilot_status():
     except Exception as e:
         return jsonify({"configured": False, "error": str(e)}), 200
 
+
+@app.route("/api/oauth/copilot/revoke", methods=["POST"])
+def oauth_copilot_revoke():
+    """Clear the stored GitHub Copilot OAuth token."""
+    try:
+        from providers.github_copilot import clear_token
+        clear_token()
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        logger.error(f"Copilot: revoke error: {e}")
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------

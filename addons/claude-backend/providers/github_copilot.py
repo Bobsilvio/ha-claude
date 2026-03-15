@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional, Generator
 from .enhanced import EnhancedProvider
 from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
+from model_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +231,19 @@ def get_token_status() -> Dict[str, Any]:
     return {"configured": True, "age_days": age_days}
 
 
+def clear_token() -> None:
+    """Clear the stored GitHub OAuth token (disconnect)."""
+    global _stored_gh_token, _copilot_session
+    _stored_gh_token = None
+    _copilot_session = None
+    try:
+        if os.path.exists(_TOKEN_FILE):
+            os.remove(_TOKEN_FILE)
+    except Exception as e:
+        logger.warning(f"Copilot: could not delete token file: {e}")
+    logger.info("Copilot: GitHub OAuth token cleared.")
+
+
 def _get_best_gh_token(config_api_key: str = "") -> Optional[str]:
     """Return the best available GitHub token (config PAT > stored OAuth)."""
     if config_api_key:
@@ -404,9 +418,10 @@ class GitHubCopilotProvider(EnhancedProvider):
         except Exception as e:
             err_msg = str(e)
             logger.error(f"GitHub Copilot: Error during streaming: {e}")
-            # If model_not_supported, give a clearer message
+            # If model_not_supported, remove the model and give a clearer message
             if "model_not_supported" in err_msg:
                 model_name = self._resolve_model()
+                get_catalog().remove_model("github_copilot", model_name)
                 yield {
                     "type": "error",
                     "message": (
