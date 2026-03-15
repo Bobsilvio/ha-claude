@@ -131,8 +131,30 @@
   },
 
   "progress": {
-    "last_completed_step": "commit_remaining_files",
-    "next_step": "phase_1_providers_P1",
-    "commit_after_each_phase": true
+    "last_completed_step": "phase_2_api_split_error_utils",
+    "next_step": "phase_2_api_split_auth_utils",
+    "commit_after_each_phase": true,
+    "api_split_status": {
+      "phase_1_translations": "COMPLETED - core/translations.py created (lines 916-1256 from api.py)",
+      "phase_2_image_helpers": "COMPLETED - core/image_helpers.py created (lines 924-989 from api.py)",
+      "phase_3_model_utils": "COMPLETED - core/model_utils.py created (lines 1414-1527 from api.py)",
+      "phase_4_error_utils": "COMPLETED - core/error_utils.py created (lines 695-847 from api.py)",
+      "current_api_size": "9677 lines (down from 10340, -663 lines, -6.4%)",
+      "remaining_core_modules": [
+        "auth.py",
+        "ha_client.py"
+      ],
+      "remaining_service_modules": [
+        "model_service.py",
+        "settings_service.py",
+        "conversation_service.py",
+        "ha_config_service.py",
+        "chat_service.py",
+        "stream_service.py",
+        "agent_service.py",
+        "prompt_service.py",
+        "bubble_service.py"
+      ]
+    }
   }
 }
