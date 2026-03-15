@@ -8994,7 +8994,9 @@ def api_settings_get():
         },
         {
             "id": "messaging", "icon": "\U0001F4F1", "fields": [
+                {"key": "enable_telegram", "type": "toggle"},
                 {"key": "telegram_bot_token", "type": "password"},
+                {"key": "enable_whatsapp", "type": "toggle"},
                 {"key": "twilio_account_sid", "type": "text"},
                 {"key": "twilio_auth_token", "type": "password"},
                 {"key": "twilio_whatsapp_from", "type": "text"},
