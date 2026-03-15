@@ -601,11 +601,6 @@ except Exception as e:
 
 # Language-specific text
 # Translation functions moved to core.translations module
-# Import them below
-    try:
-        return txt.format(**kwargs)
-    except Exception:
-        return txt
 
 # Image handling helpers moved to core.image_helpers module
 
