@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Generator
 from .enhanced import EnhancedProvider
 from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
+from model_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -118,8 +119,10 @@ class NVIDIAProvider(EnhancedProvider):
         if self._is_rate_limit_error(error_msg):
             return "NVIDIA: Rate limit exceeded. Please retry in a moment."
         if "model" in error_msg and "not found" in error_msg:
+            get_catalog().remove_model("nvidia", self._get_model())
             return "NVIDIA: Model not found or not available. Try testing models from the settings."
         if "404" in error_msg:
+            get_catalog().remove_model("nvidia", self._get_model())
             return "NVIDIA: Model not available (404). Try another model."
 
         return f"NVIDIA error: {error}"

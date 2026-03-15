@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Generator
 from .enhanced import EnhancedProvider
 from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
+from model_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +134,10 @@ class GitHubProvider(EnhancedProvider):
         if self._is_rate_limit_error(error_msg):
             return "GitHub: Rate limit exceeded. Please retry in a moment."
         if "unknown_model" in error_msg or "unknown model" in error_msg:
+            get_catalog().remove_model("github", self._get_model())
             return "GitHub: Model identifier not recognized by GitHub Models API."
         if "model" in error_msg and "not found" in error_msg:
+            get_catalog().remove_model("github", self._get_model())
             return "GitHub: Model not found or not yet available."
 
         return f"GitHub error: {error}"

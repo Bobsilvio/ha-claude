@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional, Generator
 from .enhanced import EnhancedProvider
 from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
+from model_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -299,8 +300,10 @@ class GroqProvider(EnhancedProvider):
         if "tool calling" in error_msg and "not supported" in error_msg:
             return f"Groq: tool calling not supported by this model — switching to XML simulator"
         if "model_decommissioned" in error_msg or "decommissioned" in error_msg:
+            get_catalog().remove_model("groq", self._get_model())
             return "Groq: This model has been decommissioned. Please select a different Groq model in the add-on settings."
         if "model" in error_msg and ("not found" in error_msg or "not available" in error_msg or "does not exist" in error_msg):
+            get_catalog().remove_model("groq", self._get_model())
             return "Groq: Model not found or not available."
 
         return f"Groq error: {error}"

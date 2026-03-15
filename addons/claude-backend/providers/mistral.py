@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Generator
 from .enhanced import EnhancedProvider
 from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
+from model_catalog import get_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -98,5 +99,6 @@ class MistralProvider(EnhancedProvider):
         if self._is_rate_limit_error(error_msg):
             return "Mistral: Rate limit exceeded. Please retry in a moment."
         if "model" in error_msg:
+            get_catalog().remove_model("mistral", self._get_model())
             return "Mistral: Model not found or not available."
         return f"Mistral error: {error}"
