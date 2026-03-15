@@ -131,15 +131,21 @@
   },
 
   "progress": {
-    "last_completed_step": "phase_2_api_split_error_utils",
-    "next_step": "phase_2_api_split_auth_utils",
+    "last_completed_step": "phase_10_all_blueprints",
+    "next_step": "phase_11_thin_api",
     "commit_after_each_phase": true,
     "api_split_status": {
       "phase_1_translations": "COMPLETED - core/translations.py created (lines 916-1256 from api.py)",
       "phase_2_image_helpers": "COMPLETED - core/image_helpers.py created (lines 924-989 from api.py)",
       "phase_3_model_utils": "COMPLETED - core/model_utils.py created (lines 1414-1527 from api.py)",
       "phase_4_error_utils": "COMPLETED - core/error_utils.py created (lines 695-847 from api.py)",
-      "current_api_size": "9677 lines (down from 10340, -663 lines, -6.4%)",
+      "phase_10_all_blueprints": "COMPLETED - 20 blueprint files created (agents, mcp, memory, document, conversation, settings, voice, messaging, oauth, nvidia, catalog, analytics, ui, bubble, legacy, system, usage, dashboard, file, scheduled)",
+      "current_api_size": "9348 lines (140 routes @app.route still in api.py)",
+      "blueprint_structure": {
+        "total_blueprints": 20,
+        "pattern": "Blueprint placeholder - implementations stay in api.py, blueprints only organize them",
+        "registration": "routes/__init__.py imports all blueprints and registers them with Flask app"
+      },
       "remaining_core_modules": [
         "auth.py",
         "ha_client.py"
