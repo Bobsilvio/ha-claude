@@ -56,10 +56,10 @@ class TelegramBot:
 
     def get_updates(self, timeout: int = 30) -> Dict[str, Any]:
         """Poll for new messages using long polling.
-        
+
         Args:
             timeout: Long poll timeout in seconds
-            
+
         Returns:
             Telegram API response dict
         """
@@ -73,33 +73,50 @@ class TelegramBot:
             resp = requests.get(url, params=params, timeout=timeout + 5)
             if resp.status_code == 200:
                 return resp.json()
-            return {"ok": False}
+            # Include HTTP status and body in the error description
+            try:
+                body = resp.json()
+                description = body.get("description", resp.text[:200])
+            except Exception:
+                description = resp.text[:200] or f"HTTP {resp.status_code}"
+            return {"ok": False, "description": f"HTTP {resp.status_code}: {description}"}
         except Exception as e:
-            logger.error(f"Telegram getUpdates error: {e}")
-            return {"ok": False}
+            return {"ok": False, "description": str(e)}
 
     def _poll_messages(self) -> None:
-        """Poll loop for messages."""
+        """Poll loop for messages with exponential backoff on errors."""
         logger.info("Telegram bot polling started")
-        
+        _backoff = 5       # seconds, doubles on repeated failures (max 300)
+        _fail_count = 0
+
         while self.running:
             try:
                 result = self.get_updates(timeout=30)
                 if not result.get("ok"):
                     err = result.get("description", "unknown error")
-                    logger.warning(f"Telegram getUpdates not OK: {err}")
-                    time.sleep(5)
+                    _fail_count += 1
+                    # Log first failure at WARNING, then only every 12 attempts (~1 min) to avoid spam
+                    if _fail_count == 1 or _fail_count % 12 == 0:
+                        logger.warning(f"Telegram getUpdates not OK (attempt {_fail_count}): {err}")
+                    wait = min(_backoff * (2 ** min(_fail_count - 1, 5)), 300)
+                    time.sleep(wait)
                     continue
-                
+
+                # Success — reset backoff
+                _fail_count = 0
+                _backoff = 5
+
                 updates = result.get("result", [])
                 for update in updates:
                     self.offset = update.get("update_id", self.offset) + 1
                     self._handle_update(update)
-                    
+
             except Exception as e:
-                logger.error(f"Telegram polling error: {e}")
-                time.sleep(5)
-        
+                _fail_count += 1
+                if _fail_count == 1 or _fail_count % 12 == 0:
+                    logger.error(f"Telegram polling error (attempt {_fail_count}): {e}")
+                time.sleep(min(5 * (2 ** min(_fail_count - 1, 5)), 300))
+
         logger.info("Telegram bot polling stopped")
 
     def _handle_update(self, update: Dict[str, Any]) -> None:
