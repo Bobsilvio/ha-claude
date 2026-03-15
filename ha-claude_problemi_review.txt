@@ -1,0 +1,43 @@
+Problemi rilevati nel codice (review)
+
+Data review: 2026-03-11
+Progetto: ha-claude
+
+1) Possibile crash nel formatter errori write (severità: alta)
+- Descrizione:
+  In _format_write_tool_response, il recupero dell'errore usa:
+  (result_data.get("result", {}) or {}).get("error")
+  Se "result" non è un dict (es. stringa/lista), può causare AttributeError.
+- Impatto:
+  Risposta assistant potenzialmente interrotta proprio durante la gestione di errori tool.
+- Riferimento file:
+  addons/claude-backend/api.py (funzione _format_write_tool_response)
+
+2) Match preview/update troppo letterale (severità: media)
+- Descrizione:
+  La firma di confronto preview/apply non normalizza alias semantici
+  (es. trigger vs triggers, action vs actions, condition vs conditions).
+  Due modifiche equivalenti possono risultare diverse e venire bloccate.
+- Impatto:
+  Blocco falso-positivo di update_automation anche quando la modifica è corretta.
+- Riferimento file:
+  addons/claude-backend/api.py (_normalize_automation_change_args / _automation_change_signature / guard update)
+
+3) Guard preview-match non esteso a update_script (severità: media)
+- Descrizione:
+  Il controllo “preview deve corrispondere all’apply” è applicato a update_automation,
+  ma non a update_script.
+- Impatto:
+  Possibile disallineamento preview/apply ancora presente nel flusso script.
+- Riferimento file:
+  addons/claude-backend/api.py (tool loop guard su update_automation)
+
+4) Listing helper con helper_type=counter troppo ampio (severità: bassa/UX)
+- Descrizione:
+  In modalità list per counter vengono inclusi anche tutti gli input_number.*,
+  non solo eventuali helper fallback legati al caso counter.
+- Impatto:
+  Output rumoroso/confondente in installazioni con molti input_number.
+- Riferimento file:
+  addons/claude-backend/tools.py (manage_helpers action=list, helper_type=counter)
+

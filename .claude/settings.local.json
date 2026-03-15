@@ -40,7 +40,9 @@
       "Bash(curl:*)",
       "WebFetch(domain:ai.google.dev)",
       "Bash(bash addons/claude-backend/validate.sh:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "WebSearch",
+      "WebFetch(domain:registry.modelcontextprotocol.io)"
     ]
   }
 }

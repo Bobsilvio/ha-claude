@@ -1,0 +1,138 @@
+{
+  "version": "1.0",
+  "project": "ha-claude addon backend refactor",
+  "repo": "/sessions/charming-jolly-planck/mnt/ha-claude",
+  "backend_dir": "/sessions/charming-jolly-planck/mnt/ha-claude/addons/claude-backend",
+
+  "phase_1_providers": {
+    "status": "pending",
+    "description": "Standardizzare tutti i provider",
+    "tasks": [
+      {
+        "id": "P1",
+        "description": "Aggiungere blocklist automatica su model_not_found/decommissioned in tutti i provider",
+        "files": ["providers/groq.py","providers/openai.py","providers/nvidia.py","providers/mistral.py","providers/github.py","providers/ollama.py","providers/perplexity.py","providers/google.py","providers/anthropic.py","providers/openrouter.py","providers/deepseek.py"],
+        "pattern": "Nel normalize_error_message(), quando si rileva model_not_found o model_decommissioned, chiamare get_catalog().remove_model(provider_name, model_id)",
+        "status": "pending"
+      },
+      {
+        "id": "P2",
+        "description": "Standardizzare ErrorTranslator: usarlo effettivamente in tutti i provider che lo inizializzano",
+        "pattern": "Nel blocco except, chiamare self.translator.translate(err_msg) invece di stringa hardcoded",
+        "status": "pending"
+      },
+      {
+        "id": "P3",
+        "description": "Tool simulator fallback: aggiungere il pattern di groq.py anche a openai/nvidia/mistral",
+        "pattern": "try native tools -> except tool_not_supported -> fallback to simulator",
+        "status": "pending"
+      }
+    ]
+  },
+
+  "phase_2_api_split": {
+    "status": "pending",
+    "description": "Split api.py (10340 righe) in struttura modulare",
+    "target_structure": {
+      "api.py": "Entry point thin (200 righe max): crea Flask app, registra blueprint, avvia server",
+      "config.py": "Tutte le variabili globali, env loading, defaults (righe 130-199 + variabili sparse)",
+      "core/": {
+        "__init__.py": "",
+        "translations.py": "dizionario _TRANSLATIONS + get_lang_text() + tr() (righe 1000-1256)",
+        "image_helpers.py": "parse_image_data, format_message_with_image_* (righe 1257-1324)",
+        "model_utils.py": "normalize_model_name, get_model_provider, validate_model_provider_compatibility, get_active_model (righe 1812-1927)",
+        "auth.py": "get_api_key, get_ha_token, get_ha_headers, get_max_tokens_param (righe 1928-2110)",
+        "ha_client.py": "call_ha_api, call_ha_websocket, get_all_states (righe 2699-2762)",
+        "error_utils.py": "humanize_provider_error, _extract_http_error_code, _extract_remote_message (righe 692-847)"
+      },
+      "services/": {
+        "__init__.py": "",
+        "settings_service.py": "_load_settings, _save_settings, _apply_settings, load/save_runtime_selection (righe 200-416 + 847-999)",
+        "conversation_service.py": "load_conversations, save_conversations, load/save_device_config (righe 2503-2650)",
+        "ha_config_service.py": "scan_config_structure, parse_configuration_includes, get_config_file_path (righe 2342-2465)",
+        "model_service.py": "PROVIDER_MODELS, MODEL_NAME_MAPPING, load/save_model_blocklists, blocklist_* (righe 1325-1810)",
+        "chat_service.py": "chat_with_ai, chat_anthropic, chat_openai, chat_google, sanitize_messages (righe 2766-3562)",
+        "stream_service.py": "stream_chat_with_ai (righe 3563-5372) - il pezzo piu grande",
+        "agent_service.py": "load_agents_config, _apply_channel_agent (righe 537-572 + 2242-2342)",
+        "prompt_service.py": "_load_custom_system_prompt, _persist_custom_system_prompt (righe 501-535)",
+        "bubble_service.py": "setup_chat_bubble, cleanup_chat_bubble (righe 5644-5796)"
+      },
+      "routes/": {
+        "__init__.py": "register_all_blueprints(app)",
+        "chat_routes.py": "api_chat, api_chat_stream, api_chat_abort (righe 6273-6447)",
+        "model_routes.py": "api_get_models (riga 8227)",
+        "agent_routes.py": "api_agents_* (righe 7171-7390)",
+        "mcp_routes.py": "api_mcp_* (righe 6448-6840)",
+        "memory_routes.py": "api_get_memory, api_search_memory, api_memory_* (righe 8725-8840)",
+        "document_routes.py": "upload_document, list_documents, rag_* (righe 8913-9104)",
+        "conversation_routes.py": "api_conversation_*, api_conversations_list, api_snapshots_* (righe 8006-8479)",
+        "settings_routes.py": "api_settings_get/post, api_config_read/save, api_fallback_* (righe 9751-10027)",
+        "scheduled_routes.py": "api_scheduled_* (righe 6961-7132)",
+        "voice_routes.py": "api_voice_* (righe 7472-7569)",
+        "messaging_routes.py": "api_telegram, api_messaging_*, api_whatsapp (righe 7569-7789)",
+        "oauth_routes.py": "oauth_codex_*, oauth_copilot_*, session_* (righe 9439-9626)",
+        "nvidia_routes.py": "api_nvidia_test_* (righe 8524-8724)",
+        "catalog_routes.py": "api_catalog_*, api_fallback_stats (righe 7390-7471)",
+        "analytics_routes.py": "api_semantic_cache_*, api_tool_optimizer_*, api_quality_* (righe 6841-6960)",
+        "dashboard_routes.py": "dashboard_api_*, serve_html_*, api_get_dashboard_* (righe 9237-9395)",
+        "ui_routes.py": "index, ui_bootstrap_js, ui_main_js, api_status, api_ui_ping (righe 5376-5638)",
+        "bubble_routes.py": "api_bubble_*, api_set_model, device routes (righe 5797-6175)",
+        "legacy_routes.py": "get_entities_route, send_message_legacy, call_service_route (righe 8853-8912)",
+        "system_routes.py": "health, api_system_features, api_ha_logs (righe 8840-9000)",
+        "file_routes.py": "api_files_list, api_files_read (righe 9148-9236)",
+        "usage_routes.py": "usage_stats, usage_stats_today, usage_stats_reset (righe 9397-9436)"
+      }
+    },
+    "line_ranges": {
+      "imports_setup": "1-129",
+      "version_env": "130-199",
+      "settings": "200-416",
+      "logging": "418-499",
+      "system_prompt_agents": "501-572",
+      "utils_logging_request": "573-999",
+      "translations": "1000-1256",
+      "image_helpers": "1257-1324",
+      "model_management": "1325-1810",
+      "model_utils": "1812-1927",
+      "api_key_token": "1928-2141",
+      "ai_client_init": "2142-2241",
+      "ha_integration": "2242-2762",
+      "chat_provider_impl": "2766-3062",
+      "chat_response_processing": "3066-3562",
+      "streaming_core": "3563-5372",
+      "flask_routes_core": "5373-5632",
+      "bubble_management": "5639-5969",
+      "bubble_device_routes": "5969-6175",
+      "config_management_routes": "6175-6273",
+      "chat_routes": "6273-6447",
+      "mcp_routes": "6448-6841",
+      "analytics_routes": "6841-6960",
+      "scheduled_routes": "6961-7132",
+      "agent_routes": "7171-7390",
+      "catalog_fallback_routes": "7390-7472",
+      "voice_routes": "7472-7569",
+      "messaging_routes": "7569-7789",
+      "conversation_alexa": "7794-7974",
+      "conversation_history_snapshot": "8006-8479",
+      "nvidia_test_routes": "8524-8724",
+      "memory_routes": "8725-8840",
+      "legacy_ha_routes": "8853-8912",
+      "document_rag_routes": "8913-9148",
+      "filesystem_dashboard_routes": "9148-9396",
+      "usage_routes": "9397-9436",
+      "oauth_codex_routes": "9439-9497",
+      "oauth_copilot_routes": "9500-9545",
+      "session_storage_routes": "9548-9626",
+      "error_handlers_mcp_init": "9662-9751",
+      "config_fallback_routes": "9751-9914",
+      "settings_addon_routes": "9914-10067",
+      "main_entry_point": "10068-10340"
+    }
+  },
+
+  "progress": {
+    "last_completed_step": "commit_remaining_files",
+    "next_step": "phase_1_providers_P1",
+    "commit_after_each_phase": true
+  }
+}
