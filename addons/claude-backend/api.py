@@ -224,6 +224,8 @@ SUPERVISOR_TOKEN = os.getenv("SUPERVISOR_TOKEN", "") or os.getenv("HASSIO_TOKEN"
 
 # Custom system prompt override (can be set dynamically via API)
 CUSTOM_SYSTEM_PROMPT = None
+# Set when the active agent has a full system_prompt_override (replaces everything)
+AGENT_SYSTEM_PROMPT_OVERRIDE = None
 
 # Agent defaults (hardcoded, overridden by agents.json if present)
 AGENT_NAME = "Amira"
@@ -401,7 +403,7 @@ def load_agents_config() -> Optional[Dict]:
     All format parsing (canonical array, legacy dict, flat dict) is handled
     by AgentManager._parse_config() — no duplicate logic here.
     """
-    global AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS
+    global AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS, AGENT_SYSTEM_PROMPT_OVERRIDE
     if not AGENT_CONFIG_AVAILABLE:
         return None
     try:
@@ -411,7 +413,15 @@ def load_agents_config() -> Optional[Dict]:
         if active:
             AGENT_NAME = (active.identity.name or active.name or "Amira").strip()
             AGENT_AVATAR = (active.identity.emoji or "\U0001f916").strip()
-            AGENT_INSTRUCTIONS = (active.system_prompt_override or "").strip()
+            _override = (active.system_prompt_override or "").strip()
+            if _override:
+                # Full system prompt replacement — takes absolute priority over
+                # CUSTOM_SYSTEM_PROMPT and the default HA prompt.
+                AGENT_SYSTEM_PROMPT_OVERRIDE = _override
+                AGENT_INSTRUCTIONS = ""   # not used when full override is set
+            else:
+                AGENT_SYSTEM_PROMPT_OVERRIDE = None
+                AGENT_INSTRUCTIONS = ""
             try:
                 import tools as _tools_mod
                 _tools_mod.AI_SIGNATURE = AGENT_NAME

@@ -5898,11 +5898,23 @@ def _get_tool_tier() -> str:
 
 
 def get_system_prompt() -> str:
-    """Get system prompt appropriate for current provider."""
-    # If custom system prompt is set, use it directly
+    """Get system prompt appropriate for current provider.
+
+    Priority order:
+    1. Active agent's system_prompt_override  → replaces everything (full control)
+    2. Global CUSTOM_SYSTEM_PROMPT            → replaces the HA default
+    3. Agent persona block + HA default prompt
+    """
+    # Priority 1: active agent has a full system prompt override
+    agent_override = getattr(api, "AGENT_SYSTEM_PROMPT_OVERRIDE", None)
+    if agent_override:
+        return agent_override
+
+    # Priority 2: global custom system prompt
     if api.CUSTOM_SYSTEM_PROMPT is not None:
         return api.CUSTOM_SYSTEM_PROMPT
 
+    # Priority 3: optional agent persona block prepended to the HA default
     agent_instr = getattr(api, "AGENT_INSTRUCTIONS", "") or ""
     agent_block = ""
     if agent_instr.strip():
