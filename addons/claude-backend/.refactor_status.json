@@ -1,0 +1,94 @@
+{
+  "session": "charming-jolly-planck",
+  "date": "2026-03-15",
+  "completed_phases": [
+    {
+      "phase": 1,
+      "name": "core/translations.py",
+      "status": "completed",
+      "commit": "earlier"
+    },
+    {
+      "phase": 2,
+      "name": "core/image_helpers.py",
+      "status": "completed",
+      "commit": "earlier"
+    },
+    {
+      "phase": 3,
+      "name": "core/model_utils.py",
+      "status": "completed",
+      "commit": "earlier"
+    },
+    {
+      "phase": 4,
+      "name": "core/error_utils.py",
+      "status": "completed",
+      "commit": "earlier"
+    },
+    {
+      "phase": 5,
+      "name": "services/model_service.py",
+      "status": "completed",
+      "commit": "3e3edd3",
+      "description": "Model blocklist and NVIDIA caching functions"
+    },
+    {
+      "phase": 6,
+      "name": "services/settings_service.py",
+      "status": "completed",
+      "commit": "f83f47a",
+      "description": "Settings and runtime configuration management"
+    },
+    {
+      "phase": 7,
+      "name": "services/prompt_service.py",
+      "status": "completed",
+      "commit": "173c9e0",
+      "description": "Custom prompts and agent configuration"
+    },
+    {
+      "phase": 8,
+      "name": "routes/__init__.py",
+      "status": "completed",
+      "commit": "11e8d62",
+      "description": "Blueprint registration infrastructure"
+    },
+    {
+      "phase": 9,
+      "name": "routes/chat_routes.py",
+      "status": "completed",
+      "commit": "b1c7d56",
+      "description": "Chat routes blueprint"
+    },
+    {
+      "phase": 10,
+      "name": "Blueprint registration",
+      "status": "completed",
+      "commit": "f78e3a6",
+      "description": "Register blueprints in app startup"
+    }
+  ],
+  "api_py_stats": {
+    "original_lines": 10340,
+    "current_lines": "~9500",
+    "reduction": "~8%"
+  },
+  "next_phases": [
+    {
+      "phase": 11,
+      "name": "Agents routes blueprint",
+      "description": "Extract agent-related routes"
+    },
+    {
+      "phase": 12,
+      "name": "MCP routes blueprint",
+      "description": "Extract MCP-related routes"
+    },
+    {
+      "phase": 13,
+      "name": "Additional route blueprints",
+      "description": "Memory, documents, conversations, settings, etc."
+    }
+  ]
+}
