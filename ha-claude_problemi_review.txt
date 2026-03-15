@@ -32,6 +32,47 @@ Progetto: ha-claude
 - Riferimento file:
   addons/claude-backend/api.py (tool loop guard su update_automation)
 
+5) System Prompt agente personalizzato ignorato dall'IA (severità: alta)
+- Descrizione:
+  Quando si crea un agente personalizzato con un "System Prompt Personalizzato"
+  (campo system_prompt_override), il prompt non viene usato correttamente.
+  Ci sono due bug concatenati in tools.get_system_prompt():
+
+  BUG A (più grave): se l'utente ha impostato un CUSTOM_SYSTEM_PROMPT globale
+  (non-None), get_system_prompt() fa return immediato con quel valore, ignorando
+  completamente AGENT_INSTRUCTIONS impostato da load_agents_config().
+  La riga incriminata è:
+    if api.CUSTOM_SYSTEM_PROMPT is not None:
+        return api.CUSTOM_SYSTEM_PROMPT   ← early return, agente ignorato
+
+  BUG B: anche quando CUSTOM_SYSTEM_PROMPT è None, il system_prompt_override
+  dell'agente attivo viene solo preposto come un piccolo "persona block" al lungo
+  prompt HA di default, invece di sostituirlo completamente. Il campo si chiama
+  "override" ma si comporta come "prefix".
+
+- Impatto:
+  Il prompt personalizzato dell'agente non viene mai letto dall'IA.
+  L'agente risponde come se fosse il prompt HA generico.
+
+- Causa:
+  load_agents_config() salva system_prompt_override in AGENT_INSTRUCTIONS.
+  get_system_prompt() usa AGENT_INSTRUCTIONS solo come prefisso, e solo se
+  CUSTOM_SYSTEM_PROMPT è None.
+
+- Fix suggerito:
+  In get_system_prompt() applicare questa priorità:
+    1. system_prompt_override dell'agente attivo (se presente → return diretto)
+    2. CUSTOM_SYSTEM_PROMPT globale (se impostato → return diretto)
+    3. AGENT_INSTRUCTIONS come persona block + prompt HA di default
+
+  In load_agents_config() distinguere i due casi:
+    - se system_prompt_override → trattarlo come prompt completo (non persona block)
+    - se solo nome/avatar → comportamento attuale va bene
+
+- Riferimento file:
+  addons/claude-backend/tools.py (funzione get_system_prompt, riga ~5900)
+  addons/claude-backend/api.py (funzione load_agents_config, riga ~395-430)
+
 4) Listing helper con helper_type=counter troppo ampio (severità: bassa/UX)
 - Descrizione:
   In modalità list per counter vengono inclusi anche tutti gli input_number.*,
