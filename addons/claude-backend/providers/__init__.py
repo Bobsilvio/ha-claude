@@ -44,6 +44,7 @@ _PROVIDER_CLASSES = {
     "openai_codex": "providers.openai_codex:OpenAICodexProvider",
     "claude_web": "providers.claude_web:ClaudeWebProvider",
     "chatgpt_web": "providers.chatgpt_web:ChatGPTWebProvider",
+    "gemini_web": "providers.gemini_web:GeminiWebProvider",
 }
 
 

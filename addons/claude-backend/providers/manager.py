@@ -363,6 +363,7 @@ class ProviderManager:
             "openai_codex": "OPENAI_CODEX",
             "claude_web": "CLAUDE_WEB",
             "chatgpt_web": "CHATGPT_WEB",
+            "gemini_web": "GEMINI_WEB",
         }
         
         env_prefix = env_prefix_map.get(provider, provider.upper())
@@ -377,7 +378,7 @@ class ProviderManager:
             api_key = os.getenv("GITHUB_COPILOT_TOKEN", "")
         elif provider == "openai_codex":
             api_key = os.getenv("OPENAI_CODEX_TOKEN", "")
-        elif provider in ("claude_web", "chatgpt_web"):
+        elif provider in ("claude_web", "chatgpt_web", "gemini_web"):
             api_key = ""  # session-based, no API key
         else:
             api_key = os.getenv(f"{env_prefix}_API_KEY", "")

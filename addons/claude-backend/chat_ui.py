@@ -2821,6 +2821,43 @@ def get_chat_ui():
         <button id="chatgptWebDismissBtn" style="background:#c8f0e0;color:#0d5c3a;">Dismiss</button>
     </div>
 
+    <!-- Gemini Web session banners -->
+    <div id="geminiWebBanner" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:#e8f4fd;border-bottom:1px solid #b3d4f0;font-size:13px;">
+        <span>&#9888;&#65039; <strong>Gemini Web [UNSTABLE]</strong> &mdash; browser cookies required.</span>
+        <button id="geminiWebConnectBtn">Connect Gemini Web</button>
+    </div>
+    <div id="geminiWebConnectedBanner" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:#e8f8ed;border-bottom:1px solid #a8dbb5;font-size:13px;">
+        <span>&#10003; <strong>Gemini Web</strong> &mdash; <span id="geminiWebConnDetail">connected</span></span>
+        <button id="geminiWebDisconnectBtn" style="background:#fdecea;color:#c0392b;border:1px solid #f5b7b1;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:12px;">Disconnect</button>
+    </div>
+
+    <!-- Gemini Web modal -->
+    <div id="geminiWebModal" class="modal-overlay">
+        <div class="modal-box" style="max-width:480px;">
+            <h3>&#128273; Gemini Web &mdash; Connessione</h3>
+            <div class="modal-step">
+                <strong>Step 1 &mdash; Apri DevTools su gemini.google.com</strong>
+                <p style="margin:0 0 8px;font-size:12px;color:#666;">
+                    Fai login su <a href="https://gemini.google.com" target="_blank"><strong>gemini.google.com</strong></a>,
+                    poi premi <strong>F12</strong> &rarr; <em>Application</em> &rarr; <em>Cookies</em> &rarr; <em>gemini.google.com</em>
+                </p>
+            </div>
+            <div class="modal-step">
+                <strong>Step 2 &mdash; Copia il cookie __Secure-1PSID</strong>
+                <input type="password" id="geminiWebPsidInput" placeholder="__Secure-1PSID (inizia con g.a…)" style="width:100%;box-sizing:border-box;margin-top:6px;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:monospace;" />
+            </div>
+            <div class="modal-step">
+                <strong>Step 3 &mdash; Copia il cookie __Secure-1PSIDTS</strong>
+                <input type="password" id="geminiWebPsidtsInput" placeholder="__Secure-1PSIDTS" style="width:100%;box-sizing:border-box;margin-top:6px;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:monospace;" />
+            </div>
+            <div id="geminiWebStatus" style="min-height:18px;font-size:12px;margin:6px 0;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+                <button id="geminiWebModalCancelBtn" style="background:#eee;color:#333;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;">Annulla</button>
+                <button id="geminiWebModalConnectBtn" class="btn-primary">&#10004; Connetti</button>
+            </div>
+        </div>
+    </div>
+
     <div id="chatgptWebModal">
         <div class="chatgptweb-modal-box">
             <h3>&#128273; ChatGPT Web &mdash; Connessione</h3>
@@ -6794,7 +6831,7 @@ def get_chat_ui():
                                 addMessage('\u274c ' + evt.message, 'system');
                                 // If web session expired server-side, refresh banner immediately
                                 if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
-                                else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                                else if (currentProviderId === 'claude_web') checkClaudeWebSession(); else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
                             }} else if (evt.type === 'done') {{
                                 removeThinking();
 
@@ -7582,7 +7619,8 @@ def get_chat_ui():
             'github_copilot': '⚠️ GitHub Copilot (Web)',
             'openai_codex': '⚠️ OpenAI Codex (Web)',
             'claude_web': '⚠️ Claude.ai (Web)',
-            'chatgpt_web': '⚠️ ChatGPT (Web)'
+            'chatgpt_web': '⚠️ ChatGPT (Web)',
+            'gemini_web': '⚠️ Gemini (Web)'
         }};
 
         // Build the welcome provider/model line dynamically (always reflects current selection)
@@ -7720,7 +7758,7 @@ def get_chat_ui():
                     'deepseek', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
                     'dashscope', 'moonshot', 'zhipu',
                     // --- Web providers (always last) ---
-                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web'
+                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web', 'gemini_web'
                 ];
                 for (const p of availableProviders) {{
                     if (!providerOrder.includes(p)) providerOrder.push(p);
@@ -7943,6 +7981,8 @@ def get_chat_ui():
                         checkClaudeWebSession();
                     }} else if (parsed.provider === 'chatgpt_web') {{
                         checkChatGPTWebSession();
+                    }} else if (parsed.provider === 'gemini_web') {{
+                        checkGeminiWebSession();
                     }}
                 }}
             }} catch (error) {{
@@ -8388,6 +8428,79 @@ def get_chat_ui():
             }}
         }}
 
+        // ── Gemini Web session helpers ────────────────────────────────────────
+        async function checkGeminiWebSession() {{
+            try {{
+                const r = await fetch(apiUrl('api/session/gemini_web/status'));
+                const d = await r.json();
+                const banner = document.getElementById('geminiWebBanner');
+                const connBanner = document.getElementById('geminiWebConnectedBanner');
+                if (!banner) return;
+                if (d.configured) {{
+                    if (banner) banner.style.display = 'none';
+                    if (connBanner) {{
+                        connBanner.style.display = 'flex';
+                        const det = document.getElementById('geminiWebConnDetail');
+                        if (det) det.textContent = d.age_days ? `connesso (${{d.age_days}}g fa)` : 'connesso';
+                    }}
+                }} else {{
+                    if (connBanner) connBanner.style.display = 'none';
+                    banner.style.display = 'flex';
+                }}
+            }} catch (e) {{ /* ignore */ }}
+        }}
+
+        function openGeminiWebModal() {{
+            const statusEl = document.getElementById('geminiWebStatus');
+            const psidEl   = document.getElementById('geminiWebPsidInput');
+            const psidtsEl = document.getElementById('geminiWebPsidtsInput');
+            if (statusEl) {{ statusEl.className = ''; statusEl.textContent = ''; }}
+            if (psidEl)   psidEl.value = '';
+            if (psidtsEl) psidtsEl.value = '';
+            const modal = document.getElementById('geminiWebModal');
+            if (modal) modal.classList.add('open');
+        }}
+
+        function closeGeminiWebModal() {{
+            const modal = document.getElementById('geminiWebModal');
+            if (modal) modal.classList.remove('open');
+        }}
+
+        async function submitGeminiWebCookies() {{
+            const psidEl   = document.getElementById('geminiWebPsidInput');
+            const psidtsEl = document.getElementById('geminiWebPsidtsInput');
+            const statusEl = document.getElementById('geminiWebStatus');
+            const btn      = document.getElementById('geminiWebModalConnectBtn');
+            if (!psidEl || !psidtsEl || !statusEl || !btn) return;
+            const psid   = psidEl.value.trim();
+            const psidts = psidtsEl.value.trim();
+            if (!psid || !psidts) {{
+                statusEl.className = 'err';
+                statusEl.textContent = 'Incolla entrambi i cookie (__Secure-1PSID e __Secure-1PSIDTS).';
+                return;
+            }}
+            btn.disabled = true; btn.textContent = 'Connessione...';
+            statusEl.className = ''; statusEl.textContent = '';
+            try {{
+                const r = await fetch(apiUrl('api/session/gemini_web/store'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ psid, psidts }})
+                }});
+                const d = await r.json();
+                if (d.ok || d.psid) {{
+                    statusEl.className = 'ok'; statusEl.textContent = '\u2714 Cookie salvati e sessione validata!';
+                    setTimeout(() => {{ closeGeminiWebModal(); checkGeminiWebSession(); addMessage('\u2705 Gemini Web connesso.', 'system'); }}, 1400);
+                }} else {{
+                    throw new Error(d.error || 'Salvataggio fallito');
+                }}
+            }} catch (e) {{
+                statusEl.className = 'err'; statusEl.textContent = '\u26a0\ufe0f ' + (e.message || String(e));
+            }} finally {{
+                btn.disabled = false; btn.textContent = '\u2714 Connetti';
+            }}
+        }}
+
         // Load history on page load
         function bindCspSafeHandlers() {{
             try {{
@@ -8485,6 +8598,20 @@ def get_chat_ui():
                 }});
                 if (chatgptWebCancelBtn) chatgptWebCancelBtn.addEventListener('click', closeChatGPTWebModal);
                 if (chatgptWebSubmitBtn) chatgptWebSubmitBtn.addEventListener('click', submitChatGPTWebToken);
+
+                // Gemini Web session banner/modal bindings
+                const geminiWebConnectBtn  = document.getElementById('geminiWebConnectBtn');
+                const geminiWebDisconnBtn  = document.getElementById('geminiWebDisconnectBtn');
+                const geminiWebCancelBtn   = document.getElementById('geminiWebModalCancelBtn');
+                const geminiWebSubmitBtn   = document.getElementById('geminiWebModalConnectBtn');
+                if (geminiWebConnectBtn) geminiWebConnectBtn.addEventListener('click', openGeminiWebModal);
+                if (geminiWebDisconnBtn) geminiWebDisconnBtn.addEventListener('click', async () => {{
+                    await fetch(apiUrl('api/session/gemini_web/clear'), {{method:'POST'}});
+                    checkGeminiWebSession();
+                    addMessage('\u26a0\ufe0f Gemini Web disconnesso.', 'system');
+                }});
+                if (geminiWebCancelBtn) geminiWebCancelBtn.addEventListener('click', closeGeminiWebModal);
+                if (geminiWebSubmitBtn) geminiWebSubmitBtn.addEventListener('click', submitGeminiWebCookies);
 
                 // Messaging chat modal close
                 const msgModalCloseBtn = document.getElementById('msgModalCloseBtn');
@@ -8637,7 +8764,7 @@ def get_chat_ui():
                 // Poll session status every 30s for web providers so the banner reappears when token expires
                 setInterval(async () => {{
                     if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
-                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                    else if (currentProviderId === 'claude_web') checkClaudeWebSession(); else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
                 }}, 30000);
             }} catch (e) {{
                 const msg = (e && e.message) ? e.message : String(e);

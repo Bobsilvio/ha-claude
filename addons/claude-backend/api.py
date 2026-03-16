@@ -649,6 +649,7 @@ PROVIDER_DEFAULTS = {
     "openai_codex": {"model": "gpt-5.3-codex", "name": "OpenAI Codex (OAuth)"},
     "claude_web": {"model": "claude-opus-4-6", "name": "Claude.ai Web ⚠️ [UNSTABLE]"},
     "chatgpt_web": {"model": "gpt-4o", "name": "ChatGPT Web ⚠️ [UNSTABLE]"},
+    "gemini_web": {"model": "gemini-2.0-flash", "name": "Gemini Web ⚠️ [UNSTABLE]"},
 }
 
 
@@ -1000,6 +1001,8 @@ def get_api_key() -> str:
         return ""
     elif AI_PROVIDER == "chatgpt_web":
         return ""
+    elif AI_PROVIDER == "gemini_web":
+        return ""
     return ""
 
 
@@ -1257,6 +1260,12 @@ def initialize_ai_client():
                 logger.info(f"chatgpt_web provider ready via session token (model: {get_active_model()})")
             else:
                 logger.info("chatgpt_web selected — authenticate via the 🔑 button in the UI")
+        elif AI_PROVIDER == "gemini_web":
+            _session_file = "/data/session_gemini_web.json"
+            if os.path.isfile(_session_file):
+                logger.info(f"gemini_web provider ready via session cookies (model: {get_active_model()})")
+            else:
+                logger.info("gemini_web selected — authenticate via the 🔑 button in the UI")
         else:
             logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
         ai_client = None
@@ -3368,7 +3377,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
             # For no-tool providers (claude_web, chatgpt_web, github_copilot, openai_codex):
             # buffer the full response so we can run the tool simulator on it after done.
-            _NO_TOOL_PROVIDERS = {"claude_web", "chatgpt_web", "github_copilot", "openai_codex"}
+            _NO_TOOL_PROVIDERS = {"claude_web", "chatgpt_web", "gemini_web", "github_copilot", "openai_codex"}
             # Some models on native-tool providers also use the XML simulator
             # (e.g. Kimi K2 on Groq — emits text instead of tool_call deltas).
             _NO_NATIVE_TOOL_MODELS = {
@@ -4590,6 +4599,7 @@ _PROVIDER_SDK_MAP = {
     "openai_codex": None,
     "claude_web": None,
     "chatgpt_web": None,
+    "gemini_web": None,
 }
 
 def _check_optional_sdks() -> dict:
@@ -5485,381 +5495,10 @@ def _load_mcp_config_servers() -> Dict[str, Dict[str, Any]]:
     return {str(k): v for k, v in raw_cfg.items() if isinstance(v, dict)}
 
 
-@app.route('/api/mcp/servers', methods=['GET'])
-def api_mcp_servers_list():
-    """List all configured MCP servers and their connection status."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        manager = mcp.get_mcp_manager()
-        configured = _load_mcp_config_servers()
-        autostart_set = set(_load_mcp_runtime_state().get("autostart_servers", []))
-
-        # Include every configured server (even if not started yet)
-        servers = []
-        for name, cfg in configured.items():
-            running_server = manager.servers.get(name)
-            running = bool(running_server and running_server.is_connected())
-            tools = list(running_server.tools.keys()) if running_server and running else []
-            transport = "http" if cfg.get("url") else cfg.get("transport", "stdio")
-            servers.append({
-                "name": name,
-                "configured": True,
-                "running": running,
-                "connected": running,  # backward compatibility
-                "state": "running" if running else "stopped",
-                "transport": transport,
-                "autostart": name in autostart_set,
-                "tools_count": len(tools),
-                "tools": tools,
-            })
-
-        # Also include any currently-registered server not present in config file
-        for name, server in manager.servers.items():
-            if name in configured:
-                continue
-            running = server.is_connected()
-            tools = list(server.tools.keys()) if running else []
-            servers.append({
-                "name": name,
-                "configured": False,
-                "running": running,
-                "connected": running,
-                "state": "running" if running else "stopped",
-                "transport": server.transport_type,
-                "autostart": name in autostart_set,
-                "tools_count": len(tools),
-                "tools": tools,
-            })
-        
-        return jsonify({
-            "status": "success",
-            "servers": servers,
-            "total_servers": len(servers),
-        }), 200
-    except Exception as e:
-        logger.error(f"MCP list servers error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/server/<server_name>/status', methods=['GET'])
-def api_mcp_server_status(server_name):
-    """Get status of a specific MCP server."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        manager = mcp.get_mcp_manager()
-        if server_name not in manager.servers:
-            return jsonify({
-                "status": "error",
-                "message": f"Server '{server_name}' not found"
-            }), 404
-        
-        server = manager.servers[server_name]
-        return jsonify({
-            "status": "success",
-            "server_name": server_name,
-            "connected": server.is_connected(),
-            "transport": server.transport_type,
-            "tools": {name: {"description": tool.get("description", "")} 
-                     for name, tool in server.tools.items()},
-            "tools_count": len(server.tools),
-        }), 200
-    except Exception as e:
-        logger.error(f"MCP server status error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/server/<server_name>/reconnect', methods=['POST'])
-def api_mcp_server_reconnect(server_name):
-    """Reconnect to a specific MCP server."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        manager = mcp.get_mcp_manager()
-        if server_name not in manager.servers:
-            return jsonify({
-                "status": "error",
-                "message": f"Server '{server_name}' not found"
-            }), 404
-        
-        server = manager.servers[server_name]
-        server.disconnect()
-        server.connect()
-        
-        return jsonify({
-            "status": "success",
-            "message": f"Reconnected to '{server_name}'",
-            "connected": server.is_connected(),
-            "tools_count": len(server.tools),
-        }), 200
-    except Exception as e:
-        logger.error(f"MCP server reconnect error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/server/<server_name>/start', methods=['POST'])
-def api_mcp_server_start(server_name):
-    """Start a specific MCP server from the saved config file (no addon restart needed)."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({"status": "error", "message": "MCP support not available"}), 501
-
-        raw_cfg = _load_mcp_config_servers()
-        if not raw_cfg:
-            return jsonify({"status": "error", "message": "MCP config file not found"}), 404
-
-        if server_name not in raw_cfg:
-            return jsonify({"status": "error", "message": f"Server '{server_name}' not in config"}), 404
-
-        n = mcp.initialize_mcp_servers({server_name: raw_cfg[server_name]})
-        manager = mcp.get_mcp_manager()
-        server = manager.servers.get(server_name)
-        if n > 0 and server:
-            _set_mcp_server_autostart(server_name, True)
-            return jsonify({
-                "status": "success",
-                "connected": True,
-                "running": True,
-                "autostart": True,
-                "tools_count": len(server.tools),
-                "message": f"Server '{server_name}' avviato con {len(server.tools)} tool"
-            }), 200
-        else:
-            return jsonify({"status": "error", "message": f"Impossibile connettersi a '{server_name}'"}), 500
-    except Exception as e:
-        logger.error(f"MCP server start error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/server/<server_name>/stop', methods=['POST'])
-def api_mcp_server_stop(server_name):
-    """Stop a specific MCP server and disable its autostart flag."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({"status": "error", "message": "MCP support not available"}), 501
-
-        manager = mcp.get_mcp_manager()
-        removed = manager.remove_server(server_name)
-        _set_mcp_server_autostart(server_name, False)
-
-        if removed:
-            return jsonify({
-                "status": "success",
-                "running": False,
-                "autostart": False,
-                "message": f"Server '{server_name}' fermato"
-            }), 200
-
-        # Not running is still a valid "stopped" target state.
-        return jsonify({
-            "status": "success",
-            "running": False,
-            "autostart": False,
-            "message": f"Server '{server_name}' era già fermo"
-        }), 200
-    except Exception as e:
-        logger.error(f"MCP server stop error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/tools', methods=['GET'])
-def api_mcp_all_tools():
-    """List all available tools from all connected MCP servers."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        manager = mcp.get_mcp_manager()
-        all_tools = manager.get_all_tools()
-        
-        tools_by_server = {}
-        for tool_name, tool_info in all_tools.items():
-            server_name = tool_info.get("server", "unknown")
-            if server_name not in tools_by_server:
-                tools_by_server[server_name] = []
-            tools_by_server[server_name].append({
-                "name": tool_name,
-                "tool_name": tool_info.get("tool_name", ""),
-                "description": tool_info.get("description", ""),
-            })
-        
-        return jsonify({
-            "status": "success",
-            "tools": all_tools,
-            "tools_by_server": tools_by_server,
-            "total_tools": len(all_tools),
-        }), 200
-    except Exception as e:
-        logger.error(f"MCP all tools error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/diagnostics', methods=['GET'])
-def api_mcp_diagnostics():
-    """Get detailed diagnostics for all MCP servers."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        manager = mcp.get_mcp_manager()
-        diagnostics = {
-            "timestamp": datetime.now().isoformat(),
-            "servers": {},
-            "stats": manager.stats() if hasattr(manager, 'stats') else {},
-        }
-        
-        for name, server in manager.servers.items():
-            server_diag = {
-                "name": name,
-                "connected": server.is_connected(),
-                "transport": server.transport_type,
-                "tools_count": len(server.tools),
-                "tools": list(server.tools.keys()),
-                "config": {
-                    "transport": server.transport_type,
-                    "command": server.config.get("command", "") if server.transport_type == "stdio" else "",
-                    "url": server.config.get("url", "") if server.transport_type == "http" else "",
-                }
-            }
-            diagnostics["servers"][name] = server_diag
-        
-        return jsonify(diagnostics), 200
-    except Exception as e:
-        logger.error(f"MCP diagnostics error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/test/<server_name>/<tool_name>', methods=['POST'])
-def api_mcp_test_tool(server_name, tool_name):
-    """Test a specific MCP tool with provided arguments."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        data = request.get_json() or {}
-        arguments = data.get("arguments", {})
-        
-        manager = mcp.get_mcp_manager()
-        if server_name not in manager.servers:
-            return jsonify({
-                "status": "error",
-                "message": f"Server '{server_name}' not found"
-            }), 404
-        
-        server = manager.servers[server_name]
-        if not server.is_connected():
-            return jsonify({
-                "status": "error",
-                "message": f"Server '{server_name}' is not connected"
-            }), 503
-        
-        # Execute tool and measure time
-        start_time = time.time()
-        try:
-            result = server.call_tool(tool_name, arguments)
-            elapsed = time.time() - start_time
-            
-            # Parse result if it's JSON
-            try:
-                result_obj = json.loads(result) if isinstance(result, str) else result
-            except (json.JSONDecodeError, TypeError):
-                result_obj = {"result": result}
-            
-            return jsonify({
-                "status": "success",
-                "server": server_name,
-                "tool": tool_name,
-                "arguments": arguments,
-                "result": result_obj,
-                "execution_time_ms": round(elapsed * 1000, 2),
-            }), 200
-        except Exception as e:
-            elapsed = time.time() - start_time
-            return jsonify({
-                "status": "error",
-                "server": server_name,
-                "tool": tool_name,
-                "error": str(e),
-                "execution_time_ms": round(elapsed * 1000, 2),
-            }), 500
-    except Exception as e:
-        logger.error(f"MCP test tool error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-
-@app.route('/api/mcp/install', methods=['POST'])
-def api_mcp_install():
-    """Install pip packages for MCP servers (called manually from UI)."""
-    try:
-        data = request.get_json() or {}
-        packages = data.get("packages", [])
-        if not packages:
-            return jsonify({"success": False, "output": "Nessun pacchetto specificato."}), 400
-        result = mcp.pip_install_packages(packages)
-        return jsonify(result), 200
-    except Exception as e:
-        return jsonify({"success": False, "output": f"Errore: {e}"}), 500
-
-
-@app.route('/api/mcp/server/<server_name>/tools', methods=['GET'])
-def api_mcp_server_tools(server_name):
-    """Get tools for a specific MCP server."""
-    try:
-        if not MCP_AVAILABLE:
-            return jsonify({
-                "status": "error",
-                "message": "MCP support not available"
-            }), 501
-        
-        manager = mcp.get_mcp_manager()
-        if server_name not in manager.servers:
-            return jsonify({
-                "status": "error",
-                "message": f"Server '{server_name}' not found"
-            }), 404
-        
-        server = manager.servers[server_name]
-        tools_list = []
-        
-        for tool_name, tool_info in server.tools.items():
-            tools_list.append({
-                "name": tool_name,
-                "description": tool_info.get("description", ""),
-                "inputSchema": tool_info.get("inputSchema", {}),
-            })
-        
-        return jsonify({
-            "status": "success",
-            "server": server_name,
-            "connected": server.is_connected(),
-            "tools": tools_list,
-            "total_tools": len(tools_list),
-        }), 200
-    except Exception as e:
-        logger.error(f"MCP server tools error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
+# moved to routes/mcp_routes.py: api_mcp_servers_list, api_mcp_server_status,
+# api_mcp_server_reconnect, api_mcp_server_start, api_mcp_server_stop,
+# api_mcp_all_tools, api_mcp_diagnostics, api_mcp_test_tool,
+# api_mcp_install, api_mcp_server_tools
 
 
 # ============ Nanobot-Inspired Features Endpoints ============
@@ -6046,226 +5685,9 @@ def api_scheduler_agent_clear_session(session_id):
 
 # ============ Agent / Catalog / Fallback Endpoints ============
 
-@app.route('/api/agents', methods=['GET'])
-def api_agents_list():
-    """List all agents with their configuration."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        mgr = agent_config.get_agent_manager()
-        include_disabled = request.args.get("include_disabled", "false").lower() == "true"
-        agents = mgr.get_agents_for_api() if not include_disabled else [
-            a.to_dict() for a in mgr.list_agents(include_disabled=True)
-        ]
-        active = mgr.get_active_agent()
-        return jsonify({
-            "success": True,
-            "agents": agents,
-            "active_agent": active.id if active else None,
-            "stats": mgr.stats(),
-        }), 200
-    except Exception as e:
-        logger.error(f"api_agents_list error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents', methods=['POST'])
-def api_agents_create():
-    """Create a new agent."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        data = request.get_json() or {}
-        if not data.get("id"):
-            return jsonify({"success": False, "error": "Agent 'id' is required"}), 400
-        entry = agent_config.AgentEntry.from_dict(data)
-        mgr = agent_config.get_agent_manager()
-        mgr.add_agent(entry)
-        mgr.save_config()
-        return jsonify({"success": True, "agent": entry.to_dict()}), 201
-    except Exception as e:
-        logger.error(f"api_agents_create error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/<agent_id>', methods=['GET'])
-def api_agent_get(agent_id):
-    """Get a single agent by ID."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        mgr = agent_config.get_agent_manager()
-        agent = mgr.get_agent(agent_id)
-        if not agent:
-            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found"}), 404
-        return jsonify({"success": True, "agent": agent.to_dict()}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/<agent_id>', methods=['PUT'])
-def api_agent_update(agent_id):
-    """Update an existing agent."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        data = request.get_json() or {}
-        mgr = agent_config.get_agent_manager()
-        updated = mgr.update_agent(agent_id, data)
-        if not updated:
-            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found"}), 404
-        mgr.save_config()
-        return jsonify({"success": True, "agent": updated.to_dict()}), 200
-    except Exception as e:
-        logger.error(f"api_agent_update error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/<agent_id>', methods=['DELETE'])
-def api_agent_delete(agent_id):
-    """Delete an agent."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        mgr = agent_config.get_agent_manager()
-        if not mgr.remove_agent(agent_id):
-            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found"}), 404
-        mgr.save_config()
-        return jsonify({"success": True, "message": f"Agent '{agent_id}' deleted"}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/set', methods=['POST'])
-def api_agent_set_active():
-    """Switch the active agent."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        data = request.get_json() or {}
-        agent_id = (data.get("agent_id") or "").strip()
-        if not agent_id:
-            return jsonify({"success": False, "error": "agent_id is required"}), 400
-        mgr = agent_config.get_agent_manager()
-        if not mgr.set_active_agent(agent_id):
-            return jsonify({"success": False, "error": f"Agent '{agent_id}' not found or disabled"}), 404
-
-        # Sync AGENT_SYSTEM_PROMPT_OVERRIDE and other globals immediately
-        _sync_active_agent_globals()
-
-        # If agent has a configured model, apply it as the active model
-        # (user can still override via the cascade dropdowns)
-        agent = mgr.resolve_agent(agent_id)
-        if agent and agent.model_config.primary:
-            global AI_PROVIDER, AI_MODEL, SELECTED_MODEL, SELECTED_PROVIDER
-            ref = agent.model_config.primary
-            AI_PROVIDER = ref.provider
-            AI_MODEL = ref.model
-            SELECTED_PROVIDER = ref.provider
-            SELECTED_MODEL = ref.model
-            try:
-                save_runtime_selection(AI_PROVIDER, AI_MODEL)
-                initialize_ai_client()
-            except Exception:
-                pass
-            logger.info(f"Agent '{agent_id}' activated → model {ref.provider}/{ref.model}")
-
-        identity = mgr.resolve_identity(agent_id)
-        return jsonify({
-            "success": True,
-            "agent_id": agent_id,
-            "identity": {"name": identity.name, "emoji": identity.emoji},
-            "provider": AI_PROVIDER,
-            "model": AI_MODEL,
-        }), 200
-    except Exception as e:
-        logger.error(f"api_agent_set_active error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/channels', methods=['GET'])
-def api_agent_channels_get():
-    """Get channel → agent assignments (telegram, whatsapp, alexa…)."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        mgr = agent_config.get_agent_manager()
-        mapping = mgr.get_all_channel_agents()
-        # Enrich with agent identity for the UI
-        enriched = {}
-        for ch, aid in mapping.items():
-            identity = mgr.resolve_identity(aid)
-            enriched[ch] = {
-                "agent_id": aid,
-                "name": identity.name,
-                "emoji": identity.emoji,
-            }
-        return jsonify({
-            "success": True,
-            "channel_agents": enriched,
-            "available_channels": ["telegram", "whatsapp", "alexa"],
-        }), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/channels', methods=['PUT'])
-def api_agent_channels_set():
-    """Set channel → agent assignments.
-
-    Body: {"telegram": "agent_id_or_null", "whatsapp": "agent_id_or_null"}
-    Pass null/empty string to remove the assignment for a channel.
-    """
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        data = request.get_json() or {}
-        mgr = agent_config.get_agent_manager()
-        errors = []
-        for channel, agent_id in data.items():
-            channel = str(channel).strip().lower()
-            if not channel:
-                continue
-            aid = str(agent_id).strip() if agent_id else None
-            if not mgr.set_channel_agent(channel, aid or None):
-                errors.append(f"Agent '{aid}' not found or disabled for channel '{channel}'")
-        mgr.save_config()
-        mapping = mgr.get_all_channel_agents()
-        resp = {"success": True, "channel_agents": mapping}
-        if errors:
-            resp["warnings"] = errors
-        return jsonify(resp), 200
-    except Exception as e:
-        logger.error(f"api_agent_channels_set error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/defaults', methods=['GET'])
-def api_agent_defaults_get():
-    """Get global agent defaults."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        mgr = agent_config.get_agent_manager()
-        return jsonify({"success": True, "defaults": mgr.get_defaults().to_dict()}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-
-@app.route('/api/agents/defaults', methods=['PUT'])
-def api_agent_defaults_update():
-    """Update global agent defaults."""
-    if not AGENT_CONFIG_AVAILABLE:
-        return jsonify({"success": False, "error": "Agent system not available"}), 501
-    try:
-        data = request.get_json() or {}
-        mgr = agent_config.get_agent_manager()
-        updated = mgr.update_defaults(data)
-        mgr.save_config()
-        return jsonify({"success": True, "defaults": updated.to_dict()}), 200
-    except Exception as e:
-        logger.error(f"api_agent_defaults_update error: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+# moved to routes/agents_routes.py: api_agents_list, api_agents_create, api_agent_get,
+# api_agent_update, api_agent_delete, api_agent_set_active, api_agent_channels_get,
+# api_agent_channels_set, api_agent_defaults_get, api_agent_defaults_update
 
 
 # moved to routes/catalog_routes.py: api_catalog_stats, api_catalog_models
@@ -6682,135 +6104,13 @@ def api_alexa_webhook():
 # moved to routes/system_routes.py: api_system_features
 
 
-@app.route('/api/mcp/conversations/<session_id>/messages', methods=['GET'])
-def api_conversation_messages(session_id):
-    """Get all messages for a conversation session."""
-    msgs = conversations.get(session_id, [])
-    # Return only user/assistant text messages for UI display (filter empty content)
-    display_msgs = []
-    for m in msgs:
-        content = m.get("content", "")
-        # Skip messages with empty content or only whitespace
-        if m.get("role") in ("user", "assistant") and isinstance(content, str) and content.strip():
-            # Strip [CONTEXT: ...] blocks from user messages
-            if m.get("role") == "user":
-                content = _strip_context_blocks(content)
-                if not content.strip():
-                    continue
-            msg_data = {"role": m["role"], "content": content}
-            # Include model/provider/usage info for assistant messages
-            if m.get("role") == "assistant":
-                if "model" in m:
-                    msg_data["model"] = m["model"]
-                if "provider" in m:
-                    msg_data["provider"] = m["provider"]
-                if "usage" in m:
-                    msg_data["usage"] = m["usage"]
-            display_msgs.append(msg_data)
-    return jsonify({"session_id": session_id, "messages": display_msgs}), 200
+# moved to routes/mcp_routes.py: api_conversation_messages
 
 
-@app.route('/api/conversations', methods=['GET'])
-def api_conversations_list():
-    """List all conversation sessions with metadata.
-    Optional query param ?source=card|bubble|chat to filter by source."""
-    source_filter = request.args.get("source", "").strip().lower()
-    result = []
-    for sid, msgs in conversations.items():
-        if not msgs:
-            continue
-        # Exclude messaging sessions — they have their own dedicated UI section
-        if sid.startswith(("whatsapp_", "telegram_")):
-            continue
-        # Extract first user message as title (strip [CONTEXT: ...] blocks)
-        title = "Nuova conversazione"
-        for msg in msgs:
-            if msg.get("role") == "user":
-                content = msg.get("content", "")
-                if isinstance(content, str):
-                    clean = _strip_context_blocks(content)
-                    if clean:
-                        title = clean[:50] + ("..." if len(clean) > 50 else "")
-                    break
-        # Determine source: bubble_, card_ or chat
-        source = "bubble" if sid.startswith("bubble_") else ("card" if sid.startswith("card_") else "chat")
-
-        # Extract timestamp for sorting/date grouping
-        if source in ("bubble", "card") and "_" in sid:
-            # Parse bubble session_id: bubble_<base36_timestamp>_<random>
-            try:
-                parts = sid.split("_")
-                if len(parts) >= 2:
-                    timestamp_b36 = parts[1]
-                    last_updated = int(timestamp_b36, 36)  # Decode base36 timestamp
-                else:
-                    last_updated = sid
-            except:
-                last_updated = sid
-        else:
-            # For chat: ID is typically a numeric timestamp
-            try:
-                last_updated = int(sid) if sid.isdigit() else sid
-            except:
-                last_updated = sid if msgs else 0
-        
-        # Apply source filter if requested
-        if source_filter and source != source_filter:
-            continue
-        result.append({
-            "id": sid,
-            "title": title,
-            "message_count": len(msgs),
-            "last_updated": last_updated,
-            "source": source
-        })
-    # Sort by last_updated descending
-    result.sort(key=lambda x: (x["last_updated"] if isinstance(x["last_updated"], (int, float)) else 0), reverse=True)
-    return jsonify({"conversations": result[:MAX_CONVERSATIONS]}), 200
+# moved to routes/conversation_routes.py: api_conversations_list
 
 
-@app.route('/api/snapshots', methods=['GET'])
-def api_snapshots_list():
-    """List all file snapshots (backups) created by Amira."""
-    if not os.path.isdir(SNAPSHOTS_DIR):
-        return jsonify({"snapshots": []}), 200
-    
-    snapshots = []
-    for filename in os.listdir(SNAPSHOTS_DIR):
-        if filename.endswith(".meta"):
-            continue
-        meta_path = os.path.join(SNAPSHOTS_DIR, filename + ".meta")
-        if os.path.isfile(meta_path):
-            try:
-                with open(meta_path, "r") as f:
-                    meta = json.load(f)
-                # Parse timestamp from snapshot_id: YYYYMMDD_HHMMSS_filename
-                ts_str = meta.get("timestamp", "")
-                try:
-                    ts_dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
-                    formatted_date = ts_dt.strftime("%d/%m/%Y %H:%M:%S")
-                    sort_key = ts_dt.timestamp()
-                except:
-                    formatted_date = ts_str
-                    sort_key = 0
-                snapshots.append({
-                    "id": meta.get("snapshot_id", filename),
-                    "original_file": meta.get("original_file", filename),
-                    "timestamp": ts_str,
-                    "formatted_date": formatted_date,
-                    "size": meta.get("size", 0),
-                    "sort_key": sort_key
-                })
-            except Exception as e:
-                logger.debug(f"Error reading snapshot meta {filename}: {e}")
-    
-    # Sort by timestamp descending (newest first)
-    snapshots.sort(key=lambda x: x.get("sort_key", 0), reverse=True)
-    # Remove sort_key from output
-    for s in snapshots:
-        s.pop("sort_key", None)
-    
-    return jsonify({"snapshots": snapshots}), 200
+# moved to routes/conversation_routes.py: api_snapshots_list
 
 
 def _is_tool_call_artifact(content: str, msg: dict) -> bool:
@@ -6850,157 +6150,15 @@ def _is_tool_call_artifact(content: str, msg: dict) -> bool:
     return False
 
 
-@app.route('/api/conversations/<session_id>', methods=['GET'])
-def api_conversation_get(session_id):
-    """Get a specific conversation session."""
-    if session_id in conversations:
-        # Filter to only return displayable messages (user/assistant with non-empty string content)
-        msgs = conversations.get(session_id, [])
-        display_msgs = []
-        for m in msgs:
-            role = m.get("role", "")
-            content = m.get("content", "")
-            # For multimodal messages, extract text content
-            if isinstance(content, list):
-                # Extract text from content blocks (Anthropic format: [{type:text, text:...}])
-                text_parts = []
-                for block in content:
-                    if isinstance(block, dict):
-                        if block.get("type") == "text":
-                            text_parts.append(block.get("text", ""))
-                        elif isinstance(block.get("text"), str):
-                            text_parts.append(block["text"])
-                        # Skip tool_use / tool_result blocks — not user-facing
-                content = "\n".join(text_parts) if text_parts else ""
-
-            if role in ("user", "assistant") and isinstance(content, str) and content.strip():
-                # Skip internal tool-call artifact messages
-                if role == "assistant" and _is_tool_call_artifact(content, m):
-                    continue
-                # Strip [CONTEXT: ...] blocks from user messages for clean display
-                if role == "user":
-                    content = _strip_context_blocks(content)
-                    if not content.strip():
-                        continue
-                msg_data = {"role": role, "content": content}
-                # Include model/provider metadata for assistant messages
-                if role == "assistant":
-                    if m.get("model"):
-                        msg_data["model"] = m["model"]
-                    if m.get("provider"):
-                        msg_data["provider"] = m["provider"]
-                display_msgs.append(msg_data)
-        return jsonify({"session_id": session_id, "messages": display_msgs}), 200
-    return jsonify({"error": "Conversation not found"}), 404
-
-
-@app.route('/api/conversations/<session_id>', methods=['DELETE'])
-def api_conversation_delete(session_id):
-    """Clear a conversation session."""
-    if session_id in conversations:
-        del conversations[session_id]
-        save_conversations()
-    session_last_intent.pop(session_id, None)
-    return jsonify({"status": "ok", "message": f"Session '{session_id}' cleared."}), 200
+# moved to routes/conversation_routes.py: api_conversation_get, api_conversation_delete
 
 # moved to routes/catalog_routes.py: api_get_models
 
 
-@app.route('/api/snapshots/restore', methods=['POST'])
-def api_snapshots_restore():
-    """Restore a snapshot created by the add-on (undo).
-
-    The frontend uses this to provide a one-click "Ripristina backup" under write-tool messages.
-    """
-    try:
-        data = request.get_json(force=True, silent=True) or {}
-        snapshot_id = (data.get("snapshot_id") or "").strip()
-        if not snapshot_id:
-            return jsonify({"error": "snapshot_id is required"}), 400
-
-        raw = tools.execute_tool("restore_snapshot", {"snapshot_id": snapshot_id, "reload": True})
-        try:
-            result = json.loads(raw) if isinstance(raw, str) else {"status": "success", "result": raw}
-        except Exception:
-            result = {"error": raw}
-
-        if isinstance(result, dict) and result.get("status") == "success":
-            return jsonify(result), 200
-        return jsonify(result if isinstance(result, dict) else {"error": str(result)}), 400
-    except Exception as e:
-        logger.error(f"Snapshot restore error: {e}")
-        return jsonify({"error": str(e)}), 500
+# moved to routes/conversation_routes.py: api_snapshots_restore, api_delete_snapshot
 
 
-@app.route('/api/snapshots/<snapshot_id>', methods=['DELETE'])
-def api_delete_snapshot(snapshot_id):
-    """Delete a specific snapshot (backup file + metadata)."""
-    try:
-        if not snapshot_id or ".." in snapshot_id or "/" in snapshot_id:
-            return jsonify({"error": "Invalid snapshot_id"}), 400
-
-        snap_path = os.path.join(SNAPSHOTS_DIR, snapshot_id)
-        meta_path = snap_path + ".meta"
-        deleted = False
-        if os.path.isfile(snap_path):
-            os.remove(snap_path)
-            deleted = True
-        if os.path.isfile(meta_path):
-            os.remove(meta_path)
-            deleted = True
-
-        if deleted:
-            logger.info(f"Snapshot deleted: {snapshot_id}")
-            return jsonify({"status": "success", "message": f"Snapshot '{snapshot_id}' deleted"}), 200
-        return jsonify({"error": f"Snapshot '{snapshot_id}' not found"}), 404
-    except Exception as e:
-        logger.error(f"Snapshot delete error: {e}")
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route('/api/snapshots/<snapshot_id>/download', methods=['GET'])
-def api_download_snapshot(snapshot_id):
-    """Download a backup snapshot file."""
-    try:
-        if not snapshot_id or ".." in snapshot_id or "/" in snapshot_id:
-            return jsonify({"error": "Invalid snapshot_id"}), 400
-
-        snap_path = os.path.join(SNAPSHOTS_DIR, snapshot_id)
-        meta_path = snap_path + ".meta"
-        
-        if not os.path.isfile(snap_path):
-            return jsonify({"error": f"Snapshot '{snapshot_id}' not found"}), 404
-
-        # Read metadata to get original filename
-        original_filename = snapshot_id  # default fallback
-        if os.path.isfile(meta_path):
-            try:
-                with open(meta_path, "r") as f:
-                    meta = json.load(f)
-                    original_filename = meta.get("original_file", snapshot_id)
-                    timestamp = meta.get("timestamp", "")
-            except Exception:
-                pass
-
-        # Generate download filename: original_name.YYYYMMDD_HHMMSS.ext
-        # E.g.: automations.20260220_143022.yaml
-        base_name = os.path.basename(original_filename)
-        if "." in base_name:
-            name_parts = base_name.rsplit(".", 1)
-            dl_filename = f"{name_parts[0]}.{timestamp}.{name_parts[1]}"
-        else:
-            dl_filename = f"{base_name}.{timestamp}"
-
-        logger.info(f"Snapshot download: {snapshot_id} as {dl_filename}")
-        return send_file(
-            snap_path,
-            as_attachment=True,
-            download_name=dl_filename,
-            mimetype="application/octet-stream"
-        )
-    except Exception as e:
-        logger.error(f"Snapshot download error: {e}")
-        return jsonify({"error": str(e)}), 500
+# moved to routes/conversation_routes.py: api_download_snapshot
 
 
 @app.route('/api/nvidia/test_model', methods=['POST'])
@@ -7649,6 +6807,47 @@ def session_chatgpt_web_clear():
         return jsonify({"error": str(e)}), 400
 
 
+# ---------------------------------------------------------------------------
+# Gemini Web session endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/session/gemini_web/store", methods=["POST"])
+def session_gemini_web_store():
+    """Store Gemini Web session cookies (__Secure-1PSID and __Secure-1PSIDTS)."""
+    try:
+        from providers.gemini_web import store_session
+        data = request.json or {}
+        psid   = data.get("psid", "").strip()
+        psidts = data.get("psidts", "").strip()
+        if not psid or not psidts:
+            return jsonify({"error": "Missing psid or psidts"}), 400
+        result = store_session(psid, psidts)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Gemini Web session store error: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/session/gemini_web/status", methods=["GET"])
+def session_gemini_web_status():
+    """Return Gemini Web session status."""
+    try:
+        from providers.gemini_web import get_session_status
+        return jsonify(get_session_status()), 200
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)}), 200
+
+
+@app.route("/api/session/gemini_web/clear", methods=["POST"])
+def session_gemini_web_clear():
+    """Clear stored Gemini Web session."""
+    try:
+        from providers.gemini_web import clear_session
+        clear_session()
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 def start_messaging_bots() -> None:
     """Initialize and start Telegram and WhatsApp bots if configured.
     Called from server.py so it runs regardless of __name__.
@@ -8086,7 +7285,7 @@ register_blueprints(app)
 
 if __name__ == "__main__":
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
-    _OAUTH_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web"}
+    _OAUTH_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web", "gemini_web"}
     if AI_PROVIDER in _OAUTH_PROVIDERS:
         logger.info("API Key: OAuth-based (use 🔑 button in UI)")
     else:
