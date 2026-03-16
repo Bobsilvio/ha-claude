@@ -249,6 +249,20 @@ for _msg_key in ("TELEGRAM_BOT_TOKEN", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN"
 # Per-channel enable/disable toggle (config.yaml: enable_telegram / enable_whatsapp)
 ENABLE_TELEGRAM = os.getenv("ENABLE_TELEGRAM", "true").lower() not in ("false", "0", "no")
 ENABLE_WHATSAPP = os.getenv("ENABLE_WHATSAPP", "true").lower() not in ("false", "0", "no")
+
+def _parse_allowed_ids(raw: str) -> set:
+    """Parse a comma-separated string of Telegram user IDs into a set of ints."""
+    if not raw or raw.strip() in ("", "null", "None", "none"):
+        return set()
+    ids = set()
+    for part in raw.replace(";", ",").split(","):
+        part = part.strip()
+        if part.lstrip("-").isdigit():
+            ids.add(int(part))
+    return ids
+
+_raw_allowed = os.getenv("TELEGRAM_ALLOWED_IDS", "")
+TELEGRAM_ALLOWED_IDS: set = _parse_allowed_ids(_raw_allowed)
 ENABLE_MCP = os.getenv("ENABLE_MCP", "true").lower() not in ("false", "0", "")
 MCP_CONFIG_FILE = os.getenv("MCP_CONFIG_FILE", "/config/amira/mcp_config.json")
 FALLBACK_ENABLED = os.getenv("FALLBACK_ENABLED", "true").lower() not in ("false", "0", "no")
@@ -291,6 +305,12 @@ def _apply_settings(settings: dict) -> None:
             value = str(value).upper()
         elif key == "tts_voice":
             value = str(value).lower().strip()
+        elif key == "telegram_allowed_ids":
+            # Store as set of ints for fast lookup; os.environ keeps the raw string
+            raw_str = str(value)
+            _g[gvar] = _parse_allowed_ids(raw_str)
+            os.environ[gvar] = raw_str
+            continue
         # Set Python global
         _g[gvar] = value
         # Set os.environ for inline os.getenv() calls
@@ -7200,6 +7220,7 @@ def api_settings_get():
             "id": "messaging", "icon": "\U0001F4F1", "fields": [
                 {"key": "enable_telegram", "type": "toggle"},
                 {"key": "telegram_bot_token", "type": "password"},
+                {"key": "telegram_allowed_ids", "type": "text"},
                 {"key": "enable_whatsapp", "type": "toggle"},
                 {"key": "twilio_account_sid", "type": "text"},
                 {"key": "twilio_auth_token", "type": "password"},

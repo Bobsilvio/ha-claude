@@ -125,10 +125,26 @@ class TelegramBot:
         chat_id = message.get("chat", {}).get("id")
         user_id = message.get("from", {}).get("id")
         text = message.get("text", "").strip()
-        
+
         if not text or not chat_id:
             return
-        
+
+        # --- Whitelist check ---
+        try:
+            import api as _api
+            allowed = _api.TELEGRAM_ALLOWED_IDS
+        except Exception:
+            allowed = set()
+
+        if allowed and user_id not in allowed:
+            logger.warning(
+                f"Telegram: BLOCKED message from unauthorized user_id={user_id} "
+                f"(chat_id={chat_id}). Add to telegram_allowed_ids to grant access."
+            )
+            self.send_message(chat_id, "⛔ Non sei autorizzato a usare questo bot.")
+            return
+        # -----------------------
+
         logger.info(f"Telegram: incoming message from user {user_id} in chat {chat_id}: {text[:80]}")
         
         # Import here to avoid circular dependency
