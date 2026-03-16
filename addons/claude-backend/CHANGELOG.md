@@ -2,6 +2,25 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
 
+## 4.6.18 — Sicurezza Telegram: whitelist utenti autorizzati
+
+### Nuova funzionalità: whitelist Telegram
+- **Rischio risolto**: prima qualsiasi utente Telegram poteva inviare comandi al bot e controllare casa
+- Nuovo campo **"ID Utenti Autorizzati"** in Settings → Messaging: lista di Telegram user ID separati da virgola (es. `123456789,987654321`)
+- Se la lista è non vuota, chiunque non sia in lista riceve un messaggio di blocco e il messaggio viene ignorato
+- Il messaggio di rifiuto è **multilingua** (IT/EN/ES/FR) e segue la lingua impostata in Settings
+- Se lasciato vuoto il bot rimane aperto (comportamento precedente) — sconsigliato
+- Come trovare il proprio ID: aprire Telegram → cercare `@userinfobot` → inviare `/start`
+
+### Fix: `GET /api/settings` crash — set non serializzabile
+- `TELEGRAM_ALLOWED_IDS` veniva salvato come `set` Python in memoria, ma JSON non può serializzarlo
+- Fix: conversione a stringa comma-separated ordinata prima della risposta API
+
+### README aggiornato
+- Aggiunta sezione "🔒 Telegram Security — User Whitelist" con istruzioni passo passo
+
+---
+
 ## 4.6.17 — Fix agent globals, Groq failed_generation, UI agent form
 
 ### Fix: `_sync_active_agent_globals` crash
