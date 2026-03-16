@@ -141,7 +141,17 @@ class TelegramBot:
                 f"Telegram: BLOCKED message from unauthorized user_id={user_id} "
                 f"(chat_id={chat_id}). Add to telegram_allowed_ids to grant access."
             )
-            self.send_message(chat_id, "⛔ Non sei autorizzato a usare questo bot.")
+            _UNAUTHORIZED_MSG = {
+                "it": "⛔ Non sei autorizzato a usare questo bot.",
+                "es": "⛔ No estás autorizado a usar este bot.",
+                "fr": "⛔ Vous n'êtes pas autorisé à utiliser ce bot.",
+                "en": "⛔ You are not authorized to use this bot.",
+            }
+            try:
+                lang = (_api.LANGUAGE or "en")[:2].lower()
+            except Exception:
+                lang = "en"
+            self.send_message(chat_id, _UNAUTHORIZED_MSG.get(lang, _UNAUTHORIZED_MSG["en"]))
             return
         # -----------------------
 
