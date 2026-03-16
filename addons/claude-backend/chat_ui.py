@@ -346,6 +346,7 @@ def get_chat_ui():
             "agent_channels": "Channel Assignment",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_taken": "Already assigned to",
             "tip_agent_channels": "Assign this agent to a messaging channel. Each channel can have one agent.",
         },
         "it": {
@@ -626,6 +627,7 @@ def get_chat_ui():
             "agent_channels": "Associazione Canali",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_taken": "Già assegnato a",
             "tip_agent_channels": "Associa questo agent a un canale di messaggistica. Ogni canale pu\u00f2 avere un solo agent.",
         },
         "es": {
@@ -906,6 +908,7 @@ def get_chat_ui():
             "agent_channels": "Asignación de Canal",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_taken": "Ya asignado a",
             "tip_agent_channels": "Asigna este agente a un canal de mensajería. Cada canal puede tener un único agente.",
         },
         "fr": {
@@ -1184,6 +1187,7 @@ def get_chat_ui():
             "agent_channels": "Attribution de Canal",
             "agent_channel_telegram": "Telegram",
             "agent_channel_whatsapp": "WhatsApp",
+            "agent_channel_taken": "Déjà assigné à",
             "tip_agent_channels": "Attribuez cet agent à un canal de messagerie. Chaque canal ne peut avoir qu'un seul agent.",
         },
     }
@@ -4469,12 +4473,16 @@ def get_chat_ui():
                 const label = ch === 'telegram' ? (T.agent_channel_telegram || 'Telegram')
                     : (T.agent_channel_whatsapp || 'WhatsApp');
                 const icon = ch === 'telegram' ? '\U0001f4e9' : '\U0001f4f1';
+                const chDisabled = !!otherAgent;
                 chHtml += '<div class="agent-form-group" style="flex:1;">'
-                    + '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;">'
+                    + '<label style="display:flex;align-items:center;gap:6px;font-size:12px;'
+                    + (chDisabled ? 'cursor:not-allowed;opacity:0.45;' : 'cursor:pointer;') + '">'
                     + '<input type="checkbox" class="af_channel" data-channel="' + ch + '"'
                     + (isAssigned ? ' checked' : '')
-                    + (otherAgent ? ' title="Currently: ' + otherAgent + '"' : '') + '> '
-                    + icon + ' ' + label + '</label></div>';
+                    + (chDisabled ? ' disabled title="' + (T.agent_channel_taken || 'Already assigned to') + ': ' + otherAgent + '"' : '') + '> '
+                    + icon + ' ' + label
+                    + (chDisabled ? ' <span style="font-size:10px;color:var(--text-muted,#888);">(' + otherAgent + ')</span>' : '')
+                    + '</label></div>';
             }});
             chHtml += '</div></div>';
             form.innerHTML += chHtml;
