@@ -53,7 +53,7 @@
 
 **Smart home AI assistant addon** with multi-provider support — control your home, create automations, and manage configurations using natural language.
 
-Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot (OAuth), OpenAI Codex (OAuth), Groq, Mistral, DeepSeek, Ollama and more. Chat via **Telegram** or **WhatsApp** in addition to the built-in web UI.
+Supports **23+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot (OAuth), OpenAI Codex (OAuth), Claude Web, Gemini Web, Groq, Mistral, DeepSeek, Ollama and more. Chat via **Telegram** or **WhatsApp** in addition to the built-in web UI.
 
 [![GitHub Release](https://img.shields.io/github/v/release/Bobsilvio/ha-claude)](https://github.com/Bobsilvio/ha-claude/releases)
 [![License: PolyForm NC](https://img.shields.io/badge/License-PolyForm%20NC%201.0-blue)](LICENSE)
@@ -131,9 +131,10 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Enable in Settings**: Settings → Features → Auto Fallback (OFF by default)
 
 ### 🤖 Multi-Agent System
-- **Custom Agents**: Create agents with their own model, provider, tools, and system prompt
+- **Custom Agents**: Create agents with their own model, provider, tools, and custom instructions
 - **Agent Switching**: Select agents from the chat UI dropdown
 - **Channel Routing**: Assign different agents to Telegram/WhatsApp channels
+- **Instructions field**: Add personality/context prepended to the HA default prompt — the agent keeps full HA awareness
 
 ### 💰 Cost Tracking
 - **Per-Message Cost**: Tracks token usage and cost for every message
@@ -157,6 +158,7 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 - **Telegram Bot**: Long polling — no public IP needed, works out of the box
 - **WhatsApp**: Twilio integration with webhook support
 - **Context Aware**: Full conversation history per user per channel
+- **Enable/Disable**: Toggle Telegram and WhatsApp independently from **Settings → Messaging** in the chat UI
 
 ### ⏰ Scheduled Tasks
 - **Cron-based**: Schedule automations using cron expressions
@@ -201,9 +203,13 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 | 🟩 NVIDIA NIM | [build.nvidia.com](https://build.nvidia.com) | ✅ Unlimited |
 | ⚡ Groq | [console.groq.com](https://console.groq.com) | ✅ Unlimited |
 | 🌐 OpenRouter | [openrouter.ai/keys](https://openrouter.ai/keys) | ❌ Pay per use |
-| + 12 more | See [DOCS.md](addons/claude-backend/DOCS.md) | — |
+| 🌀 Claude Web | Browser session cookies | ✅ Requires subscription |
+| 🌀 Gemini Web ⚠️ | Browser session cookies | ✅ Requires subscription |
+| + 10 more | See [DOCS.md](addons/claude-backend/DOCS.md) | — |
 
-**GitHub Copilot & OpenAI Codex** use OAuth — no API key needed, just a one-time login. → [Full guide](addons/claude-backend/DOCS.md)
+**GitHub Copilot & OpenAI Codex** use OAuth — no API key needed, just a one-time login.
+
+**Claude Web & Gemini Web** use browser session cookies — no API key needed, requires an active subscription. Connect via the 🔑 button in the chat UI. → [Full guide](addons/claude-backend/DOCS.md)
 
 ---
 
@@ -288,31 +294,33 @@ Create specialized AI assistants, each with its own model, personality, tools, a
 - **Different tasks, different models** — a home agent on Claude Sonnet, a quick-chat agent on Groq Llama (free & fast)
 - **Tool isolation** — only the "home" agent can control automations; the "coder" can only read/write files
 - **Cost optimization** — route expensive reasoning to premium models, simple Q&A to free tiers
-- **Custom personality** — each agent has its own name, emoji, and system prompt
+- **Custom personality** — each agent has its own name, emoji, and instructions
 
 ### Quick Start
 
 ```json
 {
-  "home": {
-    "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
-    "model": "anthropic/claude-sonnet-4-6",
-    "fallback": ["google/gemini-2.0-flash"],
-    "is_default": true
-  },
-  "coder": {
-    "identity": { "name": "CodeBot", "emoji": "💻", "description": "Coding & config specialist" },
-    "model": "anthropic/claude-opus-4-6",
-    "tools": ["read_config_file", "write_config_file"],
-    "system_prompt_override": "You are a coding expert. Always show code with comments.",
-    "temperature": 0.2
-  },
-  "quick": {
-    "identity": { "name": "Flash", "emoji": "⚡", "description": "Fast answers, no tools" },
-    "model": "groq/llama-3.3-70b-versatile",
-    "tools": [],
-    "temperature": 0.7
-  }
+  "agents": [
+    {
+      "id": "home",
+      "identity": { "name": "Amira", "emoji": "🏠", "description": "Home automation expert" },
+      "model": { "primary": "anthropic/claude-sonnet-4-6", "fallbacks": ["google/gemini-2.0-flash"] },
+      "default": true
+    },
+    {
+      "id": "jarvis",
+      "identity": { "name": "Jarvis", "emoji": "🤖", "description": "Personal assistant" },
+      "model": { "primary": "groq/llama-3.3-70b-versatile" },
+      "instructions": "Your name is Jarvis. The user is called Silvio Rossi. Always respond formally."
+    },
+    {
+      "id": "quick",
+      "identity": { "name": "Flash", "emoji": "⚡", "description": "Fast answers, no tools" },
+      "model": { "primary": "groq/llama-3.3-70b-versatile" },
+      "tools": [],
+      "temperature": 0.7
+    }
+  ]
 }
 ```
 
@@ -320,18 +328,21 @@ Create specialized AI assistants, each with its own model, personality, tools, a
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `id` | string | Unique identifier (lowercase, no spaces) |
 | `identity.name` | string | Display name in UI and messages |
 | `identity.emoji` | string | Icon shown in selector and chat |
 | `identity.description` | string | Tooltip text |
-| `model` | string | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
-| `fallback` | string[] | Ordered fallback models if primary fails |
+| `model.primary` | string | `provider/model` (e.g. `anthropic/claude-sonnet-4-6`) |
+| `model.fallbacks` | string[] | Ordered fallback models if primary fails |
+| `instructions` | string | Custom instructions **prepended** to the HA default prompt — the agent retains full HA context |
 | `tools` | string[] \| null | Allowed tools (`null` = all, `[]` = none) |
 | `tools_blocked` | string[] | Explicitly blocked tools |
-| `system_prompt_override` | string | Custom system prompt (replaces default) |
 | `temperature` | number | 0.0–2.0 |
 | `thinking_level` | string | `off`, `low`, `medium`, `high`, `adaptive` |
-| `is_default` | bool | Pre-selected on load |
+| `default` | bool | Pre-selected on load |
 | `enabled` | bool | Set `false` to hide without deleting |
+
+> **Note:** The old `system_prompt` and `system_prompt_override` keys are still accepted for backward compatibility and are treated as `instructions`.
 
 ### Channel Routing
 
