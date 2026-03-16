@@ -1994,12 +1994,25 @@ def get_chat_ui():
             border-color: #667eea;
         }}
         .agent-form-group textarea {{ min-height: 60px; resize: vertical; font-family: inherit; }}
-        .agent-form-group .emoji-picker {{
-            display: flex; gap: 4px; flex-wrap: wrap;
+        .emoji-dropdown {{ position: relative; display: inline-block; }}
+        .emoji-dropdown-btn {{
+            display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+            font-size: 18px; border: 2px solid #ddd; border-radius: 8px;
+            background: #f5f5f5; cursor: pointer; min-width: 56px;
+            transition: border-color 0.15s;
         }}
+        .emoji-dropdown-btn:hover {{ border-color: #667eea; }}
+        .emoji-dropdown-btn .edrop-arrow {{ font-size: 10px; color: #888; margin-left: 2px; }}
+        .emoji-dropdown-panel {{
+            display: none; position: absolute; top: calc(100% + 4px); left: 0; z-index: 9999;
+            background: var(--bg-card, #fff); border: 1px solid #ddd; border-radius: 10px;
+            padding: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            display: none; flex-wrap: wrap; gap: 3px; width: 196px;
+        }}
+        .emoji-dropdown-panel.open {{ display: flex; }}
         .agent-form-group .emoji-btn {{
-            width: 32px; height: 32px; border: 2px solid transparent; border-radius: 6px;
-            cursor: pointer; font-size: 18px; background: #f5f5f5; display: flex;
+            width: 30px; height: 30px; border: 2px solid transparent; border-radius: 6px;
+            cursor: pointer; font-size: 17px; background: transparent; display: flex;
             align-items: center; justify-content: center; transition: all 0.15s;
         }}
         .agent-form-group .emoji-btn:hover {{ background: #e8e8ff; }}
@@ -2670,7 +2683,9 @@ def get_chat_ui():
         body.dark-mode .agent-form-group textarea {{
             background: #2a2a3a; color: #e0e0e0; border-color: #4a4a5a;
         }}
-        body.dark-mode .agent-form-group .emoji-btn {{ background: #2a2a3a; }}
+        body.dark-mode .emoji-dropdown-btn {{ background: #2a2a3a; border-color: #4a4a5a; }}
+        body.dark-mode .emoji-dropdown-panel {{ background: #1e1e2e; border-color: #4a4a5a; }}
+        body.dark-mode .agent-form-group .emoji-btn {{ background: transparent; }}
         body.dark-mode .agent-form-group .emoji-btn:hover {{ background: #3a3a5a; }}
         body.dark-mode .agent-form-group .emoji-btn.selected {{ background: #2e2e5a; border-color: #8899ff; }}
         body.dark-mode .agent-tool-chip {{ background: #3a3a4a; color: #aaa; }}
@@ -4400,7 +4415,12 @@ def get_chat_ui():
             nameRow.innerHTML = '<div class="agent-form-group" style="flex:2;"><label>' + _lbl(T.agent_name || 'Name', 'tip_agent_name') + '</label>'
                 + '<input type="text" id="af_name" value="' + _escAttr(agentData ? (agentData.name || '') : 'Amira') + '" placeholder="Amira"></div>'
                 + '<div class="agent-form-group" style="flex:1;"><label>' + _lbl('Emoji', 'tip_agent_emoji') + '</label>'
-                + '<div class="emoji-picker" id="af_emoji_picker"></div></div>';
+                + '<div class="emoji-dropdown" id="af_emoji_picker">'
+                + '<button type="button" class="emoji-dropdown-btn" id="af_emoji_btn">'
+                + '<span id="af_emoji_val">\U0001f916</span><span class="edrop-arrow">▾</span>'
+                + '</button>'
+                + '<div class="emoji-dropdown-panel" id="af_emoji_panel"></div>'
+                + '</div></div>';
             form.appendChild(nameRow);
 
             // Description
@@ -4506,18 +4526,41 @@ def get_chat_ui():
             // ---- Post-render: populate dynamic parts ----
 
             // Emoji picker
-            const emojiPicker = document.getElementById('af_emoji_picker');
+            // --- Emoji dropdown ---
             const currentEmoji = agentData ? (agentData.emoji || '\U0001f916') : '\U0001f916';
+            const emojiValEl = document.getElementById('af_emoji_val');
+            const emojiBtn   = document.getElementById('af_emoji_btn');
+            const emojiPanel = document.getElementById('af_emoji_panel');
+            if (emojiValEl) emojiValEl.textContent = currentEmoji;
+
+            // Populate panel grid
             AGENT_EMOJIS.forEach(em => {{
                 const btn = document.createElement('button');
                 btn.className = 'emoji-btn' + (em === currentEmoji ? ' selected' : '');
                 btn.textContent = em;
                 btn.type = 'button';
                 btn.addEventListener('click', () => {{
-                    emojiPicker.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
+                    emojiPanel.querySelectorAll('.emoji-btn').forEach(b => b.classList.remove('selected'));
                     btn.classList.add('selected');
+                    if (emojiValEl) emojiValEl.textContent = em;
+                    emojiPanel.classList.remove('open');
                 }});
-                emojiPicker.appendChild(btn);
+                emojiPanel.appendChild(btn);
+            }});
+
+            // Toggle panel on button click
+            if (emojiBtn) {{
+                emojiBtn.addEventListener('click', (e) => {{
+                    e.stopPropagation();
+                    emojiPanel.classList.toggle('open');
+                }});
+            }}
+            // Close on outside click
+            document.addEventListener('click', function _closeEmojiPanel(e) {{
+                if (!e.target.closest('#af_emoji_picker')) {{
+                    emojiPanel.classList.remove('open');
+                    document.removeEventListener('click', _closeEmojiPanel);
+                }}
             }});
 
             // Provider/Model dropdowns
@@ -4637,8 +4680,8 @@ def get_chat_ui():
             }}
 
             const name = (document.getElementById('af_name') || {{}}).value || '';
-            const selectedEmoji = document.querySelector('#af_emoji_picker .emoji-btn.selected');
-            const emoji = selectedEmoji ? selectedEmoji.textContent : '\U0001f916';
+            const emojiValSpan = document.getElementById('af_emoji_val');
+            const emoji = (emojiValSpan && emojiValSpan.textContent.trim()) || '\U0001f916';
             const desc = (document.getElementById('af_desc') || {{}}).value || '';
 
             payload.identity = {{ name: name.trim() || 'Agent', emoji: emoji, description: desc.trim() }};
