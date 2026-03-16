@@ -120,6 +120,7 @@ def api_get_models():
         available_providers.append({"id": "claude_web", "name": "Claude.ai Web", "web": True})
         # chatgpt_web: in standby — Cloudflare blocca le richieste da server nel 2026
         # available_providers.append({"id": "chatgpt_web", "name": "ChatGPT Web [UNSTABLE]"})
+        available_providers.append({"id": "gemini_web", "name": "Gemini Web ⚠️ [UNSTABLE]", "web": True})
 
         # --- Tutti i modelli per provider (come li vuole la chat: display/prefissi) ---
         models_display = {}

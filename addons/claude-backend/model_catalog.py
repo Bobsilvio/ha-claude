@@ -345,6 +345,14 @@ _PROVIDER_MODELS: Dict[str, List[str]] = {
         "o4-mini",
     ],
 
+    # Gemini Web (browser session cookies, no API key)
+    "gemini_web": [
+        "gemini-2.0-flash",
+        "gemini-2.5-pro",
+        "gemini-2.0-pro-exp",
+        "gemini-1.5-pro",
+    ],
+
     # Custom: model name from CUSTOM_MODEL_NAME env var
     "custom": [],
 }
