@@ -299,8 +299,8 @@ def get_chat_ui():
             "agent_enabled": "Enabled",
             "agent_id_label": "ID (unique)",
             "agent_id_invalid": "ID must contain only lowercase letters, numbers, - and _",
-            "agent_sysprompt_label": "System Prompt Override",
-            "agent_sysprompt_hint": "Leave empty to use the default system prompt...",
+            "agent_sysprompt_label": "Agent Instructions",
+            "agent_sysprompt_hint": "Optional instructions prepended to the default system prompt. Example: Your name is Jarvis. The user is called John.",
             "agent_delete_confirm": "Delete agent",
             "agent_protected": "Protected (built-in)",
             "agent_fallbacks": "Fallback Models",
@@ -320,7 +320,7 @@ def get_chat_ui():
             "tip_agent_temperature": "Controls randomness (0=deterministic, 2=creative). Default: 0.7.",
             "tip_agent_thinking": "Reasoning depth: off, low, medium, high, or adaptive.",
             "tip_agent_maxtokens": "Maximum tokens for each response. Default: 4096.",
-            "tip_agent_sysprompt": "Custom instructions that override the default system prompt.",
+            "tip_agent_sysprompt": "Instructions prepended to the default HA system prompt. The AI retains full HA context plus your custom info.",
             "tip_agent_tools": "Select which tools this agent can use. None selected = all tools available.",
             "tip_agent_default": "The default agent is used when no specific agent is selected.",
             "tip_agent_enabled": "Disabled agents are hidden from the agent selector.",
@@ -579,8 +579,8 @@ def get_chat_ui():
             "agent_enabled": "Abilitato",
             "agent_id_label": "ID (univoco)",
             "agent_id_invalid": "L'ID deve contenere solo lettere minuscole, numeri, - e _",
-            "agent_sysprompt_label": "System Prompt Personalizzato",
-            "agent_sysprompt_hint": "Lascia vuoto per usare il prompt di sistema predefinito...",
+            "agent_sysprompt_label": "Istruzioni Agente",
+            "agent_sysprompt_hint": "Istruzioni opzionali aggiunte PRIMA del prompt di sistema predefinito. Esempio: Ti chiami Jarvis. L'utente si chiama Silvio.",
             "agent_delete_confirm": "Eliminare agent",
             "agent_protected": "Protetto (predefinito)",
             "agent_fallbacks": "Modelli di Fallback",
@@ -600,7 +600,7 @@ def get_chat_ui():
             "tip_agent_temperature": "Controlla la casualit\u00e0 (0=deterministico, 2=creativo). Default: 0.7.",
             "tip_agent_thinking": "Profondit\u00e0 del ragionamento: off, low, medium, high o adaptive.",
             "tip_agent_maxtokens": "Numero massimo di token per ogni risposta. Default: 4096.",
-            "tip_agent_sysprompt": "Istruzioni personalizzate che sostituiscono il prompt di sistema predefinito.",
+            "tip_agent_sysprompt": "Istruzioni aggiunte prima del prompt HA predefinito. L'AI mantiene tutto il contesto HA più le tue info personalizzate.",
             "tip_agent_tools": "Seleziona quali strumenti pu\u00f2 usare questo agente. Nessuno selezionato = tutti disponibili.",
             "tip_agent_default": "L'agente predefinito viene usato quando non ne viene selezionato uno specifico.",
             "tip_agent_enabled": "Gli agenti disabilitati sono nascosti dal selettore.",
@@ -859,8 +859,8 @@ def get_chat_ui():
             "agent_enabled": "Habilitado",
             "agent_id_label": "ID (único)",
             "agent_id_invalid": "El ID solo puede contener letras minúsculas, números, - y _",
-            "agent_sysprompt_label": "Prompt de Sistema Personalizado",
-            "agent_sysprompt_hint": "Dejar vacío para usar el prompt de sistema predeterminado...",
+            "agent_sysprompt_label": "Instrucciones del Agente",
+            "agent_sysprompt_hint": "Instrucciones opcionales añadidas ANTES del prompt de sistema. Ejemplo: Tu nombre es Jarvis. El usuario se llama Silvio.",
             "agent_delete_confirm": "Eliminar agente",
             "agent_protected": "Protegido (predeterminado)",
             "agent_fallbacks": "Modelos de Respaldo",
@@ -880,7 +880,7 @@ def get_chat_ui():
             "tip_agent_temperature": "Controla la aleatoriedad (0=determinista, 2=creativo). Default: 0.7.",
             "tip_agent_thinking": "Profundidad de razonamiento: off, low, medium, high o adaptive.",
             "tip_agent_maxtokens": "Número máximo de tokens por respuesta. Default: 4096.",
-            "tip_agent_sysprompt": "Instrucciones personalizadas que reemplazan el prompt de sistema.",
+            "tip_agent_sysprompt": "Instrucciones añadidas antes del prompt HA predefinido. La IA mantiene todo el contexto HA más tu info personalizada.",
             "tip_agent_tools": "Selecciona las herramientas que puede usar. Ninguna = todas disponibles.",
             "tip_agent_default": "El agente predeterminado se usa cuando no se selecciona otro.",
             "tip_agent_enabled": "Los agentes deshabilitados se ocultan del selector.",
@@ -1137,8 +1137,8 @@ def get_chat_ui():
             "agent_enabled": "Activé",
             "agent_id_label": "ID (unique)",
             "agent_id_invalid": "L'ID ne doit contenir que des lettres minuscules, chiffres, - et _",
-            "agent_sysprompt_label": "Prompt Système Personnalisé",
-            "agent_sysprompt_hint": "Laisser vide pour utiliser le prompt système par défaut...",
+            "agent_sysprompt_label": "Instructions de l'Agent",
+            "agent_sysprompt_hint": "Instructions optionnelles ajoutées AVANT le prompt système par défaut. Exemple : Tu t'appelles Jarvis. L'utilisateur s'appelle Silvio.",
             "agent_delete_confirm": "Supprimer l'agent",
             "agent_protected": "Protégé (intégré)",
             "agent_fallbacks": "Modèles de Repli",
@@ -1158,7 +1158,7 @@ def get_chat_ui():
             "tip_agent_temperature": "Contrôle l'aléatoire (0=déterministe, 2=créatif). Défaut : 0.7.",
             "tip_agent_thinking": "Profondeur de raisonnement : off, low, medium, high ou adaptive.",
             "tip_agent_maxtokens": "Nombre max de tokens par réponse. Défaut : 4096.",
-            "tip_agent_sysprompt": "Instructions personnalisées qui remplacent le prompt système.",
+            "tip_agent_sysprompt": "Instructions ajoutées avant le prompt HA par défaut. L'IA conserve tout le contexte HA plus vos infos personnalisées.",
             "tip_agent_tools": "Sélectionnez les outils autorisés. Aucun = tous disponibles.",
             "tip_agent_default": "L'agent par défaut est utilisé quand aucun n'est sélectionné.",
             "tip_agent_enabled": "Les agents désactivés sont masqués du sélecteur.",
@@ -4438,7 +4438,7 @@ def get_chat_ui():
             // System prompt
             form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_sysprompt_label || 'System Prompt Override', 'tip_agent_sysprompt') + '</label>'
                 + '<textarea id="af_sysprompt" rows="3" placeholder="' + _escAttr(T.agent_sysprompt_hint || 'Leave empty to use the default system prompt...') + '">'
-                + _escHtml(agentData && agentData.system_prompt ? agentData.system_prompt : '') + '</textarea></div>';
+                + _escHtml(agentData && (agentData.instructions || agentData.system_prompt) ? (agentData.instructions || agentData.system_prompt) : '') + '</textarea></div>';
 
             // Tools (multiselect chips)
             form.innerHTML += '<div class="agent-form-group"><label>' + _lbl(T.agent_tools || 'Allowed Tools', 'tip_agent_tools')
@@ -4665,7 +4665,7 @@ def get_chat_ui():
 
             // System prompt
             const sp = (document.getElementById('af_sysprompt') || {{}}).value || '';
-            if (sp.trim()) payload.system_prompt = sp.trim();
+            if (sp.trim()) payload.instructions = sp.trim();
 
             // Tools — only include if at least one chip selected
             const toolChips = document.querySelectorAll('#af_tools .agent-tool-chip.selected');

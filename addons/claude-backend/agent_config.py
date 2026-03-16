@@ -108,7 +108,7 @@ class AgentEntry:
     tools: Optional[List[str]] = None       # allowed tool names (None = all)
     tools_blocked: List[str] = field(default_factory=list)  # explicitly blocked tools
     # Behaviour
-    system_prompt_override: Optional[str] = None
+    instructions: Optional[str] = None   # prepended to HA default prompt
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     thinking_level: Optional[str] = None    # off, low, medium, high, adaptive
@@ -141,8 +141,8 @@ class AgentEntry:
         if self.tools_blocked:
             d["tools_blocked"] = self.tools_blocked
         # Behaviour
-        if self.system_prompt_override:
-            d["system_prompt"] = self.system_prompt_override
+        if self.instructions:
+            d["instructions"] = self.instructions
         if self.temperature is not None:
             d["temperature"] = self.temperature
         if self.max_tokens is not None:
@@ -195,7 +195,9 @@ class AgentEntry:
             model_config=model_config,
             tools=data.get("tools"),  # None means "all"
             tools_blocked=list(data.get("tools_blocked") or []),
-            system_prompt_override=data.get("system_prompt") or None,
+            # "instructions" → prepended to HA default
+            # "system_prompt" (old key, backward compat) → same as instructions
+            instructions=data.get("instructions") or data.get("system_prompt") or None,
             temperature=data.get("temperature"),
             max_tokens=data.get("max_tokens"),
             thinking_level=data.get("thinking_level"),
@@ -701,8 +703,10 @@ class AgentManager:
                 agent.tools = updates["tools"]
             if "tools_blocked" in updates:
                 agent.tools_blocked = list(updates["tools_blocked"] or [])
-            if "system_prompt" in updates:
-                agent.system_prompt_override = updates["system_prompt"] or None
+            if "instructions" in updates:
+                agent.instructions = updates["instructions"] or None
+            if "system_prompt" in updates:  # backward compat from UI
+                agent.instructions = updates["system_prompt"] or None
             if "temperature" in updates:
                 agent.temperature = updates["temperature"]
             if "max_tokens" in updates:

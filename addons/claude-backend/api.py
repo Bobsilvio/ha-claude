@@ -417,13 +417,8 @@ def _sync_active_agent_globals() -> None:
             return
         AGENT_NAME = (active.identity.name or active.name or "Amira").strip()
         AGENT_AVATAR = (active.identity.emoji or "\U0001f916").strip()
-        _override = (active.system_prompt_override or "").strip()
-        if _override:
-            AGENT_SYSTEM_PROMPT_OVERRIDE = _override
-            AGENT_INSTRUCTIONS = ""
-        else:
-            AGENT_SYSTEM_PROMPT_OVERRIDE = None
-            AGENT_INSTRUCTIONS = ""
+        AGENT_SYSTEM_PROMPT_OVERRIDE = None
+        AGENT_INSTRUCTIONS = (active.instructions or "").strip()
         try:
             import tools as _tools_mod
             _tools_mod.AI_SIGNATURE = AGENT_NAME
