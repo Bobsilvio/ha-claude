@@ -54,8 +54,6 @@ options:
   colored_logs: true
   debug_mode: false
   log_level: normal
-  enable_telegram: true
-  enable_whatsapp: true
 schema:
   anthropic_api_key: password?
   openai_api_key: password?
@@ -81,8 +79,6 @@ schema:
   colored_logs: bool?
   debug_mode: bool?
   log_level: list(normal|verbose|debug)?
-  enable_telegram: bool?
-  enable_whatsapp: bool?
   api_port: port?
 
 documentation: https://github.com/Bobsilvio/ha-claude
