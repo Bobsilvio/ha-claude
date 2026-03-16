@@ -39,7 +39,7 @@ jobs:
       - name: Verify addon structure
         run: |
           echo "Checking addon files..."
-          test -f addons/claude-backend/config.json && echo "✅ config.json"
+          test -f addons/claude-backend/config.yaml && echo "✅ config.yaml"
           test -f addons/claude-backend/Dockerfile && echo "✅ Dockerfile"
           test -f addons/claude-backend/build.json && echo "✅ build.json"
           test -f addons/claude-backend/requirements.txt && echo "✅ requirements.txt"
