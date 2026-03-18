@@ -161,6 +161,7 @@ def get_chat_ui():
             # Sidebar tabs
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
+            "tab_amira": "Card",
             "tab_backups": "Backups",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Messaging",
@@ -214,6 +215,7 @@ def get_chat_ui():
             "config_prompt_title": "Custom System Prompt",
             "config_memory_title": "Memory (MEMORY.md)",
             "config_llm_title": "LLM Priority",
+            "config_model_cache_title": "Model Cache",
             "llm_fallback_label": "Auto Fallback",
             "llm_priority_label": "Priority order",
             "llm_no_key": "no key",
@@ -224,6 +226,22 @@ def get_chat_ui():
             # Settings
             "config_settings_title": "Settings",
             "settings_saved": "Settings saved!",
+            "settings_clear_models_cache": "Clear Models Cache",
+            "settings_clear_models_cache_confirm": "Clear cached dynamic provider models now? Fixed models stay available.",
+            "settings_clear_models_cache_done": "Models cache cleared!",
+            "settings_clear_models_cache_error": "Failed to clear models cache",
+            "settings_refresh_models_cache": "Refresh Models Cache",
+            "settings_refresh_models_cache_done": "Models cache refreshed!",
+            "settings_refresh_models_cache_error": "Failed to refresh models cache",
+            "settings_model_cache_title": "Model Cache",
+            "settings_model_cache_loading": "Loading model cache...",
+            "settings_model_cache_updated_at": "Updated",
+            "settings_model_cache_fixed": "Fixed Models",
+            "settings_model_cache_dynamic": "Dynamic Models (cache)",
+            "settings_model_cache_blocklist": "Blocked Models",
+            "settings_model_cache_uncertain": "Uncertain Test Results",
+            "settings_model_cache_nvidia_tested": "NVIDIA Tested OK",
+            "settings_model_cache_empty": "No models",
             "restart_confirm": "Some changes require a restart to take effect. Restart the add-on now?",
             "restart_in_progress": "Restarting add-on...",
             "restart_failed": "Restart failed",
@@ -291,6 +309,8 @@ def get_chat_ui():
             "settings_desc_max_conversations": "Maximum number of chat conversations to keep in history (1\u2013100)",
             "settings_desc_max_snapshots_per_file": "Maximum backup snapshots per file. Oldest backups are auto-deleted when the limit is reached.",
             "settings_desc_cost_currency": "Currency for token cost display",
+            "models_group_fixed": "Fixed",
+            "models_group_dynamic_cache": "Dynamic (cache)",
             # Agent form
             "agent_add": "New Agent",
             "agent_new": "\U0001f916 New Agent",
@@ -445,6 +465,7 @@ def get_chat_ui():
             # Sidebar tabs
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
+            "tab_amira": "Card",
             "tab_backups": "Backup",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Messaggi",
@@ -498,6 +519,7 @@ def get_chat_ui():
             "config_prompt_title": "System Prompt Personalizzato",
             "config_memory_title": "Memoria (MEMORY.md)",
             "config_llm_title": "Priorita LLM",
+            "config_model_cache_title": "Cache Modelli",
             "llm_fallback_label": "Fallback automatico",
             "llm_priority_label": "Ordine di priorita",
             "llm_no_key": "senza chiave",
@@ -508,6 +530,22 @@ def get_chat_ui():
             # Settings
             "config_settings_title": "Impostazioni",
             "settings_saved": "Impostazioni salvate!",
+            "settings_clear_models_cache": "Cancella Cache Modelli",
+            "settings_clear_models_cache_confirm": "Vuoi cancellare ora la cache dei modelli dinamici? I modelli fissi restano disponibili.",
+            "settings_clear_models_cache_done": "Cache modelli cancellata!",
+            "settings_clear_models_cache_error": "Errore cancellazione cache modelli",
+            "settings_refresh_models_cache": "Aggiorna Cache Modelli",
+            "settings_refresh_models_cache_done": "Cache modelli aggiornata!",
+            "settings_refresh_models_cache_error": "Errore aggiornamento cache modelli",
+            "settings_model_cache_title": "Cache Modelli",
+            "settings_model_cache_loading": "Caricamento cache modelli...",
+            "settings_model_cache_updated_at": "Aggiornata",
+            "settings_model_cache_fixed": "Modelli Fissi",
+            "settings_model_cache_dynamic": "Modelli Dinamici (cache)",
+            "settings_model_cache_blocklist": "Modelli Bloccati",
+            "settings_model_cache_uncertain": "Test Incerti",
+            "settings_model_cache_nvidia_tested": "NVIDIA Testati OK",
+            "settings_model_cache_empty": "Nessun modello",
             "restart_confirm": "Alcune modifiche richiedono un riavvio per essere applicate. Riavviare l'add-on ora?",
             "restart_in_progress": "Riavvio add-on in corso...",
             "restart_failed": "Riavvio fallito",
@@ -575,6 +613,8 @@ def get_chat_ui():
             "settings_desc_max_conversations": "Numero massimo di conversazioni da mantenere nello storico (1\u2013100)",
             "settings_desc_max_snapshots_per_file": "Numero massimo di backup per file. I pi\u00f9 vecchi vengono eliminati automaticamente al raggiungimento del limite.",
             "settings_desc_cost_currency": "Valuta per la visualizzazione dei costi token",
+            "models_group_fixed": "Fissi",
+            "models_group_dynamic_cache": "Dinamici (cache)",
             # Agent form
             "agent_add": "Nuovo Agent",
             "agent_new": "\U0001f916 Nuovo Agent",
@@ -729,6 +769,7 @@ def get_chat_ui():
             # Sidebar tabs
             "tab_chat": "Chat",
             "tab_bubble": "Bubble",
+            "tab_amira": "Card",
             "tab_backups": "Copias",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Mensajes",
@@ -782,6 +823,7 @@ def get_chat_ui():
             "config_prompt_title": "Prompt de Sistema",
             "config_memory_title": "Memoria (MEMORY.md)",
             "config_llm_title": "Prioridad LLM",
+            "config_model_cache_title": "Cache de Modelos",
             "llm_fallback_label": "Respaldo automatico",
             "llm_priority_label": "Orden de prioridad",
             "llm_no_key": "sin clave",
@@ -792,6 +834,22 @@ def get_chat_ui():
             # Settings
             "config_settings_title": "Configuracion",
             "settings_saved": "Configuracion guardada!",
+            "settings_clear_models_cache": "Limpiar Cache de Modelos",
+            "settings_clear_models_cache_confirm": "Quieres borrar ahora la cache de modelos dinamicos? Los modelos fijos seguiran disponibles.",
+            "settings_clear_models_cache_done": "Cache de modelos limpiada!",
+            "settings_clear_models_cache_error": "Error al limpiar la cache de modelos",
+            "settings_refresh_models_cache": "Actualizar Cache de Modelos",
+            "settings_refresh_models_cache_done": "Cache de modelos actualizada!",
+            "settings_refresh_models_cache_error": "Error al actualizar la cache de modelos",
+            "settings_model_cache_title": "Cache de Modelos",
+            "settings_model_cache_loading": "Cargando cache de modelos...",
+            "settings_model_cache_updated_at": "Actualizada",
+            "settings_model_cache_fixed": "Modelos Fijos",
+            "settings_model_cache_dynamic": "Modelos Dinamicos (cache)",
+            "settings_model_cache_blocklist": "Modelos Bloqueados",
+            "settings_model_cache_uncertain": "Resultados Inciertos",
+            "settings_model_cache_nvidia_tested": "NVIDIA Probados OK",
+            "settings_model_cache_empty": "Sin modelos",
             "restart_confirm": "Algunos cambios requieren un reinicio para aplicarse. \u00bfReiniciar el add-on ahora?",
             "restart_in_progress": "Reiniciando add-on...",
             "restart_failed": "Reinicio fallido",
@@ -859,6 +917,8 @@ def get_chat_ui():
             "settings_desc_max_conversations": "N\u00famero m\u00e1ximo de conversaciones en el historial (1\u2013100)",
             "settings_desc_max_snapshots_per_file": "N\u00famero m\u00e1ximo de copias de seguridad por archivo. Las m\u00e1s antiguas se eliminan autom\u00e1ticamente.",
             "settings_desc_cost_currency": "Moneda para mostrar los costes de tokens",
+            "models_group_fixed": "Fijos",
+            "models_group_dynamic_cache": "Dinamicos (cache)",
             # Agent form
             "agent_add": "Nuevo Agente",
             "agent_new": "\U0001f916 Nuevo Agente",
@@ -1013,6 +1073,7 @@ def get_chat_ui():
             # Sidebar tabs
             "tab_chat": "Chat",
             "tab_bubble": "Bulle",
+            "tab_amira": "Card",
             "tab_backups": "Sauvegardes",
             "tab_devices": "Bubble Devices",
             "tab_messaging": "📱 Messages",
@@ -1066,6 +1127,7 @@ def get_chat_ui():
             "config_prompt_title": "Prompt Système Personnalisé",
             "config_memory_title": "Mémoire (MEMORY.md)",
             "config_llm_title": "Priorite LLM",
+            "config_model_cache_title": "Cache Modeles",
             "llm_fallback_label": "Repli automatique",
             "llm_priority_label": "Ordre de priorite",
             "llm_no_key": "sans cle",
@@ -1076,6 +1138,22 @@ def get_chat_ui():
             # Settings
             "config_settings_title": "Parametres",
             "settings_saved": "Parametres enregistres!",
+            "settings_clear_models_cache": "Vider le Cache Modeles",
+            "settings_clear_models_cache_confirm": "Vider maintenant le cache des modeles dynamiques ? Les modeles fixes restent disponibles.",
+            "settings_clear_models_cache_done": "Cache modeles vide !",
+            "settings_clear_models_cache_error": "Echec du vidage du cache modeles",
+            "settings_refresh_models_cache": "Rafraichir le Cache Modeles",
+            "settings_refresh_models_cache_done": "Cache modeles rafraichi !",
+            "settings_refresh_models_cache_error": "Echec du rafraichissement du cache modeles",
+            "settings_model_cache_title": "Cache Modeles",
+            "settings_model_cache_loading": "Chargement du cache modeles...",
+            "settings_model_cache_updated_at": "Mis a jour",
+            "settings_model_cache_fixed": "Modeles Fixes",
+            "settings_model_cache_dynamic": "Modeles Dynamiques (cache)",
+            "settings_model_cache_blocklist": "Modeles Bloques",
+            "settings_model_cache_uncertain": "Resultats Incertains",
+            "settings_model_cache_nvidia_tested": "NVIDIA Testes OK",
+            "settings_model_cache_empty": "Aucun modele",
             "restart_confirm": "Certains changements n\u00e9cessitent un red\u00e9marrage. Red\u00e9marrer l'add-on maintenant ?",
             "restart_in_progress": "Red\u00e9marrage de l'add-on...",
             "restart_failed": "\u00c9chec du red\u00e9marrage",
@@ -1141,6 +1219,8 @@ def get_chat_ui():
             "settings_desc_max_conversations": "Nombre maximal de conversations dans l'historique (1\u2013100)",
             "settings_desc_max_snapshots_per_file": "Nombre maximal de sauvegardes par fichier. Les plus anciennes sont supprim\u00e9es automatiquement.",
             "settings_desc_cost_currency": "Devise pour l'affichage des co\u00fbts de tokens",
+            "models_group_fixed": "Fixes",
+            "models_group_dynamic_cache": "Dynamiques (cache)",
             # Agent form
             "agent_add": "Nouvel Agent",
             "agent_new": "\U0001f916 Nouvel Agent",
@@ -1371,7 +1451,7 @@ def get_chat_ui():
         body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; height: 100svh; display: flex; flex-direction: column; overflow-x: hidden; }}
         .main-container {{ display: flex; flex: 1; overflow: hidden; min-width: 0; }}
         .sidebar {{ width: 250px; min-width: 140px; max-width: 500px; background: white; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; position: relative; }}
-        .splitter {{ width: 8px; flex: 0 0 8px; cursor: col-resize; background: transparent; }}
+        .splitter {{ width: 8px; flex: 0 0 8px; cursor: col-resize; background: transparent; touch-action: none; }}
         .splitter:hover {{ background: rgba(0,0,0,0.08); }}
         @media (pointer: coarse) {{
             .splitter {{ width: 14px; flex: 0 0 14px; background: rgba(0,0,0,0.04); }}
@@ -1381,6 +1461,7 @@ def get_chat_ui():
         .sidebar-header {{ padding: 12px; border-bottom: 1px solid #e0e0e0; font-weight: 600; font-size: 14px; color: #666; }}
         .sidebar-tabs {{ display: flex; flex-wrap: wrap; border-bottom: 1px solid #e0e0e0; background: #f8f9fa; }}
         .sidebar-tab {{ flex: 1 1 33%; min-width: 0; padding: 6px 2px; font-size: 11px; text-align: center; cursor: pointer; border: none; background: none; color: #666; transition: all 0.2s; border-bottom: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .sidebar-tab.primary-tab {{ flex-basis: 25%; }}
         .sidebar-tab:hover {{ background: #f0f0f0; }}
         .sidebar-tab.active {{ color: #667eea; border-bottom-color: #667eea; font-weight: 600; }}
         .sidebar-tab-row-sep {{ width: 100%; height: 1px; background: #e0e0e0; flex-shrink: 0; }}
@@ -1540,10 +1621,32 @@ def get_chat_ui():
         #chatgptWebBanner.configured button {{ background:#4caf50; }}
         #chatgptWebBanner.configured button:hover {{ background:#388e3c; }}
         #chatgptWebBanner button:hover {{ background:#d97706; }}
+        #geminiWebBanner {{ display:none; background:#e8f4fd; border-bottom:2px solid #4a90c2; padding:10px 20px; font-size:13px; color:#0f4c75; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #geminiWebBanner button {{ background:#4a90c2; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #geminiWebBanner button:hover {{ background:#3e7aa6; }}
+        #geminiWebConnectedBanner {{ display:none; background:#d4edda; border-bottom:2px solid #28a745; padding:8px 20px; font-size:13px; color:#155724; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #geminiWebConnectedBanner .gw-conn-info {{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }}
+        #geminiWebConnectedBanner .gw-conn-dot {{ width:8px; height:8px; border-radius:50%; background:#28a745; flex-shrink:0; }}
+        #geminiWebConnectedBanner .gw-conn-text {{ font-weight:600; }}
+        #geminiWebConnectedBanner .gw-conn-detail {{ opacity:0.75; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+        #geminiWebConnectedBanner button {{ background:transparent; color:#155724; border:1px solid #28a745; border-radius:8px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #geminiWebConnectedBanner button:hover {{ background:#c3e6cb; }}
+        #perplexityWebBanner {{ display:none; background:#efe8fb; border-bottom:2px solid #8a63d2; padding:10px 20px; font-size:13px; color:#4d2f74; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #perplexityWebBanner button {{ background:#8a63d2; color:#fff; border:none; border-radius:8px; padding:6px 14px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #perplexityWebBanner button:hover {{ background:#744fba; }}
+        #perplexityWebConnectedBanner {{ display:none; background:#d4edda; border-bottom:2px solid #28a745; padding:8px 20px; font-size:13px; color:#155724; align-items:center; gap:10px; flex-wrap:wrap; }}
+        #perplexityWebConnectedBanner .gw-conn-info {{ display:flex; align-items:center; gap:8px; flex:1; min-width:0; }}
+        #perplexityWebConnectedBanner .gw-conn-dot {{ width:8px; height:8px; border-radius:50%; background:#28a745; flex-shrink:0; }}
+        #perplexityWebConnectedBanner .gw-conn-text {{ font-weight:600; }}
+        #perplexityWebConnectedBanner .gw-conn-detail {{ opacity:0.75; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+        #perplexityWebConnectedBanner button {{ background:transparent; color:#155724; border:1px solid #28a745; border-radius:8px; padding:4px 12px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap; }}
+        #perplexityWebConnectedBanner button:hover {{ background:#c3e6cb; }}
         #chatgptWebModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
         #chatgptWebModal.open {{ display:flex; }}
         #geminiWebModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
         #geminiWebModal.open {{ display:flex; }}
+        #perplexityWebModal {{ display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; align-items:center; justify-content:center; }}
+        #perplexityWebModal.open {{ display:flex; }}
         .gemini-web-modal-box {{ background:#fff; border-radius:16px; padding:28px 32px; max-width:500px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); font-size:14px; color:#333; }}
         .gemini-web-modal-box h3 {{ margin:0 0 16px; font-size:18px; color:#222; }}
         .modal-step {{ background:#f7f7f7; border-radius:10px; padding:14px 16px; margin-bottom:14px; }}
@@ -1609,14 +1712,20 @@ def get_chat_ui():
         .chat-container {{ flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }}
         .message {{ max-width: 85%; padding: 12px 16px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-wrap: break-word; overflow-wrap: anywhere; animation: fadeIn 0.3s ease; }}
         @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(8px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-        .message.user {{ background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }}
+        .message.user {{ background: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 4px; white-space: pre-wrap; tab-size: 2; }}
+        .message.user.long {{ max-height: 320px; overflow: auto; }}
+        .message.user .user-text {{ white-space: pre-wrap; }}
+        .message.user .user-code-block {{ margin-top: 8px; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.35); border-radius: 10px; overflow: hidden; }}
+        .message.user .user-code-label {{ padding: 4px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; background: rgba(0,0,0,0.2); }}
+        .message.user .user-code-block pre {{ margin: 0; padding: 10px; max-height: 260px; overflow: auto; white-space: pre; font-size: 12px; line-height: 1.4; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }}
         .message.user img {{ max-width: 200px; max-height: 200px; border-radius: 8px; margin-top: 8px; display: block; }}
         .message.assistant {{ background: white; color: #333; align-self: flex-start; border-bottom-left-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
-        .code-block {{ position: relative; margin: 8px 0; }}
+        .code-block {{ position: relative; margin: 8px 0; max-height: 340px; overflow: hidden; }}
         .code-block .copy-button {{ position: absolute; top: 8px; right: 8px; background: #667eea; color: white; border: none; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; opacity: 0.8; transition: all 0.2s; z-index: 1; }}
         .code-block .copy-button:hover {{ opacity: 1; background: #5a6fd6; }}
         .code-block .copy-button.copied {{ background: #10b981; }}
-        .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; overflow-x: auto; margin: 0; font-size: 13px; }}
+        .code-block pre {{ max-height: 320px !important; overflow: auto !important; display: block; }}
+        .message.assistant pre {{ background: #f5f5f5; padding: 10px; border-radius: 8px; max-height: 320px; overflow: auto; margin: 0; font-size: 13px; white-space: pre; word-break: normal; overflow-wrap: normal; }}
         .message.assistant code {{ background: #f0f0f0; padding: 1px 5px; border-radius: 4px; font-size: 13px; }}
         .message.assistant pre code {{ background: none; padding: 0; }}
         /* Collapsible details blocks */
@@ -1665,6 +1774,10 @@ def get_chat_ui():
         .doc-preview-name {{ font-weight: 600; font-size: 13px; color: #333; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
         .doc-preview-size {{ font-size: 11px; color: #888; }}
         .remove-doc-btn {{ background: #ef4444; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }}
+        .input-toolbar {{ display: flex; gap: 6px; align-items: center; }}
+        .input-toolbar .fmt-btn {{ border: 1px solid #d6d6e7; background: #f7f8ff; color: #4b5563; border-radius: 8px; width: 32px; height: 28px; padding: 0; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }}
+        .input-toolbar .fmt-btn:hover {{ background: #edf0ff; border-color: #c7cdef; }}
+        .input-toolbar .fmt-btn svg {{ width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; }}
         .input-row {{ display: flex; gap: 8px; align-items: flex-end; }}
         .input-row > * {{ min-width: 0; }}
         .input-area textarea {{ flex: 1; border: 1px solid #ddd; border-radius: 20px; padding: 10px 16px; font-size: 14px; font-family: inherit; resize: none; max-height: 120px; outline: none; transition: border-color 0.2s; }}
@@ -1683,7 +1796,7 @@ def get_chat_ui():
         .input-area button.mic-btn.recording {{ background: #ef4444; animation: mic-pulse 1s infinite; }}
         .input-area button.mic-btn.processing {{ background: #f59e0b; animation: mic-pulse 1.5s infinite; }}
         @keyframes mic-pulse {{ 0%, 100% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.7; transform: scale(1.1); }} }}
-        .voice-toggle {{ display: flex; align-items: center; gap: 6px; padding: 0 16px 4px; font-size: 12px; color: #888; }}
+        .voice-toggle {{ display: flex; align-items: center; gap: 6px; padding: 0; font-size: 12px; color: #888; margin-left: auto; }}
         .voice-toggle label {{ cursor: pointer; display: flex; align-items: center; gap: 6px; user-select: none; }}
         .voice-toggle input[type="checkbox"] {{ display: none; }}
         .voice-toggle .toggle-track {{ width: 36px; height: 20px; background: #ccc; border-radius: 10px; position: relative; transition: background 0.2s; flex-shrink: 0; }}
@@ -1800,10 +1913,10 @@ def get_chat_ui():
             .input-area textarea {{ padding: 10px 14px; }}
         }}
 
-        /* Tablet: 600px - 1199px - sidebar visible but narrow */
+        /* Tablet: 600px - 1199px - sidebar visible and resizable */
         @media (min-width: 600px) and (max-width: 1199px) {{
             .mobile-only {{ display: none; }}
-            .sidebar {{ width: 160px; min-width: 140px; max-width: 180px; }}
+            .sidebar {{ width: 220px; min-width: 140px; max-width: min(520px, 45vw); }}
             .header {{ flex-wrap: wrap; padding: 10px 12px; gap: 8px; }}
             .header h1 {{ font-size: 16px; }}
             #modelSelectWrap {{ flex: 1 1 auto; }}
@@ -1959,6 +2072,27 @@ def get_chat_ui():
             padding: 2px 4px; opacity: 0.6;
         }}
         .settings-eye-btn:hover {{ opacity: 1; }}
+        .model-cache-toolbar {{
+            display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:10px 14px;
+            border-bottom:1px solid #eceff3;
+        }}
+        .model-cache-status {{ font-size:12px; color:#4caf50; }}
+        .model-cache-grid {{
+            display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap:10px; padding:10px 14px 12px;
+        }}
+        .model-cache-box {{
+            border:1px solid #e5e7eb; border-radius:8px; background:#fafbfc; overflow:hidden;
+        }}
+        .model-cache-box h5 {{
+            margin:0; padding:8px 10px; font-size:12px; letter-spacing:.3px; text-transform:uppercase;
+            color:#555; background:#f1f3f6; border-bottom:1px solid #e5e7eb;
+        }}
+        .model-cache-box pre {{
+            margin:0; padding:10px; max-height:220px; overflow:auto;
+            font-size:12px; line-height:1.5; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            color:#2f3542; background:#fafbfc;
+        }}
 
         /* ===== AGENT FORM ===== */
         .agent-list-header {{
@@ -2480,6 +2614,10 @@ def get_chat_ui():
         body.dark-mode .input-area textarea::placeholder {{
             color: #707070;
         }}
+        body.dark-mode .message.user .user-code-block {{ background: rgba(0,0,0,0.28); border-color: rgba(255,255,255,0.24); }}
+        body.dark-mode .message.user .user-code-label {{ background: rgba(255,255,255,0.08); color: #dbe4ff; }}
+        body.dark-mode .input-toolbar .fmt-btn {{ background: #2a2a44; border-color: #3d3d62; color: #d7daf0; }}
+        body.dark-mode .input-toolbar .fmt-btn:hover {{ background: #34345a; border-color: #54548a; }}
 
         body.dark-mode .voice-toggle {{ color: #888; }}
         body.dark-mode .voice-toggle .toggle-track {{ background: #444; }}
@@ -2680,6 +2818,11 @@ def get_chat_ui():
         body.dark-mode .settings-input {{ background: #2a2a3a; color: #ddd; border-color: #4a4a5a; }}
         body.dark-mode .settings-input:focus {{ border-color: #8899ff; }}
         body.dark-mode .settings-eye-btn {{ color: #aaa; }}
+        body.dark-mode .model-cache-toolbar {{ border-bottom-color:#3a3a4a; }}
+        body.dark-mode .model-cache-status {{ color:#8fd19e; }}
+        body.dark-mode .model-cache-box {{ background:#232334; border-color:#3a3a4a; }}
+        body.dark-mode .model-cache-box h5 {{ background:#2a2a3a; border-bottom-color:#3a3a4a; color:#b8c0d0; }}
+        body.dark-mode .model-cache-box pre {{ background:#232334; color:#d7dbe6; }}
 
         /* Agent form dark mode */
         body.dark-mode .agent-add-btn {{ background: #5a6fd6; }}
@@ -2737,7 +2880,7 @@ def get_chat_ui():
           <select id="providerSelect" class="model-selector" title="{ui_js['change_model']}"></select>
           <select id="modelSelect" class="model-selector" title="{ui_js['change_model']}"></select>
         </div>
-        <button id="testNvidiaBtn" class="new-chat" onclick="testNvidiaModel()" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
+        <button id="testNvidiaBtn" class="new-chat" title="{ui_js['nvidia_test_title']}" style="display:none">\U0001f50d {ui_js['nvidia_test_btn']}</button>
         <!-- Populated by JavaScript -->
         <button id="newChatBtn" class="new-chat" onclick="newChat()" title="{ui_js['new_chat_title']}">\u2728 {ui_js['new_chat_btn']}</button>
         <label class="readonly-toggle" title="{ui_js['readonly_title']}">
@@ -2864,13 +3007,18 @@ def get_chat_ui():
     </div>
 
     <!-- Gemini Web session banners -->
-    <div id="geminiWebBanner" style="display:none;align-items:center;gap:10px;padding:10px 14px;background:#e8f4fd;border-bottom:1px solid #b3d4f0;font-size:13px;">
-        <span>&#9888;&#65039; <strong>Gemini Web [UNSTABLE]</strong> &mdash; browser cookies required.</span>
+    <div id="geminiWebBanner">
+        <span>&#9888;&#65039; <strong>Gemini Web</strong> &mdash; browser cookies required.</span>
         <button id="geminiWebConnectBtn">Connect Gemini Web</button>
+        <button id="geminiWebDismissBtn" style="background:#d6e8f5;color:#0f4c75;">Dismiss</button>
     </div>
-    <div id="geminiWebConnectedBanner" style="display:none;align-items:center;gap:10px;padding:8px 14px;background:#e8f8ed;border-bottom:1px solid #a8dbb5;font-size:13px;">
-        <span>&#10003; <strong>Gemini Web</strong> &mdash; <span id="geminiWebConnDetail">connected</span></span>
-        <button id="geminiWebDisconnectBtn" style="background:#fdecea;color:#c0392b;border:1px solid #f5b7b1;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:12px;">Disconnect</button>
+    <div id="geminiWebConnectedBanner">
+        <div class="gw-conn-info">
+            <div class="gw-conn-dot"></div>
+            <span class="gw-conn-text">&#128273; Gemini Web</span>
+            <span class="gw-conn-detail" id="geminiWebConnDetail">connected</span>
+        </div>
+        <button id="geminiWebDisconnectBtn">Disconnect</button>
     </div>
 
     <!-- Gemini Web modal -->
@@ -2896,6 +3044,50 @@ def get_chat_ui():
             <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
                 <button id="geminiWebModalCancelBtn" style="background:#eee;color:#333;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;">Annulla</button>
                 <button id="geminiWebModalConnectBtn" class="btn-primary">&#10004; Connetti</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perplexity Web session banners -->
+    <div id="perplexityWebBanner">
+        <span>&#9888;&#65039; <strong>Perplexity Web</strong> &mdash; browser cookies required.</span>
+        <button id="perplexityWebConnectBtn">Connect Perplexity Web</button>
+        <button id="perplexityWebDismissBtn" style="background:#eadcf9;color:#4d2f74;">Dismiss</button>
+    </div>
+    <div id="perplexityWebConnectedBanner">
+        <div class="gw-conn-info">
+            <div class="gw-conn-dot"></div>
+            <span class="gw-conn-text">&#128273; Perplexity Web</span>
+            <span class="gw-conn-detail" id="perplexityWebConnDetail">connected</span>
+        </div>
+        <button id="perplexityWebDisconnectBtn">Disconnect</button>
+    </div>
+
+    <!-- Perplexity Web modal -->
+    <div id="perplexityWebModal">
+        <div class="gemini-web-modal-box">
+            <h3>&#128273; Perplexity Web &mdash; Connection</h3>
+            <div class="modal-step">
+                <strong>Step 1 &mdash; Open DevTools on perplexity.ai</strong>
+                <p style="margin:0 0 8px;font-size:12px;color:#666;">
+                    Login on <a href="https://www.perplexity.ai" target="_blank"><strong>perplexity.ai</strong></a>,
+                    then press <strong>F12</strong> &rarr; <em>Application</em> &rarr; <em>Cookies</em> &rarr; <em>www.perplexity.ai</em>
+                </p>
+            </div>
+            <div class="modal-step">
+                <strong>Step 2 &mdash; Copy cookie next-auth.csrf-token</strong>
+                <input type="password" id="perplexityWebCsrfInput" placeholder="next-auth.csrf-token"
+                    style="width:100%;box-sizing:border-box;margin-top:6px;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:monospace;" />
+            </div>
+            <div class="modal-step">
+                <strong>Step 3 &mdash; Copy cookie next-auth.session-token</strong>
+                <input type="password" id="perplexityWebSessionInput" placeholder="next-auth.session-token"
+                    style="width:100%;box-sizing:border-box;margin-top:6px;padding:7px 10px;border:1px solid #ccc;border-radius:6px;font-size:13px;font-family:monospace;" />
+            </div>
+            <div id="perplexityWebStatus" style="min-height:18px;font-size:12px;margin:6px 0;"></div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px;">
+                <button id="perplexityWebModalCancelBtn" style="background:#eee;color:#333;border:none;padding:7px 16px;border-radius:6px;cursor:pointer;">Cancel</button>
+                <button id="perplexityWebModalConnectBtn" class="btn-primary">&#10004; Connect</button>
             </div>
         </div>
     </div>
@@ -2948,9 +3140,10 @@ def get_chat_ui():
     <div class="main-container">
         <div class="sidebar" id="sidebar">
             <div class="sidebar-tabs">
-                <button class="sidebar-tab active" data-tab="chat" onclick="switchSidebarTab('chat')">\U0001f4ac {ui_js['tab_chat']}</button>
-                <button class="sidebar-tab" data-tab="bubble" onclick="switchSidebarTab('bubble')">\U0001f4ad {ui_js['tab_bubble']}</button>
-                <button class="sidebar-tab" data-tab="messaging" onclick="switchSidebarTab('messaging')">{ui_js['tab_messaging']}</button>
+                <button class="sidebar-tab primary-tab active" data-tab="chat" onclick="switchSidebarTab('chat')">\U0001f4ac {ui_js['tab_chat']}</button>
+                <button class="sidebar-tab primary-tab" data-tab="bubble" onclick="switchSidebarTab('bubble')">\U0001f4ad {ui_js['tab_bubble']}</button>
+                <button class="sidebar-tab primary-tab" data-tab="amira" onclick="switchSidebarTab('amira')">\U0001f916 {ui_js.get('tab_amira', 'Amira')}</button>
+                <button class="sidebar-tab primary-tab" data-tab="messaging" onclick="switchSidebarTab('messaging')">{ui_js['tab_messaging']}</button>
                 <div class="sidebar-tab-row-sep"></div>
                 <button class="sidebar-tab" data-tab="files" onclick="switchSidebarTab('files')">{ui_js['tab_files']}</button>
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
@@ -2963,6 +3156,9 @@ def get_chat_ui():
             </div>
             <div class="sidebar-content" id="tabBubble">
                 <div class="chat-list" id="bubbleList"></div>
+            </div>
+            <div class="sidebar-content" id="tabAmira">
+                <div class="chat-list" id="amiraList"></div>
             </div>
             <div class="sidebar-content" id="tabBackups">
                 <div class="backup-list" id="backupList"></div>
@@ -3028,6 +3224,24 @@ def get_chat_ui():
             </div>
             <button class="remove-doc-btn" id="removeDocBtn" title="">×</button>
         </div>
+        <div class="input-toolbar" id="inputToolbar">
+            <button class="fmt-btn" id="fmtCodeBtn" type="button" title="Code" onclick="window.__amiraInputFormat && window.__amiraInputFormat('code')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            </button>
+            <button class="fmt-btn" id="fmtHtmlBtn" type="button" title="HTML" onclick="window.__amiraInputFormat && window.__amiraInputFormat('html')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h16l-2 18-6 2-6-2z"/><polyline points="8 8 10 12 8 16"/><polyline points="16 8 14 12 16 16"/></svg>
+            </button>
+            <button class="fmt-btn" id="fmtLinkBtn" type="button" title="Link" onclick="window.__amiraInputFormat && window.__amiraInputFormat('link')">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L10 5"/><path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L14 19"/></svg>
+            </button>
+            <div class="voice-toggle" id="voiceToggle" style="display: {voice_display};">
+                <label>
+                    <input type="checkbox" id="voiceModeCheckbox" />
+                    <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                    <span class="toggle-label">{ui_js['voice_mode']}</span>
+                </label>
+            </div>
+        </div>
         <div class="input-row">
             <input type="file" id="imageInput" accept="image/*" style="display: none;" />
             <button class="image-btn" title="{ui_js['upload_image']}">
@@ -3046,13 +3260,6 @@ def get_chat_ui():
                 <svg id="sendIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
                 <svg id="stopIcon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
             </button>
-        </div>
-        <div class="voice-toggle" id="voiceToggle" style="display: {voice_display};">
-            <label>
-                <input type="checkbox" id="voiceModeCheckbox" />
-                <span class="toggle-track"><span class="toggle-thumb"></span></span>
-                <span class="toggle-label">{ui_js['voice_mode']}</span>
-            </label>
         </div>
         <div class="voice-speaking-bar" id="voiceSpeakingBar" title="{ui_js['voice_stop_speaking']}">
             <div class="wave"><span></span><span></span><span></span><span></span><span></span></div>
@@ -3695,7 +3902,7 @@ def get_chat_ui():
         let darkMode = safeLocalStorageGet('darkMode') === 'true';
         let currentProviderId = '{ai_provider}' || 'anthropic';
         let currentModelDisplay = '{model_name}';  // Updated by loadModels() and changeModel()
-        const WEB_DASH_WARN_PROVIDERS = new Set(['claude_web', 'chatgpt_web', 'gemini_web', 'github_copilot']);
+        const WEB_DASH_WARN_PROVIDERS = new Set(['claude_web', 'chatgpt_web', 'gemini_web', 'perplexity_web', 'github_copilot']);
         const _webDashWarnShown = {{}};
 
         const ANALYZING_MSG = {json.dumps(analyzing_msg)};
@@ -3753,12 +3960,17 @@ def get_chat_ui():
             if (isMobileLayout) return;
 
             const minWidth = 140;
-            const maxWidth = 500;
+            const MIN_CHAT = 320; // keep chat area readable
+            function getMaxWidth() {{
+                // Leave room for splitter + chat area, but allow wider sidebars on tablet.
+                const byViewport = window.innerWidth - MIN_CHAT - splitterEl.getBoundingClientRect().width - 8;
+                return Math.max(minWidth, Math.min(520, byViewport));
+            }}
             const storageKey = 'chatSidebarWidth';
 
             const saved = parseInt(safeLocalStorageGet(storageKey) || '', 10);
             if (!Number.isNaN(saved)) {{
-                const w = Math.max(minWidth, Math.min(maxWidth, saved));
+                const w = Math.max(minWidth, Math.min(getMaxWidth(), saved));
                 sidebarEl.style.width = w + 'px';
             }}
 
@@ -3776,7 +3988,7 @@ def get_chat_ui():
             function moveDrag(x) {{
                 if (!dragging) return;
                 const dx = x - startX;
-                let next = Math.max(minWidth, Math.min(maxWidth, startWidth + dx));
+                let next = Math.max(minWidth, Math.min(getMaxWidth(), startWidth + dx));
                 sidebarEl.style.width = next + 'px';
             }}
 
@@ -3798,9 +4010,19 @@ def get_chat_ui():
                 if (e.touches.length === 1) {{ startDrag(e.touches[0].clientX); e.preventDefault(); }}
             }}, {{ passive: false }});
             window.addEventListener('touchmove', (e) => {{
-                if (dragging && e.touches.length === 1) moveDrag(e.touches[0].clientX);
-            }}, {{ passive: true }});
+                if (dragging && e.touches.length === 1) {{
+                    e.preventDefault();
+                    moveDrag(e.touches[0].clientX);
+                }}
+            }}, {{ passive: false }});
             window.addEventListener('touchend', endDrag);
+
+            // Keep width valid after orientation/viewport changes.
+            window.addEventListener('resize', () => {{
+                const currentW = Math.round(sidebarEl.getBoundingClientRect().width);
+                const clamped = Math.max(minWidth, Math.min(getMaxWidth(), currentW));
+                if (clamped !== currentW) sidebarEl.style.width = clamped + 'px';
+            }});
         }}
 
         // ===== FILE PANEL RESIZE (mirrors initSidebarResize) =====
@@ -4138,6 +4360,7 @@ def get_chat_ui():
             {{ file: 'amira/custom_system_prompt.txt', icon: '\U0001f4dd', title: T.config_prompt_title || 'Custom System Prompt', desc: 'custom_system_prompt.txt', formBased: 'prompt' }},
             {{ file: 'amira/memory/MEMORY.md', icon: '\U0001f9e0', title: T.config_memory_title || 'Memory (MEMORY.md)', desc: 'memory/MEMORY.md', formBased: 'memory' }},
             {{ file: 'amira/fallback_config.json', icon: '\U0001f504', title: T.config_llm_title || 'LLM Priority', desc: 'fallback_config.json', formBased: 'llm_priority' }},
+            {{ file: 'amira_models_cache.json', icon: '\U0001f5c3\ufe0f', title: T.config_model_cache_title || 'Model Cache', desc: '/data/amira_models_cache.json', formBased: 'model_cache' }},
             {{ file: 'amira/settings.json', icon: '\u2699\ufe0f', title: T.config_settings_title || 'Settings', desc: 'settings.json', formBased: 'settings' }},
         ];
         let configActiveFile = null;
@@ -4207,6 +4430,10 @@ def get_chat_ui():
             }}
             if (cf.formBased === 'settings') {{
                 await openSettingsUI();
+                return;
+            }}
+            if (cf.formBased === 'model_cache') {{
+                await openModelCacheUI();
                 return;
             }}
 
@@ -5384,6 +5611,139 @@ def get_chat_ui():
             filePanelContentEl.appendChild(wrap);
         }}
 
+        async function openModelCacheUI() {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.settings_model_cache_loading || 'Loading model cache...') + '</div>';
+
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>\U0001f5c3\ufe0f ' + (T.settings_model_cache_title || 'Model Cache') + '</h3>';
+            wrap.appendChild(hdr);
+
+            const body = document.createElement('div');
+            body.style.cssText = 'flex:1;overflow-y:auto;padding:0;';
+
+            function _cacheMapToText(mp) {{
+                const lines = [];
+                const keys = Object.keys(mp || {{}}).sort();
+                if (!keys.length) return (T.settings_model_cache_empty || 'No models');
+                keys.forEach(k => {{
+                    const arr = Array.isArray(mp[k]) ? mp[k] : [];
+                    lines.push(`[${{k}}] (${{arr.length}})`);
+                    arr.forEach(m => lines.push('  - ' + m));
+                    lines.push('');
+                }});
+                return lines.join('\\n').trim() || (T.settings_model_cache_empty || 'No models');
+            }}
+
+            async function _render() {{
+                body.innerHTML = '<div style="padding:8px 14px;color:#999;">' + (T.settings_model_cache_loading || 'Loading model cache...') + '</div>';
+                try {{
+                    const resp = await fetch(apiUrl('api/models/cache/status'), {{credentials:'same-origin'}});
+                    const data = await resp.json().catch(() => ({{}}));
+                    if (!resp.ok || !data || !data.success) throw new Error((data && (data.error || data.message)) || ('HTTP ' + resp.status));
+                    const fmtUpdatedAt = (raw) => {{
+                        try {{
+                            const d = new Date(raw);
+                            if (Number.isNaN(d.getTime())) return String(raw || '');
+                            return d.toLocaleString([], {{ dateStyle: 'short', timeStyle: 'medium' }});
+                        }} catch(_e) {{
+                            return String(raw || '');
+                        }}
+                    }};
+
+                    const toolbar = document.createElement('div');
+                    toolbar.className = 'model-cache-toolbar';
+                    const refreshBtn = document.createElement('button');
+                    refreshBtn.className = 'config-save-btn';
+                    refreshBtn.style.cssText = 'padding:6px 12px;font-size:12px;background:#1976d2;';
+                    refreshBtn.textContent = '\U0001F504 ' + (T.settings_refresh_models_cache || 'Refresh Models Cache');
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'config-save-btn';
+                    clearBtn.style.cssText = 'padding:6px 12px;font-size:12px;background:#d32f2f;';
+                    clearBtn.textContent = '\U0001F5D1\uFE0F ' + (T.settings_clear_models_cache || 'Clear Models Cache');
+                    const cacheStatus = document.createElement('span');
+                    cacheStatus.className = 'model-cache-status';
+                    const updated = data.updated_at ? (' — ' + (T.settings_model_cache_updated_at || 'Updated') + ': ' + fmtUpdatedAt(data.updated_at)) : '';
+                    cacheStatus.textContent = updated || '';
+
+                    refreshBtn.addEventListener('click', async () => {{
+                        refreshBtn.disabled = true;
+                        refreshBtn.textContent = '\u23F3 ...';
+                        try {{
+                            const r = await fetch(apiUrl('api/models/cache/refresh'), {{method:'POST', headers:{{'Content-Type':'application/json'}}, credentials:'same-origin'}});
+                            const d = await r.json();
+                            if (!d.success) throw new Error(d.error || 'Refresh failed');
+                            cacheStatus.textContent = '\u2705 ' + (T.settings_refresh_models_cache_done || 'Models cache refreshed!');
+                            try {{ _cachedProviders = []; _cachedModels = {{}}; }} catch(_e) {{}}
+                            await _render();
+                        }} catch(e) {{
+                            cacheStatus.textContent = '\u274C ' + ((T.settings_refresh_models_cache_error || 'Failed to refresh models cache') + ': ' + (e.message || 'Error'));
+                        }} finally {{
+                            refreshBtn.disabled = false;
+                            refreshBtn.textContent = '\U0001F504 ' + (T.settings_refresh_models_cache || 'Refresh Models Cache');
+                        }}
+                    }});
+
+                    clearBtn.addEventListener('click', async () => {{
+                        const msg = T.settings_clear_models_cache_confirm || 'Clear cached dynamic provider models now?';
+                        if (!window.confirm(msg)) return;
+                        clearBtn.disabled = true;
+                        clearBtn.textContent = '\u23F3 ...';
+                        try {{
+                            const r = await fetch(apiUrl('api/models/cache/clear'), {{method:'POST', headers:{{'Content-Type':'application/json'}}, credentials:'same-origin'}});
+                            const d = await r.json();
+                            if (!d.success) throw new Error(d.error || 'Clear failed');
+                            cacheStatus.textContent = '\u2705 ' + (T.settings_clear_models_cache_done || 'Models cache cleared!');
+                            try {{ _cachedProviders = []; _cachedModels = {{}}; }} catch(_e) {{}}
+                            await _render();
+                        }} catch(e) {{
+                            cacheStatus.textContent = '\u274C ' + ((T.settings_clear_models_cache_error || 'Failed to clear models cache') + ': ' + (e.message || 'Error'));
+                        }} finally {{
+                            clearBtn.disabled = false;
+                            clearBtn.textContent = '\U0001F5D1\uFE0F ' + (T.settings_clear_models_cache || 'Clear Models Cache');
+                        }}
+                    }});
+
+                    toolbar.appendChild(refreshBtn);
+                    toolbar.appendChild(clearBtn);
+                    toolbar.appendChild(cacheStatus);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'model-cache-grid';
+                    const mkBox = (title, text) => {{
+                        const box = document.createElement('div');
+                        box.className = 'model-cache-box';
+                        const h = document.createElement('h5');
+                        h.textContent = title;
+                        const pre = document.createElement('pre');
+                        pre.textContent = text || (T.settings_model_cache_empty || 'No models');
+                        box.appendChild(h);
+                        box.appendChild(pre);
+                        return box;
+                    }};
+                    grid.appendChild(mkBox(T.settings_model_cache_fixed || 'Fixed Models', _cacheMapToText(data.fixed || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_dynamic || 'Dynamic Models (cache)', _cacheMapToText(data.dynamic || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_blocklist || 'Blocked Models', _cacheMapToText(data.blocklist || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_uncertain || 'Uncertain Test Results', _cacheMapToText(data.uncertain || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_nvidia_tested || 'NVIDIA Tested OK', (Array.isArray(data.nvidia_tested_ok) && data.nvidia_tested_ok.length) ? data.nvidia_tested_ok.map(m => '- ' + m).join('\\n') : (T.settings_model_cache_empty || 'No models')));
+
+                    body.innerHTML = '';
+                    body.appendChild(toolbar);
+                    body.appendChild(grid);
+                }} catch(e) {{
+                    body.innerHTML = '<div style="padding:8px 14px;color:#f44336;">' + _escHtml(String(e && e.message ? e.message : e)) + '</div>';
+                }}
+            }}
+
+            await _render();
+            wrap.appendChild(body);
+            filePanelContentEl.innerHTML = '';
+            filePanelContentEl.appendChild(wrap);
+        }}
+
         async function openSettingsUI() {{
             if (!filePanelContentEl) return;
             filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
@@ -5566,6 +5926,160 @@ def get_chat_ui():
                 body.appendChild(sec);
             }});
 
+            // ---- Model Cache panel ----
+            const cacheSec = document.createElement('div');
+            cacheSec.className = 'settings-section';
+            const cacheHdr = document.createElement('div');
+            cacheHdr.className = 'settings-section-header';
+            const cacheTitle = document.createElement('span');
+            cacheTitle.textContent = '\U0001f5c3\ufe0f ' + (T.settings_model_cache_title || 'Model Cache').toUpperCase();
+            cacheHdr.appendChild(cacheTitle);
+            const cacheArrow = document.createElement('span');
+            cacheArrow.className = 'settings-section-arrow';
+            cacheArrow.textContent = '\u25B6';
+            cacheHdr.appendChild(cacheArrow);
+            const cacheBody = document.createElement('div');
+            cacheBody.className = 'settings-section-body';
+            cacheBody.style.display = 'none';
+            cacheSec.appendChild(cacheHdr);
+            cacheSec.appendChild(cacheBody);
+            body.appendChild(cacheSec);
+
+            function _cacheMapToText(title, mp) {{
+                const lines = [];
+                const keys = Object.keys(mp || {{}}).sort();
+                if (!keys.length) return (T.settings_model_cache_empty || 'No models');
+                keys.forEach(k => {{
+                    const arr = Array.isArray(mp[k]) ? mp[k] : [];
+                    lines.push(`[${{k}}] (${{arr.length}})`);
+                    arr.forEach(m => lines.push('  - ' + m));
+                    lines.push('');
+                }});
+                return lines.join('\\n').trim() || (T.settings_model_cache_empty || 'No models');
+            }}
+
+            async function renderModelCacheStatus() {{
+                cacheBody.innerHTML = '<div style="padding:8px 14px;color:#999;">' + (T.settings_model_cache_loading || 'Loading model cache...') + '</div>';
+                try {{
+                    const resp = await fetch(apiUrl('api/models/cache/status'), {{credentials:'same-origin'}});
+                    const data = await resp.json().catch(() => ({{}}));
+                    if (!resp.ok || !data || !data.success) {{
+                        throw new Error((data && (data.error || data.message)) || ('HTTP ' + resp.status));
+                    }}
+                    const fmtUpdatedAt = (raw) => {{
+                        try {{
+                            const d = new Date(raw);
+                            if (Number.isNaN(d.getTime())) return String(raw || '');
+                            return d.toLocaleString([], {{ dateStyle: 'short', timeStyle: 'medium' }});
+                        }} catch(_e) {{
+                            return String(raw || '');
+                        }}
+                    }};
+
+                    const toolbar = document.createElement('div');
+                    toolbar.className = 'model-cache-toolbar';
+
+                    const refreshBtn = document.createElement('button');
+                    refreshBtn.className = 'config-save-btn';
+                    refreshBtn.style.cssText = 'padding:6px 12px;font-size:12px;background:#1976d2;';
+                    refreshBtn.textContent = '\U0001F504 ' + (T.settings_refresh_models_cache || 'Refresh Models Cache');
+
+                    const clearBtn = document.createElement('button');
+                    clearBtn.className = 'config-save-btn';
+                    clearBtn.style.cssText = 'padding:6px 12px;font-size:12px;background:#d32f2f;';
+                    clearBtn.textContent = '\U0001F5D1\uFE0F ' + (T.settings_clear_models_cache || 'Clear Models Cache');
+
+                    const cacheStatus = document.createElement('span');
+                    cacheStatus.className = 'model-cache-status';
+                    const updated = data.updated_at ? (' — ' + (T.settings_model_cache_updated_at || 'Updated') + ': ' + fmtUpdatedAt(data.updated_at)) : '';
+                    cacheStatus.textContent = updated || '';
+
+                    refreshBtn.addEventListener('click', async () => {{
+                        refreshBtn.disabled = true;
+                        refreshBtn.textContent = '\u23F3 ...';
+                        try {{
+                            const r = await fetch(apiUrl('api/models/cache/refresh'), {{
+                                method: 'POST',
+                                headers: {{'Content-Type': 'application/json'}},
+                                credentials: 'same-origin',
+                            }});
+                            const d = await r.json();
+                            if (!d.success) throw new Error(d.error || 'Refresh failed');
+                            cacheStatus.textContent = '\u2705 ' + (T.settings_refresh_models_cache_done || 'Models cache refreshed!');
+                            try {{ _cachedProviders = []; _cachedModels = {{}}; }} catch(_e) {{}}
+                            await renderModelCacheStatus();
+                        }} catch(e) {{
+                            cacheStatus.textContent = '\u274C ' + ((T.settings_refresh_models_cache_error || 'Failed to refresh models cache') + ': ' + (e.message || 'Error'));
+                        }} finally {{
+                            refreshBtn.disabled = false;
+                            refreshBtn.textContent = '\U0001F504 ' + (T.settings_refresh_models_cache || 'Refresh Models Cache');
+                        }}
+                    }});
+
+                    clearBtn.addEventListener('click', async () => {{
+                        const msg = T.settings_clear_models_cache_confirm || 'Clear cached dynamic provider models now?';
+                        if (!window.confirm(msg)) return;
+                        clearBtn.disabled = true;
+                        clearBtn.textContent = '\u23F3 ...';
+                        try {{
+                            const r = await fetch(apiUrl('api/models/cache/clear'), {{
+                                method: 'POST',
+                                headers: {{'Content-Type': 'application/json'}},
+                                credentials: 'same-origin',
+                            }});
+                            const d = await r.json();
+                            if (!d.success) throw new Error(d.error || 'Clear failed');
+                            cacheStatus.textContent = '\u2705 ' + (T.settings_clear_models_cache_done || 'Models cache cleared!');
+                            try {{ _cachedProviders = []; _cachedModels = {{}}; }} catch(_e) {{}}
+                            await renderModelCacheStatus();
+                        }} catch(e) {{
+                            cacheStatus.textContent = '\u274C ' + ((T.settings_clear_models_cache_error || 'Failed to clear models cache') + ': ' + (e.message || 'Error'));
+                        }} finally {{
+                            clearBtn.disabled = false;
+                            clearBtn.textContent = '\U0001F5D1\uFE0F ' + (T.settings_clear_models_cache || 'Clear Models Cache');
+                        }}
+                    }});
+
+                    toolbar.appendChild(refreshBtn);
+                    toolbar.appendChild(clearBtn);
+                    toolbar.appendChild(cacheStatus);
+
+                    const grid = document.createElement('div');
+                    grid.className = 'model-cache-grid';
+
+                    const mkBox = (title, text) => {{
+                        const box = document.createElement('div');
+                        box.className = 'model-cache-box';
+                        const h = document.createElement('h5');
+                        h.textContent = title;
+                        const pre = document.createElement('pre');
+                        pre.textContent = text || (T.settings_model_cache_empty || 'No models');
+                        box.appendChild(h);
+                        box.appendChild(pre);
+                        return box;
+                    }};
+
+                    grid.appendChild(mkBox(T.settings_model_cache_fixed || 'Fixed Models', _cacheMapToText('fixed', data.fixed || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_dynamic || 'Dynamic Models (cache)', _cacheMapToText('dynamic', data.dynamic || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_blocklist || 'Blocked Models', _cacheMapToText('blocklist', data.blocklist || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_uncertain || 'Uncertain Test Results', _cacheMapToText('uncertain', data.uncertain || {{}})));
+                    grid.appendChild(mkBox(T.settings_model_cache_nvidia_tested || 'NVIDIA Tested OK', (Array.isArray(data.nvidia_tested_ok) && data.nvidia_tested_ok.length) ? data.nvidia_tested_ok.map(m => '- ' + m).join('\\n') : (T.settings_model_cache_empty || 'No models')));
+
+                    cacheBody.innerHTML = '';
+                    cacheBody.appendChild(toolbar);
+                    cacheBody.appendChild(grid);
+                }} catch(e) {{
+                    cacheBody.innerHTML = '<div style="padding:8px 14px;color:#f44336;">' + _escHtml(String(e && e.message ? e.message : e)) + '</div>';
+                }}
+            }}
+
+            cacheHdr.addEventListener('click', async () => {{
+                const isOpen = cacheBody.style.display !== 'none';
+                cacheBody.style.display = isOpen ? 'none' : 'block';
+                cacheArrow.textContent = isOpen ? '\u25B6' : '\u25BC';
+                if (!isOpen) await renderModelCacheStatus();
+            }});
+
             // Save button
             const saveRow = document.createElement('div');
             saveRow.style.cssText = 'margin-top:16px;display:flex;align-items:center;gap:10px;padding-bottom:20px;';
@@ -5631,10 +6145,18 @@ def get_chat_ui():
                         const ok = '\u2705', no = '\u274C', warn = '\u26A0\uFE0F';
                         html += '<div>' + (d.bubble_enabled ? ok : no) + ' Chat Bubble: <b>' + (d.bubble_enabled ? 'ON' : 'OFF') + '</b></div>';
                         html += '<div>' + (d.card_button_enabled ? ok : no) + ' Card Button: <b>' + (d.card_button_enabled ? 'ON' : 'OFF') + '</b></div>';
+                        html += '<div>' + ((d.automation_button_enabled !== false) ? ok : no) + ' Automation Button: <b>' + ((d.automation_button_enabled !== false) ? 'ON' : 'OFF') + '</b></div>';
                         html += '<div>' + (d.registered_flag ? ok : warn) + ' Registered flag: <b>' + d.registered_flag + '</b></div>';
                         html += '<div>' + (d.ingress_url && d.ingress_url !== '(empty)' ? ok : no) + ' Ingress URL: <b>' + (d.ingress_url || '(empty)') + '</b></div>';
-                        const js = d.js_file || {{}};
-                        html += '<div>' + (js.exists ? ok : no) + ' JS file: <b>' + (js.exists ? (js.size_bytes + ' bytes') : 'NOT FOUND') + '</b></div>';
+                        const mods = d.module_files || {{}};
+                        const loader = mods.loader || d.js_file || {{}};
+                        const bubble = mods.bubble || {{}};
+                        const card = mods.card || {{}};
+                        const automation = mods.automation || {{}};
+                        html += '<div>' + (loader.exists ? ok : no) + ' Loader JS: <b>' + (loader.exists ? (loader.size_bytes + ' bytes') : 'NOT FOUND') + '</b></div>';
+                        html += '<div>' + (bubble.exists ? ok : no) + ' Module Bubble: <b>' + (bubble.exists ? (bubble.size_bytes + ' bytes') : 'NOT FOUND') + '</b></div>';
+                        html += '<div>' + (card.exists ? ok : no) + ' Module Card: <b>' + (card.exists ? (card.size_bytes + ' bytes') : 'NOT FOUND') + '</b></div>';
+                        html += '<div>' + (automation.exists ? ok : no) + ' Module Automation: <b>' + (automation.exists ? (automation.size_bytes + ' bytes') : 'NOT FOUND') + '</b></div>';
                         const lr = d.lovelace_resource || {{}};
                         if (lr.error) {{
                             html += '<div>' + warn + ' Lovelace: <b>' + lr.error + '</b></div>';
@@ -5713,6 +6235,7 @@ def get_chat_ui():
                 const tabName = activeTab ? activeTab.dataset.tab : 'chat';
                 if (tabName === 'chat') loadChatList();
                 else if (tabName === 'bubble') loadBubbleList();
+                else if (tabName === 'amira') loadAmiraList();
                 else if (tabName === 'backups') loadBackupList();
                 else if (tabName === 'devices') loadDeviceList();
             }}
@@ -6205,6 +6728,65 @@ def get_chat_ui():
             el.style.height = Math.min(el.scrollHeight, 120) + 'px';
         }}
 
+        function _wrapInputSelection(prefix, suffix, placeholder = '') {{
+            if (!input) return;
+            const start = input.selectionStart || 0;
+            const end = input.selectionEnd || 0;
+            const before = input.value.slice(0, start);
+            const selected = input.value.slice(start, end);
+            const after = input.value.slice(end);
+            const body = selected || placeholder;
+            input.value = before + prefix + body + suffix + after;
+            const cursorPos = before.length + prefix.length + body.length;
+            input.focus();
+            input.selectionStart = cursorPos;
+            input.selectionEnd = cursorPos;
+            autoResize(input);
+        }}
+
+        function insertCodeFence(lang) {{
+            const safeLang = String(lang || '').trim();
+            const header = safeLang ? ('```' + safeLang + '\\n') : '```\\n';
+            _wrapInputSelection(header, '\\n```', 'incolla qui il codice');
+        }}
+
+        function insertLinkTemplate() {{
+            if (!input) return;
+            const start = input.selectionStart || 0;
+            const end = input.selectionEnd || 0;
+            const selected = input.value.slice(start, end);
+            const label = selected || 'testo';
+            _wrapInputSelection('[', '](https://)', label);
+        }}
+
+        function bindInputToolbarButtons() {{
+            const fmtCodeBtn = document.getElementById('fmtCodeBtn');
+            const fmtHtmlBtn = document.getElementById('fmtHtmlBtn');
+            const fmtLinkBtn = document.getElementById('fmtLinkBtn');
+            if (fmtCodeBtn && !fmtCodeBtn._amiraBound) {{
+                fmtCodeBtn._amiraBound = true;
+                fmtCodeBtn.onclick = () => insertCodeFence('yaml');
+            }}
+            if (fmtHtmlBtn && !fmtHtmlBtn._amiraBound) {{
+                fmtHtmlBtn._amiraBound = true;
+                fmtHtmlBtn.onclick = () => insertCodeFence('html');
+            }}
+            if (fmtLinkBtn && !fmtLinkBtn._amiraBound) {{
+                fmtLinkBtn._amiraBound = true;
+                fmtLinkBtn.onclick = () => insertLinkTemplate();
+            }}
+        }}
+
+        window.__amiraInputFormat = function(kind) {{
+            try {{
+                if (kind === 'code') return insertCodeFence('yaml');
+                if (kind === 'html') return insertCodeFence('html');
+                if (kind === 'link') return insertLinkTemplate();
+            }} catch (e) {{
+                console.warn('[ui] __amiraInputFormat failed', e);
+            }}
+        }};
+
         function handleKeyDown(e) {{
             if (e.key === 'Enter' && !e.shiftKey) {{
                 e.preventDefault();
@@ -6342,7 +6924,7 @@ def get_chat_ui():
             const inp = _fmtTokens(conversationUsage.input_tokens);
             const out = _fmtTokens(conversationUsage.output_tokens);
             const sym = _currSym(conversationUsage.currency);
-            let text = '\ud83d\udcca ' + inp + ' in / ' + out + ' out';
+            let text = 'Usage: ' + inp + ' in / ' + out + ' out';
             // Cache tokens in session total
             const cR = conversationUsage.cache_read_tokens;
             const cW = conversationUsage.cache_write_tokens;
@@ -6384,7 +6966,17 @@ def get_chat_ui():
                 // If the assistant is asking to choose an entity_id, provide tap-to-select UI
                 injectEntityPicker(div, text);
             }} else {{
-                div.textContent = stripContextInjections(text);
+                const userText = stripContextInjections(text);
+                const rendered = formatUserInputDisplay(userText);
+                if (rendered.hasCode) {{
+                    div.innerHTML = rendered.html;
+                }} else {{
+                    div.textContent = userText;
+                }}
+                const lineCount = userText ? userText.split('\\n').length : 0;
+                if (!rendered.hasCode && (lineCount >= 12 || userText.length >= 1200)) {{
+                    div.classList.add('long');
+                }}
                 if (imageData) {{
                     const img = document.createElement('img');
                     img.src = imageData;
@@ -6393,6 +6985,34 @@ def get_chat_ui():
             }}
             chat.appendChild(div);
             chat.scrollTop = chat.scrollHeight;
+            return div;
+        }}
+
+        function formatUserInputDisplay(text) {{
+            const src = String(text || '');
+            const esc = (s) => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const fence = /```([a-zA-Z0-9_-]*)\\n([\\s\\S]*?)```/g;
+            let out = '';
+            let last = 0;
+            let hasCode = false;
+            let m;
+            while ((m = fence.exec(src)) !== null) {{
+                hasCode = true;
+                const before = src.slice(last, m.index);
+                if (before) {{
+                    out += '<div class="user-text">' + esc(before).replace(/\\n/g, '<br>') + '</div>';
+                }}
+                const lang = (m[1] || '').trim().toLowerCase();
+                const label = lang || 'code';
+                const code = m[2] || '';
+                out += '<div class="user-code-block"><div class="user-code-label">' + esc(label) + '</div><pre><code>' + esc(code) + '</code></pre></div>';
+                last = fence.lastIndex;
+            }}
+            const tail = src.slice(last);
+            if (tail) {{
+                out += '<div class="user-text">' + esc(tail).replace(/\\n/g, '<br>') + '</div>';
+            }}
+            return {{ hasCode, html: out }};
         }}
 
         function extractSnapshotId(text) {{
@@ -6542,9 +7162,30 @@ def get_chat_ui():
         }}
 
         function copyCode(button) {{
-            const codeBlock = button.nextElementSibling;
-            const codeElement = codeBlock.querySelector('code');
-            const code = codeElement ? (codeElement.textContent || codeElement.innerText || '') : (codeBlock.textContent || '');
+            let wrap = null;
+            try {{
+                wrap = button && button.closest ? button.closest('.code-block') : null;
+            }} catch(e) {{}}
+            if (!wrap) wrap = button && button.parentElement ? button.parentElement : null;
+            const codeElement = wrap ? wrap.querySelector('pre code, code') : null;
+            let code = codeElement ? (codeElement.textContent || codeElement.innerText || '') : '';
+            if (codeElement && codeElement.innerHTML) {{
+                try {{
+                    const _tmp = document.createElement('div');
+                    _tmp.innerHTML = String(codeElement.innerHTML || '').replace(/<br[^>]*>/gi, '\\n');
+                    const _htmlCode = _tmp.textContent || _tmp.innerText || '';
+                    if (_htmlCode && _htmlCode.trim()) code = _htmlCode;
+                }} catch (_) {{}}
+            }}
+            if (!code && wrap) {{
+                const pre = wrap.querySelector('pre');
+                code = pre ? (pre.textContent || pre.innerText || '') : '';
+            }}
+            code = String(code || '').replace(/\\u00A0/g, ' ').replace(/\\r\\n/g, '\\n').replace(/\\r/g, '\\n');
+            if (!code.trim()) {{
+                addMessage('⚠️ Nothing to copy from this code block.', 'system');
+                return;
+            }}
 
             const showSuccess = () => {{
                 const originalText = button.textContent;
@@ -6585,27 +7226,45 @@ def get_chat_ui():
         }}
 
         function fallbackCopy(text, callback) {{
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            textarea.style.left = '-9999px';
-            textarea.setAttribute('readonly', '');
-            document.body.appendChild(textarea);
-            textarea.focus();
-            textarea.select();
-            textarea.setSelectionRange(0, textarea.value.length);
+            function fallbackWithDoc(doc) {{
+                try {{
+                    if (!doc || !doc.body) return false;
+                    const textarea = doc.createElement('textarea');
+                    textarea.value = text;
+                    textarea.style.position = 'fixed';
+                    textarea.style.opacity = '0';
+                    textarea.style.left = '-9999px';
+                    textarea.style.top = '-9999px';
+                    textarea.setAttribute('readonly', '');
+                    doc.body.appendChild(textarea);
+                    textarea.focus();
+                    textarea.select();
+                    if (textarea.setSelectionRange) textarea.setSelectionRange(0, textarea.value.length);
+                    let ok = false;
+                    try {{ ok = !!doc.execCommand('copy'); }} catch(_) {{ ok = false; }}
+                    doc.body.removeChild(textarea);
+                    return ok;
+                }} catch (_) {{
+                    return false;
+                }}
+            }}
+
+            if (fallbackWithDoc(document)) {{
+                callback();
+                return true;
+            }}
             try {{
-                const ok = document.execCommand('copy');
-                if (ok) {{
+                if (window.parent && window.parent.document && fallbackWithDoc(window.parent.document)) {{
                     callback();
-                    document.body.removeChild(textarea);
                     return true;
                 }}
-            }} catch (err) {{
-                console.error('Copy failed:', err);
-            }}
-            document.body.removeChild(textarea);
+            }} catch (_) {{}}
+            try {{
+                if (window.top && window.top.document && fallbackWithDoc(window.top.document)) {{
+                    callback();
+                    return true;
+                }}
+            }} catch (_) {{}}
             return false;
         }}
 
@@ -7009,6 +7668,9 @@ def get_chat_ui():
             }} else if (tabName === 'bubble') {{
                 document.getElementById('tabBubble').classList.add('active');
                 loadBubbleList();
+            }} else if (tabName === 'amira') {{
+                document.getElementById('tabAmira').classList.add('active');
+                loadAmiraList();
             }} else if (tabName === 'backups') {{
                 document.getElementById('tabBackups').classList.add('active');
                 loadBackupList();
@@ -7279,7 +7941,7 @@ def get_chat_ui():
                 if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
                 _allConversations = data.conversations || [];
-                const chatConvs = _allConversations.filter(c => c.source !== 'bubble');
+                const chatConvs = _allConversations.filter(c => c.source === 'chat');
                 renderConversationList(chatConvs, document.getElementById('chatList'), 'chat');
             }} catch(e) {{
                 console.error('Error loading chat list:', e);
@@ -7296,6 +7958,19 @@ def get_chat_ui():
                 renderConversationList(bubbleConvs, document.getElementById('bubbleList'), 'bubble');
             }} catch(e) {{
                 console.error('Error loading bubble list:', e);
+            }}
+        }}
+
+        async function loadAmiraList() {{
+            try {{
+                const resp = await fetch(apiUrl('api/conversations'));
+                if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
+                const data = await resp.json();
+                _allConversations = data.conversations || [];
+                const amiraConvs = _allConversations.filter(c => c.source === 'card');
+                renderConversationList(amiraConvs, document.getElementById('amiraList'), 'amira');
+            }} catch(e) {{
+                console.error('Error loading Amira list:', e);
             }}
         }}
 
@@ -7734,13 +8409,31 @@ def get_chat_ui():
             'moonshot': '🌙 Moonshot (Kimi)',
             'zhipu': '🧬 Zhipu (GLM)',
             'perplexity': '🔎 Perplexity',
+            'perplexity_web': '⚠️ Perplexity Web',
             'custom': '🛠️ Custom Endpoint',
             'github_copilot': '⚠️ GitHub Copilot (Web)',
             'openai_codex': '⚠️ OpenAI Codex (Web)',
             'claude_web': '⚠️ Claude.ai (Web)',
             'chatgpt_web': '⚠️ ChatGPT (Web)',
-            'gemini_web': '⚠️ Gemini (Web)'
+            'gemini_web': '⚠️ Gemini Web'
         }};
+        const TESTABLE_BATCH_PROVIDERS = new Set(['nvidia', 'openrouter', 'mistral']);
+
+        function updateBatchTestButton() {{
+            const btn = document.getElementById('testNvidiaBtn');
+            if (!btn) return;
+            const enabled = TESTABLE_BATCH_PROVIDERS.has(currentProviderId);
+            btn.style.display = enabled ? 'inline-flex' : 'none';
+            if (!enabled) return;
+            if (currentProviderId === 'nvidia') {{
+                btn.textContent = '\U0001f50d ' + (T.nvidia_test_btn || 'Test NVIDIA');
+                btn.title = T.nvidia_test_title || 'Quick NVIDIA test (may take a few seconds)';
+            }} else {{
+                const pName = (PROVIDER_LABELS[currentProviderId] || currentProviderId || '').replace(/^[^\\w]+/u, '').trim();
+                btn.textContent = '\U0001f50d Test ' + pName;
+                btn.title = 'Batch test models for ' + pName;
+            }}
+        }}
 
         // Build the welcome provider/model line dynamically (always reflects current selection)
         function getProviderModelLine() {{
@@ -7772,7 +8465,7 @@ def get_chat_ui():
         let _selectOpen = false;
 
         function _stripProviderPrefix(model) {{
-            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
+            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|Claude Web|ChatGPT Web|Gemini Web|Perplexity Web|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
         }}
 
         // Capability badge helper
@@ -7796,6 +8489,7 @@ def get_chat_ui():
             modelSel.innerHTML = '';
 
             const models = (_modelsData.models || {{}})[providerId] || [];
+            const modelSections = ((_modelsData.models_sections || {{}})[providerId]) || null;
 
             // NVIDIA: split into tested / to-test groups
             if (providerId === 'nvidia' && (Array.isArray(_modelsData.nvidia_models_tested) || Array.isArray(_modelsData.nvidia_models_to_test))) {{
@@ -7817,13 +8511,43 @@ def get_chat_ui():
                     modelSel.appendChild(grp);
                 }});
             }} else {{
-                models.forEach(m => {{
-                    const opt = document.createElement('option');
-                    opt.value = m;
-                    opt.textContent = _stripProviderPrefix(m) + _capBadges(m, providerId);
-                    if (m === currentModel) opt.selected = true;
-                    modelSel.appendChild(opt);
-                }});
+                const fixed = modelSections && Array.isArray(modelSections.fixed) ? modelSections.fixed : [];
+                const dynamic = modelSections && Array.isArray(modelSections.dynamic) ? modelSections.dynamic : [];
+
+                if (fixed.length || dynamic.length) {{
+                    if (fixed.length) {{
+                        const grpFixed = document.createElement('optgroup');
+                        grpFixed.label = T.models_group_fixed || 'Fixed';
+                        fixed.forEach(m => {{
+                            const opt = document.createElement('option');
+                            opt.value = m;
+                            opt.textContent = _stripProviderPrefix(m) + _capBadges(m, providerId);
+                            if (m === currentModel) opt.selected = true;
+                            grpFixed.appendChild(opt);
+                        }});
+                        modelSel.appendChild(grpFixed);
+                    }}
+                    if (dynamic.length) {{
+                        const grpDyn = document.createElement('optgroup');
+                        grpDyn.label = T.models_group_dynamic_cache || 'Dynamic (cache)';
+                        dynamic.forEach(m => {{
+                            const opt = document.createElement('option');
+                            opt.value = m;
+                            opt.textContent = _stripProviderPrefix(m) + _capBadges(m, providerId);
+                            if (m === currentModel) opt.selected = true;
+                            grpDyn.appendChild(opt);
+                        }});
+                        modelSel.appendChild(grpDyn);
+                    }}
+                }} else {{
+                    models.forEach(m => {{
+                        const opt = document.createElement('option');
+                        opt.value = m;
+                        opt.textContent = _stripProviderPrefix(m) + _capBadges(m, providerId);
+                        if (m === currentModel) opt.selected = true;
+                        modelSel.appendChild(opt);
+                    }});
+                }}
             }}
 
             if (!modelSel.options.length) {{
@@ -7862,8 +8586,7 @@ def get_chat_ui():
                 if (currentModel) currentModelDisplay = currentModel;
 
                 updateHeaderProviderStatus(currentProviderId, data.available_providers);
-                const testBtn = document.getElementById('testNvidiaBtn');
-                if (testBtn) testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';
+                updateBatchTestButton();
 
                 // Build ordered provider list
                 let availableProviders = data.available_providers && data.available_providers.length
@@ -7877,7 +8600,7 @@ def get_chat_ui():
                     'deepseek', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
                     'dashscope', 'moonshot', 'zhipu',
                     // --- Web providers (always last) ---
-                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web', 'gemini_web'
+                    'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web', 'gemini_web', 'perplexity_web'
                 ];
                 for (const p of availableProviders) {{
                     if (!providerOrder.includes(p)) providerOrder.push(p);
@@ -7975,53 +8698,136 @@ def get_chat_ui():
         async function testNvidiaModel() {{
             const btn = document.getElementById('testNvidiaBtn');
             if (!btn) return;
+            if (window.__batchTestRunning) {{
+                // Toggle behavior: second click requests stop.
+                window.__batchTestStopRequested = true;
+                return;
+            }}
+            const provider = currentProviderId || 'nvidia';
+            if (!TESTABLE_BATCH_PROVIDERS.has(provider)) return;
+            const isNvidia = provider === 'nvidia';
+            const providerLabel = (PROVIDER_LABELS[provider] || provider).replace(/^[^\\w]+/u, '').trim();
 
-            const BATCH = 50;
+            // Small bounded batches => frequent progress updates in chat UI.
+            // The loop continues until completion, so all models are still covered.
+            const BATCH = 10;
             let cursor = 0;
             let totalOk = 0, totalRemoved = 0, totalTested = 0, grandTotal = 0;
             let anyBlocklisted = false;
             let batchNum = 0;
+            let progressMsgEl = null;
+            let progressEvents = [];
+
+            const appendEvents = (eventsArr) => {{
+                if (!Array.isArray(eventsArr) || !eventsArr.length) return;
+                for (const ev of eventsArr) {{
+                    const line = String(ev || '').trim();
+                    if (!line) continue;
+                    const last = progressEvents.length ? progressEvents[progressEvents.length - 1] : '';
+                    if (line === last) continue;
+                    progressEvents.push(line);
+                }}
+                if (progressEvents.length > 12) progressEvents = progressEvents.slice(-12);
+            }};
+
+            const renderProgressMessage = (headline) => {{
+                if (!progressMsgEl) return;
+                const safeHeadline = _escapeHtml(headline || '');
+                const recent = progressEvents.slice(-6);
+                if (!recent.length) {{
+                    progressMsgEl.textContent = headline || '';
+                    return;
+                }}
+                const eventsHtml = recent.map(e => '\u2022 ' + _escapeHtml(e)).join('<br>');
+                progressMsgEl.innerHTML = safeHeadline
+                    + '<br><span style="display:block; margin-top:6px; opacity:.92; font-size:12px; line-height:1.35;">'
+                    + eventsHtml
+                    + '</span>';
+            }};
 
             const oldText = btn.textContent;
-            btn.disabled = true;
+            window.__batchTestRunning = true;
+            window.__batchTestStopRequested = false;
+            btn.disabled = false;
+            btn.textContent = '⏹ Stop test';
+            progressMsgEl = addMessage('\U0001f50d Test avviato: ' + providerLabel, 'system');
 
             try {{
                 while (true) {{
+                    if (window.__batchTestStopRequested) {{
+                        const stopByUserMsg = `⏹ Test ${{providerLabel}} interrotto dall'utente • tested ${{totalTested}}/${{grandTotal || '?'}} • ok ${{totalOk}} • removed ${{totalRemoved}}`;
+                        if (progressMsgEl) renderProgressMessage(stopByUserMsg);
+                        else addMessage(stopByUserMsg, 'system');
+                        break;
+                    }}
                     batchNum++;
-                    btn.textContent = `\u23f3 Test batch ${{batchNum}}...`;
+                    btn.textContent = `⏹ Stop test (${{batchNum}})`;
 
-                    const response = await fetch(apiUrl('api/nvidia/test_models'), {{
+                    const response = await fetch(apiUrl(isNvidia ? 'api/nvidia/test_models' : 'api/provider/test_models'), {{
                         method: 'POST',
                         headers: {{'Content-Type': 'application/json'}},
-                        body: JSON.stringify({{max_models: BATCH, cursor: cursor}})
+                        body: JSON.stringify(isNvidia
+                            ? {{max_models: BATCH, cursor: cursor}}
+                            : {{provider: provider, max_models: BATCH, cursor: cursor}})
                     }});
                     const data = await response.json().catch(() => ({{}}));
 
                     if (!response.ok || !data || !data.success) {{
-                        const msg = (data && (data.message || data.error)) || (T.nvidia_test_failed + ' (' + response.status + ')');
+                        const fallbackErr = isNvidia ? (T.nvidia_test_failed || 'NVIDIA test failed') : ('Test ' + providerLabel + ' failed');
+                        const msg = (data && (data.message || data.error)) || (fallbackErr + ' (' + response.status + ')');
                         addMessage('\u26a0\ufe0f ' + msg, 'system');
                         break;
                     }}
 
                     totalOk += (data.ok || 0);
                     totalRemoved += (data.removed || 0);
-                    totalTested += (data.tested || 0);
                     grandTotal = data.total || grandTotal;
+                    const testedDelta = (data.tested || 0);
+                    totalTested += testedDelta;
+                    if (grandTotal > 0) totalTested = Math.min(totalTested, grandTotal);
                     if (data.blocklisted) anyBlocklisted = true;
+                    const batchTested = Array.isArray(data.tested_models) ? data.tested_models : [];
+                    const currentModel = batchTested.length ? batchTested[batchTested.length - 1] : '';
+                    appendEvents(data.events);
 
-                    // Se rate limit o errore di rete, ferma e mostra parziale
-                    if (data.stopped_reason && (data.stopped_reason.includes('rate') || data.stopped_reason.includes('auth') || data.stopped_reason.includes('errore'))) {{
+                    // Progress in chat (single live message, non-spam)
+                    try {{
+                        if (progressMsgEl) {{
+                            const totalLabel = grandTotal > 0 ? grandTotal : '?';
+                            const modelPart = currentModel ? ` • LLM: ${{currentModel}}` : '';
+                            renderProgressMessage(
+                                `\u23f3 Test ${{providerLabel}}: batch ${{batchNum}} • tested ${{totalTested}}/${{totalLabel}} • ok ${{totalOk}} • removed ${{totalRemoved}}${{modelPart}}`
+                            );
+                        }}
+                    }} catch (_) {{}}
+
+                    // Any stopped_reason means backend asked us to stop this run.
+                    // (e.g. rate-limit, auth, network, HTTP 500, timeout, etc.)
+                    if (data.stopped_reason) {{
                         const parts = [];
-                        parts.push(T.nvidia_test_result.replace('{{ok}}', totalOk).replace('{{removed}}', totalRemoved).replace('{{tested}}', totalTested).replace('{{total}}', grandTotal));
+                        const tpl = isNvidia
+                            ? (T.nvidia_test_result || 'NVIDIA Test: OK {{ok}}, removed {{removed}}, tested {{tested}}/{{total}}')
+                            : ('Test ' + providerLabel + ': OK {{ok}}, removed {{removed}}, tested {{tested}}/{{total}}');
+                        parts.push(tpl.replace('{{ok}}', totalOk).replace('{{removed}}', totalRemoved).replace('{{tested}}', totalTested).replace('{{total}}', grandTotal));
                         parts.push(`(${{data.stopped_reason}})`);
                         if (typeof data.remaining === 'number' && data.remaining > 0) parts.push('\u2014 ' + T.nvidia_remaining.replace('{{n}}', data.remaining));
-                        addMessage('\U0001f50d ' + parts.join(' '), 'system');
+                        const stopMsg = '\U0001f50d ' + parts.join(' ');
+                        if (progressMsgEl) renderProgressMessage(stopMsg);
+                        else addMessage(stopMsg, 'system');
                         break;
                     }}
 
                     // Aggiorna cursor
+                    const prevCursor = cursor;
                     if (typeof data.next_cursor === 'number') {{
                         cursor = data.next_cursor;
+                    }}
+                    // Defensive guard: if cursor doesn't advance, stop to avoid infinite loop.
+                    if (typeof data.next_cursor === 'number' && data.next_cursor === prevCursor && typeof data.remaining === 'number' && data.remaining > 0) {{
+                        const loopMsg = `⚠️ Test ${{providerLabel}} fermato: cursor bloccato su ${{cursor}} (remaining=${{data.remaining}})`;
+                        if (progressMsgEl) renderProgressMessage(loopMsg);
+                        else addMessage(loopMsg, 'system');
+                        break;
                     }}
 
                     // Se non ci sono più modelli da testare, fine
@@ -8035,16 +8841,26 @@ def get_chat_ui():
 
                 // Messaggio riepilogo finale
                 const parts = [];
-                parts.push(T.nvidia_test_result.replace('{{ok}}', totalOk).replace('{{removed}}', totalRemoved).replace('{{tested}}', totalTested).replace('{{total}}', grandTotal));
+                const tpl = isNvidia
+                    ? (T.nvidia_test_result || 'NVIDIA Test: OK {{ok}}, removed {{removed}}, tested {{tested}}/{{total}}')
+                    : ('Test ' + providerLabel + ': OK {{ok}}, removed {{removed}}, tested {{tested}}/{{total}}');
+                parts.push(tpl.replace('{{ok}}', totalOk).replace('{{removed}}', totalRemoved).replace('{{tested}}', totalTested).replace('{{total}}', grandTotal));
                 if (totalTested >= grandTotal) parts.push('\u2705 Completato!');
-                addMessage('\U0001f50d ' + parts.join(' '), 'system');
+                const finalMsg = '\U0001f50d ' + parts.join(' ');
+                if (progressMsgEl) renderProgressMessage(finalMsg);
+                else addMessage(finalMsg, 'system');
 
                 if (anyBlocklisted) await loadModels();
             }} catch (e) {{
-                addMessage('\u26a0\ufe0f ' + T.nvidia_test_failed + ': ' + (e && e.message ? e.message : String(e)), 'system');
+                const errLbl = isNvidia ? (T.nvidia_test_failed || 'NVIDIA test failed') : ('Test ' + providerLabel + ' failed');
+                const errMsg = '\u26a0\ufe0f ' + errLbl + ': ' + (e && e.message ? e.message : String(e));
+                if (progressMsgEl) renderProgressMessage(errMsg);
+                else addMessage(errMsg, 'system');
             }} finally {{
                 btn.disabled = false;
                 btn.textContent = oldText;
+                window.__batchTestRunning = false;
+                window.__batchTestStopRequested = false;
             }}
         }}
 
@@ -8070,10 +8886,7 @@ def get_chat_ui():
                     // Keep UI state in sync so the thinking message matches the selected provider
                     currentProviderId = parsed.provider;
                     currentModelDisplay = parsed.model;
-                    const testBtn = document.getElementById('testNvidiaBtn');
-                    if (testBtn) {{
-                        testBtn.style.display = (currentProviderId === 'nvidia') ? 'inline-flex' : 'none';
-                    }}
+                    updateBatchTestButton();
                     // Show notification
                     const providerName = PROVIDER_LABELS[parsed.provider] || parsed.provider;
                     addMessage('\U0001f504 ' + T.switched_to.replace('{{provider}}', providerName).replace('{{model}}', parsed.model), 'system');
@@ -8090,6 +8903,8 @@ def get_chat_ui():
                         'copilotOAuthBanner','copilotOAuthConnectedBanner',
                         'claudeWebBanner','claudeWebConnectedBanner',
                         'chatgptWebBanner',
+                        'geminiWebBanner','geminiWebConnectedBanner',
+                        'perplexityWebBanner','perplexityWebConnectedBanner',
                     ];
                     // Hide all session banners, then show only the relevant ones
                     _allSessionBanners.forEach(id => {{ const el=document.getElementById(id); if(el) el.style.display='none'; }});
@@ -8103,6 +8918,8 @@ def get_chat_ui():
                         checkChatGPTWebSession();
                     }} else if (parsed.provider === 'gemini_web') {{
                         checkGeminiWebSession();
+                    }} else if (parsed.provider === 'perplexity_web') {{
+                        checkPerplexityWebSession();
                     }}
                 }}
             }} catch (error) {{
@@ -8621,6 +9438,87 @@ def get_chat_ui():
             }}
         }}
 
+        // ── Perplexity Web session helpers ───────────────────────────────────
+        async function checkPerplexityWebSession() {{
+            try {{
+                const r = await fetch(apiUrl('api/session/perplexity_web/status'));
+                const d = await r.json();
+                const banner = document.getElementById('perplexityWebBanner');
+                const connBanner = document.getElementById('perplexityWebConnectedBanner');
+                if (!banner) return;
+                if (d.configured) {{
+                    if (banner) banner.style.display = 'none';
+                    if (connBanner) {{
+                        connBanner.style.display = 'flex';
+                        const det = document.getElementById('perplexityWebConnDetail');
+                        let detail = d.age_days ? `connected (${{d.age_days}}d ago)` : 'connected';
+                        if (d.email) detail += ` · ${{d.email}}`;
+                        if (det) det.textContent = detail;
+                    }}
+                }} else {{
+                    if (connBanner) connBanner.style.display = 'none';
+                    banner.style.display = 'flex';
+                }}
+            }} catch (e) {{ /* ignore */ }}
+        }}
+
+        function openPerplexityWebModal() {{
+            const statusEl = document.getElementById('perplexityWebStatus');
+            const csrfEl   = document.getElementById('perplexityWebCsrfInput');
+            const sessEl   = document.getElementById('perplexityWebSessionInput');
+            if (statusEl) {{ statusEl.className = ''; statusEl.textContent = ''; }}
+            if (csrfEl) csrfEl.value = '';
+            if (sessEl) sessEl.value = '';
+            const modal = document.getElementById('perplexityWebModal');
+            if (modal) modal.classList.add('open');
+        }}
+
+        function closePerplexityWebModal() {{
+            const modal = document.getElementById('perplexityWebModal');
+            if (modal) modal.classList.remove('open');
+        }}
+
+        async function submitPerplexityWebCookies() {{
+            const csrfEl = document.getElementById('perplexityWebCsrfInput');
+            const sessEl = document.getElementById('perplexityWebSessionInput');
+            const statusEl = document.getElementById('perplexityWebStatus');
+            const btn = document.getElementById('perplexityWebModalConnectBtn');
+            if (!csrfEl || !sessEl || !statusEl || !btn) return;
+            const csrfToken = csrfEl.value.trim();
+            const sessionToken = sessEl.value.trim();
+            if (!csrfToken || !sessionToken) {{
+                statusEl.className = 'err';
+                statusEl.textContent = 'Paste both cookies first.';
+                return;
+            }}
+            btn.disabled = true; btn.textContent = 'Connecting...';
+            statusEl.className = ''; statusEl.textContent = '';
+            try {{
+                const r = await fetch(apiUrl('api/session/perplexity_web/store'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ csrf_token: csrfToken, session_token: sessionToken }})
+                }});
+                const d = await r.json();
+                if (d.ok || d.configured || d.csrf_token) {{
+                    statusEl.className = 'ok';
+                    statusEl.textContent = '\u2714 Cookies saved and validated!';
+                    setTimeout(() => {{
+                        closePerplexityWebModal();
+                        checkPerplexityWebSession();
+                        addMessage('\u2705 Perplexity Web connected.', 'system');
+                    }}, 1300);
+                }} else {{
+                    throw new Error(d.error || 'Save failed');
+                }}
+            }} catch (e) {{
+                statusEl.className = 'err';
+                statusEl.textContent = '\u26a0\ufe0f ' + (e.message || String(e));
+            }} finally {{
+                btn.disabled = false; btn.textContent = '\u2714 Connect';
+            }}
+        }}
+
         // Load history on page load
         function bindCspSafeHandlers() {{
             try {{
@@ -8721,10 +9619,15 @@ def get_chat_ui():
 
                 // Gemini Web session banner/modal bindings
                 const geminiWebConnectBtn  = document.getElementById('geminiWebConnectBtn');
+                const geminiWebDismissBtn  = document.getElementById('geminiWebDismissBtn');
                 const geminiWebDisconnBtn  = document.getElementById('geminiWebDisconnectBtn');
                 const geminiWebCancelBtn   = document.getElementById('geminiWebModalCancelBtn');
                 const geminiWebSubmitBtn   = document.getElementById('geminiWebModalConnectBtn');
                 if (geminiWebConnectBtn) geminiWebConnectBtn.addEventListener('click', openGeminiWebModal);
+                if (geminiWebDismissBtn) geminiWebDismissBtn.addEventListener('click', () => {{
+                    const banner = document.getElementById('geminiWebBanner');
+                    if (banner) banner.style.display = 'none';
+                }});
                 if (geminiWebDisconnBtn) geminiWebDisconnBtn.addEventListener('click', async () => {{
                     await fetch(apiUrl('api/session/gemini_web/clear'), {{method:'POST'}});
                     checkGeminiWebSession();
@@ -8732,6 +9635,25 @@ def get_chat_ui():
                 }});
                 if (geminiWebCancelBtn) geminiWebCancelBtn.addEventListener('click', closeGeminiWebModal);
                 if (geminiWebSubmitBtn) geminiWebSubmitBtn.addEventListener('click', submitGeminiWebCookies);
+
+                // Perplexity Web session banner/modal bindings
+                const perplexityWebConnectBtn = document.getElementById('perplexityWebConnectBtn');
+                const perplexityWebDismissBtn = document.getElementById('perplexityWebDismissBtn');
+                const perplexityWebDisconnBtn = document.getElementById('perplexityWebDisconnectBtn');
+                const perplexityWebCancelBtn  = document.getElementById('perplexityWebModalCancelBtn');
+                const perplexityWebSubmitBtn  = document.getElementById('perplexityWebModalConnectBtn');
+                if (perplexityWebConnectBtn) perplexityWebConnectBtn.addEventListener('click', openPerplexityWebModal);
+                if (perplexityWebDismissBtn) perplexityWebDismissBtn.addEventListener('click', () => {{
+                    const banner = document.getElementById('perplexityWebBanner');
+                    if (banner) banner.style.display = 'none';
+                }});
+                if (perplexityWebDisconnBtn) perplexityWebDisconnBtn.addEventListener('click', async () => {{
+                    await fetch(apiUrl('api/session/perplexity_web/clear'), {{method:'POST'}});
+                    checkPerplexityWebSession();
+                    addMessage('\u26a0\ufe0f Perplexity Web disconnected.', 'system');
+                }});
+                if (perplexityWebCancelBtn) perplexityWebCancelBtn.addEventListener('click', closePerplexityWebModal);
+                if (perplexityWebSubmitBtn) perplexityWebSubmitBtn.addEventListener('click', submitPerplexityWebCookies);
 
                 // Messaging chat modal close
                 const msgModalCloseBtn = document.getElementById('msgModalCloseBtn');
@@ -8772,6 +9694,7 @@ def get_chat_ui():
                     input.addEventListener('keydown', handleKeyDown);
                     input.addEventListener('input', () => autoResize(input));
                 }}
+                bindInputToolbarButtons();
 
                 // Suggestions: make clickable via JS (inline onclick may be blocked)
                 document.querySelectorAll('.suggestion').forEach((el) => {{
@@ -8815,6 +9738,7 @@ def get_chat_ui():
                 }}
 
                 bindCspSafeHandlers();
+                bindInputToolbarButtons();
 
                 initSidebarResize();
                 initFilePanelResize();
@@ -8826,6 +9750,8 @@ def get_chat_ui():
                 if (currentProviderId === 'github_copilot') checkCopilotOAuth();
                 if (currentProviderId === 'claude_web') checkClaudeWebSession();
                 if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
+                if (currentProviderId === 'gemini_web') checkGeminiWebSession();
+                if (currentProviderId === 'perplexity_web') checkPerplexityWebSession();
                 if (input) input.focus();
 
                 // ── Immediate SDK check on page load ──
@@ -8884,7 +9810,9 @@ def get_chat_ui():
                 // Poll session status every 30s for web providers so the banner reappears when token expires
                 setInterval(async () => {{
                     if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
-                    else if (currentProviderId === 'claude_web') checkClaudeWebSession(); else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
+                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                    else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
+                    else if (currentProviderId === 'perplexity_web') checkPerplexityWebSession();
                 }}, 30000);
             }} catch (e) {{
                 const msg = (e && e.message) ? e.message : String(e);

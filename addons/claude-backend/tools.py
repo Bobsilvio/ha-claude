@@ -2505,6 +2505,78 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                     default=str,
                 )
 
+            # Validate referenced entity_ids before calling HA.
+            # Prevents false "✅ executed" confirmations on non-existing entities.
+            def _collect_entity_ids(payload: dict) -> list[str]:
+                out: list[str] = []
+
+                def _add(v):
+                    if v is None:
+                        return
+                    if isinstance(v, str):
+                        # Support comma-separated values occasionally emitted by LLMs.
+                        parts = [p.strip() for p in v.split(",")] if "," in v else [v.strip()]
+                        for p in parts:
+                            if p and "." in p:
+                                out.append(p)
+                        return
+                    if isinstance(v, list):
+                        for item in v:
+                            _add(item)
+
+                _add(payload.get("entity_id"))
+                tgt = payload.get("target")
+                if isinstance(tgt, dict):
+                    _add(tgt.get("entity_id"))
+                # Keep order, deduplicate
+                seen = set()
+                uniq = []
+                for eid in out:
+                    if eid not in seen:
+                        seen.add(eid)
+                        uniq.append(eid)
+                return uniq
+
+            referenced_eids = _collect_entity_ids(data)
+            if referenced_eids:
+                try:
+                    all_states = api.get_all_states()
+                    known_ids = {s.get("entity_id") for s in all_states if isinstance(s, dict) and s.get("entity_id")}
+                except Exception:
+                    known_ids = set()
+
+                if known_ids:
+                    invalid = [eid for eid in referenced_eids if eid not in known_ids]
+                    if invalid:
+                        suggestions = {}
+                        for bad_id in invalid:
+                            domain_hint = bad_id.split(".", 1)[0] if "." in bad_id else ""
+                            name_part = bad_id.split(".", 1)[1] if "." in bad_id else bad_id
+                            candidates = [
+                                kid for kid in known_ids
+                                if (
+                                    (not domain_hint or kid.startswith(domain_hint + "."))
+                                    and (
+                                        name_part in kid
+                                        or kid.split(".", 1)[-1] in name_part
+                                        or any(tok and tok in kid for tok in name_part.split("_"))
+                                    )
+                                )
+                            ][:5]
+                            if candidates:
+                                suggestions[bad_id] = candidates
+                        return json.dumps(
+                            {
+                                "status": "error",
+                                "error": "Entity ID not found in Home Assistant.",
+                                "invalid_entities": invalid,
+                                "suggestions": suggestions,
+                                "hint": "Use search_entities to find the correct entity_id, then retry call_service.",
+                            },
+                            ensure_ascii=False,
+                            default=str,
+                        )
+
             result = api.call_ha_api("POST", f"services/{domain}/{service}", data)
             if isinstance(result, dict) and result.get("error"):
                 return json.dumps({"status": "error", "result": result}, ensure_ascii=False, default=str)

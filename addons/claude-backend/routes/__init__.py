@@ -136,6 +136,9 @@ ROUTE_REGISTRATIONS = {
         (catalog_bp, '/api/catalog/stats', 'api_catalog_stats', ['GET']),
         (catalog_bp, '/api/catalog/models', 'api_catalog_models', ['GET']),
         (catalog_bp, '/api/get_models', 'api_get_models', ['GET']),
+        (catalog_bp, '/api/models/cache/status', 'api_models_cache_status', ['GET']),
+        (catalog_bp, '/api/models/cache/clear', 'api_models_cache_clear', ['POST']),
+        (catalog_bp, '/api/models/cache/refresh', 'api_models_cache_refresh', ['POST']),
     ],
     'analytics': [
         (analytics_bp, '/api/cache/semantic/stats', 'api_cache_semantic_stats', ['GET']),

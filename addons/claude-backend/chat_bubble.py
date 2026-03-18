@@ -22,7 +22,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool = True, show_card_button: bool = True) -> str:
+def get_chat_bubble_js(
+    ingress_url: str,
+    language: str = "en",
+    show_bubble: bool = True,
+    show_card_button: bool = True,
+    show_automation_button: bool = True,
+) -> str:
     """Generate the floating chat bubble JavaScript module.
 
     Args:
@@ -30,6 +36,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
         language: User language (en/it/es/fr)
         show_bubble: If False, the floating bubble button is hidden.
         show_card_button: If False, the Amira button in the card editor is hidden.
+        show_automation_button: If False, disables automation-page Amira UI/button.
 
     Returns:
         Complete JavaScript ES module as string
@@ -111,6 +118,78 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "flow_condition": "Condition",
             "flow_action": "Action",
             "flow_no_data": "No automation data",
+            "flow_on": "Flow",
+            "flow_off": "Flow off",
+            "flow_unavailable": "Flow unavailable for this automation.",
+            "flow_unavailable_migrate": "Flow unavailable: automation has no ID or config API is not accessible. Try Migrate.",
+            "flow_last_triggered": "Last triggered",
+            "flow_never": "Never",
+            "flow_problem_subject": "Problem: {value}",
+            "flow_trigger_device_problem": "When {value} reports a problem",
+            "flow_trigger_device_generic": "Device trigger",
+            "flow_actions_title": "Actions",
+            "flow_branch": "Branch",
+            "flow_actions_count": "actions",
+            "flow_notify": "Notify",
+            "flow_action_word": "Action",
+            "flow_wait": "Wait",
+            "flow_set": "Set",
+            "flow_set_value_of": "Set value of",
+            "flow_with_message": "Action with message",
+            "flow_automation_action": "Automation action",
+            "flow_state_word": "state",
+            "flow_dynamic_value": "dynamic value",
+            "flow_problem": "Problem",
+            "flow_no_problem": "No problem",
+            "flow_when_equals": "When {entity} = {value}",
+            "flow_change": "Change: {entity}",
+            "flow_time_window": "Time window",
+            "flow_after": "After {value}",
+            "flow_before": "Before {value}",
+            "flow_cyclic_execution": "Cyclic execution: {value}",
+            "flow_trigger_prefix": "Trigger: {value}",
+            "flow_event": "event",
+            "flow_condition_prefix": "Condition: {value}",
+            "flow_verify": "check",
+            "flow_check_state_of": "Checks state of {entity}",
+            "flow_check_threshold_of": "Checks threshold of {entity}",
+            "flow_starts_when": "Starts when {entity} changes state",
+            "flow_becomes": "Starts when {entity} becomes {value}",
+            "flow_change_from_to": "State change: {entity} from {from} to {to}",
+            "flow_starts_fixed_time": "Starts at a fixed time",
+            "flow_starts_above_threshold": "Starts when a numeric threshold is crossed",
+            "flow_valid_between": "Valid only between {from} and {to}",
+            "flow_valid_after": "Valid only after {value}",
+            "flow_valid_before": "Valid only before {value}",
+            "flow_if": "If {value}",
+            "flow_else": "Else",
+            "flow_branch_choose": "Choose branch #{index}",
+            "flow_branch_default": "Choose default branch",
+            "flow_event_generic": "Event",
+            "flow_event_named": "Event: {value}",
+            "flow_trigger_event_generic": "Triggered by event",
+            "flow_trigger_event_type": "Triggered by event: {value}",
+            "flow_trigger_event_when": "When event {value} fires",
+            "flow_repeat_while": "Repeat while {value}",
+            "flow_repeat_count": "Repeat {value} times",
+            "flow_repeat_foreach": "Repeat for each item",
+            "flow_repeat_until": "Repeat until {value}",
+            "flow_repeat_branch": "Loop branch",
+            "flow_data": "data",
+            "flow_random_color": "random color",
+            "flow_brightness": "brightness",
+            "flow_service": "service",
+            "flow_entities": "entities",
+            "flow_template_condition": "Template condition",
+            "flow_template_condition_short": "Template: {value}",
+            "flow_template_eval": "Evaluates template: {value}",
+            "flow_template_logic": "template logic",
+            "flow_dynamic_message": "dynamic message",
+            "flow_wait_for": "Wait for {value}",
+            "flow_template_if_equals": "Only if {field} is {value}",
+            "flow_template_if_not_equals": "Only if {field} is not {value}",
+            "flow_template_event_check": "Custom check on event data",
+            "flow_notify_match_summary": "final score with teams, score, scorers and venue",
         },
         "it": {
             "placeholder": "Chiedi qualcosa su questa pagina...",
@@ -188,6 +267,78 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "flow_condition": "Condizione",
             "flow_action": "Azione",
             "flow_no_data": "Nessun dato automazione",
+            "flow_on": "Flow",
+            "flow_off": "Flow off",
+            "flow_unavailable": "Flow non disponibile per questa automazione.",
+            "flow_unavailable_migrate": "Flow non disponibile: automazione senza ID/config API non accessibile. Prova \"Migra\".",
+            "flow_last_triggered": "Ultima attivazione",
+            "flow_never": "Mai",
+            "flow_problem_subject": "Problema: {value}",
+            "flow_trigger_device_problem": "Quando {value} segnala un problema",
+            "flow_trigger_device_generic": "Trigger dispositivo",
+            "flow_actions_title": "Azioni",
+            "flow_branch": "Ramo",
+            "flow_actions_count": "azioni",
+            "flow_notify": "Notifica",
+            "flow_action_word": "Azione",
+            "flow_wait": "Attendi",
+            "flow_set": "Imposta",
+            "flow_set_value_of": "Imposta valore di",
+            "flow_with_message": "Azione con messaggio",
+            "flow_automation_action": "Azione automazione",
+            "flow_state_word": "stato",
+            "flow_dynamic_value": "valore dinamico",
+            "flow_problem": "Problema",
+            "flow_no_problem": "Nessun problema",
+            "flow_when_equals": "Quando {entity} = {value}",
+            "flow_change": "Cambio: {entity}",
+            "flow_time_window": "Fascia oraria",
+            "flow_after": "Dopo {value}",
+            "flow_before": "Prima di {value}",
+            "flow_cyclic_execution": "Esecuzione ciclica: {value}",
+            "flow_trigger_prefix": "Trigger: {value}",
+            "flow_event": "evento",
+            "flow_condition_prefix": "Condizione: {value}",
+            "flow_verify": "verifica",
+            "flow_check_state_of": "Controlla stato di {entity}",
+            "flow_check_threshold_of": "Controlla soglia numerica di {entity}",
+            "flow_starts_when": "Parte quando {entity} cambia stato",
+            "flow_becomes": "Parte quando {entity} diventa {value}",
+            "flow_change_from_to": "Cambio stato: {entity} da {from} a {to}",
+            "flow_starts_fixed_time": "Parte a un orario fisso",
+            "flow_starts_above_threshold": "Parte quando supera una soglia numerica",
+            "flow_valid_between": "Valida solo tra {from} e {to}",
+            "flow_valid_after": "Valida solo dopo {value}",
+            "flow_valid_before": "Valida solo prima di {value}",
+            "flow_if": "Se {value}",
+            "flow_else": "Altrimenti",
+            "flow_branch_choose": "Ramo choose #{index}",
+            "flow_branch_default": "Ramo default choose",
+            "flow_event_generic": "Evento",
+            "flow_event_named": "Evento: {value}",
+            "flow_trigger_event_generic": "Attivato da evento",
+            "flow_trigger_event_type": "Attivato da evento: {value}",
+            "flow_trigger_event_when": "Quando l'evento {value} viene attivato",
+            "flow_repeat_while": "Ripeti finché {value}",
+            "flow_repeat_count": "Ripeti {value} volte",
+            "flow_repeat_foreach": "Ripeti per ogni elemento",
+            "flow_repeat_until": "Ripeti fino a {value}",
+            "flow_repeat_branch": "Ramo ciclo",
+            "flow_data": "dati",
+            "flow_random_color": "colore casuale",
+            "flow_brightness": "luminosità",
+            "flow_service": "servizio",
+            "flow_entities": "entità",
+            "flow_template_condition": "Condizione template",
+            "flow_template_condition_short": "Template: {value}",
+            "flow_template_eval": "Valuta template: {value}",
+            "flow_template_logic": "logica template",
+            "flow_dynamic_message": "messaggio dinamico",
+            "flow_wait_for": "Attendi {value}",
+            "flow_template_if_equals": "Solo se {field} è {value}",
+            "flow_template_if_not_equals": "Solo se {field} non è {value}",
+            "flow_template_event_check": "Controllo personalizzato sui dati evento",
+            "flow_notify_match_summary": "risultato finale con squadre, punteggio, marcatori e stadio",
         },
         "es": {
             "placeholder": "Pregunta sobre esta página...",
@@ -265,6 +416,78 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "flow_condition": "Condici\u00f3n",
             "flow_action": "Acci\u00f3n",
             "flow_no_data": "Sin datos de automatizaci\u00f3n",
+            "flow_on": "Flow",
+            "flow_off": "Flow off",
+            "flow_unavailable": "Flow no disponible para esta automatización.",
+            "flow_unavailable_migrate": "Flow no disponible: la automatización no tiene ID o la API no es accesible. Prueba \"Migrar\".",
+            "flow_last_triggered": "Última activación",
+            "flow_never": "Nunca",
+            "flow_problem_subject": "Problema: {value}",
+            "flow_trigger_device_problem": "Cuando {value} reporta un problema",
+            "flow_trigger_device_generic": "Disparador de dispositivo",
+            "flow_actions_title": "Acciones",
+            "flow_branch": "Rama",
+            "flow_actions_count": "acciones",
+            "flow_notify": "Notificar",
+            "flow_action_word": "Acción",
+            "flow_wait": "Esperar",
+            "flow_set": "Establecer",
+            "flow_set_value_of": "Establecer valor de",
+            "flow_with_message": "Acción con mensaje",
+            "flow_automation_action": "Acción de automatización",
+            "flow_state_word": "estado",
+            "flow_dynamic_value": "valor dinámico",
+            "flow_problem": "Problema",
+            "flow_no_problem": "Sin problema",
+            "flow_when_equals": "Cuando {entity} = {value}",
+            "flow_change": "Cambio: {entity}",
+            "flow_time_window": "Franja horaria",
+            "flow_after": "Después de {value}",
+            "flow_before": "Antes de {value}",
+            "flow_cyclic_execution": "Ejecución cíclica: {value}",
+            "flow_trigger_prefix": "Disparador: {value}",
+            "flow_event": "evento",
+            "flow_condition_prefix": "Condición: {value}",
+            "flow_verify": "verificación",
+            "flow_check_state_of": "Comprueba el estado de {entity}",
+            "flow_check_threshold_of": "Comprueba el umbral numérico de {entity}",
+            "flow_starts_when": "Se inicia cuando {entity} cambia de estado",
+            "flow_becomes": "Se inicia cuando {entity} pasa a {value}",
+            "flow_change_from_to": "Cambio de estado: {entity} de {from} a {to}",
+            "flow_starts_fixed_time": "Se inicia a una hora fija",
+            "flow_starts_above_threshold": "Se inicia al superar un umbral numérico",
+            "flow_valid_between": "Válido solo entre {from} y {to}",
+            "flow_valid_after": "Válido solo después de {value}",
+            "flow_valid_before": "Válido solo antes de {value}",
+            "flow_if": "Si {value}",
+            "flow_else": "Si no",
+            "flow_branch_choose": "Rama choose #{index}",
+            "flow_branch_default": "Rama predeterminada choose",
+            "flow_event_generic": "Evento",
+            "flow_event_named": "Evento: {value}",
+            "flow_trigger_event_generic": "Activado por evento",
+            "flow_trigger_event_type": "Activado por evento: {value}",
+            "flow_trigger_event_when": "Cuando se activa el evento {value}",
+            "flow_repeat_while": "Repetir mientras {value}",
+            "flow_repeat_count": "Repetir {value} veces",
+            "flow_repeat_foreach": "Repetir por cada elemento",
+            "flow_repeat_until": "Repetir hasta {value}",
+            "flow_repeat_branch": "Rama de bucle",
+            "flow_data": "datos",
+            "flow_random_color": "color aleatorio",
+            "flow_brightness": "brillo",
+            "flow_service": "servicio",
+            "flow_entities": "entidades",
+            "flow_template_condition": "Condición de plantilla",
+            "flow_template_condition_short": "Plantilla: {value}",
+            "flow_template_eval": "Evalúa plantilla: {value}",
+            "flow_template_logic": "lógica de plantilla",
+            "flow_dynamic_message": "mensaje dinámico",
+            "flow_wait_for": "Esperar {value}",
+            "flow_template_if_equals": "Solo si {field} es {value}",
+            "flow_template_if_not_equals": "Solo si {field} no es {value}",
+            "flow_template_event_check": "Comprobación personalizada en datos del evento",
+            "flow_notify_match_summary": "resultado final con equipos, marcador, goleadores y estadio",
         },
         "fr": {
             "placeholder": "Posez une question sur cette page...",
@@ -342,6 +565,78 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "flow_condition": "Condition",
             "flow_action": "Action",
             "flow_no_data": "Aucune donn\u00e9e d'automatisation",
+            "flow_on": "Flow",
+            "flow_off": "Flow off",
+            "flow_unavailable": "Flow indisponible pour cette automatisation.",
+            "flow_unavailable_migrate": "Flow indisponible : automatisation sans ID ou API de configuration inaccessible. Essayez \"Migrer\".",
+            "flow_last_triggered": "Dernière activation",
+            "flow_never": "Jamais",
+            "flow_problem_subject": "Problème : {value}",
+            "flow_trigger_device_problem": "Quand {value} signale un problème",
+            "flow_trigger_device_generic": "Déclencheur appareil",
+            "flow_actions_title": "Actions",
+            "flow_branch": "Branche",
+            "flow_actions_count": "actions",
+            "flow_notify": "Notifier",
+            "flow_action_word": "Action",
+            "flow_wait": "Attendre",
+            "flow_set": "Définir",
+            "flow_set_value_of": "Définir la valeur de",
+            "flow_with_message": "Action avec message",
+            "flow_automation_action": "Action d'automatisation",
+            "flow_state_word": "état",
+            "flow_dynamic_value": "valeur dynamique",
+            "flow_problem": "Problème",
+            "flow_no_problem": "Aucun problème",
+            "flow_when_equals": "Quand {entity} = {value}",
+            "flow_change": "Changement : {entity}",
+            "flow_time_window": "Plage horaire",
+            "flow_after": "Après {value}",
+            "flow_before": "Avant {value}",
+            "flow_cyclic_execution": "Exécution cyclique : {value}",
+            "flow_trigger_prefix": "Déclencheur : {value}",
+            "flow_event": "événement",
+            "flow_condition_prefix": "Condition : {value}",
+            "flow_verify": "vérification",
+            "flow_check_state_of": "Vérifie l'état de {entity}",
+            "flow_check_threshold_of": "Vérifie le seuil numérique de {entity}",
+            "flow_starts_when": "Démarre quand {entity} change d'état",
+            "flow_becomes": "Démarre quand {entity} devient {value}",
+            "flow_change_from_to": "Changement d'état : {entity} de {from} à {to}",
+            "flow_starts_fixed_time": "Démarre à une heure fixe",
+            "flow_starts_above_threshold": "Démarre quand un seuil numérique est dépassé",
+            "flow_valid_between": "Valide uniquement entre {from} et {to}",
+            "flow_valid_after": "Valide uniquement après {value}",
+            "flow_valid_before": "Valide uniquement avant {value}",
+            "flow_if": "Si {value}",
+            "flow_else": "Sinon",
+            "flow_branch_choose": "Branche choose #{index}",
+            "flow_branch_default": "Branche par défaut choose",
+            "flow_event_generic": "Événement",
+            "flow_event_named": "Événement : {value}",
+            "flow_trigger_event_generic": "Déclenché par événement",
+            "flow_trigger_event_type": "Déclenché par événement : {value}",
+            "flow_trigger_event_when": "Quand l'événement {value} se déclenche",
+            "flow_repeat_while": "Répéter tant que {value}",
+            "flow_repeat_count": "Répéter {value} fois",
+            "flow_repeat_foreach": "Répéter pour chaque élément",
+            "flow_repeat_until": "Répéter jusqu'à {value}",
+            "flow_repeat_branch": "Branche de boucle",
+            "flow_data": "données",
+            "flow_random_color": "couleur aléatoire",
+            "flow_brightness": "luminosité",
+            "flow_service": "service",
+            "flow_entities": "entités",
+            "flow_template_condition": "Condition de template",
+            "flow_template_condition_short": "Template : {value}",
+            "flow_template_eval": "Évalue le template : {value}",
+            "flow_template_logic": "logique de template",
+            "flow_dynamic_message": "message dynamique",
+            "flow_wait_for": "Attendre {value}",
+            "flow_template_if_equals": "Seulement si {field} est {value}",
+            "flow_template_if_not_equals": "Seulement si {field} n'est pas {value}",
+            "flow_template_event_check": "Vérification personnalisée sur les données d'événement",
+            "flow_notify_match_summary": "résultat final avec équipes, score, buteurs et stade",
         },
     }
 
@@ -356,7 +651,7 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 (function() {{
   'use strict';
 
-  console.log('[Amira] Bubble JS executing — bubble={show_bubble}, card_btn={show_card_button}');
+  console.log('[Amira] Bubble JS executing — bubble={show_bubble}, card_btn={show_card_button}, auto_btn={show_automation_button}');
 
   // Global error handler — shows JS errors as visible banner + sends to backend
   if (!window.__AMIRA_BUBBLE_ERROR_HANDLER) {{
@@ -406,8 +701,24 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   const INGRESS_URL = '{ingress_url}';
   const API_BASE = INGRESS_URL;
+  const UI_LANG = '{language}';
+  const AMIRA_ENABLE_AUTOMATION_BUTTON = {'true' if show_automation_button else 'false'};
   const T = {__import__('json').dumps(t, ensure_ascii=False)};
   const VOICE_LANG = '{voice_lang}';
+  function tt(key, fallback) {{
+    try {{
+      return (T && Object.prototype.hasOwnProperty.call(T, key) && T[key] !== undefined && T[key] !== null && T[key] !== '')
+        ? String(T[key]) : String(fallback || '');
+    }} catch(e) {{ return String(fallback || ''); }}
+  }}
+  function tf(key, fallback, vars) {{
+    var s = tt(key, fallback);
+    if (!vars) return s;
+    Object.keys(vars).forEach(function(k) {{
+      s = s.split(String.fromCharCode(123) + k + String.fromCharCode(125)).join(String(vars[k]));
+    }});
+    return s;
+  }}
 
   // ---- Ingress session (needed for companion app / tablet WebView) ----
   // The companion app does not automatically get a hassio_session cookie.
@@ -768,11 +1079,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       return ctx;
     }}
 
-    let m = path.match(/\\/config\\/automation\\/edit\\/([^/]+)/);
-    if (m) {{ ctx.type = 'automation'; ctx.id = m[1]; ctx.label = T.context_automation + ': ' + m[1]; return ctx; }}
-
-    m = path.match(/\\/config\\/automation\\/trace\\/([^/]+)/);
-    if (m) {{ ctx.type = 'automation'; ctx.id = m[1]; ctx.label = T.context_automation + ' (trace): ' + m[1]; return ctx; }}
+    let m = path.match(/\\/config\\/automation\\/(?:edit|show|trace)\\/([^/]+)/);
+    if (m) {{
+      ctx.type = 'automation';
+      ctx.id = m[1];
+      ctx.label = (path.includes('/trace/') ? (T.context_automation + ' (trace): ') : (T.context_automation + ': ')) + m[1];
+      return ctx;
+    }}
+    if (path.includes('/config/automation')) {{
+      ctx.type = 'automation';
+      ctx.label = T.context_automation;
+      return ctx;
+    }}
 
     m = path.match(/\\/config\\/script\\/edit\\/([^/]+)/);
     if (m) {{ ctx.type = 'script'; ctx.id = m[1]; ctx.label = T.context_script + ': ' + m[1]; return ctx; }}
@@ -956,6 +1274,10 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       return '[CONTEXT: User is viewing automation id="' + ctx.id + '". '
            + 'The automation_id for modify operations is: ' + ctx.id + '. '
            + 'Use get_automations or the DATA section to read it. Refer to it directly.] ';
+    if (ctx.type === 'automation')
+      return '[CONTEXT: User is viewing an automation page in Home Assistant. '
+           + 'Automation id may be unavailable in this view (read-only or no-id automation). '
+           + 'Analyze and explain based on visible automation logic.] ';
     if (ctx.type === 'script' && ctx.id)
       return '[CONTEXT: User is viewing script id="' + ctx.id + '". '
            + 'The script_id for modify operations is: ' + ctx.id + '. '
@@ -2016,19 +2338,52 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       injectCardEditorButton();
     }}
     // ---- Automation integrated view detection ----
-    const autoEditMatch = curPath.match(/\\/config\\/automation\\/edit\\/([^/]+)/);
-    if (autoEditMatch) {{
-      const autoId = autoEditMatch[1];
+    const autoMatch = AMIRA_ENABLE_AUTOMATION_BUTTON ? curPath.match(/\\/config\\/automation\\/(?:edit|show|trace)\\/([^/]+)/) : null;
+    const onAutomationDetailView = !!(
+      AMIRA_ENABLE_AUTOMATION_BUTTON
+      && (autoMatch || _findAutomationFlowHost())
+    );
+    if (onAutomationDetailView) {{
+      const autoId = autoMatch ? autoMatch[1] : null;
       // Inject toolbar button if not present
       if (!_autoBtnInjected || !_autoToolbarBtnExists()) {{
         _autoBtnInjected = false;
         injectAutomationToolbarButton();
       }}
+      // Inject flow toggle near Amira button
+      if (!_autoFlowToggleBtnExists()) {{
+        injectAutomationFlowToggleButton();
+      }} else {{
+        _applyFlowVisibility();
+      }}
       // Inject flow visualization if not done or automation changed
-      if (!_autoFlowInjected || _lastAutoPageId !== autoId) {{
+      if (autoId && (_lastAutoPageId !== autoId || _autoFlowStatus === 'idle')) {{
+        if (_lastAutoPageId !== autoId) {{
+          _autoFlowStatus = 'idle';
+          _autoFlowUnavailableReason = '';
+          _autoFlowInjected = false;
+          _autoFlowConfigSig = '';
+          _autoFlowLastCheckTs = 0;
+        }}
         _lastAutoPageId = autoId;
+        fetchAndRenderAutomationFlow(autoId, {{ showUnavailable: false }});
+      }} else if (autoId && _autoFlowStatus === 'rendered' && _autoFlowVisible) {{
+        const now = Date.now();
+        if ((now - _autoFlowLastCheckTs) >= AUTO_FLOW_REFRESH_MS) {{
+          _autoFlowLastCheckTs = now;
+          fetchAndRenderAutomationFlow(autoId, {{ showUnavailable: false, refresh: true }});
+        }}
+      }}
+      if (!autoId && _autoFlowInjected) {{
+        const flow = _findAutomationFlowEl();
+        if (flow) flow.remove();
+        _autoFlowEl = null;
         _autoFlowInjected = false;
-        fetchAndRenderAutomationFlow(autoId);
+        _lastAutoPageId = null;
+        _autoFlowStatus = 'idle';
+        _autoFlowUnavailableReason = '';
+        _autoFlowConfigSig = '';
+        _autoFlowLastCheckTs = 0;
       }}
       // Auto-restore sidebar if it was open
       if (!_autoSidebarOpen && loadSetting('auto-sidebar-open', false)) {{
@@ -2616,6 +2971,8 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   // ---- Automation page integrated sidebar + flow visualization ----
   const AMIRA_AUTO_BTN_ID   = 'amira-auto-toolbar-btn';
+  const AMIRA_FLOW_TOGGLE_ID = 'amira-auto-flow-toggle-btn';
+  const AMIRA_AUTO_BTN_GROUP_ID = 'amira-auto-toolbar-btn-group';
   const AMIRA_SIDEBAR_ID    = 'amira-auto-sidebar';
   const AMIRA_FLOW_ID       = 'amira-auto-flow';
   const AUTO_SESSION_KEY    = 'ha-claude-auto-session';
@@ -2630,6 +2987,16 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
   let _autoModSel           = null;
   let _autoAgentSel         = null;
   let _autoContentWrapper   = null;
+  let _autoToolbarBtnEl     = null;
+  let _autoFlowToggleBtnEl  = null;
+  let _autoFlowEl           = null;
+  let _autoFlowVisible      = loadSetting('auto-flow-visible', true);
+  let _autoFlowStatus       = 'idle'; // idle | rendered | unavailable
+  let _autoFlowUnavailableReason = '';
+  let _autoFlowConfigSig    = '';
+  let _autoFlowLastCheckTs  = 0;
+  const AUTO_FLOW_REFRESH_MS = 4000;
+  let _autoFlowRenderBusy   = false;
 
   function getAutoSessionId() {{
     let sid = null;
@@ -2642,105 +3009,399 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     try {{ localStorage.removeItem(AUTO_SESSION_KEY); }} catch(e) {{}}
   }}
 
-  // ---- Toolbar button injection ----
+  // ---- Toolbar button injection (position:fixed on body — avoids Shadow DOM unreliability) ----
   function _autoToolbarBtnExists() {{
-    const toolbar = _findAutomationToolbar();
-    return !!(toolbar && toolbar.querySelector('#' + AMIRA_AUTO_BTN_ID));
+    if (_autoToolbarBtnEl && _autoToolbarBtnEl.isConnected) return true;
+    if (document.getElementById(AMIRA_AUTO_BTN_ID)) return true;
+    const toolbarContent = _findAutomationToolbarContent();
+    return !!(toolbarContent && toolbarContent.querySelector('#' + AMIRA_AUTO_BTN_ID));
+  }}
+
+  function _findAutomationToolbarContent() {{
+    try {{
+      const toolbar = _findAutomationToolbar();
+      if (!toolbar) return null;
+      const root = toolbar.shadowRoot || toolbar;
+      return root.querySelector('.toolbar-content')
+          || root.querySelector('.toolbar')
+          || root.querySelector('.main-title')
+          || null;
+    }} catch(e) {{ return null; }}
+  }}
+
+  function _getAutoToolbarButtonGroup(createIfMissing) {{
+    const toolbarContent = _findAutomationToolbarContent();
+    if (!toolbarContent) return null;
+    let group = toolbarContent.querySelector ? toolbarContent.querySelector('#' + AMIRA_AUTO_BTN_GROUP_ID) : null;
+    if (group || !createIfMissing) return group;
+    group = document.createElement('div');
+    group.id = AMIRA_AUTO_BTN_GROUP_ID;
+    group.style.cssText = 'display:inline-flex;align-items:center;gap:8px;flex-shrink:0;margin-left:10px;';
+    const toolbarIconSlot = toolbarContent.querySelector ? toolbarContent.querySelector('slot[name="toolbar-icon"]') : null;
+    if (toolbarIconSlot && toolbarIconSlot.parentElement === toolbarContent) {{
+      toolbarContent.insertBefore(group, toolbarIconSlot);
+    }} else {{
+      toolbarContent.appendChild(group);
+    }}
+    return group;
   }}
 
   function injectAutomationToolbarButton() {{
-    if (_autoBtnInjected && _autoToolbarBtnExists()) return;
-    const toolbar = _findAutomationToolbar();
-    if (!toolbar) return;
-    // Find the action buttons area (right side of toolbar)
-    // HA toolbar typically has: [back-btn] [title ...flex...] [action-icons] [overflow-menu]
-    const existing = toolbar.querySelector('#' + AMIRA_AUTO_BTN_ID);
-    if (existing) {{ _autoBtnInjected = true; return; }}
-    const aiBtn = document.createElement('ha-icon-button');
-    aiBtn.id = AMIRA_AUTO_BTN_ID;
-    aiBtn.setAttribute('label', 'Amira');
-    // Style as a text button matching HA's toolbar style
+    if (_autoToolbarBtnExists()) {{ _autoBtnInjected = true; return; }}
+    const toolbarContent = _findAutomationToolbarContent();
+    if (!toolbarContent) return;
+    const group = _getAutoToolbarButtonGroup(true);
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'display:inline-flex;align-items:center;cursor:pointer;padding:0 8px;height:40px;border-radius:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:13px;font-weight:600;gap:4px;user-select:none;white-space:nowrap;margin:0 4px;box-shadow:0 2px 6px rgba(102,126,234,0.4);transition:opacity 0.15s;';
-    wrapper.innerHTML = '<span style="font-size:16px;">&#129302;</span><span>Amira</span>';
     wrapper.id = AMIRA_AUTO_BTN_ID;
-    wrapper.onmouseenter = () => {{ wrapper.style.opacity='0.85'; }};
-    wrapper.onmouseleave = () => {{ wrapper.style.opacity='1'; }};
+    // Native placement in the automation toolbar (same strategy as Flow button).
+    const inlineStyle = 'display:inline-flex;align-items:center;cursor:pointer;padding:0 12px;height:32px;border-radius:16px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:13px;font-weight:600;gap:6px;user-select:none;white-space:nowrap;box-shadow:0 2px 8px rgba(102,126,234,0.35);transition:opacity 0.15s,transform 0.1s;line-height:1;flex-shrink:0;';
+    wrapper.style.cssText = inlineStyle;
+    wrapper.innerHTML = '<span style="font-size:15px;line-height:1;">&#129302;</span><span>Amira</span>';
+    wrapper.onmouseenter = () => {{ wrapper.style.opacity='0.88'; wrapper.style.transform='translateY(-1px)'; }};
+    wrapper.onmouseleave = () => {{ wrapper.style.opacity='1'; wrapper.style.transform=''; }};
     wrapper.addEventListener('click', (e) => {{
       e.stopPropagation(); e.preventDefault();
       _autoSidebarOpen ? closeAutomationSidebar() : openAutomationSidebar();
     }});
-    // Insert before the overflow menu (last child is usually ha-button-menu or mwc-icon-button)
-    const overflowMenu = toolbar.querySelector('ha-button-menu') || toolbar.querySelector('ha-icon-overflow-menu');
-    if (overflowMenu) {{
-      toolbar.insertBefore(wrapper, overflowMenu);
-    }} else {{
-      toolbar.appendChild(wrapper);
+    // Place it inside a dedicated button group to avoid overlap.
+    const title = toolbarContent.querySelector ? toolbarContent.querySelector('.main-title') : null;
+    if (title && title.parentElement === toolbarContent) {{
+      title.style.marginRight = 'auto';
     }}
+    if (group) group.appendChild(wrapper);
+    else toolbarContent.appendChild(wrapper);
+    _autoToolbarBtnEl = wrapper;
     _autoBtnInjected = true;
   }}
 
-  function removeAutomationToolbarButton() {{
-    try {{
-      const toolbar = _findAutomationToolbar();
-      if (toolbar) {{
-        const b = toolbar.querySelector('#' + AMIRA_AUTO_BTN_ID);
-        if (b) b.remove();
+  function _autoFlowToggleBtnExists() {{
+    if (_autoFlowToggleBtnEl && _autoFlowToggleBtnEl.isConnected) return true;
+    if (document.getElementById(AMIRA_FLOW_TOGGLE_ID)) return true;
+    const toolbarContent = _findAutomationToolbarContent();
+    return !!(toolbarContent && toolbarContent.querySelector('#' + AMIRA_FLOW_TOGGLE_ID));
+  }}
+
+  function _applyFlowVisibility() {{
+    const flow = _findAutomationFlowEl();
+    if (flow) flow.style.display = _autoFlowVisible ? '' : 'none';
+    if (_autoFlowToggleBtnEl) {{
+      _autoFlowToggleBtnEl.style.opacity = _autoFlowVisible ? '1' : '0.65';
+      _autoFlowToggleBtnEl.textContent = _autoFlowVisible ? ('🧭 ' + tt('flow_on', 'Flow')) : ('🧭 ' + tt('flow_off', 'Flow off'));
+    }}
+  }}
+
+  function injectAutomationFlowToggleButton() {{
+    if (_autoFlowToggleBtnExists()) {{
+      _applyFlowVisibility();
+      return;
+    }}
+    const toolbarContent = _findAutomationToolbarContent();
+    if (!toolbarContent) return;
+    const group = _getAutoToolbarButtonGroup(true);
+    const btn = document.createElement('div');
+    btn.id = AMIRA_FLOW_TOGGLE_ID;
+    btn.style.cssText = 'display:inline-flex;align-items:center;cursor:pointer;padding:0 10px;height:32px;border-radius:16px;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);color:#1e293b;font-size:12px;font-weight:600;gap:6px;user-select:none;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,0.12);transition:opacity 0.15s,transform 0.1s;flex-shrink:0;';
+    btn.onmouseenter = () => {{ btn.style.opacity='0.88'; btn.style.transform='translateY(-1px)'; }};
+    btn.onmouseleave = () => {{ btn.style.opacity='1'; btn.style.transform=''; }};
+    btn.addEventListener('click', (e) => {{
+      e.stopPropagation(); e.preventDefault();
+      _autoFlowVisible = !_autoFlowVisible;
+      saveSetting('auto-flow-visible', _autoFlowVisible);
+      if (_autoFlowVisible && !_findAutomationFlowEl()) {{
+        if (_autoFlowStatus === 'unavailable') {{
+          _renderFlowInfoMessage(_autoFlowUnavailableReason || tt('flow_unavailable', 'Flow unavailable for this automation.'));
+        }} else if (_lastAutoPageId && _autoFlowStatus === 'idle') {{
+          fetchAndRenderAutomationFlow(_lastAutoPageId, {{ showUnavailable: true }});
+        }}
       }}
-    }} catch(e) {{}}
+      _applyFlowVisibility();
+    }});
+    if (group) group.appendChild(btn);
+    else toolbarContent.appendChild(btn);
+    _autoFlowToggleBtnEl = btn;
+    _applyFlowVisibility();
+  }}
+
+  function removeAutomationToolbarButton() {{
+    if (_autoToolbarBtnEl && _autoToolbarBtnEl.remove) _autoToolbarBtnEl.remove();
+    _autoToolbarBtnEl = null;
+    const b = document.getElementById(AMIRA_AUTO_BTN_ID);
+    if (b) b.remove();
+    const toolbarContent = _findAutomationToolbarContent();
+    if (toolbarContent) {{
+      const sb = toolbarContent.querySelector('#' + AMIRA_AUTO_BTN_ID);
+      if (sb) sb.remove();
+      const fb = toolbarContent.querySelector('#' + AMIRA_FLOW_TOGGLE_ID);
+      if (fb) fb.remove();
+      const gb = toolbarContent.querySelector('#' + AMIRA_AUTO_BTN_GROUP_ID);
+      if (gb) gb.remove();
+    }}
+    if (_autoFlowToggleBtnEl && _autoFlowToggleBtnEl.remove) _autoFlowToggleBtnEl.remove();
+    _autoFlowToggleBtnEl = null;
     _autoBtnInjected = false;
   }}
 
   // ---- Flow visualization ----
+  function _entityLabel(eid) {{
+    if (!eid) return '';
+    const raw = Array.isArray(eid) ? eid[0] : eid;
+    if (!raw) return '';
+    return String(raw).split('.').pop().replace(/_/g, ' ');
+  }}
+
+  function _normalizeEntityIds(v) {{
+    const out = [];
+    function pushOne(x) {{
+      if (x === undefined || x === null) return;
+      const s = String(x).trim();
+      if (!s) return;
+      if (s.includes(',')) {{
+        s.split(',').forEach(part => pushOne(part));
+        return;
+      }}
+      if (!out.includes(s)) out.push(s);
+    }}
+    if (Array.isArray(v)) v.forEach(pushOne);
+    else pushOne(v);
+    return out;
+  }}
+
+  function _nodeEntityIds(node, fallback) {{
+    const fromNode = node && node.target && node.target.entity_id !== undefined
+      ? node.target.entity_id
+      : (node && node.entity_id !== undefined ? node.entity_id : fallback);
+    return _normalizeEntityIds(fromNode);
+  }}
+
+  function _entityListText(ids, maxVisible) {{
+    const arr = Array.isArray(ids) ? ids : [];
+    if (!arr.length) return '';
+    const m = Math.max(1, maxVisible || 2);
+    const labels = arr.slice(0, m).map(_entityLabel).filter(Boolean);
+    if (!labels.length) return '';
+    if (arr.length <= m) return labels.join(', ');
+    return labels.join(', ') + ' +' + (arr.length - m);
+  }}
+
+  function _formatDuration(delay) {{
+    if (delay === null || delay === undefined) return '';
+    if (typeof delay === 'number') return String(delay) + 's';
+    if (typeof delay === 'string') {{
+      const d = delay.trim();
+      if (!d) return '';
+      if (/^\\d+$/.test(d)) return d + 's';
+      return d;
+    }}
+    if (typeof delay === 'object') {{
+      const h = parseInt(delay.hours || 0, 10) || 0;
+      const m = parseInt(delay.minutes || 0, 10) || 0;
+      const s = parseInt(delay.seconds || 0, 10) || 0;
+      const out = [];
+      if (h) out.push(h + 'h');
+      if (m) out.push(m + 'm');
+      if (s) out.push(s + 's');
+      return out.length ? out.join(' ') : '';
+    }}
+    return '';
+  }}
+
+  function _humanizeTimePattern(node) {{
+    const parts = [];
+    const mins = String(node.minutes || '').trim();
+    const hours = String(node.hours || '').trim();
+    const secs = String(node.seconds || '').trim();
+    const minuteStep = mins.match(/^\\/(\\d+)$/);
+    const hourStep = hours.match(/^\\/(\\d+)$/);
+    const secStep = secs.match(/^\\/(\\d+)$/);
+
+    if (minuteStep) parts.push('Ogni ' + minuteStep[1] + ' min');
+    else if (hourStep) parts.push('Ogni ' + hourStep[1] + ' ore');
+    else if (secStep) parts.push('Ogni ' + secStep[1] + ' sec');
+    else if (mins && mins !== '*') parts.push('Al minuto ' + mins);
+    else if (hours && hours !== '*') parts.push('All\\'ora ' + hours);
+    else parts.push('Intervallo regolare');
+
+    return parts.join(' ');
+  }}
+
+  function _humanizeService(service, entity, node) {{
+    const svc = String(service || '');
+    if (svc.startsWith('notify.')) {{
+      const ch = svc.split('.').slice(1).join(' ').replace(/_/g, ' ').trim();
+      return ch ? (tt('flow_notify', 'Notify') + ': ' + ch) : tt('flow_notify', 'Notify');
+    }}
+    const op = svc.split('.').pop();
+    const ids = _nodeEntityIds(node || null, entity);
+    const ent = _entityListText(ids, 2) || _entityLabel(entity);
+    if (op === 'turn_on') return ent ? ('Accendi ' + ent) : 'Accendi';
+    if (op === 'turn_off') return ent ? ('Spegni ' + ent) : 'Spegni';
+    if (op === 'toggle') return ent ? ('Inverti ' + ent) : 'Inverti stato';
+    if (op === 'open_cover') return ent ? ('Apri ' + ent) : 'Apri';
+    if (op === 'close_cover') return ent ? ('Chiudi ' + ent) : 'Chiudi';
+    const shortSvc = op ? op.replace(/_/g, ' ') : tt('flow_action_word', 'Action');
+    return ent ? (shortSvc + ': ' + ent) : shortSvc;
+  }}
+
+  function _compactText(v, maxLen) {{
+    if (v === undefined || v === null) return '';
+    let s = String(v).replace(/\\s+/g, ' ').trim();
+    // Humanize Jinja-like templates so users see readable intent, not raw syntax.
+    s = s
+      .replace(/\\u007b\\u007b\\s*trigger\\.event\\.data\\.([a-z0-9_]+)\\s*\\u007d\\u007d/gi, function(_, fld) {{
+        return '[' + tt('flow_event', 'event') + ': ' + String(fld).replace(/_/g, ' ') + ']';
+      }})
+      .replace(/\\u007b\\u007b\\s*states\\('([^']+)'\\)\\s*\\u007d\\u007d/gi, function(_, eid) {{
+        return '[' + tt('flow_state_word', 'state') + ' ' + _entityLabel(eid) + ']';
+      }})
+      .replace(/\\u007b\\u007b\\s*\\(\\s*states\\('([^']+)'\\)\\s*\\|\\s*int\\(0\\)\\s*\\)\\s*\\+\\s*1\\s*\\u007d\\u007d/gi, function(_, eid) {{
+        return '[(' + _entityLabel(eid) + ') + 1]';
+      }})
+      .replace(/\\u007b%[\\s\\S]*?%\\u007d/g, '[' + tt('flow_template_logic', 'template logic') + ']')
+      .replace(/\\u007b\\u007b[^\\u007d]+\\u007d\\u007d/g, '[' + tt('flow_dynamic_value', 'dynamic value') + ']');
+    const dyn = '[' + tt('flow_dynamic_value', 'dynamic value') + ']';
+    const tpl = '[' + tt('flow_template_logic', 'template logic') + ']';
+    while (s.indexOf(dyn + dyn) !== -1) s = s.replaceAll(dyn + dyn, dyn);
+    while (s.indexOf(dyn + ' ' + dyn) !== -1) s = s.replaceAll(dyn + ' ' + dyn, dyn);
+    while (s.indexOf(tpl + tpl) !== -1) s = s.replaceAll(tpl + tpl, tpl);
+    while (s.indexOf(tpl + ' ' + tpl) !== -1) s = s.replaceAll(tpl + ' ' + tpl, tpl);
+    s = s.replace(/\\s+([,.;:!?])/g, '$1').trim();
+    if (!s) return '';
+    if (!maxLen || s.length <= maxLen) return s;
+    return s.slice(0, Math.max(0, maxLen - 1)) + '…';
+  }}
+
+  function _humanizeStateValue(val, eid) {{
+    const v = String(val || '').toLowerCase();
+    const e = String(eid || '').toLowerCase();
+    const isProblemLike = /error|fault|problem|alarm|allarme/.test(e);
+    if (v === 'on') return isProblemLike ? tt('flow_problem', 'Problem') : 'ON';
+    if (v === 'off') return isProblemLike ? tt('flow_no_problem', 'No problem') : 'OFF';
+    return String(val || '');
+  }}
+
+  function _eventTriggerName(node, maxLen) {{
+    if (!node || typeof node !== 'object') return '';
+    const raw =
+      node.event_type ||
+      node.event ||
+      node.event_name ||
+      (node.event_data && (node.event_data.event_type || node.event_data.type || node.event_data.event)) ||
+      (node.data && (node.data.event_type || node.data.event)) ||
+      '';
+    return _compactText(raw, maxLen || 72);
+  }}
+
+  function _humanizeFieldName(name) {{
+    const f = String(name || '').trim();
+    if (!f) return '';
+    if (f === 'league_name') return 'campionato';
+    if (f === 'home_team') return 'squadra casa';
+    if (f === 'away_team') return 'squadra ospite';
+    if (f === 'home_score') return 'gol casa';
+    if (f === 'away_score') return 'gol ospite';
+    if (f === 'goal_scorers_str') return 'marcatori';
+    if (f === 'venue') return 'stadio';
+    return f.replace(/_/g, ' ');
+  }}
+
+  function _templateBody(node) {{
+    const raw = String((node && (node.value_template || node.template || node.value)) || '').trim();
+    if (!raw) return '';
+    return raw.replace(/^\\u007b\\u007b\\s*/, '').replace(/\\s*\\u007d\\u007d$/, '').trim();
+  }}
+
+  function _humanizeTemplateCondition(node, maxLen) {{
+    const expr = _templateBody(node);
+    if (!expr) return '';
+
+    const eq = expr.match(/^trigger\\.event\\.data\\.([a-z0-9_]+)\\s*==\\s*['"]([^'"]+)['"]$/i);
+    if (eq) {{
+      const field = _humanizeFieldName(eq[1]);
+      const val = _compactText(eq[2], 36);
+      return tf('flow_template_if_equals', 'Only if {{field}} is {{value}}', {{ field: field, value: val }});
+    }}
+    const ne = expr.match(/^trigger\\.event\\.data\\.([a-z0-9_]+)\\s*!=\\s*['"]([^'"]+)['"]$/i);
+    if (ne) {{
+      const field = _humanizeFieldName(ne[1]);
+      const val = _compactText(ne[2], 36);
+      return tf('flow_template_if_not_equals', 'Only if {{field}} is not {{value}}', {{ field: field, value: val }});
+    }}
+    if (/trigger\\.event\\.data\\./i.test(expr)) {{
+      return tt('flow_template_event_check', 'Custom check on event data');
+    }}
+    return _compactText(expr, maxLen || 120);
+  }}
+
   function _describeFlowNode(node, type) {{
     if (!node || typeof node !== 'object') return '';
     if (type === 'trigger') {{
       const p = node.platform || node.trigger || '';
       const eid = node.entity_id || '';
-      if (p === 'state' && eid) return eid.split('.').pop().replace(/_/g, ' ');
-      if (p === 'time') return node.at || 'time';
-      if (p === 'mqtt') return node.topic || 'MQTT';
+      if (p === 'time_pattern') return _humanizeTimePattern(node);
+      if (p === 'state' && eid) {{
+        if (node.to !== undefined && node.to !== null && String(node.to) !== '') {{
+          return tf('flow_when_equals', 'When state matches', {{ entity: _entityLabel(eid), value: _humanizeStateValue(node.to, eid) }});
+        }}
+        return tf('flow_change', 'State change', {{ entity: _entityLabel(eid) }});
+      }}
+      if (p === 'time') return node.at ? ('Alle ' + node.at) : 'A orario';
+      if (p === 'mqtt') return node.topic ? ('MQTT ' + node.topic) : 'MQTT';
       if (p === 'sun') return (node.event || 'sun') + ' ' + (node.offset || '');
       if (p === 'homeassistant') return 'HA ' + (node.event || 'start');
-      if (p === 'numeric_state' && eid) return eid.split('.').pop().replace(/_/g, ' ');
-      if (p === 'zone' && eid) return eid.split('.').pop().replace(/_/g, ' ');
-      if (p === 'template') return 'template';
+      if (p === 'event') {{
+        const ev = _eventTriggerName(node, 56);
+        return ev ? tf('flow_event_named', 'Event: {{value}}', {{ value: ev }}) : tt('flow_event_generic', 'Event');
+      }}
+      if (p === 'numeric_state' && eid) return 'Valore: ' + _entityLabel(eid);
+      if (p === 'zone' && eid) return 'Zona: ' + _entityLabel(eid);
+      if (p === 'template') return tt('flow_template_condition', 'Template condition');
       if (p === 'webhook') return 'webhook';
-      if (p === 'device' && node.device_id) return (node.type || 'device').replace(/_/g, ' ');
-      if (eid) return eid.split('.').pop().replace(/_/g, ' ');
-      return p || 'trigger';
+      if (p === 'device' && node.device_id) {{
+        const subj = _compactText(node.__subject || '', 40);
+        const typ = String(node.type || '').toLowerCase();
+        if (subj && /problem|fault|error|alarm|allarme/.test(typ)) {{
+          return tf('flow_problem_subject', 'Problem: {{value}}', {{ value: subj }});
+        }}
+        return (node.type || tt('flow_trigger_device_generic', 'Device trigger')).replace(/_/g, ' ');
+      }}
+      if (eid) return _entityLabel(eid);
+      return p ? p.replace(/_/g, ' ') : 'trigger';
     }}
     if (type === 'condition') {{
       const c = node.condition || '';
       const eid = node.entity_id || '';
-      if (c === 'state' && eid) return eid.split('.').pop().replace(/_/g, ' ') + (node.state ? ' = ' + node.state : '');
-      if (c === 'sun') return (node.after || node.before || 'sun');
-      if (c === 'time') return (node.after || '') + ' - ' + (node.before || '');
-      if (c === 'numeric_state' && eid) return eid.split('.').pop().replace(/_/g, ' ');
-      if (c === 'template') return 'template';
+      if (c === 'state' && eid) return _entityLabel(eid) + (node.state ? (' = ' + node.state) : '');
+      if (c === 'sun') return 'Cond. sole';
+      if (c === 'time') {{
+        if (node.after && node.before) return node.after + ' - ' + node.before;
+        if (node.after) return 'Dopo ' + node.after;
+        if (node.before) return 'Prima di ' + node.before;
+        return tt('flow_time_window', 'Time window');
+      }}
+      if (c === 'numeric_state' && eid) return 'Soglia: ' + _entityLabel(eid);
+      if (c === 'template') {{
+        const tpl = _humanizeTemplateCondition(node, 68);
+        return tpl ? tf('flow_template_condition_short', 'Template: {{value}}', {{ value: tpl }}) : tt('flow_template_condition', 'Template condition');
+      }}
       if (c === 'zone') return 'zone';
       if (c === 'and' || c === 'or' || c === 'not') return c.toUpperCase();
-      if (eid) return eid.split('.').pop().replace(/_/g, ' ');
-      return c || 'condition';
+      if (eid) return _entityLabel(eid);
+      return c ? c.replace(/_/g, ' ') : 'condition';
     }}
     if (type === 'action') {{
       const svc = node.service || node.action || '';
       const eid = (node.target && node.target.entity_id) || node.entity_id || '';
-      if (svc) {{
-        const shortSvc = svc.split('.').pop().replace(/_/g, ' ');
-        if (eid) {{
-          const shortEid = (Array.isArray(eid) ? eid[0] : eid).split('.').pop().replace(/_/g, ' ');
-          return shortSvc + ': ' + shortEid;
-        }}
-        return shortSvc;
+      if (svc) return _humanizeService(svc, eid, node);
+      if (node.delay) {{
+        const d = _formatDuration(node.delay);
+        return d ? (tt('flow_wait', 'Wait') + ' ' + d) : tt('flow_wait', 'Wait');
       }}
-      if (node.delay) return 'delay ' + (typeof node.delay === 'object' ? JSON.stringify(node.delay) : node.delay);
-      if (node.wait_template) return 'wait template';
+      if (node.wait_template) return tt('flow_template_condition', 'Template condition');
       if (node.choose) return 'choose';
       if (node.repeat) return 'repeat';
       if (node.if) return 'if/then';
       if (node.scene) return 'scene: ' + (node.scene.split('.').pop() || '');
-      if (node.event) return 'event: ' + node.event;
+      if (node.event) return tf('flow_event_named', 'Event: {{value}}', {{ value: node.event }});
       return 'action';
     }}
     return '';
@@ -2767,51 +3428,543 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     return '#bdbdbd';
   }}
 
-  async function fetchAndRenderAutomationFlow(automationId) {{
-    const contentWrap = _findAutomationContentWrapper();
-    if (!contentWrap) return;
-    // Remove old flow if present
-    const oldFlow = contentWrap.parentNode ? contentWrap.parentNode.querySelector('#' + AMIRA_FLOW_ID) : null;
-    if (oldFlow) oldFlow.remove();
+  function _describeFlowDetail(node, type) {{
+    if (!node || typeof node !== 'object') return '';
+    if (type === 'trigger') {{
+      const p = node.platform || node.trigger || '';
+      if (p === 'time_pattern') return tf('flow_cyclic_execution', 'Cyclic execution', {{ value: _humanizeTimePattern(node) }});
+      if (p === 'state') {{
+        const e = _entityLabel(node.entity_id) || 'entita';
+        const from = (node.from !== undefined && String(node.from) !== '') ? _humanizeStateValue(node.from, node.entity_id) : '';
+        const to = (node.to !== undefined && String(node.to) !== '') ? _humanizeStateValue(node.to, node.entity_id) : '';
+        if (from && to) return tf('flow_change_from_to', 'State change', {{ entity: e, from: from, to: to }});
+        if (to) return tf('flow_becomes', 'Starts on state', {{ entity: e, value: to }});
+        return tf('flow_starts_when', 'Starts on state change', {{ entity: e }});
+      }}
+      if (p === 'time') return node.at ? tf('flow_after', 'After', {{ value: node.at }}) : tt('flow_starts_fixed_time', 'Starts at a fixed time');
+      if (p === 'numeric_state') return tt('flow_starts_above_threshold', 'Starts when a numeric threshold is crossed');
+      if (p === 'event') {{
+        const ev = _eventTriggerName(node, 120);
+        return ev ? tf('flow_trigger_event_when', 'When event {{value}} fires', {{ value: ev }}) : tt('flow_trigger_event_generic', 'Triggered by event');
+      }}
+      if (p === 'device') {{
+        const subj = _compactText(node.__subject || '', 56);
+        const typ = String(node.type || '').toLowerCase();
+        if (subj && /problem|fault|error|alarm|allarme/.test(typ)) {{
+          return tf('flow_trigger_device_problem', 'When {{value}} reports a problem', {{ value: subj }});
+        }}
+        return tt('flow_trigger_device_generic', 'Device trigger');
+      }}
+      return tf('flow_trigger_prefix', 'Trigger', {{ value: (p || tt('flow_event', 'event')) }});
+    }}
+    if (type === 'condition') {{
+      const c = node.condition || '';
+      if (c === 'time') {{
+        const after = node.after || '';
+        const before = node.before || '';
+        if (after && before) return tf('flow_valid_between', 'Valid between', {{ from: after, to: before }});
+        if (after) return tf('flow_valid_after', 'Valid after', {{ value: after }});
+        if (before) return tf('flow_valid_before', 'Valid before', {{ value: before }});
+      }}
+      if (c === 'state') return tf('flow_check_state_of', 'Checks state', {{ entity: (_entityLabel(node.entity_id) || 'entity') }});
+      if (c === 'numeric_state') return tf('flow_check_threshold_of', 'Checks threshold', {{ entity: (_entityLabel(node.entity_id) || 'entity') }});
+      if (c === 'template') {{
+        const tpl = _humanizeTemplateCondition(node, 180);
+        return tpl ? tf('flow_template_eval', 'Evaluates template: {{value}}', {{ value: tpl }}) : tt('flow_template_condition', 'Template condition');
+      }}
+      return tf('flow_condition_prefix', 'Condition', {{ value: (c || tt('flow_verify', 'check')) }});
+    }}
+    if (type === 'action') {{
+      const svc = node.service || node.action || '';
+      const eid = (node.target && node.target.entity_id) || node.entity_id || '';
+      if (svc) {{
+        const svcMeta = ' · ' + tt('flow_service', 'service') + ': ' + String(svc);
+        if (String(svc).startsWith('notify.')) {{
+          const rawTitle = String((node.data && node.data.title) || '');
+          const rawMsg = String((node.data && node.data.message) || '');
+          const hasTemplate = /\\u007b\\u007b|\\u007b%/.test(rawTitle + ' ' + rawMsg);
+          const isMatchSummary = /home_team|away_team|home_score|away_score|goal_scorers_str|venue/i.test(rawMsg);
+          const title = _compactText(node.data && node.data.title, 64);
+          const msg = _compactText(node.data && node.data.message, 180);
+          let body = '';
+          if (title) body = title;
+          if (isMatchSummary) body += (body ? '\\n' : '') + tt('flow_notify_match_summary', 'final score with teams, score, scorers and venue');
+          else if (msg) body += (body ? '\\n' : '') + msg;
+          else if (hasTemplate) body += (body ? '\\n' : '') + tt('flow_dynamic_message', 'dynamic message');
+          let out = tt('flow_notify', 'Notify') + ':';
+          if (body) out += ' ' + body;
+          out += '\\n' + tt('flow_service', 'service') + ': ' + String(svc);
+          return out;
+        }}
+        if (svc === 'input_number.set_value' || svc === 'number.set_value') {{
+          const targetName = _entityLabel(eid) || 'valore';
+          const val = _compactText(node.data && node.data.value, 90);
+          if (val) return tt('flow_set', 'Set') + ' ' + targetName + ' = ' + val + svcMeta;
+          return tt('flow_set_value_of', 'Set value of') + ' ' + targetName + svcMeta;
+        }}
+        const base = tt('flow_action_word', 'Action') + ': ' + _humanizeService(svc, eid, node);
+        const data = node.data && typeof node.data === 'object' ? node.data : null;
+        const ids = _nodeEntityIds(node, eid);
+        const entityBlock = ids.length > 1
+          ? ('\\n' + tt('flow_entities', 'entities') + ':\\n' + ids.map(v => ('• ' + _entityLabel(v))).join('\\n'))
+          : '';
+        if (!data) return base + svcMeta;
+        const bits = [];
+        if (data.brightness !== undefined && data.brightness !== null && String(data.brightness) !== '') {{
+          bits.push(tt('flow_brightness', 'brightness') + ' ' + String(data.brightness));
+        }}
+        if (data.xy_color !== undefined && data.xy_color !== null) {{
+          const xyRaw = String(data.xy_color);
+          const hasRandom = /\\|\\s*random|random/i.test(xyRaw);
+          const hasTpl = (xyRaw.indexOf(String.fromCharCode(123) + String.fromCharCode(123)) !== -1)
+            || (xyRaw.indexOf(String.fromCharCode(123) + '%') !== -1);
+          if (hasRandom || hasTpl) bits.push(tt('flow_random_color', 'random color'));
+          else bits.push('xy ' + _compactText(xyRaw, 44));
+        }}
+        if (data.rgb_color !== undefined && data.rgb_color !== null) {{
+          bits.push('rgb ' + _compactText(data.rgb_color, 32));
+        }}
+        if (!bits.length) return base + svcMeta + entityBlock;
+        return base + ' (' + tt('flow_data', 'data') + ': ' + bits.join(', ') + ')' + svcMeta + entityBlock;
+      }}
+      if (node.delay) {{
+        const d = _formatDuration(node.delay);
+        return d ? tf('flow_wait_for', 'Wait for {{value}}', {{ value: d }}) : tt('flow_wait', 'Wait');
+      }}
+      if (node.data && (node.data.message || node.data.title)) {{
+        const title = _compactText(node.data.title, 64);
+        const msg = _compactText(node.data.message, 180);
+        return (title ? (title + ' — ') : '') + (msg || tt('flow_with_message', 'Action with message'));
+      }}
+      return tt('flow_automation_action', 'Automation action');
+    }}
+    return '';
+  }}
+
+  function _humanizeConditionOne(c) {{
+    if (!c || typeof c !== 'object') return 'condizione';
+    const t = c.condition || '';
+    if (t === 'numeric_state') {{
+      const n = _entityLabel(c.entity_id) || 'valore';
+      const low = c.above !== undefined ? (' > ' + c.above) : '';
+      const high = c.below !== undefined ? (' < ' + c.below) : '';
+      return n + low + high;
+    }}
+    if (t === 'state') {{
+      const n = _entityLabel(c.entity_id) || 'entita';
+      return n + (c.state !== undefined ? (' = ' + c.state) : '');
+    }}
+    if (t === 'time') {{
+      if (c.after && c.before) return c.after + ' - ' + c.before;
+      if (c.after) return tf('flow_after', 'After', {{ value: c.after }});
+      if (c.before) return tf('flow_before', 'Before', {{ value: c.before }});
+      return 'fascia oraria';
+    }}
+    return t ? String(t).replace(/_/g, ' ') : 'condizione';
+  }}
+
+  function _expandActionNodes(actions) {{
+    const out = [];
+    let _branchCounter = 0;
+    function _nextBranchId() {{
+      _branchCounter += 1;
+      return _branchCounter;
+    }}
+
+    function pushAction(node, branchLabel, detailLabel, branchId) {{
+      if (!node || typeof node !== 'object') return;
+      const clone = Object.assign({{}}, node);
+      if (branchLabel) clone.__branch = branchLabel;
+      if (detailLabel) clone.__detail = detailLabel;
+      if (branchId) clone.__branchId = branchId;
+      out.push(clone);
+    }}
+
+    function walk(list, branchLabel, branchId) {{
+      if (!Array.isArray(list)) return;
+      list.forEach((node) => {{
+        if (!node || typeof node !== 'object') return;
+        if (Array.isArray(node.choose) && node.choose.length) {{
+          node.choose.forEach((ch, idx) => {{
+            const conds = Array.isArray(ch.conditions) ? ch.conditions : (ch.conditions ? [ch.conditions] : []);
+            const condTxt = conds.length ? conds.map(_humanizeConditionOne).join(' & ') : 'condizione';
+            const label = tf('flow_if', 'If', {{ value: condTxt }});
+            const bid = _nextBranchId();
+            pushAction({{ action: '__branch__', __kind: 'branch_marker' }}, label, tf('flow_branch_choose', 'Choose branch', {{ index: (idx + 1) }}), bid);
+            const seq = Array.isArray(ch.sequence) ? ch.sequence : (ch.sequence ? [ch.sequence] : []);
+            walk(seq, label, bid);
+          }});
+          if (Array.isArray(node.default) && node.default.length) {{
+            const defLabel = tt('flow_else', 'Else');
+            const bid = _nextBranchId();
+            pushAction({{ action: '__branch__', __kind: 'branch_marker' }}, defLabel, tt('flow_branch_default', 'Choose default branch'), bid);
+            walk(node.default, defLabel, bid);
+          }}
+          return;
+        }}
+        if (node.if) {{
+          const ifConds = Array.isArray(node.if) ? node.if : [node.if];
+          const ifTxt = ifConds.map(_humanizeConditionOne).join(' & ') || 'condizione';
+          const ifLabel = tf('flow_if', 'If', {{ value: ifTxt }});
+          const thenBid = _nextBranchId();
+          pushAction({{ action: '__branch__', __kind: 'branch_marker' }}, ifLabel, tf('flow_if', 'If', {{ value: ifTxt }}), thenBid);
+          walk(Array.isArray(node.then) ? node.then : (node.then ? [node.then] : []), ifLabel, thenBid);
+          if (Array.isArray(node.else) && node.else.length) {{
+            const elseLabel = tt('flow_else', 'Else');
+            const elseBid = _nextBranchId();
+            pushAction({{ action: '__branch__', __kind: 'branch_marker' }}, elseLabel, tt('flow_else', 'Else'), elseBid);
+            walk(node.else, elseLabel, elseBid);
+          }}
+          return;
+        }}
+        if (node.repeat && typeof node.repeat === 'object') {{
+          const rep = node.repeat;
+          let repLabel = 'repeat';
+          if (Array.isArray(rep.while) && rep.while.length) {{
+            const whileTxt = rep.while.map(_humanizeConditionOne).join(' & ');
+            repLabel = tf('flow_repeat_while', 'Repeat while {{value}}', {{ value: whileTxt || tt('flow_verify', 'check') }});
+          }} else if (rep.count !== undefined && rep.count !== null && String(rep.count) !== '') {{
+            repLabel = tf('flow_repeat_count', 'Repeat {{value}} times', {{ value: String(rep.count) }});
+          }} else if (Array.isArray(rep.for_each) || rep.for_each !== undefined) {{
+            repLabel = tt('flow_repeat_foreach', 'Repeat for each item');
+          }} else if (Array.isArray(rep.until) && rep.until.length) {{
+            const untilTxt = rep.until.map(_humanizeConditionOne).join(' & ');
+            repLabel = tf('flow_repeat_until', 'Repeat until {{value}}', {{ value: untilTxt || tt('flow_verify', 'check') }});
+          }}
+          const bid = _nextBranchId();
+          pushAction({{ action: '__branch__', __kind: 'branch_marker' }}, repLabel, tt('flow_repeat_branch', 'Loop branch'), bid);
+          const repSeq = Array.isArray(rep.sequence) ? rep.sequence : (rep.sequence ? [rep.sequence] : []);
+          walk(repSeq, repLabel, bid);
+          return;
+        }}
+        pushAction(node, branchLabel, '', branchId);
+      }});
+    }}
+
+    walk(actions, '', 0);
+    return out;
+  }}
+
+  function _formatLastTriggered(ts) {{
+    if (!ts) return '';
+    try {{
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return String(ts);
+      return d.toLocaleString('it-IT', {{
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }});
+    }} catch(e) {{
+      return String(ts);
+    }}
+  }}
+
+  function _relativeLastTriggered(ts) {{
+    if (!ts) return '';
+    try {{
+      const d = new Date(ts);
+      if (isNaN(d.getTime())) return '';
+      const diffMs = Date.now() - d.getTime();
+      if (!isFinite(diffMs) || diffMs < 0) return '';
+      const sec = Math.round(diffMs / 1000);
+      const localeMap = {{ it: 'it-IT', en: 'en-US', es: 'es-ES', fr: 'fr-FR' }};
+      const loc = localeMap[UI_LANG] || 'en-US';
+      const rtf = new Intl.RelativeTimeFormat(loc, {{ numeric: 'auto' }});
+      if (sec < 90) return rtf.format(-sec, 'second');
+      const min = Math.round(sec / 60);
+      if (min < 90) return rtf.format(-min, 'minute');
+      const hr = Math.round(min / 60);
+      if (hr < 48) return rtf.format(-hr, 'hour');
+      const day = Math.round(hr / 24);
+      return rtf.format(-day, 'day');
+    }} catch(e) {{
+      return '';
+    }}
+  }}
+
+  function _inferAutomationSubject(config) {{
+    try {{
+      const raw = String((config && (config.alias || config.name)) || '').trim();
+      if (!raw) return '';
+      let s = raw.split('|')[0].split('—')[0].split('-')[0].trim();
+      if (!s) s = raw;
+      s = s.replace(/\\bamira\\b/ig, '').replace(/\\s+/g, ' ').trim();
+      return s;
+    }} catch(e) {{
+      return '';
+    }}
+  }}
+
+  async function _fetchAutomationLastTriggered(automationId, token, config) {{
+    if (!token || !automationId) return '';
+    const candidates = [];
+    if (String(automationId).startsWith('automation.')) candidates.push(String(automationId));
+    else candidates.push('automation.' + String(automationId));
+    candidates.push(String(automationId));
+    if (config && config.id) {{
+      const cid = String(config.id);
+      if (cid.startsWith('automation.')) candidates.push(cid);
+      else candidates.push('automation.' + cid);
+      candidates.push(cid);
+    }}
+    if (config && config.alias) {{
+      const slug = String(config.alias).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (slug) candidates.push('automation.' + slug);
+    }}
+    for (const ent of candidates) {{
+      try {{
+        const r = await fetch('/api/states/' + encodeURIComponent(ent), {{
+          headers: {{ 'Authorization': 'Bearer ' + token }}
+        }});
+        if (!r.ok) continue;
+        const st = await r.json();
+        const lt = st && st.attributes ? st.attributes.last_triggered : '';
+        if (lt) return lt;
+      }} catch(e) {{}}
+    }}
+    // Fallback: find automation state by attribute id/friendly_name.
+    try {{
+      const rs = await fetch('/api/states', {{
+        headers: {{ 'Authorization': 'Bearer ' + token }}
+      }});
+      if (rs.ok) {{
+        const all = await rs.json();
+        if (Array.isArray(all)) {{
+          const wantedId = String(automationId || '');
+          const wantedAlias = String((config && config.alias) || '').trim();
+          for (const st of all) {{
+            if (!st || typeof st !== 'object') continue;
+            const eid = String(st.entity_id || '');
+            if (!eid.startsWith('automation.')) continue;
+            const attrs = st.attributes || {{}};
+            const attrId = attrs.id !== undefined && attrs.id !== null ? String(attrs.id) : '';
+            const fname = String(attrs.friendly_name || '').trim();
+            if ((attrId && attrId === wantedId) || (wantedAlias && fname && fname === wantedAlias)) {{
+              const lt = attrs.last_triggered || '';
+              if (lt) return lt;
+            }}
+          }}
+        }}
+      }}
+    }} catch(e) {{}}
+    return '';
+  }}
+
+  async function _fetchAutomationEnabledState(automationId, token, config) {{
+    if (!token || !automationId) return '';
+    const candidates = [];
+    if (String(automationId).startsWith('automation.')) candidates.push(String(automationId));
+    else candidates.push('automation.' + String(automationId));
+    candidates.push(String(automationId));
+    if (config && config.id) {{
+      const cid = String(config.id);
+      if (cid.startsWith('automation.')) candidates.push(cid);
+      else candidates.push('automation.' + cid);
+      candidates.push(cid);
+    }}
+    if (config && config.alias) {{
+      const slug = String(config.alias).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      if (slug) candidates.push('automation.' + slug);
+    }}
+    for (const ent of candidates) {{
+      try {{
+        const r = await fetch('/api/states/' + encodeURIComponent(ent), {{
+          headers: {{ 'Authorization': 'Bearer ' + token }}
+        }});
+        if (!r.ok) continue;
+        const st = await r.json();
+        const s = String(st && st.state || '').toLowerCase();
+        if (s === 'on' || s === 'off') return s;
+      }} catch(e) {{}}
+    }}
+    return '';
+  }}
+
+  function _findAutomationFlowHost() {{
+    // Prefer the container div around the automation editor.
+    try {{
+      const wrap = _findAutomationContentWrapper();
+      if (wrap) return wrap;
+    }} catch(e) {{}}
+    try {{
+      const subpage = _findAutomationSubpage();
+      if (!subpage) return null;
+      const root = subpage.shadowRoot || subpage;
+      const editor = root.querySelector('manual-automation-editor');
+      if (editor && editor.parentElement) return editor.parentElement;
+    }} catch(e) {{}}
+    return null;
+  }}
+
+  function _findAutomationFlowEl() {{
+    if (_autoFlowEl && _autoFlowEl.isConnected) return _autoFlowEl;
+    const byDoc = document.getElementById(AMIRA_FLOW_ID);
+    if (byDoc) {{
+      _autoFlowEl = byDoc;
+      return byDoc;
+    }}
+    const host = _findAutomationFlowHost();
+    if (host && host.querySelector) {{
+      const inHost = host.querySelector('#' + AMIRA_FLOW_ID);
+      if (inHost) {{
+        _autoFlowEl = inHost;
+        return inHost;
+      }}
+    }}
+    return null;
+  }}
+
+  function _removeAllAutomationFlowEls() {{
+    try {{
+      const nodes = document.querySelectorAll('#' + AMIRA_FLOW_ID);
+      nodes.forEach(n => {{ try {{ n.remove(); }} catch(e) {{}} }});
+    }} catch(e) {{}}
+    try {{
+      const host = _findAutomationFlowHost();
+      if (host && host.querySelectorAll) {{
+        const inHost = host.querySelectorAll('#' + AMIRA_FLOW_ID);
+        inHost.forEach(n => {{ try {{ n.remove(); }} catch(e) {{}} }});
+      }}
+    }} catch(e) {{}}
+    _autoFlowEl = null;
+  }}
+
+  function _renderFlowInfoMessage(msg) {{
+    const host = _findAutomationFlowHost();
+    if (!host) return;
+    _removeAllAutomationFlowEls();
+    const flowEl = document.createElement('div');
+    flowEl.id = AMIRA_FLOW_ID;
+    flowEl.style.cssText = 'position:relative;z-index:2;display:flex;align-items:center;justify-content:center;padding:10px 12px;background:linear-gradient(to right,#f0f4ff,#fafafa);border:1px solid #7c8fff;border-radius:10px;min-height:56px;box-shadow:0 2px 8px rgba(0,0,0,0.08);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:8px 0 10px;color:var(--secondary-text-color,#64748b);font-size:12px;text-align:center;';
+    flowEl.textContent = msg || T.flow_no_data;
+    host.prepend(flowEl);
+    _autoFlowEl = flowEl;
+    _applyFlowVisibility();
+  }}
+
+  async function fetchAndRenderAutomationFlow(automationId, opts) {{
+    if (_autoFlowRenderBusy) return;
+    _autoFlowRenderBusy = true;
+    try {{
+    const showUnavailable = !!(opts && opts.showUnavailable);
+    const refresh = !!(opts && opts.refresh);
+    const existingFlow = _findAutomationFlowEl();
+    // Global dedup — prevents double-render on rapid polling ticks
+    if (existingFlow && !refresh) {{ _autoFlowInjected = true; return; }}
+    _autoFlowInjected = true;  // set early to block re-entry during async fetch
 
     const flowEl = document.createElement('div');
     flowEl.id = AMIRA_FLOW_ID;
-    flowEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:12px 16px;overflow-x:auto;background:var(--secondary-background-color,#f5f5f5);border-bottom:1px solid var(--divider-color,#e0e0e0);flex-shrink:0;flex-wrap:nowrap;min-height:56px;';
+    // Render inside the automation editor container (not as a fixed top overlay).
+    flowEl.style.cssText = 'position:relative;z-index:2;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;background:linear-gradient(to right,#f0f4ff,#fafafa);border:1px solid #7c8fff;border-radius:10px;min-height:56px;box-shadow:0 2px 8px rgba(0,0,0,0.08);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:8px 0 10px;';
+    if (!document.getElementById('amira-flow-anim-style')) {{
+      const st = document.createElement('style');
+      st.id = 'amira-flow-anim-style';
+      st.textContent = '@keyframes amiraFlowIn{{from{{opacity:0;transform:translateY(4px)}}to{{opacity:1;transform:translateY(0)}}}}';
+      document.head.appendChild(st);
+    }}
 
     // Fetch automation config
     try {{
       const token = _getHassToken();
-      if (!token) {{ flowEl.textContent = T.flow_no_data; contentWrap.parentNode.insertBefore(flowEl, contentWrap); _autoFlowInjected = true; return; }}
+      if (!token) {{
+        flowEl.innerHTML = '<span style="font-size:12px;color:#999;">' + T.flow_no_data + '</span>';
+        const host = _findAutomationFlowHost();
+        if (host) host.prepend(flowEl);
+        else document.body.appendChild(flowEl);
+        return;
+      }}
       const resp = await fetch('/api/config/automation/config/' + encodeURIComponent(automationId), {{
         headers: {{ 'Authorization': 'Bearer ' + token }}
       }});
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const config = await resp.json();
+      if (!resp.ok) {{
+        let msg = T.flow_no_data;
+        if (resp.status === 404 || resp.status === 400) {{
+          msg = tt('flow_unavailable_migrate', 'Flow unavailable: automation has no ID or config API is not accessible. Try Migrate.');
+        }}
+        _autoFlowStatus = 'unavailable';
+        _autoFlowUnavailableReason = msg;
+        _autoFlowInjected = true; // avoid retry loop
+        if (showUnavailable) _renderFlowInfoMessage(msg);
+        return;
+      }}
+      const rawConfig = await resp.json();
+      const config = Array.isArray(rawConfig)
+        ? (rawConfig[0] || {{}})
+        : ((rawConfig && (rawConfig.config || rawConfig.automation)) || rawConfig || {{}});
+      const configSig = JSON.stringify(config || {{}});
+      if (refresh && existingFlow && _autoFlowConfigSig && _autoFlowConfigSig === configSig) {{
+        _autoFlowStatus = 'rendered';
+        _autoFlowUnavailableReason = '';
+        _autoFlowInjected = true;
+        return;
+      }}
+      const lastTriggered = await _fetchAutomationLastTriggered(automationId, token, config);
+      const automationEnabledState = await _fetchAutomationEnabledState(automationId, token, config);
 
-      const triggers = Array.isArray(config.trigger) ? config.trigger : (config.trigger ? [config.trigger] : []);
-      const conditions = Array.isArray(config.condition) ? config.condition : (config.condition ? [config.condition] : []);
-      const actions = Array.isArray(config.action) ? config.action : (config.action ? [config.action] : []);
+      const _trRaw = (config.trigger !== undefined) ? config.trigger : config.triggers;
+      const _coRaw = (config.condition !== undefined) ? config.condition : config.conditions;
+      const _acRaw = (config.action !== undefined) ? config.action : (config.actions !== undefined ? config.actions : config.sequence);
+      const triggers = Array.isArray(_trRaw) ? _trRaw : (_trRaw ? [_trRaw] : []);
+      const flowSubject = _inferAutomationSubject(config);
+      const flowTriggers = triggers.map(t => {{
+        if (!t || typeof t !== 'object') return t;
+        const c = Object.assign({{}}, t);
+        if (flowSubject) c.__subject = flowSubject;
+        return c;
+      }});
+      const conditions = Array.isArray(_coRaw) ? _coRaw : (_coRaw ? [_coRaw] : []);
+      const actions = Array.isArray(_acRaw) ? _acRaw : (_acRaw ? [_acRaw] : []);
+      const expandedActions = _expandActionNodes(actions);
+
+      const branchColors = ['#60a5fa', '#34d399', '#f59e0b', '#a78bfa', '#f472b6'];
 
       function makeBubble(node, type, label) {{
         const bubble = document.createElement('div');
-        const desc = _describeFlowNode(node, type);
-        bubble.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;background:' + _flowGradient(type) + ';border:1.5px solid ' + _flowBorderColor(type) + ';font-size:12px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.08);';
+        const isBranchMarker = (type === 'action' && node && node.__kind === 'branch_marker');
+        const desc = isBranchMarker
+          ? (node.__branch || _describeFlowNode(node, type))
+          : _describeFlowNode(node, type);
+        const detail = isBranchMarker
+          ? (node.__detail || desc || label)
+          : (_describeFlowDetail(node, type) || desc || label);
+        const bColor = (type === 'action' && node && node.__branchId)
+          ? branchColors[(node.__branchId - 1) % branchColors.length]
+          : _flowBorderColor(type);
+        const bg = (type === 'action' && node && node.__kind === 'branch_marker')
+          ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)'
+          : _flowGradient(type);
+        bubble.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;background:' + bg + ';border:1.5px solid ' + bColor + ';font-size:12px;white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;transition:transform .14s ease,box-shadow .14s ease;';
+        bubble.title = detail;
         const iconSpan = document.createElement('span');
         iconSpan.style.cssText = 'font-size:16px;flex-shrink:0;';
-        iconSpan.textContent = _flowIcon(type);
+        iconSpan.textContent = isBranchMarker ? '⑂' : _flowIcon(type);
         const textSpan = document.createElement('span');
         textSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;color:var(--primary-text-color,#333);font-weight:500;';
         textSpan.textContent = desc || label;
         textSpan.title = desc || label;
         bubble.appendChild(iconSpan);
         bubble.appendChild(textSpan);
+        bubble.addEventListener('mouseenter', () => {{ bubble.style.transform = 'translateY(-1px)'; bubble.style.boxShadow = '0 3px 8px rgba(0,0,0,0.14)'; }});
+        bubble.addEventListener('mouseleave', () => {{ bubble.style.transform = ''; bubble.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)'; }});
+        bubble.addEventListener('click', () => {{
+          if (detailInfo.style.display === 'block' && detailInfo.textContent === detail) {{
+            detailInfo.style.display = 'none';
+            return;
+          }}
+          detailInfo.textContent = detail;
+          detailInfo.style.display = 'block';
+        }});
         return bubble;
       }}
 
-      function makeArrow() {{
+      function makeArrow(sym) {{
         const arrow = document.createElement('span');
         arrow.style.cssText = 'color:var(--secondary-text-color,#999);font-size:18px;flex-shrink:0;font-weight:bold;';
-        arrow.textContent = '\u2192';
+        arrow.textContent = sym || '\u2192';
         return arrow;
       }}
 
@@ -2822,46 +3975,148 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
         return lbl;
       }}
 
-      // Build flow: triggers → conditions → actions
-      if (triggers.length) {{
-        flowEl.appendChild(makeSectionLabel(T.flow_trigger));
-        triggers.forEach((t, i) => {{
-          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; flowEl.appendChild(plus); }}
-          flowEl.appendChild(makeBubble(t, 'trigger', T.flow_trigger));
+      const detailInfo = document.createElement('div');
+      detailInfo.style.cssText = 'display:none;align-self:center;text-align:center;margin:4px auto 0;padding:6px 10px;border-radius:8px;border:1px dashed #8da2ff;background:#f7f9ff;color:#334155;font-size:11px;white-space:pre-line;max-width:760px;line-height:1.35;';
+
+      const ltInfo = document.createElement('div');
+      const ltActiveStyle = (automationEnabledState === 'on')
+        ? 'border:1px solid #86efac;background:#dcfce7;color:#14532d;'
+        : 'border:1px solid #c7d2fe;background:#eef2ff;color:#334155;';
+      ltInfo.style.cssText = 'display:inline-flex;align-items:center;padding:6px 10px;border-radius:8px;' + ltActiveStyle + 'font-size:11px;white-space:nowrap;flex-shrink:0;margin-right:4px;';
+      const absTs = lastTriggered ? _formatLastTriggered(lastTriggered) : tt('flow_never', 'Never');
+      const relTs = lastTriggered ? _relativeLastTriggered(lastTriggered) : '';
+      ltInfo.textContent = tt('flow_last_triggered', 'Last triggered') + ': ' + absTs + (relTs ? (' (' + relTs + ')') : '');
+      flowEl.appendChild(ltInfo);
+
+      const topBlock = document.createElement('div');
+      topBlock.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;';
+
+      // Trigger block (label above bubble)
+      if (flowTriggers.length) {{
+        const trLabel = document.createElement('div');
+        trLabel.textContent = (T.flow_trigger || 'Trigger').toUpperCase();
+        trLabel.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;color:var(--secondary-text-color,#64748b);text-align:center;';
+        topBlock.appendChild(trLabel);
+
+        const trRow = document.createElement('div');
+        trRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;';
+        flowTriggers.forEach((t, i) => {{
+          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; trRow.appendChild(plus); }}
+          trRow.appendChild(makeBubble(t, 'trigger', T.flow_trigger));
         }});
+        topBlock.appendChild(trRow);
       }}
 
+      // Conditions block (below trigger)
       if (conditions.length) {{
-        flowEl.appendChild(makeArrow());
-        flowEl.appendChild(makeSectionLabel(T.flow_condition));
+        const down = document.createElement('div');
+        down.textContent = '↓';
+        down.style.cssText = 'font-size:16px;color:var(--secondary-text-color,#94a3b8);line-height:1;';
+        topBlock.appendChild(down);
+
+        const coLabel = document.createElement('div');
+        coLabel.textContent = (T.flow_condition || 'Condition').toUpperCase();
+        coLabel.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;color:var(--secondary-text-color,#64748b);text-align:center;';
+        topBlock.appendChild(coLabel);
+
+        const coRow = document.createElement('div');
+        coRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;';
         conditions.forEach((c, i) => {{
-          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; flowEl.appendChild(plus); }}
-          flowEl.appendChild(makeBubble(c, 'condition', T.flow_condition));
+          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; coRow.appendChild(plus); }}
+          coRow.appendChild(makeBubble(c, 'condition', T.flow_condition));
         }});
+        topBlock.appendChild(coRow);
       }}
 
-      if (actions.length) {{
-        flowEl.appendChild(makeArrow());
-        flowEl.appendChild(makeSectionLabel(T.flow_action));
-        actions.forEach((a, i) => {{
-          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; flowEl.appendChild(plus); }}
-          flowEl.appendChild(makeBubble(a, 'action', T.flow_action));
+      if (flowTriggers.length || conditions.length) flowEl.appendChild(topBlock);
+
+      if (expandedActions.length) {{
+        const actionsBlock = document.createElement('div');
+        actionsBlock.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
+        const actionsHead = document.createElement('div');
+        actionsHead.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;';
+        actionsHead.appendChild(makeSectionLabel(T.flow_action));
+        actionsBlock.appendChild(actionsHead);
+
+        const rows = [];
+        let current = {{ title: tt('flow_actions_title', 'Actions'), branchId: 0, items: [] }};
+        rows.push(current);
+        expandedActions.forEach((a) => {{
+          if (a && a.__kind === 'branch_marker') {{
+            current = {{ title: a.__branch || tt('flow_branch', 'Branch'), branchId: a.__branchId || 0, items: [] }};
+            rows.push(current);
+            return;
+          }}
+          current.items.push(a);
         }});
+
+        let renderedRows = 0;
+        rows.forEach((row, idx) => {{
+          if (!row.items.length) return;
+          const rowWrap = document.createElement('div');
+          const c = row.branchId ? branchColors[(row.branchId - 1) % branchColors.length] : '#94a3b8';
+          rowWrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;border-left:3px solid ' + c + ';padding:8px 10px;background:rgba(255,255,255,0.45);border-radius:8px;';
+
+          const rowTitle = document.createElement('div');
+          rowTitle.style.cssText = 'font-size:11px;font-weight:700;color:#475569;text-align:center;';
+          rowTitle.textContent = row.title;
+          rowWrap.appendChild(rowTitle);
+
+          const steps = document.createElement('div');
+          steps.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;gap:8px;flex-wrap:wrap;';
+          row.items.forEach((a, i) => {{
+            if (i > 0) steps.appendChild(makeArrow('→'));
+            const nodeWrap = document.createElement('div');
+            nodeWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;max-width:320px;';
+            const b = makeBubble(a, 'action', T.flow_action);
+            nodeWrap.appendChild(b);
+            steps.appendChild(nodeWrap);
+          }});
+          const count = document.createElement('div');
+          count.style.cssText = 'font-size:11px;color:#64748b;margin-top:2px;text-align:center;';
+          count.textContent = row.items.length + ' ' + tt('flow_actions_count', 'actions');
+          rowWrap.appendChild(steps);
+          rowWrap.appendChild(count);
+          actionsBlock.appendChild(rowWrap);
+          renderedRows += 1;
+        }});
+
+        if (renderedRows > 0) flowEl.appendChild(actionsBlock);
       }}
 
-      if (!triggers.length && !conditions.length && !actions.length) {{
-        flowEl.textContent = T.flow_no_data;
+      if (!flowTriggers.length && !conditions.length && !expandedActions.length) {{
+        if (refresh) _removeAllAutomationFlowEls();
+        _autoFlowStatus = 'unavailable';
+        _autoFlowUnavailableReason = T.flow_no_data;
+        _autoFlowConfigSig = configSig;
+        _autoFlowInjected = true;
+        if (showUnavailable) _renderFlowInfoMessage(T.flow_no_data);
+        return;
+      }} else {{
+        flowEl.appendChild(detailInfo);
       }}
+      _autoFlowConfigSig = configSig;
     }} catch(e) {{
       console.warn('[Amira] Failed to fetch automation flow:', e);
-      flowEl.innerHTML = '<span style="font-size:12px;color:var(--secondary-text-color,#999);">' + T.flow_no_data + '</span>';
+      _autoFlowStatus = 'unavailable';
+      _autoFlowUnavailableReason = T.flow_no_data;
+      _autoFlowInjected = true;
+      if (showUnavailable) _renderFlowInfoMessage(T.flow_no_data);
+      return;
     }}
 
-    // Insert flow above content
-    if (contentWrap.parentNode) {{
-      contentWrap.parentNode.insertBefore(flowEl, contentWrap);
+    // Append inside automation editor host when available.
+    if (refresh) _removeAllAutomationFlowEls();
+    const host = _findAutomationFlowHost();
+    if (host) host.prepend(flowEl);
+    else document.body.appendChild(flowEl);
+    _autoFlowEl = flowEl;
+    _autoFlowStatus = 'rendered';
+    _autoFlowUnavailableReason = '';
+    _applyFlowVisibility();
+    }} finally {{
+      _autoFlowRenderBusy = false;
     }}
-    _autoFlowInjected = true;
   }}
 
   // ---- Automation sidebar chat panel ----
@@ -3000,20 +4255,15 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
 
   function openAutomationSidebar() {{
     if (_autoSidebarOpen) return;
-    const contentWrap = _findAutomationContentWrapper();
-    if (!contentWrap) return;
-    _autoContentWrapper = contentWrap;
+    // Remove any stale chat panel
+    if (_autoSidebarEl && _autoSidebarEl.remove) _autoSidebarEl.remove();
+    const stale = document.getElementById(AMIRA_SIDEBAR_ID);
+    if (stale) stale.remove();
 
-    // Make parent a flex row
-    const parent = contentWrap.parentNode;
-    if (!parent) return;
-    parent.style.cssText += ';display:flex !important;flex-direction:row !important;overflow:hidden !important;height:100% !important;';
-    contentWrap.style.cssText += ';flex:1 1 0% !important;min-width:0 !important;overflow-y:auto !important;';
-
-    // Build sidebar
+    // Build horizontal chat panel (placed under the flow, inside automation editor host)
     const sidebar = document.createElement('div');
     sidebar.id = AMIRA_SIDEBAR_ID;
-    sidebar.style.cssText = 'display:flex;flex-direction:column;width:380px;min-width:320px;max-width:45vw;flex-shrink:0;border-left:2px solid #667eea;background:var(--card-background-color,#fff);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;height:100%;';
+    sidebar.style.cssText = 'position:relative;z-index:2;display:flex;flex-direction:column;width:100%;min-height:260px;max-height:42vh;border:1px solid #667eea;border-radius:12px;background:var(--card-background-color,#fff);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;box-shadow:0 3px 10px rgba(0,0,0,0.10);margin:0 0 10px;';
 
     // Header
     const hdr = document.createElement('div');
@@ -3135,8 +4385,18 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     inputRow.appendChild(sendBtn2);
     sidebar.appendChild(inputRow);
 
-    // Append sidebar after content
-    parent.appendChild(sidebar);
+    // Append under flow when possible, otherwise at top of automation host.
+    const host = _findAutomationFlowHost();
+    const flow = host ? host.querySelector('#' + AMIRA_FLOW_ID) : null;
+    if (host && flow && flow.nextSibling) {{
+      host.insertBefore(sidebar, flow.nextSibling);
+    }} else if (host && flow) {{
+      host.appendChild(sidebar);
+    }} else if (host) {{
+      host.prepend(sidebar);
+    }} else {{
+      document.body.appendChild(sidebar);
+    }}
 
     // Save refs
     _autoSidebarEl = sidebar;
@@ -3148,27 +4408,15 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     _autoSidebarOpen = true;
     saveSetting('auto-sidebar-open', true);
 
-    // Hide floating bubble
-    btn.style.display = 'none';
+    // Close floating bubble panel if open (sidebar takes over)
     if (isOpen) {{ isOpen = false; panel.classList.remove('open'); }}
 
     setTimeout(() => inp.focus(), 50);
   }}
 
   function closeAutomationSidebar() {{
-    if (_autoContentWrapper) {{
-      // Restore parent styles
-      const parent = _autoContentWrapper.parentNode;
-      if (parent) {{
-        parent.style.display = '';
-        parent.style.flexDirection = '';
-        parent.style.overflow = '';
-        parent.style.height = '';
-      }}
-      _autoContentWrapper.style.flex = '';
-      _autoContentWrapper.style.minWidth = '';
-      _autoContentWrapper.style.overflowY = '';
-    }}
+    const el = document.getElementById(AMIRA_SIDEBAR_ID);
+    if (el) el.remove();
     if (_autoSidebarEl) _autoSidebarEl.remove();
     _autoSidebarEl = null;
     _autoMsgsEl = null;
@@ -3179,24 +4427,20 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     _autoContentWrapper = null;
     _autoSidebarOpen = false;
     saveSetting('auto-sidebar-open', false);
-
-    // Restore floating bubble
-    btn.style.display = '';
   }}
 
   function removeAutomationIntegration() {{
     closeAutomationSidebar();
     removeAutomationToolbarButton();
-    // Remove flow
-    try {{
-      const contentWrap = _findAutomationContentWrapper();
-      if (contentWrap && contentWrap.parentNode) {{
-        const flow = contentWrap.parentNode.querySelector('#' + AMIRA_FLOW_ID);
-        if (flow) flow.remove();
-      }}
-    }} catch(e) {{}}
+    const flow = _findAutomationFlowEl();
+    if (flow) flow.remove();
+    _autoFlowEl = null;
     _autoFlowInjected = false;
     _lastAutoPageId = null;
+    _autoFlowStatus = 'idle';
+    _autoFlowUnavailableReason = '';
+    _autoFlowConfigSig = '';
+    _autoFlowLastCheckTs = 0;
   }}
 
   // ---- Auto-resize textarea ----

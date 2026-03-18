@@ -4,7 +4,7 @@ Multi-provider AI assistant for Home Assistant. Control your smart home, create 
 
 Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot, OpenAI Codex, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
 
-**New in v4.5.2**: Settings now managed from the chat UI (no more config.yaml toggles), floating bubble + card editor button ON by default with independent toggles, tool execution feedback in bubble chat, multi-provider voice system. See [CHANGELOG](CHANGELOG.md) for full details.
+**Recent updates**: automation flow chart redesigned (human-readable trigger/condition/action, branch expansion for choose/if/repeat, refresh after Save, relative last-triggered time), plus model catalog cache panel in Settings, provider model test improvements, card-editor chat tab, and HTML dashboard snapshot debug files. See [CHANGELOG](CHANGELOG.md) for full details.
 
 ---
 
@@ -29,7 +29,9 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 | 🔧 **System Diagnostics** | Built-in | View HA repairs, health checks, AI-suggested fixes |
 | 💬 **Streaming Chat UI** | Built-in | Real-time responses, tool badges, code copy, conversation history |
 | 🫧 **Floating Chat Bubble** | ⚙️ ON | AI accessible on every HA page, context-aware |
+| 🧭 **Automation Flow Chart** | Built-in | Visual automation map in editor/detail pages with human-readable logic and branch rendering |
 | 🤖 **Card Editor Button** | ⚙️ ON | Amira button in Lovelace card editor for inline AI help |
+| 💬 **Card Chat Tab** | Built-in | Dedicated history tab for Lovelace card-editor conversations |
 | 🎙️ **Voice Input & TTS** | ⚙️ ON | Multi-provider voice: Groq/OpenAI/Google STT + Edge/Groq/OpenAI TTS |
 | 📎 **File Upload** | ⚙️ ON | Upload PDF, DOCX, TXT, MD, YAML for AI analysis |
 | 👁️ **Vision** | Built-in | Image upload & analysis (Claude, GPT-4o, Gemini) |
@@ -38,6 +40,7 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 | 🔍 **RAG** | ⚙️ OFF | Semantic search over uploaded documents |
 | 🔌 **MCP Tools** | ⚙️ OFF | Extend AI with external tools via Model Context Protocol |
 | 🔄 **Provider Fallback** | ⚙️ OFF | Automatic fallback chain when primary provider fails |
+| 🗂️ **Model Cache Panel** | Built-in | Inspect fixed/dynamic models, blocklists, tested models, refresh/clear cache |
 | 🤖 **Multi-Agent System** | Built-in | Custom agents with own model, tools, prompt, fallback |
 | 💰 **Cost Tracking** | Built-in | Per-message cost with cache breakdown, daily aggregates |
 | 🛠️ **Dashboard Creation** | Built-in | Lovelace cards + AI-generated HTML dashboards (Vue 3) |
@@ -145,6 +148,22 @@ Amira uses **two layers** of configuration:
 | `cost_currency` | `USD` | Cost display currency (USD, EUR) |
 | `timeout` | `30` | Request timeout (seconds) |
 | `max_retries` | `3` | Retry failed API requests |
+
+### 🗂️ Model Cache (Settings → Config → Model Cache)
+
+The Settings UI includes a dedicated **Model Cache** section showing:
+- **Fixed models** (hardcoded curated models per provider)
+- **Dynamic cached models** (discovered at runtime)
+- **Blocklisted models** (provider-specific invalid/unsupported models)
+- **Tested OK models** (for providers that support batch testing)
+
+Controls:
+- **Refresh Cache**: refreshes runtime-discovered models
+- **Clear Cache**: clears dynamic cache while keeping persistent blocklist safety
+
+Notes:
+- Fixed and dynamic lists are de-duplicated. If a model appears in both, it is shown in **Fixed**.
+- Blocklists are persisted and re-applied after startup, refresh, and clear operations.
 
 ### 💰 Cost & Usage Tracking
 
@@ -258,6 +277,15 @@ All model metadata lives in a centralized catalog (`model_catalog.py`) — capab
 2. Enriched at runtime by `/v1/models` discovery (NVIDIA, Ollama, GitHub Copilot)
 3. Queried by the agent system, fallback engine, and UI
 
+Model catalog/cache APIs:
+- `GET /api/models/cache/status` — fixed/dynamic cache + blocklist + tested summary
+- `POST /api/models/cache/refresh` — refresh dynamic cache
+- `POST /api/models/cache/clear` — clear dynamic cache (blocklist persists)
+
+Provider model test APIs:
+- `POST /api/nvidia/test_models` — NVIDIA model batch validation
+- `POST /api/provider/test_models` — batch validation for selected providers (currently OpenRouter, Mistral)
+
 ### 🛡️ Automation Safety
 
 `create_automation` now includes safety guards:
@@ -276,7 +304,8 @@ All persistent data lives in **`/config/amira/`** — one folder, easy to backup
 ├── settings.json             # Runtime settings (managed via Settings UI)
 ├── conversations.json        # Chat history
 ├── runtime_selection.json    # Last selected model/provider
-├── model_blocklist.json      # NVIDIA blocked/tested models (auto-managed)
+├── model_blocklist.json      # Provider model blocklists/tested state (auto-managed)
+├── llm_dashboards/           # Incoming/final HTML snapshots for dashboard debug
 ├── agents.json               # Multi-agent config (name, model, tools, fallback)
 ├── bubble_devices.json       # Chat bubble per-device config
 ├── custom_system_prompt.txt  # Custom system prompt override
@@ -293,6 +322,7 @@ All persistent data lives in **`/config/amira/`** — one folder, easy to backup
 └── ha-claude-chat-bubble.js  # Floating chat bubble (auto-generated)
 
 /data/
+├── amira_models_cache.json   # Dynamic discovered model cache
 └── usage_stats.json          # Persistent cost/usage tracking (daily, per-model, per-provider)
 ```
 
@@ -414,5 +444,3 @@ Commercial use requires explicit written permission from the author.
 - 🐛 [Report Issues](https://github.com/Bobsilvio/ha-claude/issues)
 - 💬 [Discussions](https://github.com/Bobsilvio/ha-claude/discussions)
 - ⭐ Star on GitHub if you find it useful!
-
-

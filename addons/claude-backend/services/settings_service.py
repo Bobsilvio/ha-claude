@@ -157,7 +157,7 @@ def load_runtime_selection() -> tuple[str, str]:
             "groq", "mistral", "openrouter", "deepseek", "minimax",
             "aihubmix", "siliconflow", "volcengine", "dashscope",
             "moonshot", "zhipu", "ollama", "github_copilot", "openai_codex",
-            "claude_web", "chatgpt_web",
+            "claude_web", "chatgpt_web", "gemini_web", "perplexity_web",
         }
         if provider not in _known:
             return ("", "")

@@ -699,10 +699,6 @@ class GeminiWebProvider(EnhancedProvider):
         "gemini-3.0-pro",
         "gemini-3.0-flash",
         "gemini-3.0-flash-thinking",
-        "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-pro-exp",
-        "gemini-1.5-pro",
     ]
 
     def __init__(self, api_key: str = "", model: str = ""):

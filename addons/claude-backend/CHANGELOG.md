@@ -2,6 +2,46 @@
 
 > **⚠️ Dopo l'aggiornamento, ricostruire l'add-on** (Impostazioni → Add-on → Amira → Ricostruisci) per applicare le nuove dipendenze.
 
+## 4.6.20 — Flow chart automazioni umanizzato, refresh affidabile e UX toolbar migliorata
+
+### Flow chart automazioni (chat bubble)
+- Trigger/condizioni/azioni resi più leggibili in linguaggio naturale (IT/EN/ES/FR), con migliore umanizzazione di `event`, `template`, notifiche e delay
+- Supporto avanzato ai rami: espansione visiva di `choose`, `if/else` e `repeat` (incluse sequenze interne)
+- Migliorata la resa delle azioni con target multipli:
+  - parsing robusto di `entity_id` singolo/lista/CSV
+  - dettaglio multi-entità (una per riga) nel pannello click
+  - sintesi dati azione (`brightness`, `xy_color` random/template, `rgb_color`)
+- Notifiche in dettaglio multilinea più leggibile:
+  - `Notifica: ...`
+  - `Servizio: notify.xxx`
+- Trigger `device/problem` più semantico quando possibile (es. soggetto inferito da alias automazione, come "Lavatrice")
+
+### Ultima attivazione
+- Badge `Ultima attivazione` migliorato:
+  - mostra anche il relativo (es. `6 ore fa`) oltre al timestamp assoluto
+  - se l'automazione è attiva (`state: on`) il badge usa stile verde
+  - fallback esplicito `Mai` quando non disponibile
+
+### Refresh dopo salvataggio automazione
+- Il flow ora rileva e applica modifiche anche dopo `Salva` senza cambiare pagina
+- Aggiunto refresh intelligente con firma config (`JSON signature`) per evitare ricalcoli inutili
+- Risolti i casi di flow duplicata con:
+  - lock anti-race durante render
+  - rimozione completa di tutte le istanze stale prima del re-render
+
+### Toolbar / injection automazioni
+- Allineata l'iniezione del tasto `Amira` al comportamento del tasto `Flow` (stesso host toolbar, stesso gruppo)
+- Rimosso fallback `position: fixed` per il tasto `Amira` in automazioni
+- Injection limitata alle viste dettaglio/modifica/trace automazione, esclusa la lista automazioni
+
+### Chat UI tablet
+- Migliorato resize sidebar su tablet:
+  - rimossi limiti troppo stretti
+  - drag touch più fluido (`passive: false`, `preventDefault`, `touch-action: none`)
+  - clamp dinamico su resize/orientamento
+
+---
+
 ## 4.6.19 — Tool-calling unificato, dashboard HTML più affidabili, Gemini Web stabilizzato
 
 ### Tool-calling (stile OpenClaw) su provider API-key

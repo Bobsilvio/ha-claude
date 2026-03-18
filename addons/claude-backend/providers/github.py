@@ -74,17 +74,24 @@ class GitHubProvider(EnhancedProvider):
     def get_available_models(self) -> List[str]:
         """Return list of available GitHub Models (new API, no provider prefix)."""
         return [
+            # OpenAI
             "gpt-4o",
-            "gpt-4o-mini",
             "gpt-4.1",
-            "gpt-4.1-mini",
-            "gpt-4.1-nano",
-            "o1",
-            "o3-mini",
-            "meta-llama-3.1-405b-instruct",
-            "meta-llama-3.1-70b-instruct",
-            "mistral-large",
-            "mistral-nemo",
+            "gpt-5-mini",
+            "gpt-5.3-codex",
+            "gpt-5.4",
+            # Claude
+            "claude-haiku-4.5",
+            "claude-sonnet-4",
+            "claude-sonnet-4.5",
+            "claude-sonnet-4.6",
+            "claude-opus-4.5",
+            "claude-opus-4.6",
+            # Gemini
+            "gemini-2.5-pro",
+            "gemini-3-flash-preview",
+            "gemini-3-pro-preview",
+            "gemini-3.1-pro-preview",
         ]
 
     def get_error_translations(self) -> Dict[str, Dict[str, str]]:

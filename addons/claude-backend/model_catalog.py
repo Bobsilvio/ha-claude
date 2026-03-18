@@ -285,7 +285,26 @@ _PROVIDER_MODELS: Dict[str, List[str]] = {
     "openai": [],
     "google": [],
     "nvidia": [],
-    "github": [],
+    "github": [
+        # OpenAI (GitHub Models)
+        "gpt-4o",
+        "gpt-4.1",
+        "gpt-5-mini",
+        "gpt-5.3-codex",
+        "gpt-5.4",
+        # Claude (GitHub Models)
+        "claude-haiku-4.5",
+        "claude-sonnet-4",
+        "claude-sonnet-4.5",
+        "claude-sonnet-4.6",
+        "claude-opus-4.5",
+        "claude-opus-4.6",
+        # Gemini (GitHub Models)
+        "gemini-2.5-pro",
+        "gemini-3-flash-preview",
+        "gemini-3-pro-preview",
+        "gemini-3.1-pro-preview",
+    ],
     "groq": [],
     "mistral": [],
     "openrouter": [],
@@ -360,6 +379,31 @@ _PROVIDER_MODELS: Dict[str, List[str]] = {
         "gemini-2.5-pro",
         "gemini-2.0-pro-exp",
         "gemini-1.5-pro",
+    ],
+
+    # Perplexity Web (browser session cookies, no API key)
+    "perplexity_web": [
+        # Pro lane
+        "sonar",
+        "gpt-5.2",
+        "gpt-5.4",
+        "claude-4.5-sonnet",
+        "claude-4.6-sonnet",
+        "claude-4.6-opus",
+        "grok-4-1",
+        "gemini-3.1-pro",
+        "nemotron-3-super",
+        # Reasoning lane
+        "gpt-5.2-thinking",
+        "claude-4.5-sonnet-thinking",
+        "gemini-3.0-pro",
+        "kimi-k2-thinking",
+        "grok-4.1-reasoning",
+        # Legacy/internal aliases kept for compatibility
+        "pplx_pro",
+        "pplx_reasoning",
+        "pplx_auto",
+        "pplx_deep_research",
     ],
 
     # Custom: model name from CUSTOM_MODEL_NAME env var
@@ -449,9 +493,16 @@ class ModelCatalog:
             for provider, model_ids in data.items():
                 if provider == "nvidia":
                     continue  # managed exclusively by api.py
-                if not isinstance(model_ids, list):
+                blocked_list = []
+                if isinstance(model_ids, dict):
+                    b = model_ids.get("blocked") or []
+                    if isinstance(b, list):
+                        blocked_list = b
+                elif isinstance(model_ids, list):
+                    blocked_list = model_ids
+                else:
                     continue
-                for mid in model_ids:
+                for mid in blocked_list:
                     if isinstance(mid, str) and mid.strip():
                         self.remove_model(provider, mid.strip(), _persist=False)
                         restored += 1
@@ -489,7 +540,16 @@ class ModelCatalog:
             # Merge: keep nvidia unchanged, overwrite our providers
             payload = dict(existing)
             for provider, model_ids in by_provider.items():
-                payload[provider] = sorted(set(model_ids))
+                prev = payload.get(provider)
+                if isinstance(prev, dict):
+                    # Preserve tested_ok/uncertain, refresh blocked list.
+                    payload[provider] = {
+                        "blocked": sorted(set(model_ids)),
+                        "tested_ok": sorted(set(prev.get("tested_ok") or [])),
+                        "uncertain": sorted(set(prev.get("uncertain") or [])),
+                    }
+                else:
+                    payload[provider] = sorted(set(model_ids))
 
             os.makedirs(os.path.dirname(_CATALOG_BLOCKLIST_FILE), exist_ok=True)
             with open(_CATALOG_BLOCKLIST_FILE, "w") as fh:

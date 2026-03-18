@@ -418,14 +418,14 @@ class GitHubCopilotProvider(EnhancedProvider):
         except Exception as e:
             err_msg = str(e)
             logger.error(f"GitHub Copilot: Error during streaming: {e}")
-            # If model_not_supported, remove the model and give a clearer message
-            if "model_not_supported" in err_msg:
+            # If model is not chat-compatible for Copilot, remove it and show clear hint
+            if ("model_not_supported" in err_msg) or ("unsupported_api_for_model" in err_msg):
                 model_name = self._resolve_model()
                 get_catalog().remove_model("github_copilot", model_name)
                 yield {
                     "type": "error",
                     "message": (
-                        f"⚠️ Il modello '{model_name}' non è supportato da GitHub Copilot "
+                        f"⚠️ Il modello '{model_name}' non è compatibile con la chat di GitHub Copilot "
                         f"ed è stato rimosso automaticamente dalla lista. "
                         f"Seleziona un altro modello."
                     ),

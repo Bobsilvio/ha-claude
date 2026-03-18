@@ -494,6 +494,64 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
         if bracket_end != -1:
             clean_msg = clean_msg[bracket_end + 1:]
     msg = clean_msg.strip().lower()
+    has_yaml_fence = "```yaml" in msg or "```yml" in msg
+    has_html_fence = "```html" in msg
+
+    # --- LOVELACE YAML CARD (high-priority guard) ---
+    # If the user pasted a Lovelace YAML card and is asking to improve/beautify that card,
+    # we must route to card_editor (even if previous intent was create_html_dashboard).
+    has_lovelace_yaml = (
+        ("type:" in msg)
+        and (
+            "cards:" in msg
+            or "custom:" in msg
+            or "entity:" in msg
+            or "- type:" in msg
+        )
+    ) or bool(re.search(r"(?mi)^\s*type\s*:\s*", user_message))
+    explicit_html_request = any(
+        k in msg for k in [
+            "/local/dashboards",
+            ".html",
+            "dashboard html",
+            "html dashboard",
+            "pagina html",
+            "crea una dashboard html",
+            "create html dashboard",
+        ]
+    )
+    card_edit_signals = any(
+        k in msg for k in [
+            "questa card",
+            "questa scheda",
+            "abbellisci",
+            "migliora questa card",
+            "migliora la card",
+            "sistema questa card",
+            "fix this card",
+            "improve this card",
+            "beautify this card",
+        ]
+    )
+    if (has_yaml_fence or has_lovelace_yaml) and (card_edit_signals or not explicit_html_request):
+        logger.info("Lovelace YAML detected (high-priority) — routing to card_editor intent")
+        return {
+            "intent": "card_editor",
+            "tools": INTENT_TOOL_SETS["card_editor"],
+            "prompt": INTENT_PROMPTS.get("card_editor"),
+            "specific_target": False,
+        }
+
+    # --- EXPLICIT HTML BLOCK (high-priority guard) ---
+    # If the user pasted an HTML fenced block, treat it as HTML dashboard context.
+    if has_html_fence:
+        logger.info("HTML fenced block detected — routing to create_html_dashboard intent")
+        return {
+            "intent": "create_html_dashboard",
+            "tools": INTENT_TOOL_SETS["create_html_dashboard"],
+            "prompt": INTENT_PROMPTS.get("create_html_dashboard"),
+            "specific_target": True,
+        }
 
     # --- CONFIRMATION CONTINUITY ---
     # Short confirmation replies ("si", "sì", "yes", "ok") should carry forward the previous intent
@@ -560,6 +618,9 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
         return {"intent": "chat", "tools": INTENT_TOOL_SETS["chat"],
                 "prompt": INTENT_PROMPTS["chat"], "specific_target": False, "max_rounds": 1}
 
+    # --- LOVELACE YAML CARD (manual paste) ---
+    # Already handled above with high priority, before follow-up continuity.
+
     # --- HTML DASHBOARD CREATION/MODIFICATION (kept for specialized prompt) ---
     # The create_html_dashboard prompt is very specific (~100 lines of CSS/JS/Vue guidance)
     # so we keep keyword detection for it rather than relying on the LLM alone.
@@ -568,7 +629,13 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
                      "custom design", "pannello web", "pagina web", "pagina live",
                      "pannello live", "plancia", "bento"]
     dash_kw = lang_keywords.get("dashboard", [])
-    has_html_kw = any(k in msg for k in html_keywords)
+    def _kw_in_msg(_msg: str, _kw: str) -> bool:
+        # Avoid false positives for short tokens like "js" inside other words.
+        if len(_kw) <= 3:
+            return bool(re.search(rf"(?<![a-z0-9_]){re.escape(_kw)}(?![a-z0-9_])", _msg))
+        return _kw in _msg
+
+    has_html_kw = any(_kw_in_msg(msg, k) for k in html_keywords)
     has_dash = any(k in msg for k in dash_kw)
     has_html_ref = any(k in msg for k in ["/local/dashboards", ".html"])
     if not has_html_ref and smart_context:

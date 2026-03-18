@@ -8,6 +8,7 @@ import re
 import time
 import threading
 import uuid
+from copy import deepcopy
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -28,8 +29,10 @@ from core.model_utils import normalize_model_name, get_model_provider, validate_
 from core.error_utils import humanize_provider_error, _extract_http_error_code, _extract_remote_message
 from services.model_service import (
     NVIDIA_MODEL_BLOCKLIST, NVIDIA_MODEL_TESTED_OK, MODEL_BLOCKLIST_FILE,
+    NVIDIA_MODEL_UNCERTAIN, PROVIDER_MODEL_TESTED_OK, PROVIDER_MODEL_UNCERTAIN,
     _NVIDIA_MODELS_CACHE, _NVIDIA_MODELS_CACHE_TTL_SECONDS,
     load_model_blocklists, save_model_blocklists, mark_nvidia_model_tested_ok,
+    mark_nvidia_model_uncertain, mark_provider_model_tested_ok, mark_provider_model_uncertain,
     blocklist_nvidia_model, blocklist_model, _fetch_nvidia_models_live, get_nvidia_models_cached
 )
 import services.settings_service as settings_service
@@ -664,7 +667,8 @@ PROVIDER_DEFAULTS = {
     "openai_codex": {"model": "gpt-5.3-codex", "name": "OpenAI Codex (OAuth)"},
     "claude_web": {"model": "claude-opus-4-6", "name": "Claude.ai Web ⚠️ [UNSTABLE]"},
     "chatgpt_web": {"model": "gpt-4o", "name": "ChatGPT Web ⚠️ [UNSTABLE]"},
-    "gemini_web": {"model": "gemini-2.0-flash", "name": "Gemini Web ⚠️ [UNSTABLE]"},
+    "gemini_web": {"model": "gemini-3.1-pro", "name": "Gemini Web"},
+    "perplexity_web": {"model": "grok-4-1", "name": "Perplexity Web ⚠️ [UNSTABLE]"},
 }
 
 
@@ -678,6 +682,132 @@ if MODEL_CATALOG_AVAILABLE:
 else:
     # Bare-minimum fallback if model_catalog is missing
     PROVIDER_MODELS = {"anthropic": ["claude-sonnet-4-6"], "openai": ["gpt-4o"]}
+
+# Immutable baseline from source files (fixed/hardcoded models).
+FIXED_PROVIDER_MODELS = deepcopy(PROVIDER_MODELS)
+
+def apply_persistent_model_blocklist() -> Dict[str, Any]:
+    """Filter runtime PROVIDER_MODELS using persisted blocklist for all providers.
+
+    Returns stats useful for logs/debug:
+    {"removed_total": int, "removed_by_provider": {provider: count}}
+    """
+    removed_total = 0
+    removed_by_provider: Dict[str, int] = {}
+    try:
+        if not os.path.isfile(MODEL_BLOCKLIST_FILE):
+            return {"removed_total": 0, "removed_by_provider": {}}
+        with open(MODEL_BLOCKLIST_FILE, "r", encoding="utf-8") as fh:
+            data = json.load(fh) or {}
+
+        for provider, blocked_cfg in (data.items() if isinstance(data, dict) else []):
+            if provider not in PROVIDER_MODELS:
+                continue
+
+            blocked_ids: set[str] = set()
+            # Backward-compatible shapes:
+            # {"provider": [blocked...]}
+            # {"provider": {"blocked": [...], "tested_ok": [...]}}
+            if isinstance(blocked_cfg, dict):
+                raw_blocked = blocked_cfg.get("blocked") or []
+                if isinstance(raw_blocked, list):
+                    blocked_ids = {m.strip() for m in raw_blocked if isinstance(m, str) and m.strip()}
+            elif isinstance(blocked_cfg, list):
+                blocked_ids = {m.strip() for m in blocked_cfg if isinstance(m, str) and m.strip()}
+
+            if not blocked_ids:
+                continue
+
+            before = list(PROVIDER_MODELS.get(provider) or [])
+            after = [m for m in before if m not in blocked_ids]
+            delta = len(before) - len(after)
+            if delta > 0:
+                PROVIDER_MODELS[provider] = after
+                removed_total += delta
+                removed_by_provider[provider] = delta
+    except Exception as _e:
+        logger.warning(f"Apply persistent model blocklist failed: {_e}")
+    return {"removed_total": removed_total, "removed_by_provider": removed_by_provider}
+
+def _refresh_model_cache_at_startup() -> Dict[str, Any]:
+    """Refresh dynamic model cache and overlay runtime model list.
+
+    Returns a small summary dict for diagnostics/UI.
+    """
+    try:
+        from providers.model_fetcher import (
+            refresh_all_providers as _refresh_all_model_providers,
+            load_dynamic_cache as _load_dynamic_model_cache,
+            update_fixed_cache as _update_fixed_model_cache,
+        )
+
+        # Persist current hardcoded baseline in cache file (separate "fixed" section).
+        _update_fixed_model_cache(FIXED_PROVIDER_MODELS)
+
+        provider_keys: Dict[str, str] = {
+            "anthropic": ANTHROPIC_API_KEY,
+            "openai": OPENAI_API_KEY,
+            "google": GOOGLE_API_KEY,
+            "github": GITHUB_TOKEN,
+            "nvidia": NVIDIA_API_KEY,
+            "groq": GROQ_API_KEY,
+            "mistral": MISTRAL_API_KEY,
+            "openrouter": OPENROUTER_API_KEY,
+            "deepseek": DEEPSEEK_API_KEY,
+            "minimax": MINIMAX_API_KEY,
+            "aihubmix": AIHUBMIX_API_KEY,
+            "siliconflow": SILICONFLOW_API_KEY,
+            "volcengine": VOLCENGINE_API_KEY,
+            "dashscope": DASHSCOPE_API_KEY,
+            "moonshot": MOONSHOT_API_KEY,
+            "zhipu": ZHIPU_API_KEY,
+            "perplexity": PERPLEXITY_API_KEY,
+            "custom": CUSTOM_API_KEY,
+            # OAuth provider, no API key required (fetcher handles token lookup)
+            "github_copilot": "__oauth__",
+            # Web-session provider, no API key required
+            "perplexity_web": "__oauth__",
+        }
+        # Ollama is local/keyless: refresh only when actively used to avoid startup stalls.
+        if AI_PROVIDER == "ollama":
+            provider_keys["ollama"] = "__local__"
+        extra = {
+            "ollama_base_url": OLLAMA_BASE_URL,
+            "custom_api_base": CUSTOM_API_BASE,
+        }
+        results = _refresh_all_model_providers(provider_keys, extra)
+        _updated = results.get("updated", {}) if isinstance(results, dict) else {}
+        if _updated:
+            for _p, _ml in _updated.items():
+                if _ml:
+                    PROVIDER_MODELS[_p] = list(_ml)
+            logger.info(f"Model cache startup refresh: updated {len(_updated)} providers")
+
+        # Always re-apply persisted dynamic cache (latest write wins).
+        _dyn = _load_dynamic_model_cache()
+        if _dyn:
+            for _p, _ml in _dyn.items():
+                if _ml:
+                    if _p == "ollama" and PROVIDER_MODELS.get("ollama"):
+                        continue
+                    PROVIDER_MODELS[_p] = list(_ml)
+            logger.info(f"Model cache startup overlay: dynamic cache for {len(_dyn)} providers")
+        block_res = apply_persistent_model_blocklist()
+        if block_res.get("removed_total", 0):
+            logger.info(
+                f"Model blocklist applied after refresh: removed {block_res['removed_total']} model(s) "
+                f"across {len(block_res.get('removed_by_provider') or {})} provider(s)"
+            )
+        return {
+            "success": True,
+            "updated_count": len(_updated),
+            "dynamic_count": len(_dyn),
+            "updated": sorted(list(_updated.keys())),
+            "blocklist_removed": int(block_res.get("removed_total", 0)),
+        }
+    except Exception as _e:
+        logger.warning(f"Model cache startup refresh failed: {_e}")
+        return {"success": False, "error": str(_e), "updated_count": 0, "dynamic_count": 0, "updated": []}
 
 try:
     from providers import _PROVIDER_CLASSES, get_provider_class as _get_provider_class
@@ -694,6 +824,10 @@ try:
             _live = _inst.get_available_models()
             if _live:  # only replace if the provider returned something
                 PROVIDER_MODELS[_pid] = _live
+                # Seed fixed baseline for runtime-discovered API providers that start empty
+                # in model_catalog._PROVIDER_MODELS. This keeps Fixed/Dynamic grouping useful.
+                if not FIXED_PROVIDER_MODELS.get(_pid):
+                    FIXED_PROVIDER_MODELS[_pid] = list(_live)
                 _dynamic_ok.append(f"{_pid}({len(_live)})")
         except Exception as _e:
             _dynamic_fail.append(f"{_pid}:{_e.__class__.__name__}")
@@ -706,11 +840,14 @@ try:
 except Exception:
     pass
 
-# Load persisted model cache from disk.
-# Overlay on PROVIDER_MODELS so the UI shows dynamically-fetched models.
+# Load persisted dynamic model cache from disk and overlay runtime list.
 try:
-    from providers.model_fetcher import load_cache as _load_model_cache
-    _model_cache = _load_model_cache()
+    from providers.model_fetcher import (
+        load_dynamic_cache as _load_dynamic_model_cache,
+        update_fixed_cache as _update_fixed_model_cache,
+    )
+    _update_fixed_model_cache(FIXED_PROVIDER_MODELS)
+    _model_cache = _load_dynamic_model_cache()
     for _p, _ml in _model_cache.items():
         if _ml:
             # Skip Ollama cache — always use live /api/tags results
@@ -719,9 +856,12 @@ try:
             PROVIDER_MODELS[_p] = _ml
     if _model_cache:
         import logging as _log
-        _log.getLogger(__name__).info(f"Loaded model cache for {len(_model_cache)} providers")
-except Exception as _mc_err:
+        _log.getLogger(__name__).info(f"Loaded dynamic model cache for {len(_model_cache)} providers")
+except Exception:
     pass  # cache optional — dynamic lists remain
+
+# Always refresh dynamic model cache at addon startup.
+_refresh_model_cache_at_startup()
 
 
 # Mapping user-friendly names (with prefixes) to technical model names
@@ -731,23 +871,128 @@ MODEL_NAME_MAPPING = {
     "Claude: Haiku 4.5": "claude-haiku-4-5-20251001",
     "Claude: Sonnet 4.5": "claude-sonnet-4-5-20250929",
     "Claude: Opus 4.5": "claude-opus-4-5-20251101",
-    "Claude: Opus 4.1": "claude-opus-4-1-20250805",
     "Claude: Sonnet 4": "claude-sonnet-4-20250514",
+    "Claude: Haiku 4": "claude-haiku-4",
     "Claude: Opus 4": "claude-opus-4-20250514",
+    "Claude: Opus 4.1": "claude-opus-4-1-20250805",
+    "Claude: Haiku 3": "claude-3-haiku-20240307",
     "OpenAI: GPT-5.2": "gpt-5.2",
     "OpenAI: GPT-5.2-mini": "gpt-5.2-mini",
     "OpenAI: GPT-5": "gpt-5",
     "OpenAI: GPT-4o": "gpt-4o",
     "OpenAI: GPT-4o-mini": "gpt-4o-mini",
     "OpenAI: GPT-4-turbo": "gpt-4-turbo",
+    "OpenAI: GPT-4 (Legacy)": "gpt-4",
+    "OpenAI: GPT-3.5 Turbo (Legacy)": "gpt-3.5-turbo",
+    "OpenAI: GPT-3.5 Turbo-0125 (Legacy)": "gpt-3.5-turbo-0125",
+    "OpenAI: GPT-3.5 Turbo-1106 (Legacy)": "gpt-3.5-turbo-1106",
+    "OpenAI: GPT-3.5 Turbo 16k (Legacy)": "gpt-3.5-turbo-16k",
+    "OpenAI: GPT-3.5 Turbo Instruct (Legacy)": "gpt-3.5-turbo-instruct",
+    "OpenAI: GPT-3.5 Turbo Instruct-0914 (Legacy)": "gpt-3.5-turbo-instruct-0914",
+    "OpenAI: GPT-4-0125 Preview (Legacy)": "gpt-4-0125-preview",
+    "OpenAI: GPT-4-0613 (Legacy)": "gpt-4-0613",
+    "OpenAI: GPT-4-1106 Preview (Legacy)": "gpt-4-1106-preview",
+    "OpenAI: GPT-4 Turbo Preview (Legacy)": "gpt-4-turbo-preview",
+    "OpenAI: GPT-4 Turbo (2024-04-09)": "gpt-4-turbo-2024-04-09",
+    "OpenAI: GPT-4.1": "gpt-4.1",
+    "OpenAI: GPT-4.1 (2025-04-14)": "gpt-4.1-2025-04-14",
+    "OpenAI: GPT-4.1 Mini": "gpt-4.1-mini",
+    "OpenAI: GPT-4.1 Mini (2025-04-14)": "gpt-4.1-mini-2025-04-14",
+    "OpenAI: GPT-4.1 Nano": "gpt-4.1-nano",
+    "OpenAI: GPT-4.1 Nano (2025-04-14)": "gpt-4.1-nano-2025-04-14",
+    "OpenAI: GPT-4o (2024-05-13)": "gpt-4o-2024-05-13",
+    "OpenAI: GPT-4o (2024-08-06)": "gpt-4o-2024-08-06",
+    "OpenAI: GPT-4o (2024-11-20)": "gpt-4o-2024-11-20",
+    "OpenAI: GPT-4o Audio Preview": "gpt-4o-audio-preview",
+    "OpenAI: GPT-4o Audio Preview (2024-12-17)": "gpt-4o-audio-preview-2024-12-17",
+    "OpenAI: GPT-4o Audio Preview (2025-06-03)": "gpt-4o-audio-preview-2025-06-03",
+    "OpenAI: GPT-4o Mini (2024-07-18)": "gpt-4o-mini-2024-07-18",
+    "OpenAI: GPT-4o Mini Audio Preview": "gpt-4o-mini-audio-preview",
+    "OpenAI: GPT-4o Mini Audio Preview (2024-12-17)": "gpt-4o-mini-audio-preview-2024-12-17",
+    "OpenAI: GPT-4o Mini Transcribe": "gpt-4o-mini-transcribe",
+    "OpenAI: GPT-4o Mini Transcribe (2025-03-20)": "gpt-4o-mini-transcribe-2025-03-20",
+    "OpenAI: GPT-4o Mini Transcribe (2025-12-15)": "gpt-4o-mini-transcribe-2025-12-15",
+    "OpenAI: GPT-4o Transcribe": "gpt-4o-transcribe",
+    "OpenAI: GPT-4o Transcribe Diarize": "gpt-4o-transcribe-diarize",
+    "OpenAI: GPT-5": "gpt-5",
+    "OpenAI: GPT-5 (2025-08-07)": "gpt-5-2025-08-07",
+    "OpenAI: GPT-5 Chat Latest": "gpt-5-chat-latest",
+    "OpenAI: GPT-5 Codex": "gpt-5-codex",
+    "OpenAI: GPT-5 Mini": "gpt-5-mini",
+    "OpenAI: GPT-5 Mini (2025-08-07)": "gpt-5-mini-2025-08-07",
+    "OpenAI: GPT-5 Nano": "gpt-5-nano",
+    "OpenAI: GPT-5 Nano (2025-08-07)": "gpt-5-nano-2025-08-07",
+    "OpenAI: GPT-5 Pro": "gpt-5-pro",
+    "OpenAI: GPT-5 Pro (2025-10-06)": "gpt-5-pro-2025-10-06",
+    "OpenAI: GPT-5.1": "gpt-5.1",
+    "OpenAI: GPT-5.1 (2025-11-13)": "gpt-5.1-2025-11-13",
+    "OpenAI: GPT-5.1 Chat Latest": "gpt-5.1-chat-latest",
+    "OpenAI: GPT-5.1 Codex": "gpt-5.1-codex",
+    "OpenAI: GPT-5.1 Codex Max": "gpt-5.1-codex-max",
+    "OpenAI: GPT-5.1 Codex Mini": "gpt-5.1-codex-mini",
+    "OpenAI: GPT-5.2 (2025-12-11)": "gpt-5.2-2025-12-11",
+    "OpenAI: GPT-5.2 Chat Latest": "gpt-5.2-chat-latest",
+    "OpenAI: GPT-5.2 Codex": "gpt-5.2-codex",
+    "OpenAI: GPT-5.2 Pro": "gpt-5.2-pro",
+    "OpenAI: GPT-5.2 Pro (2025-12-11)": "gpt-5.2-pro-2025-12-11",
+    "OpenAI: GPT-5.3 Chat Latest": "gpt-5.3-chat-latest",
+    "OpenAI: GPT-5.3 Codex": "gpt-5.3-codex",
+    "OpenAI: GPT-5.4": "gpt-5.4",
+    "OpenAI: GPT-5.4 (2026-03-05)": "gpt-5.4-2026-03-05",
+    "OpenAI: GPT-5.4 Mini": "gpt-5.4-mini",
+    "OpenAI: GPT-5.4 Mini (2026-03-17)": "gpt-5.4-mini-2026-03-17",
+    "OpenAI: GPT-5.4 Nano": "gpt-5.4-nano",
+    "OpenAI: GPT-5.4 Nano (2026-03-17)": "gpt-5.4-nano-2026-03-17",
+    "OpenAI: GPT-5.4 Pro": "gpt-5.4-pro",
+    "OpenAI: GPT-5.4 Pro (2026-03-05)": "gpt-5.4-pro-2026-03-05",
+    "OpenAI: GPT Audio": "gpt-audio",
+    "OpenAI: GPT Audio 1.5": "gpt-audio-1.5",
+    "OpenAI: GPT Audio (2025-08-28)": "gpt-audio-2025-08-28",
+    "OpenAI: GPT Audio Mini": "gpt-audio-mini",
+    "OpenAI: GPT Audio Mini (2025-10-06)": "gpt-audio-mini-2025-10-06",
+    "OpenAI: GPT Audio Mini (2025-12-15)": "gpt-audio-mini-2025-12-15",
     "OpenAI: o3": "o3",
     "OpenAI: o3-mini": "o3-mini",
     "OpenAI: o1": "o1",
+    "OpenAI: o1 (2024-12-17)": "o1-2024-12-17",
+    "OpenAI: o1 Pro": "o1-pro",
+    "OpenAI: o1 Pro (2025-03-19)": "o1-pro-2025-03-19",
+    "OpenAI: o3 (2025-04-16)": "o3-2025-04-16",
+    "OpenAI: o3-mini (2025-01-31)": "o3-mini-2025-01-31",
+    "OpenAI: o4-mini": "o4-mini",
+    "OpenAI: o4-mini (2025-04-16)": "o4-mini-2025-04-16",
+    "OpenAI: Sora 2": "sora-2",
+    "OpenAI: Sora 2 Pro": "sora-2-pro",
     "Google: Gemini 3 Pro (Preview)": "gemini-3-pro-preview",
     "Google: Gemini 3 Flash (Preview)": "gemini-3-flash-preview",
     "Google: Gemini 2.0 Flash": "gemini-2.0-flash",
     "Google: Gemini 2.5 Pro": "gemini-2.5-pro",
     "Google: Gemini 2.5 Flash": "gemini-2.5-flash",
+    "Google: Gemini 2.0 Flash 001": "gemini-2.0-flash-001",
+    "Google: Gemini 2.0 Flash Lite": "gemini-2.0-flash-lite",
+    "Google: Gemini 2.0 Flash Lite 001": "gemini-2.0-flash-lite-001",
+    "Google: Gemini 2.5 Computer Use (Preview 10-2025)": "gemini-2.5-computer-use-preview-10-2025",
+    "Google: Gemini 2.5 Flash Image": "gemini-2.5-flash-image",
+    "Google: Gemini 2.5 Flash Lite": "gemini-2.5-flash-lite",
+    "Google: Gemini 2.5 Flash Lite (Preview 09-2025)": "gemini-2.5-flash-lite-preview-09-2025",
+    "Google: Gemini 2.5 Flash Preview TTS": "gemini-2.5-flash-preview-tts",
+    "Google: Gemini 2.5 Pro Preview TTS": "gemini-2.5-pro-preview-tts",
+    "Google: Gemini 3 Pro Image Preview": "gemini-3-pro-image-preview",
+    "Google: Gemini 3.1 Flash Image Preview": "gemini-3.1-flash-image-preview",
+    "Google: Gemini 3.1 Flash Lite Preview": "gemini-3.1-flash-lite-preview",
+    "Google: Gemini 3.1 Pro Preview": "gemini-3.1-pro-preview",
+    "Google: Gemini 3.1 Pro Preview Customtools": "gemini-3.1-pro-preview-customtools",
+    "Google: Gemini Flash Latest": "gemini-flash-latest",
+    "Google: Gemini Flash Lite Latest": "gemini-flash-lite-latest",
+    "Google: Gemini Pro Latest": "gemini-pro-latest",
+    "Google: Gemini Robotics ER 1.5 Preview": "gemini-robotics-er-1.5-preview",
+    "Google: Gemma 3 1B IT": "gemma-3-1b-it",
+    "Google: Gemma 3 4B IT": "gemma-3-4b-it",
+    "Google: Gemma 3 12B IT": "gemma-3-12b-it",
+    "Google: Gemma 3 27B IT": "gemma-3-27b-it",
+    "Google: Gemma 3n E2B IT": "gemma-3n-e2b-it",
+    "Google: Gemma 3n E4B IT": "gemma-3n-e4b-it",
+    "Google: Nano Banana Pro Preview": "nano-banana-pro-preview",
     "NVIDIA: Kimi K2.5": "moonshotai/kimi-k2.5",
     "NVIDIA: Llama 3.1 70B": "meta/llama-3.1-70b-instruct",
     "NVIDIA: Llama 3.1 405B": "meta/llama-3.1-405b-instruct",
@@ -799,6 +1044,22 @@ MODEL_NAME_MAPPING = {
     "GitHub: Jamba 1.5 Large": "ai21-labs/ai21-jamba-1.5-large",
     "GitHub: Grok-3": "xai/grok-3",
     "GitHub: Grok-3 Mini": "xai/grok-3-mini",
+    # GitHub Models - bare model IDs (new API shape)
+    "GitHub: GPT-4o": "gpt-4o",
+    "GitHub: GPT-4.1": "gpt-4.1",
+    "GitHub: GPT-5 Mini": "gpt-5-mini",
+    "GitHub: GPT-5.3 Codex": "gpt-5.3-codex",
+    "GitHub: GPT-5.4": "gpt-5.4",
+    "GitHub: Claude Haiku 4.5": "claude-haiku-4.5",
+    "GitHub: Claude Sonnet 4": "claude-sonnet-4",
+    "GitHub: Claude Sonnet 4.5": "claude-sonnet-4.5",
+    "GitHub: Claude Sonnet 4.6": "claude-sonnet-4.6",
+    "GitHub: Claude Opus 4.5": "claude-opus-4.5",
+    "GitHub: Claude Opus 4.6": "claude-opus-4.6",
+    "GitHub: Gemini 2.5 Pro": "gemini-2.5-pro",
+    "GitHub: Gemini 3 Flash (Preview)": "gemini-3-flash-preview",
+    "GitHub: Gemini 3 Pro (Preview)": "gemini-3-pro-preview",
+    "GitHub: Gemini 3.1 Pro (Preview)": "gemini-3.1-pro-preview",
     
     "Groq: Llama 3.3 70B": "llama-3.3-70b-versatile",
     "Groq: Llama 3.1 8B": "llama-3.1-8b-instant",
@@ -810,6 +1071,14 @@ MODEL_NAME_MAPPING = {
     "Groq: Llama 4 Scout": "meta-llama/llama-4-scout-17b-16e-instruct",
     "Groq: Qwen3 32B": "qwen/qwen3-32b",
     "Groq: Kimi K2": "moonshotai/kimi-k2-instruct-0905",
+    # Groq dynamic cache models (raw IDs -> readable names)
+    "Groq: Allam 2 7B": "allam-2-7b",
+    "Groq: Orpheus Arabic Saudi": "canopylabs/orpheus-arabic-saudi",
+    "Groq: Orpheus V1 English": "canopylabs/orpheus-v1-english",
+    "Groq: Llama Prompt Guard 2 22M": "meta-llama/llama-prompt-guard-2-22m",
+    "Groq: Llama Prompt Guard 2 86M": "meta-llama/llama-prompt-guard-2-86m",
+    "Groq: Kimi K2 Instruct": "moonshotai/kimi-k2-instruct",
+    "Groq: GPT OSS Safeguard 20B": "openai/gpt-oss-safeguard-20b",
     
     "Mistral: Large": "mistral-large-latest",
     "Mistral: Medium": "mistral-medium",
@@ -893,10 +1162,24 @@ MODEL_NAME_MAPPING = {
     "GitHub Copilot: Claude Opus 4.6 Fast": "claude-opus-4.6-fast",
     "GitHub Copilot: Claude Sonnet 4.6": "claude-sonnet-4.6",
     "GitHub Copilot: Claude Sonnet 4.5": "claude-sonnet-4.5",
+    "GitHub Copilot: Claude Opus 4.5": "claude-opus-4.5",
     "GitHub Copilot: Claude Sonnet 4": "claude-sonnet-4",
     "GitHub Copilot: Claude Haiku 4.5": "claude-haiku-4.5",
     "GitHub Copilot: Claude 3.7 Sonnet": "claude-3.7-sonnet",
     "GitHub Copilot: Claude 3.5 Sonnet": "claude-3.5-sonnet",
+    # GitHub Copilot — raw model ids normalized to readable labels
+    "GitHub Copilot: claude-opus-4-5": "claude-opus-4-5",
+    "GitHub Copilot: GPT-4o (2024-11-20)": "gpt-4o-2024-11-20",
+    "GitHub Copilot: GPT-4o (2024-08-06)": "gpt-4o-2024-08-06",
+    "GitHub Copilot: GPT-4o Mini (2024-07-18)": "gpt-4o-mini-2024-07-18",
+    "GitHub Copilot: GPT-4o (2024-05-13)": "gpt-4o-2024-05-13",
+    "GitHub Copilot: GPT-4o Preview": "gpt-4-o-preview",
+    "GitHub Copilot: GPT-4.1 Copilot": "gpt-41-copilot",
+    "GitHub Copilot: GPT-4.1 (2025-04-14)": "gpt-4.1-2025-04-14",
+    "GitHub Copilot: GPT-4 (Legacy)": "gpt-4",
+    "GitHub Copilot: GPT-4-0613 (Legacy)": "gpt-4-0613",
+    "GitHub Copilot: GPT-3.5 Turbo (Legacy)": "gpt-3.5-turbo",
+    "GitHub Copilot: GPT-3.5 Turbo-0613 (Legacy)": "gpt-3.5-turbo-0613",
     "GitHub Copilot: Gemini 3.1 Pro": "gemini-3.1-pro-preview",
     "GitHub Copilot: Gemini 3 Pro": "gemini-3-pro-preview",
     "GitHub Copilot: Gemini 3 Flash": "gemini-3-flash-preview",
@@ -909,14 +1192,21 @@ MODEL_NAME_MAPPING = {
     "GitHub Copilot: GPT-5.1": "gpt-5.1",
     "GitHub Copilot: GPT-5.2": "gpt-5.2",
     "GitHub Copilot: GPT-5-mini": "gpt-5-mini",
+    "GitHub Copilot: GPT-5.4": "gpt-5.4",
+    "GitHub Copilot: GPT-5.4-mini": "gpt-5.4-mini",
 
-    "OpenAI Codex: gpt-5.3-codex": "gpt-5.3-codex",
-    "OpenAI Codex: gpt-5.3-codex-spark": "gpt-5.3-codex-spark",
-    "OpenAI Codex: gpt-5.2-codex": "gpt-5.2-codex",
-    "OpenAI Codex: gpt-5.1-codex-max": "gpt-5.1-codex-max",
-    "OpenAI Codex: gpt-5.1-codex": "gpt-5.1-codex",
-    "OpenAI Codex: gpt-5-codex": "gpt-5-codex",
-    "OpenAI Codex: gpt-5-codex-mini": "gpt-5-codex-mini",
+    "OpenAI Codex: GPT-5.3 Codex": "gpt-5.3-codex",
+    "OpenAI Codex: GPT-5.3 Codex Spark": "gpt-5.3-codex-spark",
+    "OpenAI Codex: GPT-5.2 Codex": "gpt-5.2-codex",
+    "OpenAI Codex: GPT-5.1 Codex Max": "gpt-5.1-codex-max",
+    "OpenAI Codex: GPT-5.1 Codex": "gpt-5.1-codex",
+    "OpenAI Codex: GPT-5 Codex": "gpt-5-codex",
+    "OpenAI Codex: GPT-5 Codex Mini": "gpt-5-codex-mini",
+    "Claude Web: Claude Opus 4.6": "claude-opus-4-6",
+    "Claude Web: Claude Sonnet 4.6": "claude-sonnet-4-6",
+    "Claude Web: Claude Opus 4.5": "claude-opus-4-5-20251101",
+    "Claude Web: Claude Sonnet 4.5": "claude-sonnet-4-5-20250929",
+    "Claude Web: Claude Haiku 4.5": "claude-haiku-4-5-20251001",
     "ChatGPT Web: gpt-4o": "gpt-4o",
     "ChatGPT Web: gpt-4o-mini": "gpt-4o-mini",
     "ChatGPT Web: gpt-4.5": "gpt-4.5",
@@ -927,10 +1217,28 @@ MODEL_NAME_MAPPING = {
     "ChatGPT Web: o3": "o3",
     "ChatGPT Web: o3-mini": "o3-mini",
     "ChatGPT Web: o4-mini": "o4-mini",
-    "Gemini Web: gemini-3.1-pro": "gemini-3.1-pro",
-    "Gemini Web: gemini-3.0-pro": "gemini-3.0-pro",
-    "Gemini Web: gemini-3.0-flash": "gemini-3.0-flash",
-    "Gemini Web: gemini-3.0-flash-thinking": "gemini-3.0-flash-thinking",
+    "Gemini Web: Gemini 3.1 Pro": "gemini-3.1-pro",
+    "Gemini Web: Gemini 3.0 Pro": "gemini-3.0-pro",
+    "Gemini Web: Gemini 3.0 Flash": "gemini-3.0-flash",
+    "Gemini Web: Gemini 3.0 Flash Thinking": "gemini-3.0-flash-thinking",
+    "Perplexity Web: Pro": "pplx_pro",
+    "Perplexity Web: Reasoning": "pplx_reasoning",
+    "Perplexity Web: Auto": "pplx_auto",
+    "Perplexity Web: Deep Research": "pplx_deep_research",
+    "Perplexity Web: Sonar": "sonar",
+    "Perplexity Web: GPT-5.2": "gpt-5.2",
+    "Perplexity Web: GPT-5.4": "gpt-5.4",
+    "Perplexity Web: Claude 4.5 Sonnet": "claude-4.5-sonnet",
+    "Perplexity Web: Claude Sonnet 4.6": "claude-4.6-sonnet",
+    "Perplexity Web: Claude Opus 4.6": "claude-4.6-opus",
+    "Perplexity Web: Grok 4.1": "grok-4-1",
+    "Perplexity Web: Gemini 3.1 Pro": "gemini-3.1-pro",
+    "Perplexity Web: Nemotron 3 Super": "nemotron-3-super",
+    "Perplexity Web: GPT-5.2 Thinking": "gpt-5.2-thinking",
+    "Perplexity Web: Claude 4.5 Sonnet Thinking": "claude-4.5-sonnet-thinking",
+    "Perplexity Web: Gemini 3.0 Pro": "gemini-3.0-pro",
+    "Perplexity Web: Kimi K2 Thinking": "kimi-k2-thinking",
+    "Perplexity Web: Grok 4.1 Reasoning": "grok-4.1-reasoning",
 }
 
 # Per-provider reverse mapping: {provider: {technical_name: display_name}}
@@ -956,8 +1264,10 @@ _PREFIX_TO_PROVIDER = {
     "Zhipu:": "zhipu",
     "GitHub Copilot:": "github_copilot",
     "OpenAI Codex:": "openai_codex",
+    "Claude Web:": "claude_web",
     "ChatGPT Web:": "chatgpt_web",
     "Gemini Web:": "gemini_web",
+    "Perplexity Web:": "perplexity_web",
 }
 for _display_name, _tech_name in MODEL_NAME_MAPPING.items():
     for _prefix, _prov in _PREFIX_TO_PROVIDER.items():
@@ -975,6 +1285,100 @@ for _prov_models in PROVIDER_DISPLAY.values():
     for _tech, _disp in _prov_models.items():
         if _tech not in MODEL_DISPLAY_MAPPING:
             MODEL_DISPLAY_MAPPING[_tech] = _disp
+
+
+def _humanize_nvidia_model_name(model_id: str) -> str:
+    """Generate a readable NVIDIA model display label from a technical model ID."""
+    raw = str(model_id or "").strip()
+    if not raw:
+        return "Model"
+    core = raw.split("/", 1)[1] if "/" in raw else raw
+    core = core.replace("_", "-")
+    tokens = [t for t in core.split("-") if t]
+    if not tokens:
+        return core
+
+    token_map = {
+        "ai": "AI",
+        "api": "API",
+        "oss": "OSS",
+        "gpt": "GPT",
+        "llama": "Llama",
+        "qwen": "Qwen",
+        "gemma": "Gemma",
+        "deepseek": "DeepSeek",
+        "mistral": "Mistral",
+        "mistralai": "MistralAI",
+        "minimax": "MiniMax",
+        "moonshotai": "MoonshotAI",
+        "nemotron": "Nemotron",
+        "nemoretriever": "NemoRetriever",
+        "nemoguard": "NemoGuard",
+        "chatqa": "ChatQA",
+        "coder": "Coder",
+        "instruct": "Instruct",
+        "reasoning": "Reasoning",
+        "vision": "Vision",
+        "flash": "Flash",
+        "thinking": "Thinking",
+        "content": "Content",
+        "safety": "Safety",
+        "guard": "Guard",
+        "translate": "Translate",
+        "mini": "Mini",
+        "nano": "Nano",
+        "super": "Super",
+        "ultra": "Ultra",
+        "it": "IT",
+        "vl": "VL",
+        "pii": "PII",
+    }
+
+    out = []
+    for tok in tokens:
+        low = tok.lower()
+        if low in token_map:
+            out.append(token_map[low])
+            continue
+        if re.fullmatch(r"\d+b", low):
+            out.append(low[:-1] + "B")
+            continue
+        if re.fullmatch(r"v\d+(\.\d+)?", low):
+            out.append(low)
+            continue
+        if re.fullmatch(r"\d+(\.\d+)?", low):
+            out.append(low)
+            continue
+        out.append(low.capitalize())
+    return " ".join(out)
+
+
+def get_model_display_name(provider: str, technical_name: str) -> str:
+    """Return best-effort human display name for a model ID."""
+    prov = (provider or "").strip()
+    tech = str(technical_name or "").strip()
+    if not tech:
+        return tech
+    by_provider = PROVIDER_DISPLAY.get(prov, {})
+    if tech in by_provider:
+        return by_provider[tech]
+    if tech in MODEL_DISPLAY_MAPPING:
+        return MODEL_DISPLAY_MAPPING[tech]
+    if prov == "nvidia":
+        return f"NVIDIA: {_humanize_nvidia_model_name(tech)}"
+    return tech
+
+
+# Ensure NVIDIA always has readable names, even for dynamically discovered IDs.
+try:
+    PROVIDER_DISPLAY.setdefault("nvidia", {})
+    for _mid in PROVIDER_MODELS.get("nvidia", []) or []:
+        if _mid not in PROVIDER_DISPLAY["nvidia"]:
+            PROVIDER_DISPLAY["nvidia"][_mid] = f"NVIDIA: {_humanize_nvidia_model_name(_mid)}"
+        if _mid not in MODEL_DISPLAY_MAPPING:
+            MODEL_DISPLAY_MAPPING[_mid] = PROVIDER_DISPLAY["nvidia"][_mid]
+except Exception as _e:
+    logger.debug(f"NVIDIA display name bootstrap skipped: {_e}")
 
 
 # Model utility functions moved to core.model_utils module
@@ -1024,6 +1428,8 @@ def get_api_key() -> str:
     elif AI_PROVIDER == "chatgpt_web":
         return ""
     elif AI_PROVIDER == "gemini_web":
+        return ""
+    elif AI_PROVIDER == "perplexity_web":
         return ""
     return ""
 
@@ -1251,7 +1657,7 @@ def initialize_ai_client():
         "groq", "mistral", "openrouter", "deepseek", "minimax",
         "aihubmix", "siliconflow", "volcengine", "dashscope",
         "moonshot", "zhipu", "github_copilot", "openai_codex",
-        "claude_web", "chatgpt_web", "gemini_web",
+        "claude_web", "chatgpt_web", "gemini_web", "perplexity_web",
     ):
         # Questi provider usano providers/manager.py — non serve un ai_client dedicato
         if api_key:
@@ -1288,6 +1694,12 @@ def initialize_ai_client():
                 logger.info(f"gemini_web provider ready via session cookies (model: {get_active_model()})")
             else:
                 logger.info("gemini_web selected — authenticate via the 🔑 button in the UI")
+        elif AI_PROVIDER == "perplexity_web":
+            _session_file = "/data/session_perplexity_web.json"
+            if os.path.isfile(_session_file):
+                logger.info(f"perplexity_web provider ready via session cookies (model: {get_active_model()})")
+            else:
+                logger.info("perplexity_web selected — authenticate via the 🔑 button in the UI")
         else:
             logger.warning(f"AI provider '{AI_PROVIDER}' not configured - set the API key in addon settings")
         ai_client = None
@@ -3404,7 +3816,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
             # For no-tool providers (claude_web, chatgpt_web, github_copilot, openai_codex):
             # buffer the full response so we can run the tool simulator on it after done.
-            _NO_TOOL_PROVIDERS = {"claude_web", "chatgpt_web", "gemini_web", "github_copilot", "openai_codex"}
+            _NO_TOOL_PROVIDERS = {"claude_web", "chatgpt_web", "gemini_web", "perplexity_web", "github_copilot", "openai_codex"}
             # Some models on native-tool providers also use the XML simulator
             # (e.g. Kimi K2 on Groq — emits text instead of tool_call deltas).
             _NO_NATIVE_TOOL_MODELS = {
@@ -4143,6 +4555,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # Execute each tool and append its result
             _round_has_rich_diff = False
             _any_successful_write_this_round = False
+            _round_write_confirms: list[str] = []
             _stop_after_html_dashboard_success = False
             _html_dashboard_success_message = ""
             _stop_after_html_dashboard_error = False
@@ -4232,6 +4645,24 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     if not _is_read_only_call(tc) and _is_ok:
                         _any_successful_write_this_round = True
                         _write_tools_executed.append(fn_name)
+                        # Deterministic confirmation for no-tool providers:
+                        # avoid extra model round that may contradict executed actions.
+                        if fn_name == "call_service":
+                            _dom = str(tc_args.get("domain") or "").strip()
+                            _svc = str(tc_args.get("service") or "").strip()
+                            _eid = str(tc_args.get("entity_id") or "").strip()
+                            _tgt = tc_args.get("target") if isinstance(tc_args.get("target"), dict) else {}
+                            _dat = tc_args.get("data") if isinstance(tc_args.get("data"), dict) else {}
+                            _eid = _eid or str(_tgt.get("entity_id") or _dat.get("entity_id") or "").strip()
+                            _svc_full = f"{_dom}.{_svc}" if _dom and _svc else (_svc or _dom or "service")
+                            if _eid:
+                                _round_write_confirms.append(f"✅ Eseguito `{_svc_full}` su `{_eid}`.")
+                            else:
+                                _round_write_confirms.append(f"✅ Eseguito `{_svc_full}`.")
+                        else:
+                            _msg = str(_result_obj.get("message") or "").strip()
+                            if _msg:
+                                _round_write_confirms.append(f"✅ {_msg}")
 
                     if fn_name == "preview_automation_change" and _status == "preview":
                         _norm = _normalize_automation_change_args(tc_args)
@@ -4327,6 +4758,15 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     _streamed_text_parts = [_html_dashboard_error_message]
                 break
 
+            # For no-tool providers: if a write action was executed, finish here
+            # with backend-confirmed text (skip another LLM round).
+            if _is_no_tool_provider and _round_write_confirms:
+                _final_conf = "\n".join(dict.fromkeys([c for c in _round_write_confirms if c]))
+                if _final_conf:
+                    yield {"type": "token", "content": _final_conf}
+                    _streamed_text_parts = [_final_conf]
+                break
+
             # ── After executing a WRITE tool, disable ToolSimulator extraction
             # ── for the next round so the model MUST produce text (not another
             # ── <tool_call> block).  No-tool providers (Copilot) tend to re-call
@@ -4399,20 +4839,103 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             _HALLUCINATED_SUCCESS_PHRASES = (
                 "aggiornata", "applicata", "modificata", "updated successfully", "applied",
                 "aggiornato", "creata", "salvata", "success", "✅", "completata", "eseguita",
+                "ho acceso", "acceso", "ho spento", "spento", "ho attivato", "attivato",
+                "fatto", "done", "completed",
             )
+            _ACTION_REQUEST_RE = re.compile(
+                r"\b(accendi|spegni|apri|chiudi|attiva|disattiva|riavvia|"
+                r"turn\s*on|turn\s*off|switch\s*on|switch\s*off|open|close|enable|disable)\b",
+                re.IGNORECASE,
+            )
+            _user_asked_action = bool(_ACTION_REQUEST_RE.search(str(user_message or "")))
+            # Fallback for no-tool providers:
+            # if user asked a simple on/off action and the model produced text only,
+            # execute via backend tools to avoid "no action performed" dead-ends.
+            if (
+                _is_no_tool_provider
+                and assembled
+                and not _write_tools_executed
+                and _user_asked_action
+            ):
+                _um = str(user_message or "")
+                _um_l = _um.lower()
+                _svc = ""
+                if re.search(r"\b(spegni|turn\s*off|switch\s*off|disattiva|off)\b", _um_l):
+                    _svc = "turn_off"
+                elif re.search(r"\b(accendi|turn\s*on|switch\s*on|attiva|on)\b", _um_l):
+                    _svc = "turn_on"
+
+                if _svc:
+                    try:
+                        _q = re.sub(
+                            r"\b(mi|per favore|perfavore|la|il|lo|i|gli|le|un|uno|una|della|del|dello|dei|degli|delle|di|da|in|su|con|e)\b",
+                            " ",
+                            _um_l,
+                            flags=re.IGNORECASE,
+                        )
+                        _q = re.sub(
+                            r"\b(accendi|spegni|attiva|disattiva|turn\s*on|turn\s*off|switch\s*on|switch\s*off|open|close|enable|disable)\b",
+                            " ",
+                            _q,
+                            flags=re.IGNORECASE,
+                        )
+                        _q = re.sub(r"[^\w\s\.]", " ", _q)
+                        _q = re.sub(r"\s+", " ", _q).strip()
+                        if not _q:
+                            _q = _um_l
+
+                        _sr_raw = tools.execute_tool("search_entities", {"query": _q})
+                        _sr = json.loads(_sr_raw) if isinstance(_sr_raw, str) else _sr_raw
+                        _matches = _sr if isinstance(_sr, list) else []
+                        _best_eid = ""
+                        if _matches:
+                            _allowed_domains = {"light", "switch", "input_boolean", "fan"}
+                            _sorted = sorted(
+                                _matches,
+                                key=lambda it: (
+                                    0 if str((it or {}).get("entity_id", "")).split(".")[0] in _allowed_domains else 1,
+                                    -float((it or {}).get("token_coverage", 0) or 0),
+                                    0 if str((it or {}).get("match_quality", "")) == "high" else (1 if str((it or {}).get("match_quality", "")) == "medium" else 2),
+                                ),
+                            )
+                            _best_eid = str((_sorted[0] or {}).get("entity_id", "")).strip()
+
+                        if _best_eid and "." in _best_eid:
+                            _dom = _best_eid.split(".", 1)[0]
+                            _svc_raw = tools.execute_tool(
+                                "call_service",
+                                {"domain": _dom, "service": _svc, "entity_id": _best_eid},
+                            )
+                            _svc_obj = json.loads(_svc_raw) if isinstance(_svc_raw, str) else _svc_raw
+                            _ok = isinstance(_svc_obj, dict) and str(_svc_obj.get("status", "")).lower() == "success" and not _svc_obj.get("error")
+                            if _ok:
+                                assembled = f"✅ Eseguito `{_dom}.{_svc}` su `{_best_eid}`."
+                                _write_tools_executed.append("call_service")
+                                logger.info(
+                                    "No-tool fallback action executed: %s on %s (provider=%s)",
+                                    f"{_dom}.{_svc}", _best_eid, AI_PROVIDER
+                                )
+                    except Exception as _fb_e:
+                        logger.warning(f"No-tool fallback action failed: {_fb_e}")
+
+            _looks_like_fake_success = any(p in assembled.lower() for p in _HALLUCINATED_SUCCESS_PHRASES)
             if (
                 _is_no_tool_provider
                 and assembled
                 and not _write_tools_executed
                 and intent_name not in ("chat", "create_html_dashboard")
-                and any(p in assembled.lower() for p in _HALLUCINATED_SUCCESS_PHRASES)
+                and (_looks_like_fake_success or _user_asked_action)
             ):
                 _warn = get_lang_text("warn_no_tool_called") or (
-                    "⚠️ Warning: the model described a change but did not actually execute it. "
-                    "No modifications were made to Home Assistant. "
-                    "Please try again and confirm when prompted."
+                    "⚠️ Azione NON eseguita: questo provider ha risposto in testo senza chiamare tool di Home Assistant. "
+                    "Nessuna modifica è stata applicata. "
+                    "Riprova con un provider che supporta tool-calling oppure conferma l'esecuzione guidata."
                 )
-                yield {"type": "system_message", "content": _warn}
+                logger.warning(
+                    "No-tool provider attempted action-like reply without write tool execution "
+                    f"(provider={AI_PROVIDER}, intent={intent_name}). Replacing assistant text with safety warning."
+                )
+                assembled = _warn
             if assembled:
                 # Log the AI response for debugging (truncate to 500 chars)
                 _log_resp = assembled[:500] + ('...' if len(assembled) > 500 else '')
@@ -4877,6 +5400,7 @@ _PROVIDER_SDK_MAP = {
     "claude_web": None,
     "chatgpt_web": None,
     "gemini_web": None,
+    "perplexity_web": None,
 }
 
 def _check_optional_sdks() -> dict:
@@ -4993,24 +5517,104 @@ def setup_chat_bubble():
             logger.warning("Chat bubble: Cannot register — ingress URL not available")
             return
 
+        # Build split scripts
         js_content = chat_bubble.get_chat_bubble_js(
             ingress_url=ingress_url,
             language=LANGUAGE,
             show_bubble=ENABLE_CHAT_BUBBLE,
             show_card_button=ENABLE_AMIRA_CARD_BUTTON,
+            show_automation_button=ENABLE_AMIRA_CARD_BUTTON,
+        )
+        # Phase 1 split artifacts (kept in sync, not primary resource yet).
+        # Keep the first loaded module fully featured: the bubble script has a
+        # global anti-double-injection guard, so later split modules may not run.
+        # If this module disables card/automation buttons, those UIs never appear.
+        js_bubble_content = chat_bubble.get_chat_bubble_js(
+            ingress_url=ingress_url,
+            language=LANGUAGE,
+            show_bubble=ENABLE_CHAT_BUBBLE,
+            show_card_button=ENABLE_AMIRA_CARD_BUTTON,
+            show_automation_button=ENABLE_AMIRA_CARD_BUTTON,
+        )
+        js_card_content = chat_bubble.get_chat_bubble_js(
+            ingress_url=ingress_url,
+            language=LANGUAGE,
+            show_bubble=False,
+            show_card_button=ENABLE_AMIRA_CARD_BUTTON,
+            show_automation_button=False,
+        )
+        js_auto_content = chat_bubble.get_chat_bubble_js(
+            ingress_url=ingress_url,
+            language=LANGUAGE,
+            show_bubble=False,
+            show_card_button=False,
+            show_automation_button=ENABLE_AMIRA_CARD_BUTTON,
         )
 
-        # Save to /config/www/ (served by HA at /local/)
+        # Save split scripts to /config/www/ (served by HA at /local/)
         www_dir = os.path.join(HA_CONFIG_DIR, "www")
         os.makedirs(www_dir, exist_ok=True)
+        split_paths = {
+            "bubble": os.path.join(www_dir, "ha-claude-chat-bubble.bubble.js"),
+            "card": os.path.join(www_dir, "ha-claude-chat-bubble.card.js"),
+            "automation": os.path.join(www_dir, "ha-claude-chat-bubble.automation.js"),
+        }
+        with open(split_paths["bubble"], "w", encoding="utf-8") as sf:
+            sf.write(js_bubble_content)
+        with open(split_paths["card"], "w", encoding="utf-8") as sf:
+            sf.write(js_card_content)
+        with open(split_paths["automation"], "w", encoding="utf-8") as sf:
+            sf.write(js_auto_content)
+        # Build loader as primary Lovelace resource (stable URL)
+        import hashlib
+        bubble_h = hashlib.md5(js_bubble_content.encode()).hexdigest()[:8]
+        card_h = hashlib.md5(js_card_content.encode()).hexdigest()[:8]
+        auto_h = hashlib.md5(js_auto_content.encode()).hexdigest()[:8]
+        logger.info(
+            "Chat bubble: split modules saved "
+            f"(bubble={len(js_bubble_content)} chars h={bubble_h}, "
+            f"card={len(js_card_content)} chars h={card_h}, "
+            f"automation={len(js_auto_content)} chars h={auto_h})"
+        )
+        loader_js = f"""(function(){{
+  try {{
+    if (window.__HA_CLAUDE_BUBBLE_LOADER__) return;
+    window.__HA_CLAUDE_BUBBLE_LOADER__ = true;
+    var parts = [
+      '/local/ha-claude-chat-bubble.bubble.js?v={VERSION}&h={bubble_h}',
+      '/local/ha-claude-chat-bubble.card.js?v={VERSION}&h={card_h}',
+      '/local/ha-claude-chat-bubble.automation.js?v={VERSION}&h={auto_h}'
+    ];
+    function loadOne(src) {{
+      return new Promise(function(resolve) {{
+        var s = document.createElement('script');
+        s.src = src;
+        s.async = false;
+        s.dataset.amiraPart = src;
+        s.onload = function() {{ resolve(); }};
+        s.onerror = function() {{ resolve(); }};
+        (document.head || document.documentElement || document.body).appendChild(s);
+      }});
+    }}
+    (async function() {{
+      for (var i = 0; i < parts.length; i++) await loadOne(parts[i]);
+    }})();
+  }} catch (e) {{
+    console.error('[Amira loader] error:', e);
+  }}
+}})();
+"""
         js_path = os.path.join(www_dir, "ha-claude-chat-bubble.js")
         with open(js_path, "w", encoding="utf-8") as f:
-            f.write(js_content)
-        logger.info(f"Chat bubble: JS saved to {js_path} ({len(js_content)} chars)")
+            f.write(loader_js)
+        logger.info(
+            "Chat bubble: loader JS saved "
+            f"({js_path}, {len(loader_js)} chars, "
+            f"default_ctx=all_modules)"
+        )
 
         # Register as Lovelace resource via websocket
-        import hashlib
-        content_hash = hashlib.md5(js_content.encode()).hexdigest()[:8]
+        content_hash = hashlib.md5(loader_js.encode()).hexdigest()[:8]
         resource_url = "/local/ha-claude-chat-bubble.js"
         cache_bust_url = f"{resource_url}?v={VERSION}&h={content_hash}"
         registration_ok = False
@@ -5081,7 +5685,11 @@ def setup_chat_bubble():
         # Only mark as registered if we succeeded or the file is at least written
         if registration_ok:
             _chat_bubble_registered = True
-            logger.info(f"Chat bubble: Setup complete (bubble={ENABLE_CHAT_BUBBLE}, card_btn={ENABLE_AMIRA_CARD_BUTTON})")
+            logger.info(
+                "Chat bubble: Setup complete "
+                f"(bubble={ENABLE_CHAT_BUBBLE}, card_btn={ENABLE_AMIRA_CARD_BUTTON}, "
+                f"automation_btn={ENABLE_AMIRA_CARD_BUTTON}, modular_loader=True)"
+            )
         else:
             logger.warning("Chat bubble: JS file saved but Lovelace registration may have failed — will retry on next call")
 
@@ -5111,12 +5719,20 @@ def cleanup_chat_bubble():
                     except Exception as e:
                         logger.warning(f"Chat bubble cleanup: Could not remove resource: {e}")
 
-        js_path = os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.js")
-        if os.path.isfile(js_path):
-            os.remove(js_path)
-            logger.info(f"Chat bubble cleanup: Deleted {js_path}")
+        js_files = [
+            os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.js"),
+            os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.bubble.js"),
+            os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.card.js"),
+            os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.automation.js"),
+        ]
+        deleted_any = False
+        for js_path in js_files:
+            if os.path.isfile(js_path):
+                os.remove(js_path)
+                deleted_any = True
+                logger.info(f"Chat bubble cleanup: Deleted {js_path}")
 
-        if removed or os.path.isfile(js_path):
+        if removed or deleted_any:
             logger.info("Chat bubble cleanup: Done")
     except Exception as e:
         logger.warning(f"Chat bubble cleanup failed: {e}")
@@ -5125,9 +5741,21 @@ def cleanup_chat_bubble():
 @app.route('/api/bubble/status', methods=['GET'])
 def api_bubble_status():
     """Diagnostic endpoint: check chat bubble registration status."""
-    js_path = os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.js")
-    js_exists = os.path.isfile(js_path)
-    js_size = os.path.getsize(js_path) if js_exists else 0
+    loader_path = os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.js")
+    module_paths = {
+        "loader": loader_path,
+        "bubble": os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.bubble.js"),
+        "card": os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.card.js"),
+        "automation": os.path.join(HA_CONFIG_DIR, "www", "ha-claude-chat-bubble.automation.js"),
+    }
+    module_files = {}
+    for name, p in module_paths.items():
+        ex = os.path.isfile(p)
+        module_files[name] = {
+            "path": p,
+            "exists": ex,
+            "size_bytes": (os.path.getsize(p) if ex else 0),
+        }
 
     ingress_url = get_addon_ingress_url()
 
@@ -5153,11 +5781,13 @@ def api_bubble_status():
     return jsonify({
         "bubble_enabled": ENABLE_CHAT_BUBBLE,
         "card_button_enabled": ENABLE_AMIRA_CARD_BUTTON,
+        "automation_button_enabled": ENABLE_AMIRA_CARD_BUTTON,
         "registered_flag": _chat_bubble_registered,
         "ingress_url": ingress_url or "(empty)",
-        "js_file": {"path": js_path, "exists": js_exists, "size_bytes": js_size},
+        "js_file": module_files["loader"],  # backward-compat for old UI
+        "module_files": module_files,
         "lovelace_resource": resource_info,
-        "hint": "After registering, do a FULL browser refresh (Ctrl+Shift+R) on your HA dashboard.",
+        "hint": "After registering, do a FULL browser refresh (Ctrl+Shift+R) on your HA dashboard. Loader + 3 modules must all be present.",
     })
 
 
@@ -5308,13 +5938,17 @@ def api_bubble_device_id():
         data = request.get_json() or {}
         device_id = data.get("device_id", "").strip()
         device_name = data.get("device_name", "").strip()
+        fingerprint = str(data.get("fingerprint") or "").strip()
         
         # Generate device ID if not provided
         if not device_id:
             import hashlib
             import uuid
-            # Create stable device ID from browser fingerprint
-            device_id = hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()[:12]
+            # Prefer deterministic ID from provided fingerprint
+            if fingerprint:
+                device_id = hashlib.md5(fingerprint.encode("utf-8")).hexdigest()[:12]
+            else:
+                device_id = hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()[:12]
         
         # Validate: only allow alphanum, dash, underscore
         if not all(c.isalnum() or c in '-_' for c in device_id):
@@ -5380,6 +6014,9 @@ def api_bubble_devices_register():
         device_id = (data.get("device_id") or "").strip()
         device_name = (data.get("device_name") or "").strip()
         device_type = (data.get("device_type") or "desktop").lower()
+        fingerprint = str(data.get("fingerprint") or "").strip()
+        if len(fingerprint) > 512:
+            fingerprint = fingerprint[:512]
         
         if not device_id or len(device_id) < 4:
             return jsonify({"success": False, "error": "Invalid device_id"}), 400
@@ -5388,6 +6025,19 @@ def api_bubble_devices_register():
             device_type = "desktop"
         
         devices = load_device_config()
+
+        # Canonicalize by fingerprint to avoid duplicate registrations of same browser/device
+        canonical_id = None
+        if fingerprint:
+            for did, meta in devices.items():
+                if not isinstance(meta, dict):
+                    continue
+                if (meta.get("fingerprint") == fingerprint) and (meta.get("device_type") == device_type):
+                    canonical_id = did
+                    break
+        if canonical_id and canonical_id != device_id:
+            logger.info(f"Device dedupe by fingerprint: {device_id} -> {canonical_id}")
+            device_id = canonical_id
         
         # If device doesn't exist yet, add it with default enabled state based on mode
         is_new_device = device_id not in devices
@@ -5396,6 +6046,7 @@ def api_bubble_devices_register():
             devices[device_id] = {
                 "name": device_name or f"{device_type.capitalize()}",
                 "device_type": device_type,
+                "fingerprint": fingerprint,
                 "enabled": True,
                 "first_seen": datetime.now().isoformat(),
                 "last_seen": datetime.now().isoformat(),
@@ -5405,6 +6056,8 @@ def api_bubble_devices_register():
             devices[device_id]["last_seen"] = datetime.now().isoformat()
             if device_name:
                 devices[device_id]["name"] = device_name
+            if fingerprint and not devices[device_id].get("fingerprint"):
+                devices[device_id]["fingerprint"] = fingerprint
         
         save_device_config(devices)
         if is_new_device:
@@ -6520,6 +7173,7 @@ def api_nvidia_test_models():
         return jsonify({"success": False, "error": tr("err_nvidia_api_key")}), 400
 
     body = request.get_json(silent=True) or {}
+    logger.info("NVIDIA test_models invoked")
     try:
         max_models = int(body.get("max_models") or 0)
     except Exception:
@@ -6530,19 +7184,23 @@ def api_nvidia_test_models():
     except Exception:
         cursor = 0
 
-    # Safety defaults: keep the request reasonably fast.
-    if max_models <= 0:
-        max_models = 50
-    max_models = max(1, min(200, max_models))
+    # max_models <= 0 => "test all" in one run (bounded by time safety below).
+    # Positive value keeps legacy bounded-batch behavior.
+    unlimited_scan = max_models <= 0
+    if not unlimited_scan:
+        max_models = max(1, min(200, max_models))
 
-    max_seconds = 55.0
+    # In full scan mode allow longer execution to cover the whole catalog.
+    max_seconds = 300.0 if unlimited_scan else 55.0
     per_model_timeout = 10
 
     # Use a fresh live list when possible.
     all_models = _fetch_nvidia_models_live(NVIDIA_API_KEY) or get_nvidia_models_cached(NVIDIA_API_KEY) or PROVIDER_MODELS.get("nvidia", [])
     all_models = [m for m in (all_models or []) if isinstance(m, str) and m.strip()]
-    # Remove already known-bad models.
-    candidates = [m for m in all_models if m not in NVIDIA_MODEL_BLOCKLIST]
+    # Full retest mode: include also previously blocked/tested/uncertain models.
+    candidates = list(dict.fromkeys(
+        all_models + sorted(NVIDIA_MODEL_BLOCKLIST) + sorted(NVIDIA_MODEL_TESTED_OK) + sorted(NVIDIA_MODEL_UNCERTAIN)
+    ))
 
     if cursor < 0:
         cursor = 0
@@ -6559,22 +7217,58 @@ def api_nvidia_test_models():
     tested: list[str] = []
     ok: list[str] = []
     removed: list[str] = []
+    uncertain: list[str] = []
+    events: list[str] = []
     stopped_reason = None
     timeouts = 0
-    errors = 0
 
     idx = cursor
 
+    def _is_model_invalid_4xx(status_code: int, body_text: str) -> bool:
+        """Return True only when 4xx clearly indicates model incompatibility."""
+        if status_code in (404, 422):
+            return True
+        if status_code != 400:
+            return False
+        low = (body_text or "").lower()
+        invalid_markers = (
+            "model_not_found",
+            "unknown model",
+            "model not found",
+            "unsupported model",
+            "model is not supported",
+            "invalid model",
+            "no such model",
+            "not chat-compatible",
+        )
+        # Do NOT treat billing/auth/rate-limit payloads as invalid model.
+        non_model_markers = (
+            "insufficient",
+            "quota",
+            "credit",
+            "balance",
+            "billing",
+            "auth",
+            "unauthorized",
+            "forbidden",
+            "rate limit",
+            "too many requests",
+        )
+        if any(m in low for m in non_model_markers):
+            return False
+        return any(m in low for m in invalid_markers)
+
     while idx < len(candidates):
         model_id = candidates[idx]
-        if len(tested) >= max_models:
-            stopped_reason = f"limit modelli ({max_models})"
+        if (not unlimited_scan) and (len(tested) >= max_models):
+            # Normal end-of-batch (UI paginates in small chunks): do not mark as "stopped".
             break
         if (time.time() - started) > max_seconds:
             stopped_reason = f"timeout ({int(max_seconds)}s)"
             break
 
         tested.append(model_id)
+        logger.info(f"NVIDIA test_models: [{idx + 1}/{len(candidates)}] testing '{model_id}'")
         payload = {
             "model": model_id,
             "messages": [{"role": "user", "content": "ciao"}],
@@ -6587,42 +7281,84 @@ def api_nvidia_test_models():
             resp = requests.post(url, headers=headers, json=payload, timeout=per_model_timeout)
         except requests.exceptions.ReadTimeout:
             # Don't abort the whole scan on a single slow model.
+            logger.info(f"NVIDIA test_models: timeout on '{model_id}'")
+            events.append(f"⏱ timeout: {model_id}")
+            uncertain.append(model_id)
+            mark_nvidia_model_uncertain(model_id)
             timeouts += 1
-            tested.append(model_id)
             idx += 1
             continue
         except Exception as e:
-            errors += 1
-            tested.append(model_id)
+            logger.warning(f"NVIDIA test_models: network error on '{model_id}': {type(e).__name__}: {e}")
+            uncertain.append(model_id)
+            mark_nvidia_model_uncertain(model_id)
+            events.append(f"⚠️ network {type(e).__name__}: {model_id}")
             idx += 1
-            # If we see repeated unknown network errors, stop to avoid looping forever.
-            if errors >= 3:
-                stopped_reason = f"errore rete: {type(e).__name__}"
-                break
             continue
 
         if resp.status_code == 200:
+            logger.info(f"NVIDIA test_models: OK '{model_id}'")
+            events.append(f"✅ ok: {model_id}")
             ok.append(model_id)
             mark_nvidia_model_tested_ok(model_id)
             idx += 1
             continue
 
-        if resp.status_code in (404, 400, 422):
+        _resp_text = ""
+        try:
+            _resp_text = resp.text or ""
+        except Exception:
+            _resp_text = ""
+
+        if _is_model_invalid_4xx(resp.status_code, _resp_text):
+            logger.info(f"NVIDIA test_models: blocklist '{model_id}' (HTTP {resp.status_code})")
+            events.append(f"⛔ blocklist (HTTP {resp.status_code}): {model_id}")
             blocklist_nvidia_model(model_id)
             removed.append(model_id)
             idx += 1
             continue
 
         if resp.status_code == 429:
-            stopped_reason = "rate limit (429)"
-            break
+            logger.warning(f"NVIDIA test_models: rate limit on '{model_id}' (continuing)")
+            uncertain.append(model_id)
+            mark_nvidia_model_uncertain(model_id)
+            events.append(f"⚠️ rate-limit 429: {model_id}")
+            idx += 1
+            continue
 
         if resp.status_code in (401, 403):
-            stopped_reason = f"auth/permessi (HTTP {resp.status_code})"
-            break
+            logger.warning(f"NVIDIA test_models: auth/perm error on '{model_id}' HTTP {resp.status_code} (continuing)")
+            uncertain.append(model_id)
+            mark_nvidia_model_uncertain(model_id)
+            events.append(f"⚠️ auth {resp.status_code}: {model_id}")
+            idx += 1
+            continue
 
-        stopped_reason = f"HTTP {resp.status_code}"
-        break
+        # Other 4xx client errors: do not stop full scan, just skip model.
+        # Typical cases: non-chat/embedding-only endpoints exposed in catalog.
+        if 400 <= resp.status_code < 500:
+            logger.warning(f"NVIDIA test_models: non-fatal client error on '{model_id}' HTTP {resp.status_code} (continuing)")
+            uncertain.append(model_id)
+            mark_nvidia_model_uncertain(model_id)
+            events.append(f"⚠️ client {resp.status_code}: {model_id}")
+            idx += 1
+            continue
+
+        # Transient provider-side/server errors: skip current model and continue.
+        if 500 <= resp.status_code < 600:
+            logger.warning(f"NVIDIA test_models: transient server error on '{model_id}' HTTP {resp.status_code} (continuing)")
+            uncertain.append(model_id)
+            mark_nvidia_model_uncertain(model_id)
+            events.append(f"⚠️ server {resp.status_code}: {model_id}")
+            idx += 1
+            continue
+
+        logger.warning(f"NVIDIA test_models: non-fatal unknown status on '{model_id}' HTTP {resp.status_code} (continuing)")
+        uncertain.append(model_id)
+        mark_nvidia_model_uncertain(model_id)
+        events.append(f"⚠️ status {resp.status_code}: {model_id}")
+        idx += 1
+        continue
 
     next_cursor = idx
     remaining = max(0, len(candidates) - next_cursor)
@@ -6632,6 +7368,261 @@ def api_nvidia_test_models():
         "total": len(candidates),
         "ok": len(ok),
         "removed": len(removed),
+        "uncertain": len(uncertain),
+        "tested_models": tested,
+        "ok_models": ok,
+        "removed_models": removed,
+        "uncertain_models": uncertain,
+        "events": events,
+        "blocklisted": bool(removed),
+        "stopped_reason": stopped_reason,
+        "remaining": remaining,
+        "next_cursor": next_cursor,
+        "timeouts": timeouts,
+    }), 200
+
+
+@app.route('/api/provider/test_models', methods=['POST'])
+def api_provider_test_models():
+    """Generic model scan for selected API providers (OpenRouter, Mistral).
+
+    Uses a minimal non-streaming OpenAI-compatible chat completion call.
+    Models returning 404/400/422 are blocklisted for that provider.
+    """
+    body = request.get_json(silent=True) or {}
+    provider = str(body.get("provider") or "").strip().lower()
+    if provider not in {"openrouter", "mistral"}:
+        return jsonify({"success": False, "error": "Unsupported provider for batch test"}), 400
+
+    provider_keys = {
+        "openrouter": OPENROUTER_API_KEY,
+        "mistral": MISTRAL_API_KEY,
+    }
+    provider_urls = {
+        "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+        "mistral": "https://api.mistral.ai/v1/chat/completions",
+    }
+    api_key = provider_keys.get(provider) or ""
+    if not api_key:
+        return jsonify({"success": False, "error": f"{provider}: API key not configured"}), 400
+
+    try:
+        max_models = int(body.get("max_models") or 0)
+    except Exception:
+        max_models = 0
+    try:
+        cursor = int(body.get("cursor") or 0)
+    except Exception:
+        cursor = 0
+
+    unlimited_scan = max_models <= 0
+    if not unlimited_scan:
+        max_models = max(1, min(200, max_models))
+
+    max_seconds = 300.0 if unlimited_scan else 55.0
+    per_model_timeout = 12
+
+    # Full retest mode: include current provider models + previously blocked + previously tested.
+    # This allows users to re-validate old failures after provider-side fixes.
+    all_models = [m for m in (PROVIDER_MODELS.get(provider) or []) if isinstance(m, str) and m.strip()]
+    blocked_from_file: list[str] = []
+    tested_from_file: list[str] = []
+    uncertain_from_file: list[str] = []
+    try:
+        if os.path.isfile(MODEL_BLOCKLIST_FILE):
+            with open(MODEL_BLOCKLIST_FILE, "r", encoding="utf-8") as fh:
+                _blk = json.load(fh) or {}
+            _pv = _blk.get(provider)
+            if isinstance(_pv, dict):
+                _b = _pv.get("blocked") or []
+                _t = _pv.get("tested_ok") or []
+                _u = _pv.get("uncertain") or []
+                if isinstance(_b, list):
+                    blocked_from_file = [m for m in _b if isinstance(m, str) and m.strip()]
+                if isinstance(_t, list):
+                    tested_from_file = [m for m in _t if isinstance(m, str) and m.strip()]
+                if isinstance(_u, list):
+                    uncertain_from_file = [m for m in _u if isinstance(m, str) and m.strip()]
+            elif isinstance(_pv, list):
+                blocked_from_file = [m for m in _pv if isinstance(m, str) and m.strip()]
+    except Exception as _e:
+        logger.warning(f"{provider} test_models: unable to read blocklist file: {_e}")
+    if provider in PROVIDER_MODEL_TESTED_OK:
+        tested_from_file.extend([m for m in PROVIDER_MODEL_TESTED_OK.get(provider, set()) if isinstance(m, str) and m.strip()])
+    if provider in PROVIDER_MODEL_UNCERTAIN:
+        uncertain_from_file.extend([m for m in PROVIDER_MODEL_UNCERTAIN.get(provider, set()) if isinstance(m, str) and m.strip()])
+    all_models = list(dict.fromkeys(all_models + blocked_from_file + tested_from_file + uncertain_from_file))
+    if cursor < 0:
+        cursor = 0
+    if all_models and cursor >= len(all_models):
+        cursor = 0
+
+    logger.info(f"{provider} test_models invoked")
+    url = provider_urls[provider]
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+
+    started = time.time()
+    tested: list[str] = []
+    ok: list[str] = []
+    removed: list[str] = []
+    uncertain: list[str] = []
+    events: list[str] = []
+    stopped_reason = None
+    timeouts = 0
+    idx = cursor
+
+    def _is_model_invalid_4xx(status_code: int, body_text: str) -> bool:
+        """Return True only when 4xx clearly indicates model incompatibility."""
+        if status_code in (404, 422):
+            return True
+        if status_code != 400:
+            return False
+        low = (body_text or "").lower()
+        invalid_markers = (
+            "model_not_found",
+            "unknown model",
+            "model not found",
+            "unsupported model",
+            "model is not supported",
+            "invalid model",
+            "no such model",
+            "unsupported_api_for_model",
+            "not accessible via the /chat/completions endpoint",
+            "not chat-compatible",
+        )
+        non_model_markers = (
+            "insufficient",
+            "quota",
+            "credit",
+            "balance",
+            "billing",
+            "auth",
+            "unauthorized",
+            "forbidden",
+            "rate limit",
+            "too many requests",
+        )
+        if any(m in low for m in non_model_markers):
+            return False
+        return any(m in low for m in invalid_markers)
+
+    while idx < len(all_models):
+        model_id = all_models[idx]
+        if (not unlimited_scan) and (len(tested) >= max_models):
+            # Normal end-of-batch (UI paginates in small chunks): do not mark as "stopped".
+            break
+        if (time.time() - started) > max_seconds:
+            stopped_reason = f"timeout ({int(max_seconds)}s)"
+            break
+
+        tested.append(model_id)
+        logger.info(f"{provider} test_models: [{idx + 1}/{len(all_models)}] testing '{model_id}'")
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": "ciao"}],
+            "stream": False,
+            "max_tokens": 16,
+            "temperature": 0.0,
+        }
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=per_model_timeout)
+        except requests.exceptions.ReadTimeout:
+            logger.info(f"{provider} test_models: timeout on '{model_id}'")
+            events.append(f"⏱ timeout: {model_id}")
+            uncertain.append(model_id)
+            mark_provider_model_uncertain(provider, model_id)
+            timeouts += 1
+            idx += 1
+            continue
+        except Exception as e:
+            logger.warning(f"{provider} test_models: network error on '{model_id}': {type(e).__name__}: {e}")
+            uncertain.append(model_id)
+            mark_provider_model_uncertain(provider, model_id)
+            events.append(f"⚠️ network {type(e).__name__}: {model_id}")
+            idx += 1
+            continue
+
+        if resp.status_code == 200:
+            logger.info(f"{provider} test_models: OK '{model_id}'")
+            events.append(f"✅ ok: {model_id}")
+            ok.append(model_id)
+            mark_provider_model_tested_ok(provider, model_id)
+            idx += 1
+            continue
+
+        _resp_text = ""
+        try:
+            _resp_text = resp.text or ""
+        except Exception:
+            _resp_text = ""
+
+        if _is_model_invalid_4xx(resp.status_code, _resp_text):
+            logger.info(f"{provider} test_models: blocklist '{model_id}' (HTTP {resp.status_code})")
+            events.append(f"⛔ blocklist (HTTP {resp.status_code}): {model_id}")
+            blocklist_model(provider, model_id)
+            removed.append(model_id)
+            idx += 1
+            continue
+
+        if resp.status_code == 429:
+            logger.warning(f"{provider} test_models: rate limit on '{model_id}' (continuing)")
+            uncertain.append(model_id)
+            mark_provider_model_uncertain(provider, model_id)
+            events.append(f"⚠️ rate-limit 429: {model_id}")
+            idx += 1
+            continue
+        if resp.status_code in (401, 403):
+            logger.warning(f"{provider} test_models: auth/perm error on '{model_id}' HTTP {resp.status_code} (continuing)")
+            uncertain.append(model_id)
+            mark_provider_model_uncertain(provider, model_id)
+            events.append(f"⚠️ auth {resp.status_code}: {model_id}")
+            idx += 1
+            continue
+
+        # Other 4xx client errors: do not stop full scan, just skip model.
+        if 400 <= resp.status_code < 500:
+            logger.warning(f"{provider} test_models: non-fatal client error on '{model_id}' HTTP {resp.status_code} (continuing)")
+            uncertain.append(model_id)
+            mark_provider_model_uncertain(provider, model_id)
+            events.append(f"⚠️ client {resp.status_code}: {model_id}")
+            idx += 1
+            continue
+
+        # Transient provider-side/server errors: skip current model and continue.
+        if 500 <= resp.status_code < 600:
+            logger.warning(f"{provider} test_models: transient server error on '{model_id}' HTTP {resp.status_code} (continuing)")
+            uncertain.append(model_id)
+            mark_provider_model_uncertain(provider, model_id)
+            events.append(f"⚠️ server {resp.status_code}: {model_id}")
+            idx += 1
+            continue
+
+        logger.warning(f"{provider} test_models: non-fatal unknown status on '{model_id}' HTTP {resp.status_code} (continuing)")
+        uncertain.append(model_id)
+        mark_provider_model_uncertain(provider, model_id)
+        events.append(f"⚠️ status {resp.status_code}: {model_id}")
+        idx += 1
+        continue
+
+    next_cursor = idx
+    remaining = max(0, len(all_models) - next_cursor)
+    return jsonify({
+        "success": True,
+        "provider": provider,
+        "tested": len(tested),
+        "total": len(all_models),
+        "ok": len(ok),
+        "removed": len(removed),
+        "uncertain": len(uncertain),
+        "tested_models": tested,
+        "ok_models": ok,
+        "removed_models": removed,
+        "uncertain_models": uncertain,
+        "events": events,
         "blocklisted": bool(removed),
         "stopped_reason": stopped_reason,
         "remaining": remaining,
@@ -7125,6 +8116,47 @@ def session_gemini_web_clear():
         return jsonify({"error": str(e)}), 400
 
 
+# ---------------------------------------------------------------------------
+# Perplexity Web session endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/session/perplexity_web/store", methods=["POST"])
+def session_perplexity_web_store():
+    """Store Perplexity Web session cookies (next-auth.csrf-token + next-auth.session-token)."""
+    try:
+        from providers.perplexity_web import store_session
+        data = request.json or {}
+        csrf_token = (data.get("csrf_token") or "").strip()
+        session_token = (data.get("session_token") or "").strip()
+        if not csrf_token or not session_token:
+            return jsonify({"error": "Missing csrf_token or session_token"}), 400
+        result = store_session(csrf_token, session_token)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Perplexity Web session store error: {e}")
+        return jsonify({"error": str(e)}), 400
+
+
+@app.route("/api/session/perplexity_web/status", methods=["GET"])
+def session_perplexity_web_status():
+    """Return Perplexity Web session status."""
+    try:
+        from providers.perplexity_web import get_session_status
+        return jsonify(get_session_status()), 200
+    except Exception as e:
+        return jsonify({"configured": False, "error": str(e)}), 200
+
+
+@app.route("/api/session/perplexity_web/clear", methods=["POST"])
+def session_perplexity_web_clear():
+    """Clear stored Perplexity Web session."""
+    try:
+        from providers.perplexity_web import clear_session
+        clear_session()
+        return jsonify({"ok": True}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+
 def start_messaging_bots() -> None:
     """Initialize and start Telegram and WhatsApp bots if configured.
     Called from server.py so it runs regardless of __name__.
@@ -7567,7 +8599,7 @@ register_blueprints(app)
 
 if __name__ == "__main__":
     logger.info(f"Provider: {AI_PROVIDER} | Model: {get_active_model()}")
-    _OAUTH_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web", "gemini_web"}
+    _OAUTH_PROVIDERS = {"openai_codex", "claude_web", "chatgpt_web", "gemini_web", "perplexity_web"}
     if AI_PROVIDER in _OAUTH_PROVIDERS:
         logger.info("API Key: OAuth-based (use 🔑 button in UI)")
     else:

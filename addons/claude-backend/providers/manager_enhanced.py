@@ -141,6 +141,17 @@ class EnhancedProviderManager:
 
                     # Done with success
                     if event.get("type") == "done":
+                        # Guardrail: provider ended without emitting any meaningful content.
+                        # Treat as incomplete so we can try fallback provider (or return
+                        # explicit error if this was the last one).
+                        if not content_started:
+                            logger.warning(
+                                f"EnhancedProviderManager: {prov} done without content "
+                                f"({event_count} events) — treating as empty response"
+                            )
+                            self._record_failure(prov, "empty_response")
+                            last_exception = Exception("Empty response from provider")
+                            break
                         self._record_success(prov, event_count)
                         self._clear_failure_count(prov)  # Reset failure tracking
                         return

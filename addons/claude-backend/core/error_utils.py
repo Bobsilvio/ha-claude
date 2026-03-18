@@ -48,12 +48,27 @@ def _extract_remote_message(error_text: str) -> str:
     # Common shapes:
     # - {'error': {'message': '...'}}
     # - {"error": {"message": "..."}}
-    for pat in (
-        r"['\"]message['\"]\s*:\s*['\"]([^'\"]+)['\"]",
-    ):
+    # Handle escaped quotes inside strings, e.g.:
+    # {"message":"model \"gpt-5.4\" is not accessible ..."}
+    patterns = (
+        r'"message"\s*:\s*"((?:\\.|[^"\\])*)"',
+        r"'message'\s*:\s*'((?:\\.|[^'\\])*)'",
+    )
+    for pat in patterns:
         m = re.search(pat, error_text)
-        if m:
-            return (m.group(1) or "").strip()
+        if not m:
+            continue
+        raw_msg = (m.group(1) or "").strip()
+        if not raw_msg:
+            continue
+        try:
+            # Decode escape sequences safely by round-tripping through JSON.
+            decoded = __import__("json").loads(f'"{raw_msg}"')
+            if isinstance(decoded, str) and decoded.strip():
+                return decoded.strip()
+        except Exception:
+            pass
+        return raw_msg
     return ""
 
 
@@ -94,6 +109,16 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
     if provider == "github" and code == 403 and ("budget limit" in low or "reached its budget" in low):
         return get_lang_text("err_github_budget_limit") or (
             "GitHub Models: budget limit reached. Increase budget/credit or switch model/provider."
+        )
+
+    if provider == "github_copilot" and (
+        "unsupported_api_for_model" in low
+        or "/chat/completions endpoint" in low
+        or "not accessible via the /chat/completions endpoint" in low
+    ):
+        return (
+            "GitHub Copilot: il modello selezionato non è compatibile con l'endpoint chat. "
+            "Seleziona un modello chat-compatible (es. gpt-4.1, gpt-4o, gpt-5.1)."
         )
 
     if provider == "github" and (code == 413 or "tokens_limit_reached" in low or "request body too large" in low):

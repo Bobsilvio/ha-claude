@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: Amira
-version: "4.6.19"
+version: "4.6.20"
 slug: claude-backend
 description: >-
   Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -17,7 +17,7 @@ boot: auto
 ingress: true
 ingress_port: 5010
 ingress_entry: /
-panel_icon: mdi:robot
+panel_icon: mdi:robot-excited-outline
 panel_title: Amira
 homeassistant_api: true
 map:

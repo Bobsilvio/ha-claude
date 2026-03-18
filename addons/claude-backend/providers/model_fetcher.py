@@ -22,6 +22,7 @@ Usage:
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -29,6 +30,7 @@ import httpx
 logger = logging.getLogger(__name__)
 
 CACHE_FILE = "/data/amira_models_cache.json"
+SCHEMA_VERSION = 2
 TIMEOUT = 10.0
 
 # Keywords identifying non-chat models (embeddings, TTS, image, moderation, etc.)
@@ -204,7 +206,7 @@ def refresh_all_providers(
         if provider in _NO_ENDPOINT:
             skipped.append(provider)
             continue
-        if not api_key and provider != "ollama":
+        if not api_key and provider not in {"ollama", "github_copilot"}:
             skipped.append(provider)
             continue
 
@@ -216,9 +218,10 @@ def refresh_all_providers(
             errors[provider] = "fetch failed or endpoint not available"
 
     if updated:
-        cache = load_cache()
-        cache.update(updated)
-        save_cache(cache)
+        bundle = load_cache_sections()
+        dynamic = dict(bundle.get("dynamic") or {})
+        dynamic.update(updated)
+        save_cache_sections(fixed=bundle.get("fixed") or {}, dynamic=dynamic)
 
     return {"updated": updated, "errors": errors, "skipped": skipped}
 
@@ -228,22 +231,111 @@ def _apply_blacklist(models: List[str]) -> List[str]:
     return [m for m in models if not any(m.startswith(p) for p in _BLACKLISTED_PREFIXES)]
 
 
-def load_cache() -> Dict[str, List[str]]:
-    """Load persisted model lists from disk (blacklisted models are stripped)."""
-    try:
-        with open(CACHE_FILE) as f:
-            raw = json.load(f)
-        # Strip blacklisted models that may have been cached before the filter existed
-        return {prov: _apply_blacklist(mlist) for prov, mlist in raw.items()}
-    except Exception:
+def _normalize_models_map(raw: Any) -> Dict[str, List[str]]:
+    """Normalize provider->models map and apply blacklist."""
+    if not isinstance(raw, dict):
         return {}
+    out: Dict[str, List[str]] = {}
+    for prov, models in raw.items():
+        if not isinstance(prov, str):
+            continue
+        if not isinstance(models, list):
+            continue
+        cleaned = _apply_blacklist([str(m) for m in models if isinstance(m, (str, int, float))])
+        if cleaned:
+            out[prov] = cleaned
+    return out
+
+
+def load_cache_sections() -> Dict[str, Any]:
+    """Load cache bundle with separated fixed/dynamic sections.
+
+    Schema v2:
+    {
+      "schema_version": 2,
+      "updated_at": "...",
+      "fixed": {provider: [models]},
+      "dynamic": {provider: [models]}
+    }
+
+    Legacy schema (provider->models) is treated as dynamic-only.
+    """
+    try:
+        with open(CACHE_FILE, encoding="utf-8") as f:
+            raw = json.load(f)
+    except Exception:
+        return {"schema_version": SCHEMA_VERSION, "updated_at": None, "fixed": {}, "dynamic": {}}
+
+    # v2 bundle
+    if isinstance(raw, dict) and ("fixed" in raw or "dynamic" in raw):
+        fixed = _normalize_models_map(raw.get("fixed", {}))
+        dynamic = _normalize_models_map(raw.get("dynamic", {}))
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "updated_at": raw.get("updated_at"),
+            "fixed": fixed,
+            "dynamic": dynamic,
+        }
+
+    # Legacy map: provider -> models
+    legacy_dynamic = _normalize_models_map(raw)
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "updated_at": None,
+        "fixed": {},
+        "dynamic": legacy_dynamic,
+    }
+
+
+def save_cache_sections(
+    fixed: Optional[Dict[str, List[str]]] = None,
+    dynamic: Optional[Dict[str, List[str]]] = None,
+) -> None:
+    """Persist v2 cache bundle with separate fixed/dynamic sections."""
+    try:
+        os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
+        bundle = {
+            "schema_version": SCHEMA_VERSION,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "fixed": _normalize_models_map(fixed or {}),
+            "dynamic": _normalize_models_map(dynamic or {}),
+        }
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(bundle, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.warning(f"model_fetcher: cache save failed: {e}")
+
+
+def update_fixed_cache(fixed_models: Dict[str, List[str]]) -> None:
+    """Update only the fixed section, preserving dynamic section."""
+    bundle = load_cache_sections()
+    save_cache_sections(fixed=fixed_models, dynamic=bundle.get("dynamic") or {})
+
+
+def load_dynamic_cache() -> Dict[str, List[str]]:
+    """Load only the dynamic section of the models cache."""
+    bundle = load_cache_sections()
+    return dict(bundle.get("dynamic") or {})
+
+
+def clear_cache() -> None:
+    """Delete the model cache file from disk."""
+    try:
+        if os.path.isfile(CACHE_FILE):
+            os.remove(CACHE_FILE)
+    except Exception as e:
+        logger.warning(f"model_fetcher: cache clear failed: {e}")
+
+
+def load_cache() -> Dict[str, List[str]]:
+    """Back-compat loader: return merged map fixed+dynamic with dynamic precedence."""
+    bundle = load_cache_sections()
+    merged = dict(bundle.get("fixed") or {})
+    merged.update(bundle.get("dynamic") or {})
+    return merged
 
 
 def save_cache(data: Dict[str, List[str]]) -> None:
-    """Persist model lists to disk."""
-    try:
-        os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
-        with open(CACHE_FILE, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        logger.warning(f"model_fetcher: cache save failed: {e}")
+    """Back-compat saver: write dynamic section only, preserve fixed."""
+    bundle = load_cache_sections()
+    save_cache_sections(fixed=bundle.get("fixed") or {}, dynamic=data)
