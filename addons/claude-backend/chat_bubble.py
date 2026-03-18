@@ -106,6 +106,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "back_to_chat": "Back to chat",
             "copy_btn": "Copy",
             "copied": "Copied!",
+            "auto_sidebar_title": "Amira",
+            "flow_trigger": "Trigger",
+            "flow_condition": "Condition",
+            "flow_action": "Action",
+            "flow_no_data": "No automation data",
         },
         "it": {
             "placeholder": "Chiedi qualcosa su questa pagina...",
@@ -178,6 +183,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "back_to_chat": "Torna alla chat",
             "copy_btn": "Copia",
             "copied": "Copiato!",
+            "auto_sidebar_title": "Amira",
+            "flow_trigger": "Trigger",
+            "flow_condition": "Condizione",
+            "flow_action": "Azione",
+            "flow_no_data": "Nessun dato automazione",
         },
         "es": {
             "placeholder": "Pregunta sobre esta página...",
@@ -250,6 +260,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "back_to_chat": "Volver al chat",
             "copy_btn": "Copiar",
             "copied": "\u00a1Copiado!",
+            "auto_sidebar_title": "Amira",
+            "flow_trigger": "Disparador",
+            "flow_condition": "Condici\u00f3n",
+            "flow_action": "Acci\u00f3n",
+            "flow_no_data": "Sin datos de automatizaci\u00f3n",
         },
         "fr": {
             "placeholder": "Posez une question sur cette page...",
@@ -322,6 +337,11 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
             "back_to_chat": "Retour au chat",
             "copy_btn": "Copier",
             "copied": "Copi\u00e9 !",
+            "auto_sidebar_title": "Amira",
+            "flow_trigger": "D\u00e9clencheur",
+            "flow_condition": "Condition",
+            "flow_action": "Action",
+            "flow_no_data": "Aucune donn\u00e9e d'automatisation",
         },
     }
 
@@ -635,6 +655,82 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       }}
       return walk(document, 0);
     }} catch(e) {{ return null; }}
+  }}
+
+  // ---- Shadow DOM walkers for automation editor ----
+  // Walk down the HA shadow DOM tree to find automation editor elements.
+  // Path: home-assistant → ha-panel-config → ha-config-automation → ha-automation-editor → hass-subpage
+  function _walkAutoShadow(selectors) {{
+    try {{
+      let node = document;
+      for (const sel of selectors) {{
+        if (!node) return null;
+        const target = node.querySelector ? node.querySelector(sel) : null;
+        if (!target) return null;
+        node = target.shadowRoot || target;
+      }}
+      return node;
+    }} catch(e) {{ return null; }}
+  }}
+
+  function _findAutomationSubpage() {{
+    // Direct path — works on HA 2024+
+    const direct = _walkAutoShadow([
+      'home-assistant', 'home-assistant-main', 'ha-panel-config',
+      'ha-config-automation', 'ha-automation-editor', 'hass-subpage'
+    ]);
+    if (direct) return direct;
+    // Alt path — some HA versions nest differently
+    const alt = _walkAutoShadow([
+      'home-assistant', 'home-assistant-main', 'ha-panel-config',
+      'ha-config-automation', 'ha-automation-editor'
+    ]);
+    if (alt) {{
+      // hass-subpage might be in light DOM
+      const sub = (alt.querySelector ? alt.querySelector('hass-subpage') : null)
+               || (alt.shadowRoot ? alt.shadowRoot.querySelector('hass-subpage') : null);
+      if (sub) return sub;
+    }}
+    // BFS fallback
+    try {{
+      function walk(root, depth) {{
+        if (!root || depth > 10) return null;
+        const el = root.querySelector ? root.querySelector('ha-automation-editor') : null;
+        if (el) {{
+          const sr = el.shadowRoot || el;
+          return sr.querySelector ? (sr.querySelector('hass-subpage') || sr) : null;
+        }}
+        const allEls = root.querySelectorAll ? root.querySelectorAll('*') : [];
+        for (const c of allEls) {{
+          if (c.shadowRoot) {{ const f = walk(c.shadowRoot, depth + 1); if (f) return f; }}
+        }}
+        return null;
+      }}
+      return walk(document, 0);
+    }} catch(e) {{ return null; }}
+  }}
+
+  function _findAutomationToolbar() {{
+    const subpage = _findAutomationSubpage();
+    if (!subpage) return null;
+    // hass-subpage has a shadowRoot with the toolbar inside
+    const sr = subpage.shadowRoot || subpage;
+    return sr.querySelector('app-toolbar')
+        || sr.querySelector('.toolbar')
+        || sr.querySelector('ha-top-app-bar-fixed')
+        || sr.querySelector('[slot="toolbar"]')
+        || null;
+  }}
+
+  function _findAutomationContentWrapper() {{
+    const subpage = _findAutomationSubpage();
+    if (!subpage) return null;
+    const sr = subpage.shadowRoot || subpage;
+    // The content div wraps the automation editor form
+    return sr.querySelector('.content')
+        || sr.querySelector('div[class*="content"]')
+        || sr.querySelector('#content')
+        || null;
   }}
 
   // Returns the footer element (for button injection).
@@ -1919,6 +2015,36 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
       _cardBtnInjected = false;
       injectCardEditorButton();
     }}
+    // ---- Automation integrated view detection ----
+    const autoEditMatch = curPath.match(/\\/config\\/automation\\/edit\\/([^/]+)/);
+    if (autoEditMatch) {{
+      const autoId = autoEditMatch[1];
+      // Inject toolbar button if not present
+      if (!_autoBtnInjected || !_autoToolbarBtnExists()) {{
+        _autoBtnInjected = false;
+        injectAutomationToolbarButton();
+      }}
+      // Inject flow visualization if not done or automation changed
+      if (!_autoFlowInjected || _lastAutoPageId !== autoId) {{
+        _lastAutoPageId = autoId;
+        _autoFlowInjected = false;
+        fetchAndRenderAutomationFlow(autoId);
+      }}
+      // Auto-restore sidebar if it was open
+      if (!_autoSidebarOpen && loadSetting('auto-sidebar-open', false)) {{
+        openAutomationSidebar();
+      }}
+      // Hide floating bubble when sidebar is open
+      if (_autoSidebarOpen) {{
+        btn.style.display = 'none';
+      }}
+    }} else {{
+      // Navigated away from automation page — clean up
+      if (_autoBtnInjected || _autoSidebarOpen || _autoFlowInjected) {{
+        removeAutomationIntegration();
+        btn.style.display = '';
+      }}
+    }}
   }}, 1000);
 
   // ---- Card editor inline chat panel ----
@@ -2486,6 +2612,591 @@ def get_chat_bubble_js(ingress_url: str, language: str = "en", show_bubble: bool
     }}
     _cardBtnInjected = false;
     _cardBtnParent = null;
+  }}
+
+  // ---- Automation page integrated sidebar + flow visualization ----
+  const AMIRA_AUTO_BTN_ID   = 'amira-auto-toolbar-btn';
+  const AMIRA_SIDEBAR_ID    = 'amira-auto-sidebar';
+  const AMIRA_FLOW_ID       = 'amira-auto-flow';
+  const AUTO_SESSION_KEY    = 'ha-claude-auto-session';
+  let _autoSidebarOpen      = false;
+  let _autoBtnInjected      = false;
+  let _autoFlowInjected     = false;
+  let _lastAutoPageId       = null;
+  let _autoSidebarEl        = null;
+  let _autoMsgsEl           = null;
+  let _autoInputEl          = null;
+  let _autoProvSel          = null;
+  let _autoModSel           = null;
+  let _autoAgentSel         = null;
+  let _autoContentWrapper   = null;
+
+  function getAutoSessionId() {{
+    let sid = null;
+    try {{ sid = localStorage.getItem(AUTO_SESSION_KEY); }} catch(e) {{}}
+    if (!sid) {{ sid = 'auto_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7); }}
+    try {{ localStorage.setItem(AUTO_SESSION_KEY, sid); }} catch(e) {{}}
+    return sid;
+  }}
+  function resetAutoSession() {{
+    try {{ localStorage.removeItem(AUTO_SESSION_KEY); }} catch(e) {{}}
+  }}
+
+  // ---- Toolbar button injection ----
+  function _autoToolbarBtnExists() {{
+    const toolbar = _findAutomationToolbar();
+    return !!(toolbar && toolbar.querySelector('#' + AMIRA_AUTO_BTN_ID));
+  }}
+
+  function injectAutomationToolbarButton() {{
+    if (_autoBtnInjected && _autoToolbarBtnExists()) return;
+    const toolbar = _findAutomationToolbar();
+    if (!toolbar) return;
+    // Find the action buttons area (right side of toolbar)
+    // HA toolbar typically has: [back-btn] [title ...flex...] [action-icons] [overflow-menu]
+    const existing = toolbar.querySelector('#' + AMIRA_AUTO_BTN_ID);
+    if (existing) {{ _autoBtnInjected = true; return; }}
+    const aiBtn = document.createElement('ha-icon-button');
+    aiBtn.id = AMIRA_AUTO_BTN_ID;
+    aiBtn.setAttribute('label', 'Amira');
+    // Style as a text button matching HA's toolbar style
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display:inline-flex;align-items:center;cursor:pointer;padding:0 8px;height:40px;border-radius:20px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:13px;font-weight:600;gap:4px;user-select:none;white-space:nowrap;margin:0 4px;box-shadow:0 2px 6px rgba(102,126,234,0.4);transition:opacity 0.15s;';
+    wrapper.innerHTML = '<span style="font-size:16px;">&#129302;</span><span>Amira</span>';
+    wrapper.id = AMIRA_AUTO_BTN_ID;
+    wrapper.onmouseenter = () => {{ wrapper.style.opacity='0.85'; }};
+    wrapper.onmouseleave = () => {{ wrapper.style.opacity='1'; }};
+    wrapper.addEventListener('click', (e) => {{
+      e.stopPropagation(); e.preventDefault();
+      _autoSidebarOpen ? closeAutomationSidebar() : openAutomationSidebar();
+    }});
+    // Insert before the overflow menu (last child is usually ha-button-menu or mwc-icon-button)
+    const overflowMenu = toolbar.querySelector('ha-button-menu') || toolbar.querySelector('ha-icon-overflow-menu');
+    if (overflowMenu) {{
+      toolbar.insertBefore(wrapper, overflowMenu);
+    }} else {{
+      toolbar.appendChild(wrapper);
+    }}
+    _autoBtnInjected = true;
+  }}
+
+  function removeAutomationToolbarButton() {{
+    try {{
+      const toolbar = _findAutomationToolbar();
+      if (toolbar) {{
+        const b = toolbar.querySelector('#' + AMIRA_AUTO_BTN_ID);
+        if (b) b.remove();
+      }}
+    }} catch(e) {{}}
+    _autoBtnInjected = false;
+  }}
+
+  // ---- Flow visualization ----
+  function _describeFlowNode(node, type) {{
+    if (!node || typeof node !== 'object') return '';
+    if (type === 'trigger') {{
+      const p = node.platform || node.trigger || '';
+      const eid = node.entity_id || '';
+      if (p === 'state' && eid) return eid.split('.').pop().replace(/_/g, ' ');
+      if (p === 'time') return node.at || 'time';
+      if (p === 'mqtt') return node.topic || 'MQTT';
+      if (p === 'sun') return (node.event || 'sun') + ' ' + (node.offset || '');
+      if (p === 'homeassistant') return 'HA ' + (node.event || 'start');
+      if (p === 'numeric_state' && eid) return eid.split('.').pop().replace(/_/g, ' ');
+      if (p === 'zone' && eid) return eid.split('.').pop().replace(/_/g, ' ');
+      if (p === 'template') return 'template';
+      if (p === 'webhook') return 'webhook';
+      if (p === 'device' && node.device_id) return (node.type || 'device').replace(/_/g, ' ');
+      if (eid) return eid.split('.').pop().replace(/_/g, ' ');
+      return p || 'trigger';
+    }}
+    if (type === 'condition') {{
+      const c = node.condition || '';
+      const eid = node.entity_id || '';
+      if (c === 'state' && eid) return eid.split('.').pop().replace(/_/g, ' ') + (node.state ? ' = ' + node.state : '');
+      if (c === 'sun') return (node.after || node.before || 'sun');
+      if (c === 'time') return (node.after || '') + ' - ' + (node.before || '');
+      if (c === 'numeric_state' && eid) return eid.split('.').pop().replace(/_/g, ' ');
+      if (c === 'template') return 'template';
+      if (c === 'zone') return 'zone';
+      if (c === 'and' || c === 'or' || c === 'not') return c.toUpperCase();
+      if (eid) return eid.split('.').pop().replace(/_/g, ' ');
+      return c || 'condition';
+    }}
+    if (type === 'action') {{
+      const svc = node.service || node.action || '';
+      const eid = (node.target && node.target.entity_id) || node.entity_id || '';
+      if (svc) {{
+        const shortSvc = svc.split('.').pop().replace(/_/g, ' ');
+        if (eid) {{
+          const shortEid = (Array.isArray(eid) ? eid[0] : eid).split('.').pop().replace(/_/g, ' ');
+          return shortSvc + ': ' + shortEid;
+        }}
+        return shortSvc;
+      }}
+      if (node.delay) return 'delay ' + (typeof node.delay === 'object' ? JSON.stringify(node.delay) : node.delay);
+      if (node.wait_template) return 'wait template';
+      if (node.choose) return 'choose';
+      if (node.repeat) return 'repeat';
+      if (node.if) return 'if/then';
+      if (node.scene) return 'scene: ' + (node.scene.split('.').pop() || '');
+      if (node.event) return 'event: ' + node.event;
+      return 'action';
+    }}
+    return '';
+  }}
+
+  function _flowIcon(type) {{
+    if (type === 'trigger') return '\U0001f514';
+    if (type === 'condition') return '\U0001f550';
+    if (type === 'action') return '\U0001f4a1';
+    return '\u2699\ufe0f';
+  }}
+
+  function _flowGradient(type) {{
+    if (type === 'trigger') return 'linear-gradient(135deg,#e3f2fd,#bbdefb)';
+    if (type === 'condition') return 'linear-gradient(135deg,#fff8e1,#ffecb3)';
+    if (type === 'action') return 'linear-gradient(135deg,#e8f5e9,#c8e6c9)';
+    return 'linear-gradient(135deg,#f5f5f5,#e0e0e0)';
+  }}
+
+  function _flowBorderColor(type) {{
+    if (type === 'trigger') return '#90caf9';
+    if (type === 'condition') return '#ffe082';
+    if (type === 'action') return '#a5d6a7';
+    return '#bdbdbd';
+  }}
+
+  async function fetchAndRenderAutomationFlow(automationId) {{
+    const contentWrap = _findAutomationContentWrapper();
+    if (!contentWrap) return;
+    // Remove old flow if present
+    const oldFlow = contentWrap.parentNode ? contentWrap.parentNode.querySelector('#' + AMIRA_FLOW_ID) : null;
+    if (oldFlow) oldFlow.remove();
+
+    const flowEl = document.createElement('div');
+    flowEl.id = AMIRA_FLOW_ID;
+    flowEl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:12px 16px;overflow-x:auto;background:var(--secondary-background-color,#f5f5f5);border-bottom:1px solid var(--divider-color,#e0e0e0);flex-shrink:0;flex-wrap:nowrap;min-height:56px;';
+
+    // Fetch automation config
+    try {{
+      const token = _getHassToken();
+      if (!token) {{ flowEl.textContent = T.flow_no_data; contentWrap.parentNode.insertBefore(flowEl, contentWrap); _autoFlowInjected = true; return; }}
+      const resp = await fetch('/api/config/automation/config/' + encodeURIComponent(automationId), {{
+        headers: {{ 'Authorization': 'Bearer ' + token }}
+      }});
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const config = await resp.json();
+
+      const triggers = Array.isArray(config.trigger) ? config.trigger : (config.trigger ? [config.trigger] : []);
+      const conditions = Array.isArray(config.condition) ? config.condition : (config.condition ? [config.condition] : []);
+      const actions = Array.isArray(config.action) ? config.action : (config.action ? [config.action] : []);
+
+      function makeBubble(node, type, label) {{
+        const bubble = document.createElement('div');
+        const desc = _describeFlowNode(node, type);
+        bubble.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;background:' + _flowGradient(type) + ';border:1.5px solid ' + _flowBorderColor(type) + ';font-size:12px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.08);';
+        const iconSpan = document.createElement('span');
+        iconSpan.style.cssText = 'font-size:16px;flex-shrink:0;';
+        iconSpan.textContent = _flowIcon(type);
+        const textSpan = document.createElement('span');
+        textSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;color:var(--primary-text-color,#333);font-weight:500;';
+        textSpan.textContent = desc || label;
+        textSpan.title = desc || label;
+        bubble.appendChild(iconSpan);
+        bubble.appendChild(textSpan);
+        return bubble;
+      }}
+
+      function makeArrow() {{
+        const arrow = document.createElement('span');
+        arrow.style.cssText = 'color:var(--secondary-text-color,#999);font-size:18px;flex-shrink:0;font-weight:bold;';
+        arrow.textContent = '\u2192';
+        return arrow;
+      }}
+
+      function makeSectionLabel(text) {{
+        const lbl = document.createElement('span');
+        lbl.style.cssText = 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--secondary-text-color,#999);writing-mode:horizontal-tb;flex-shrink:0;margin-right:-2px;';
+        lbl.textContent = text;
+        return lbl;
+      }}
+
+      // Build flow: triggers → conditions → actions
+      if (triggers.length) {{
+        flowEl.appendChild(makeSectionLabel(T.flow_trigger));
+        triggers.forEach((t, i) => {{
+          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; flowEl.appendChild(plus); }}
+          flowEl.appendChild(makeBubble(t, 'trigger', T.flow_trigger));
+        }});
+      }}
+
+      if (conditions.length) {{
+        flowEl.appendChild(makeArrow());
+        flowEl.appendChild(makeSectionLabel(T.flow_condition));
+        conditions.forEach((c, i) => {{
+          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; flowEl.appendChild(plus); }}
+          flowEl.appendChild(makeBubble(c, 'condition', T.flow_condition));
+        }});
+      }}
+
+      if (actions.length) {{
+        flowEl.appendChild(makeArrow());
+        flowEl.appendChild(makeSectionLabel(T.flow_action));
+        actions.forEach((a, i) => {{
+          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; flowEl.appendChild(plus); }}
+          flowEl.appendChild(makeBubble(a, 'action', T.flow_action));
+        }});
+      }}
+
+      if (!triggers.length && !conditions.length && !actions.length) {{
+        flowEl.textContent = T.flow_no_data;
+      }}
+    }} catch(e) {{
+      console.warn('[Amira] Failed to fetch automation flow:', e);
+      flowEl.innerHTML = '<span style="font-size:12px;color:var(--secondary-text-color,#999);">' + T.flow_no_data + '</span>';
+    }}
+
+    // Insert flow above content
+    if (contentWrap.parentNode) {{
+      contentWrap.parentNode.insertBefore(flowEl, contentWrap);
+    }}
+    _autoFlowInjected = true;
+  }}
+
+  // ---- Automation sidebar chat panel ----
+  function _autoAddMsg(role, text) {{
+    if (!_autoMsgsEl) return null;
+    const d = document.createElement('div');
+    d.style.cssText = role === 'user'
+      ? 'align-self:flex-end;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:8px 12px;border-radius:14px 14px 2px 14px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.45;'
+      : 'align-self:flex-start;background:var(--secondary-background-color,#f0f0f0);color:var(--primary-text-color,#212121);padding:8px 12px;border-radius:14px 14px 14px 2px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.5;';
+    if (role === 'user') d.textContent = text;
+    else d.innerHTML = _renderInlineMd(text);
+    _autoMsgsEl.appendChild(d);
+    _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
+    return d;
+  }}
+
+  async function autoSidebarSend(presetText) {{
+    const text = presetText || (_autoInputEl ? _autoInputEl.value.trim() : '');
+    if (!text) return;
+    if (_autoInputEl && !presetText) {{ _autoInputEl.value = ''; _autoInputEl.style.height = 'auto'; }}
+    _autoAddMsg('user', text);
+    const thinkEl = _autoAddMsg('assistant', T.thinking + '\u2026');
+    try {{
+      const ctx = detectContext();
+      const prefix = buildContextPrefix(ctx);
+      const fullMsg = prefix ? prefix + '\\n\\n' + text : text;
+      const _session = getAutoSessionId();
+      const response = await fetch(API_BASE + '/api/chat/stream', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ message: fullMsg, session_id: _session }})
+      }});
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '', assistantText = '';
+      let firstToken = true;
+
+      while (true) {{
+        const {{ done, value }} = await reader.read();
+        if (done) {{
+          if (buffer.trim()) {{
+            let _flushUsage = null;
+            for (const line of buffer.split('\\n')) {{
+              if (!line.startsWith('data: ')) continue;
+              try {{
+                const evt = JSON.parse(line.slice(6));
+                if (evt.type === 'token') {{ assistantText += evt.content || ''; }}
+                else if (evt.type === 'done') {{
+                  if (evt.full_text) {{ assistantText = evt.full_text; }}
+                  if (evt.usage) {{ _flushUsage = evt.usage; }}
+                }}
+              }} catch(e) {{}}
+            }}
+            if (thinkEl && assistantText) {{
+              thinkEl.innerHTML = _renderInlineMd(assistantText);
+            }}
+            if (thinkEl && _flushUsage && (_flushUsage.input_tokens || _flushUsage.output_tokens)) {{
+              const u = _flushUsage;
+              const iTokens = (u.input_tokens || 0).toLocaleString();
+              const oTokens = (u.output_tokens || 0).toLocaleString();
+              let usageTxt = iTokens + ' in / ' + oTokens + ' out';
+              if (u.cost !== undefined && u.cost > 0) {{
+                const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+              }} else if (u.cost === 0) {{
+                usageTxt += ' \u2022 free';
+              }}
+              const uDiv = document.createElement('div');
+              uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
+              uDiv.textContent = usageTxt;
+              thinkEl.appendChild(uDiv);
+            }}
+          }}
+          break;
+        }}
+
+        buffer += decoder.decode(value, {{ stream: true }});
+        const lines = buffer.split('\\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {{
+          if (!line.startsWith('data: ')) continue;
+          try {{
+            const evt = JSON.parse(line.slice(6));
+            if (evt.type === 'token') {{
+              if (firstToken) {{ firstToken = false; }}
+              assistantText += evt.content || '';
+              if (thinkEl) thinkEl.innerHTML = _renderInlineMd(assistantText);
+              if (_autoMsgsEl) _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
+            }} else if (evt.type === 'clear') {{
+              assistantText = '';
+              if (thinkEl) thinkEl.innerHTML = T.thinking + '\u2026';
+            }} else if (evt.type === 'done') {{
+              if (evt.full_text) {{
+                assistantText = evt.full_text;
+                if (thinkEl) thinkEl.innerHTML = _renderInlineMd(assistantText);
+              }}
+              if (thinkEl && evt.usage && (evt.usage.input_tokens || evt.usage.output_tokens)) {{
+                const u = evt.usage;
+                const iTokens = (u.input_tokens || 0).toLocaleString();
+                const oTokens = (u.output_tokens || 0).toLocaleString();
+                let usageTxt = iTokens + ' in / ' + oTokens + ' out';
+                if (u.cost !== undefined && u.cost > 0) {{
+                  const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                  usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+                }} else if (u.cost === 0) {{
+                  usageTxt += ' \u2022 free';
+                }}
+                const uDiv = document.createElement('div');
+                uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
+                uDiv.textContent = usageTxt;
+                thinkEl.appendChild(uDiv);
+              }}
+            }} else if (evt.type === 'error') {{
+              if (thinkEl) thinkEl.textContent = evt.message || T.error_connection;
+            }} else if (evt.type === 'status') {{
+              const msg = evt.message || evt.content || '';
+              if (firstToken && thinkEl) thinkEl.textContent = msg + '\u2026';
+            }} else if (evt.type === 'tool') {{
+              const desc = evt.description || evt.name || 'tool';
+              if (firstToken && thinkEl) thinkEl.textContent = '\U0001f527 ' + desc + '\u2026';
+            }}
+          }} catch (parseErr) {{}}
+        }}
+      }}
+      if (!assistantText && thinkEl) {{
+        thinkEl.textContent = T.error_connection;
+      }}
+    }} catch(e) {{
+      console.error('[Amira auto sidebar] send error:', e);
+      if (thinkEl) thinkEl.textContent = T.error_connection + ' (' + e.message + ')';
+    }}
+    if (_autoMsgsEl) _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
+  }}
+
+  function openAutomationSidebar() {{
+    if (_autoSidebarOpen) return;
+    const contentWrap = _findAutomationContentWrapper();
+    if (!contentWrap) return;
+    _autoContentWrapper = contentWrap;
+
+    // Make parent a flex row
+    const parent = contentWrap.parentNode;
+    if (!parent) return;
+    parent.style.cssText += ';display:flex !important;flex-direction:row !important;overflow:hidden !important;height:100% !important;';
+    contentWrap.style.cssText += ';flex:1 1 0% !important;min-width:0 !important;overflow-y:auto !important;';
+
+    // Build sidebar
+    const sidebar = document.createElement('div');
+    sidebar.id = AMIRA_SIDEBAR_ID;
+    sidebar.style.cssText = 'display:flex;flex-direction:column;width:380px;min-width:320px;max-width:45vw;flex-shrink:0;border-left:2px solid #667eea;background:var(--card-background-color,#fff);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;overflow:hidden;height:100%;';
+
+    // Header
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'display:flex;align-items:center;padding:10px 14px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;flex-shrink:0;gap:8px;';
+    const hdrTitle = document.createElement('span');
+    hdrTitle.textContent = '\U0001f916 ' + T.auto_sidebar_title;
+    hdrTitle.style.cssText = 'font-weight:600;font-size:14px;white-space:nowrap;';
+    // Agent select mirror
+    const _mainAgentSel = document.getElementById('haAgentSelect');
+    const autoAgentSel = document.createElement('select');
+    autoAgentSel.style.cssText = 'font-size:11px;padding:2px 4px;border-radius:4px;border:none;background:rgba(255,255,255,0.2);color:#fff;cursor:pointer;max-width:130px;min-width:0;flex-shrink:1;';
+    if (_mainAgentSel && _mainAgentSel.style.display !== 'none' && _mainAgentSel.options.length) {{
+      Array.from(_mainAgentSel.options).forEach(o => {{
+        const opt = document.createElement('option');
+        opt.value = o.value; opt.textContent = o.textContent;
+        if (o.selected) opt.selected = true;
+        autoAgentSel.appendChild(opt);
+      }});
+      autoAgentSel.addEventListener('change', () => {{ _mainAgentSel.value = autoAgentSel.value; _mainAgentSel.dispatchEvent(new Event('change')); }});
+    }} else {{
+      autoAgentSel.style.display = 'none';
+    }}
+    // Provider select mirror
+    const _mainProvSel = document.getElementById('haProviderSelect');
+    const _mainModSel  = document.getElementById('haModelSelect');
+    const autoProvSel = document.createElement('select');
+    autoProvSel.style.cssText = 'font-size:11px;padding:2px 4px;border-radius:4px;border:none;background:rgba(255,255,255,0.2);color:#fff;cursor:pointer;max-width:150px;min-width:0;flex-shrink:1;';
+    if (_mainProvSel) {{
+      Array.from(_mainProvSel.options).forEach(o => {{
+        const opt = document.createElement('option');
+        opt.value = o.value; opt.textContent = o.textContent;
+        if (o.selected) opt.selected = true;
+        autoProvSel.appendChild(opt);
+      }});
+      autoProvSel.addEventListener('change', () => {{ _mainProvSel.value = autoProvSel.value; _mainProvSel.dispatchEvent(new Event('change')); }});
+    }}
+    const autoModSel = document.createElement('select');
+    autoModSel.style.cssText = 'font-size:11px;padding:2px 4px;border-radius:4px;border:none;background:rgba(255,255,255,0.2);color:#fff;cursor:pointer;max-width:200px;min-width:0;flex-shrink:1;';
+    if (_mainModSel) {{
+      Array.from(_mainModSel.options).forEach(o => {{
+        const opt = document.createElement('option');
+        opt.value = o.value; opt.textContent = o.textContent;
+        if (o.selected) opt.selected = true;
+        autoModSel.appendChild(opt);
+      }});
+      autoModSel.addEventListener('change', () => {{ _mainModSel.value = autoModSel.value; _mainModSel.dispatchEvent(new Event('change')); }});
+    }}
+    // New chat + close buttons
+    const hdrActions = document.createElement('div');
+    hdrActions.style.cssText = 'display:flex;gap:6px;margin-left:auto;';
+    const newChatBtn = document.createElement('button');
+    newChatBtn.innerHTML = '&#10227;';
+    newChatBtn.title = T.new_chat;
+    newChatBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;font-size:16px;padding:4px;opacity:0.8;border-radius:4px;';
+    newChatBtn.onmouseenter = () => {{ newChatBtn.style.opacity='1'; }};
+    newChatBtn.onmouseleave = () => {{ newChatBtn.style.opacity='0.8'; }};
+    newChatBtn.addEventListener('click', () => {{ resetAutoSession(); if (_autoMsgsEl) _autoMsgsEl.innerHTML = ''; }});
+    const closeBtn2 = document.createElement('button');
+    closeBtn2.innerHTML = '&times;';
+    closeBtn2.title = T.close;
+    closeBtn2.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;font-size:18px;padding:4px;opacity:0.8;border-radius:4px;';
+    closeBtn2.onmouseenter = () => {{ closeBtn2.style.opacity='1'; }};
+    closeBtn2.onmouseleave = () => {{ closeBtn2.style.opacity='0.8'; }};
+    closeBtn2.addEventListener('click', () => {{ closeAutomationSidebar(); }});
+    hdrActions.appendChild(newChatBtn);
+    hdrActions.appendChild(closeBtn2);
+    hdr.appendChild(hdrTitle);
+    hdr.appendChild(autoAgentSel);
+    hdr.appendChild(autoProvSel);
+    hdr.appendChild(autoModSel);
+    hdr.appendChild(hdrActions);
+    sidebar.appendChild(hdr);
+
+    // Quick actions row
+    const qaRow = document.createElement('div');
+    qaRow.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px;border-bottom:1px solid var(--divider-color,#e0e0e0);flex-shrink:0;';
+    const qaItems = [
+      {{ label: T.qa_analyze, text: T.qa_analyze }},
+      {{ label: T.qa_optimize, text: T.qa_optimize }},
+      {{ label: T.qa_add_condition, text: T.qa_add_condition }},
+      {{ label: T.qa_explain, text: T.qa_explain }},
+      {{ label: T.qa_fix, text: T.qa_fix }},
+    ];
+    qaItems.forEach(qa => {{
+      const chip = document.createElement('button');
+      chip.textContent = qa.label;
+      chip.style.cssText = 'background:var(--secondary-background-color,#f0f0f0);color:var(--primary-text-color,#333);border:1px solid var(--divider-color,#ddd);border-radius:16px;padding:4px 12px;font-size:11px;cursor:pointer;white-space:nowrap;transition:background 0.15s;';
+      chip.onmouseenter = () => {{ chip.style.background='var(--primary-color,#03a9f4)'; chip.style.color='#fff'; chip.style.borderColor='transparent'; }};
+      chip.onmouseleave = () => {{ chip.style.background='var(--secondary-background-color,#f0f0f0)'; chip.style.color='var(--primary-text-color,#333)'; chip.style.borderColor='var(--divider-color,#ddd)'; }};
+      chip.addEventListener('click', () => {{ autoSidebarSend(qa.text); }});
+      qaRow.appendChild(chip);
+    }});
+    sidebar.appendChild(qaRow);
+
+    // Messages container
+    const msgs = document.createElement('div');
+    msgs.style.cssText = 'flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:8px;';
+    sidebar.appendChild(msgs);
+
+    // Input area
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;align-items:flex-end;gap:6px;padding:10px 14px;border-top:1px solid var(--divider-color,#e0e0e0);flex-shrink:0;background:var(--card-background-color,#fff);';
+    const inp = document.createElement('textarea');
+    inp.placeholder = T.placeholder;
+    inp.rows = 1;
+    inp.style.cssText = 'flex:1;resize:none;border:1px solid var(--divider-color,#ddd);border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;min-height:36px;max-height:80px;background:var(--card-background-color,#fff);color:var(--primary-text-color,#333);';
+    inp.addEventListener('input', () => {{ inp.style.height = 'auto'; inp.style.height = Math.min(inp.scrollHeight, 80) + 'px'; }});
+    inp.addEventListener('keydown', (e) => {{
+      if (e.key === 'Enter' && !e.shiftKey) {{ e.preventDefault(); autoSidebarSend(); }}
+    }});
+    const sendBtn2 = document.createElement('button');
+    sendBtn2.innerHTML = '&#9654;';
+    sendBtn2.title = T.send;
+    sendBtn2.style.cssText = 'width:36px;height:36px;border-radius:50%;border:none;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:opacity 0.15s;';
+    sendBtn2.onmouseenter = () => {{ sendBtn2.style.opacity='0.85'; }};
+    sendBtn2.onmouseleave = () => {{ sendBtn2.style.opacity='1'; }};
+    sendBtn2.addEventListener('click', () => {{ autoSidebarSend(); }});
+    inputRow.appendChild(inp);
+    inputRow.appendChild(sendBtn2);
+    sidebar.appendChild(inputRow);
+
+    // Append sidebar after content
+    parent.appendChild(sidebar);
+
+    // Save refs
+    _autoSidebarEl = sidebar;
+    _autoMsgsEl    = msgs;
+    _autoInputEl   = inp;
+    _autoProvSel   = autoProvSel;
+    _autoModSel    = autoModSel;
+    _autoAgentSel  = autoAgentSel;
+    _autoSidebarOpen = true;
+    saveSetting('auto-sidebar-open', true);
+
+    // Hide floating bubble
+    btn.style.display = 'none';
+    if (isOpen) {{ isOpen = false; panel.classList.remove('open'); }}
+
+    setTimeout(() => inp.focus(), 50);
+  }}
+
+  function closeAutomationSidebar() {{
+    if (_autoContentWrapper) {{
+      // Restore parent styles
+      const parent = _autoContentWrapper.parentNode;
+      if (parent) {{
+        parent.style.display = '';
+        parent.style.flexDirection = '';
+        parent.style.overflow = '';
+        parent.style.height = '';
+      }}
+      _autoContentWrapper.style.flex = '';
+      _autoContentWrapper.style.minWidth = '';
+      _autoContentWrapper.style.overflowY = '';
+    }}
+    if (_autoSidebarEl) _autoSidebarEl.remove();
+    _autoSidebarEl = null;
+    _autoMsgsEl = null;
+    _autoInputEl = null;
+    _autoProvSel = null;
+    _autoModSel = null;
+    _autoAgentSel = null;
+    _autoContentWrapper = null;
+    _autoSidebarOpen = false;
+    saveSetting('auto-sidebar-open', false);
+
+    // Restore floating bubble
+    btn.style.display = '';
+  }}
+
+  function removeAutomationIntegration() {{
+    closeAutomationSidebar();
+    removeAutomationToolbarButton();
+    // Remove flow
+    try {{
+      const contentWrap = _findAutomationContentWrapper();
+      if (contentWrap && contentWrap.parentNode) {{
+        const flow = contentWrap.parentNode.querySelector('#' + AMIRA_FLOW_ID);
+        if (flow) flow.remove();
+      }}
+    }} catch(e) {{}}
+    _autoFlowInjected = false;
+    _lastAutoPageId = null;
   }}
 
   // ---- Auto-resize textarea ----
