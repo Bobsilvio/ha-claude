@@ -16,6 +16,30 @@ logger = logging.getLogger(__name__)
 class GoogleProvider(EnhancedProvider):
     """Enhanced provider adapter for Google Gemini models."""
 
+    @staticmethod
+    def _sanitize_function_parameters_for_gemini(schema: Any) -> Any:
+        """Return a deep-copied schema safe for Gemini function declarations.
+
+        Gemini rejects empty-string enum values. Other providers may allow them,
+        so we sanitize only on the Google provider path.
+        """
+        import copy
+
+        node = copy.deepcopy(schema)
+
+        def _walk(value: Any) -> Any:
+            if isinstance(value, dict):
+                cleaned = {k: _walk(v) for k, v in value.items()}
+                enum_values = cleaned.get("enum")
+                if isinstance(enum_values, list):
+                    cleaned["enum"] = [v for v in enum_values if not (isinstance(v, str) and v == "")]
+                return cleaned
+            if isinstance(value, list):
+                return [_walk(v) for v in value]
+            return value
+
+        return _walk(node)
+
     def __init__(self, api_key: str = "", model: str = ""):
         """Initialize Google provider with enhanced features."""
         super().__init__(api_key, model)
@@ -127,7 +151,9 @@ class GoogleProvider(EnhancedProvider):
                 _decl = {
                     "name": _name,
                     "description": str(_fn.get("description") or ""),
-                    "parameters": _fn.get("parameters") or {"type": "object", "properties": {}},
+                    "parameters": self._sanitize_function_parameters_for_gemini(
+                        _fn.get("parameters") or {"type": "object", "properties": {}}
+                    ),
                 }
                 _decls.append(_decl)
             if _decls:
