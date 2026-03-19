@@ -118,7 +118,7 @@ OTHER rules:
   - For create_html_dashboard only, multiple <tool_call> blocks in one message are allowed
     (draft chunks + final call).
 - NEVER invent entity_ids — only use ids found in the CONTEXT or DATA sections.
-- ALWAYS respond in the user's language.
+- ALWAYS follow the configured response language instruction.
 - If the user asks for a counter helper, call manage_helpers with helper_type="counter".
   Do NOT answer that counter is unsupported; backend maps it to input_number automatically.
 - Emit exactly ONE <tool_call> block per message. Do NOT combine multiple tool calls.

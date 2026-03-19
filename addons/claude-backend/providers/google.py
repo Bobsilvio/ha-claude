@@ -112,6 +112,31 @@ class GoogleProvider(EnhancedProvider):
             "contents": contents,
             "generationConfig": {"maxOutputTokens": _max_output_tokens},
         }
+        def _sanitize_tool_schema(obj: Any) -> Any:
+            if isinstance(obj, dict):
+                out: Dict[str, Any] = {}
+                for k, v in obj.items():
+                    if k == "enum" and isinstance(v, list):
+                        vals = []
+                        for item in v:
+                            if item is None:
+                                continue
+                            if isinstance(item, str) and item.strip() == "":
+                                continue
+                            vals.append(_sanitize_tool_schema(item))
+                        if vals:
+                            out[k] = vals
+                        continue
+                    if k == "required" and isinstance(v, list):
+                        req = [item for item in v if isinstance(item, str) and item.strip()]
+                        if req:
+                            out[k] = req
+                        continue
+                    out[k] = _sanitize_tool_schema(v)
+                return out
+            if isinstance(obj, list):
+                return [_sanitize_tool_schema(x) for x in obj]
+            return obj
         # Enable native Gemini function calling using the existing OpenAI-format
         # tool schemas injected by api.py (intent_info["tool_schemas"]).
         _tool_schemas = self._get_intent_tools(intent_info) or []
@@ -127,7 +152,9 @@ class GoogleProvider(EnhancedProvider):
                 _decl = {
                     "name": _name,
                     "description": str(_fn.get("description") or ""),
-                    "parameters": _fn.get("parameters") or {"type": "object", "properties": {}},
+                    "parameters": _sanitize_tool_schema(
+                        _fn.get("parameters") or {"type": "object", "properties": {}}
+                    ),
                 }
                 _decls.append(_decl)
             if _decls:

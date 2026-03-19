@@ -7,6 +7,7 @@ Supports:
 - Google         /v1beta/models
 - Ollama         /api/tags
 - GitHub Copilot api.githubcopilot.com/models (OAuth token from /data/oauth_copilot.json)
+- Grok Web (session-based): probes grok.com /rest/rate-limits candidates
 
 Providers without a public models endpoint (GitHub Models, OpenAI Codex,
 Claude Web, ChatGPT Web) are skipped silently; their static lists remain in use.
@@ -28,6 +29,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 logger = logging.getLogger(__name__)
+from .ollama import resolve_ollama_base_url
 
 CACHE_FILE = "/data/amira_models_cache.json"
 SCHEMA_VERSION = 2
@@ -61,6 +63,7 @@ _BASE_URLS: Dict[str, str] = {
     "mistral":     "https://api.mistral.ai/v1",
     "nvidia":      "https://integrate.api.nvidia.com/v1",
     "deepseek":    "https://api.deepseek.com/v1",
+    "xai":         "https://api.x.ai/v1",
     "openrouter":  "https://openrouter.ai/api/v1",
     "zhipu":       "https://open.bigmodel.cn/api/paas/v4",
     "siliconflow": "https://api.siliconflow.cn/v1",
@@ -79,12 +82,24 @@ def _is_chat_model(model_id: str) -> bool:
     return not any(kw in m for kw in _EXCLUDE)
 
 
+def _normalize_api_key(api_key: str) -> str:
+    """Normalize API key field.
+
+    Accepts accidental values like "Bearer xxx" and returns just the token.
+    """
+    key = (api_key or "").strip()
+    if key.lower().startswith("bearer "):
+        key = key[7:].strip()
+    return key
+
+
 # ---------------------------------------------------------------------------
 # Per-provider fetch functions
 # ---------------------------------------------------------------------------
 
 def _fetch_openai_compat(base_url: str, api_key: str) -> List[str]:
     """Fetch models from an OpenAI-compatible /models endpoint."""
+    api_key = _normalize_api_key(api_key)
     url = base_url.rstrip("/") + "/models"
     headers = {"Authorization": f"Bearer {api_key}"}
     resp = httpx.get(url, headers=headers, timeout=TIMEOUT)
@@ -128,10 +143,15 @@ def _fetch_google(api_key: str) -> List[str]:
     return sorted(models)
 
 
-def _fetch_ollama(base_url: str) -> List[str]:
-    """Fetch models from local Ollama /api/tags."""
-    url = base_url.rstrip("/") + "/api/tags"
-    resp = httpx.get(url, timeout=5.0)
+def _fetch_ollama(base_url: str, api_key: str = "") -> List[str]:
+    """Fetch models from Ollama /api/tags (local or cloud)."""
+    resolved_base_url = resolve_ollama_base_url(base_url=base_url, api_key=api_key)
+    url = resolved_base_url.rstrip("/") + "/api/tags"
+    headers = {}
+    key = _normalize_api_key(api_key)
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
+    resp = httpx.get(url, headers=headers or None, timeout=5.0)
     resp.raise_for_status()
     data = resp.json()
     return sorted(m.get("name", "") for m in data.get("models", []) if m.get("name"))
@@ -152,12 +172,16 @@ def fetch_provider_models(
     """
     extra = extra or {}
     try:
+        api_key = _normalize_api_key(api_key)
         if provider == "anthropic":
             return _fetch_anthropic(api_key)
         if provider == "google":
             return _fetch_google(api_key)
         if provider == "ollama":
-            return _fetch_ollama(extra.get("ollama_base_url", "http://localhost:11434"))
+            return _fetch_ollama(
+                extra.get("ollama_base_url", "http://localhost:11434"),
+                extra.get("ollama_api_key", api_key),
+            )
         if provider == "github_copilot":
             # Uses OAuth token stored in /data/oauth_copilot.json — no config API key
             from .github_copilot import _load_token_from_disk, _fetch_models_from_api
@@ -168,6 +192,24 @@ def fetch_provider_models(
             if not copilot_token:
                 return None
             return _fetch_models_from_api(copilot_token)
+        if provider == "grok_web":
+            from .grok_web import discover_available_models
+            models = discover_available_models(force=True)
+            return sorted(models) if models else None
+        if provider == "xai":
+            # xAI /v1/models can intermittently return 400 for some accounts/keys.
+            # Keep refresh resilient by falling back to provider static models.
+            try:
+                models = _fetch_openai_compat(_BASE_URLS["xai"], api_key)
+                if models:
+                    return models
+            except httpx.HTTPStatusError as e:
+                code = e.response.status_code if e.response is not None else 0
+                if code == 400:
+                    logger.info("model_fetcher [xai]: /models returned 400, using static fallback list")
+                    from .xai import XAIProvider
+                    return XAIProvider(api_key=api_key).get_available_models()
+                raise
         if provider == "custom":
             base = extra.get("custom_api_base", "")
             if not base or not api_key:
@@ -206,7 +248,7 @@ def refresh_all_providers(
         if provider in _NO_ENDPOINT:
             skipped.append(provider)
             continue
-        if not api_key and provider not in {"ollama", "github_copilot"}:
+        if not api_key and provider not in {"ollama", "github_copilot", "grok_web"}:
             skipped.append(provider)
             continue
 

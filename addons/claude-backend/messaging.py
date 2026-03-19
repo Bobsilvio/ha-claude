@@ -36,12 +36,54 @@ class MessagingManager:
         
         logger.info(f"MessagingManager initialized. Telegram: {bool(self.telegram_token)}, WhatsApp: {bool(self.whatsapp_token)}")
 
+    @staticmethod
+    def _normalize_message_text(text: Any) -> str:
+        """Normalize message text preserving human formatting.
+
+        Handles legacy payloads where newlines were saved as literal ``\\n``
+        sequences and normalizes CRLF/CR to LF.
+        """
+        if text is None:
+            return ""
+        if not isinstance(text, str):
+            text = str(text)
+
+        # Normalize Windows/Mac line endings
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+
+        # Legacy fix: only decode escaped newlines when no real newline exists
+        if "\n" not in text and ("\\n" in text or "\\r\\n" in text):
+            text = text.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+        return text
+
     def _load_chats(self) -> Dict[str, List[Dict[str, Any]]]:
         """Load chat history from storage."""
         if CHATS_DB.exists():
             try:
                 with open(CHATS_DB) as f:
-                    return json.load(f)
+                    chats = json.load(f)
+                if not isinstance(chats, dict):
+                    return {}
+
+                # Normalize legacy message text formats once during load.
+                changed = False
+                for key, messages in chats.items():
+                    if not isinstance(messages, list):
+                        continue
+                    for msg in messages:
+                        if not isinstance(msg, dict):
+                            continue
+                        old = msg.get("text", "")
+                        new = self._normalize_message_text(old)
+                        if new != old:
+                            msg["text"] = new
+                            changed = True
+
+                if changed:
+                    self.chats = chats
+                    self._save_chats()
+                return chats
             except Exception as e:
                 logger.error(f"Failed to load chats: {e}")
         return {}
@@ -70,7 +112,7 @@ class MessagingManager:
         self.chats[key].append({
             "timestamp": datetime.now().isoformat(),
             "role": role,
-            "text": text
+            "text": self._normalize_message_text(text)
         })
         
         # Keep last 50 messages per chat
@@ -90,7 +132,13 @@ class MessagingManager:
         """
         key = f"{channel}:{user_id}"
         messages = self.chats.get(key, [])[-limit:]
-        return [{"role": m["role"], "text": m["text"]} for m in messages]
+        return [
+            {
+                "role": m.get("role", "user"),
+                "text": self._normalize_message_text(m.get("text", "")),
+            }
+            for m in messages
+        ]
 
     def clear_chat(self, channel: str, user_id: str) -> None:
         """Clear chat history for a user."""
@@ -136,7 +184,7 @@ class MessagingManager:
                     "user_id": user_id,
                     "channel": channel,
                     "message_count": len(messages),
-                    "last_message": messages[-1].get("text", "")[:100],
+                    "last_message": self._normalize_message_text(messages[-1].get("text", ""))[:100],
                     "last_timestamp": messages[-1].get("timestamp", "")
                 })
         

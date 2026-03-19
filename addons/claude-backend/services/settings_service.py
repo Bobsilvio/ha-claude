@@ -23,6 +23,7 @@ SETTINGS_DEFAULTS = {
     "enable_rag": False,
     "enable_chat_bubble": True,
     "enable_amira_card_button": True,
+    "enable_amira_automation_button": True,
     "enable_mcp": False,
     "fallback_enabled": False,
     "anthropic_extended_thinking": False,
@@ -55,6 +56,7 @@ _SETTINGS_GLOBAL_MAP = {
     "enable_rag": "ENABLE_RAG",
     "enable_chat_bubble": "ENABLE_CHAT_BUBBLE",
     "enable_amira_card_button": "ENABLE_AMIRA_CARD_BUTTON",
+    "enable_amira_automation_button": "ENABLE_AMIRA_AUTOMATION_BUTTON",
     "enable_mcp": "ENABLE_MCP",
     "fallback_enabled": "FALLBACK_ENABLED",
     "anthropic_extended_thinking": "ANTHROPIC_EXTENDED_THINKING",
@@ -154,10 +156,10 @@ def load_runtime_selection() -> tuple[str, str]:
         # Accept only known providers; model is expected to be a technical id.
         _known = {
             "anthropic", "openai", "google", "nvidia", "github",
-            "groq", "mistral", "openrouter", "deepseek", "minimax",
+            "groq", "mistral", "openrouter", "deepseek", "xai", "minimax",
             "aihubmix", "siliconflow", "volcengine", "dashscope",
             "moonshot", "zhipu", "ollama", "github_copilot", "openai_codex",
-            "claude_web", "chatgpt_web", "gemini_web", "perplexity_web",
+            "claude_web", "chatgpt_web", "grok_web", "gemini_web", "perplexity_web",
         }
         if provider not in _known:
             return ("", "")

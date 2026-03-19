@@ -1,7 +1,7 @@
-"""Ollama provider - Run LLMs locally using Ollama.
+"""Ollama provider - Run LLMs via Ollama (local or cloud).
 
-Ollama allows running open-source LLMs (LLaMA, Mistral, etc.) on local hardware.
-Perfect for privacy-conscious deployments and for development.
+Ollama allows running open-source LLMs (LLaMA, Mistral, etc.) on local hardware
+or via cloud endpoints.
 """
 
 import os
@@ -14,22 +14,52 @@ from .rate_limiter import get_rate_limit_coordinator
 
 logger = logging.getLogger(__name__)
 
+_OLLAMA_LOCAL_DEFAULT = "http://localhost:11434"
+_OLLAMA_LOCAL_ALT = "http://127.0.0.1:11434"
+_OLLAMA_CLOUD_DEFAULT = "https://ollama.com"
+
+
+def resolve_ollama_base_url(base_url: str = "", api_key: str = "") -> str:
+    """Resolve Ollama base URL.
+
+    If an API key is configured and the URL is still the local default,
+    auto-switch to official cloud host (https://ollama.com).
+    """
+    resolved = (base_url or "").strip()
+    key = (api_key or "").strip()
+
+    if not resolved:
+        resolved = os.getenv("OLLAMA_BASE_URL", _OLLAMA_LOCAL_DEFAULT).strip() or _OLLAMA_LOCAL_DEFAULT
+
+    if key and resolved in (_OLLAMA_LOCAL_DEFAULT, _OLLAMA_LOCAL_ALT):
+        return _OLLAMA_CLOUD_DEFAULT
+    return resolved
+
 
 class OllamaProvider(EnhancedProvider):
-    """Provider adapter for Ollama (local LLM inference)."""
+    """Provider adapter for Ollama (local/cloud inference)."""
 
     def __init__(self, api_key: str = "", model: str = "", base_url: str = ""):
         """Initialize Ollama provider.
         
         Args:
-            api_key: Not used for Ollama (local), keeping for interface compatibility
+            api_key: Optional API key (used by Ollama Cloud)
             model: Model name (e.g., 'llama2', 'mistral', 'neural-chat')
             base_url: Ollama server URL (default: http://localhost:11434)
         """
         super().__init__(api_key, model)
-        self.base_url = base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        self.base_url = resolve_ollama_base_url(base_url=base_url, api_key=api_key)
         self.translator = ErrorTranslator()
         self.rate_limiter = None
+
+    def _auth_headers(self) -> Dict[str, str]:
+        """Authorization headers for Ollama Cloud (no-op for local Ollama)."""
+        key = (self.api_key or "").strip()
+        if key.lower().startswith("bearer "):
+            key = key[7:].strip()
+        if key:
+            return {"Authorization": f"Bearer {key}"}
+        return {}
 
     @staticmethod
     def get_provider_name() -> str:
@@ -37,13 +67,14 @@ class OllamaProvider(EnhancedProvider):
         return "ollama"
 
     def validate_credentials(self) -> tuple[bool, str]:
-        """Validate Ollama is accessible on localhost.
-        
-        Ollama doesn't require API keys, but needs to be running locally.
-        """
+        """Validate Ollama endpoint reachability and auth (if configured)."""
         try:
             import requests
-            response = requests.get(f"{self.base_url}/api/tags", timeout=2)
+            response = requests.get(
+                f"{self.base_url}/api/tags",
+                headers=self._auth_headers() or None,
+                timeout=2,
+            )
             if response.status_code == 200:
                 return True, ""
             return False, "Ollama server not responding correctly"
@@ -73,13 +104,24 @@ class OllamaProvider(EnhancedProvider):
         yield from self.stream_chat_with_caching(messages, intent_info, max_retries=2)
 
     # -- Ollama-specific lightweight system prompt -------------------------
-    _OLLAMA_SYSTEM_PROMPT = (
-        "Sei Amira, un'assistente domestica intelligente e amichevole.\n"
-        "Rispondi in modo conciso e naturale nella lingua dell'utente.\n"
-        "Se l'utente chiede di controllare dispositivi o sensori, descrivi "
-        "l'azione richiesta; non hai accesso diretto ai dispositivi.\n"
-        "Sii gentile, utile e vai dritto al punto."
-    )
+    @staticmethod
+    def _ollama_system_prompt() -> str:
+        """Small prompt tuned for local models, honoring configured LANGUAGE."""
+        lang = (os.getenv("LANGUAGE", "en") or "en").lower()
+        language_map = {
+            "it": "Italian",
+            "es": "Spanish",
+            "fr": "French",
+            "en": "English",
+        }
+        target_lang = language_map.get(lang, "English")
+        return (
+            "You are Amira, a smart and friendly Home Assistant assistant.\n"
+            f"Always answer in {target_lang}.\n"
+            "If the user asks you to control devices or sensors, describe the requested "
+            "action; you don't have direct device control in this local mode.\n"
+            "Be concise, helpful, and direct."
+        )
 
     def _prepare_messages(
         self,
@@ -94,7 +136,7 @@ class OllamaProvider(EnhancedProvider):
         within the model's context window and speed up prefill.
         """
         # Build message list: lightweight system + conversation (no tool blocks)
-        out: List[Dict[str, Any]] = [{"role": "system", "content": self._OLLAMA_SYSTEM_PROMPT}]
+        out: List[Dict[str, Any]] = [{"role": "system", "content": self._ollama_system_prompt()}]
         for msg in messages:
             role = msg.get("role", "")
             # Skip tool-call / tool-result messages (Ollama can't use HA tools)
@@ -134,7 +176,7 @@ class OllamaProvider(EnhancedProvider):
         # Local models on weak CPUs can't handle the full HA system prompt
         # (~7000 tokens with 48 tool descriptions). We replace it entirely.
         msgs: List[Dict[str, Any]] = [
-            {"role": "system", "content": self._OLLAMA_SYSTEM_PROMPT}
+            {"role": "system", "content": self._ollama_system_prompt()}
         ]
         for msg in messages:
             role = msg.get("role", "")
@@ -246,6 +288,7 @@ class OllamaProvider(EnhancedProvider):
         with httpx.stream(
             "POST", f"{base_url}/api/chat",
             json=body,
+            headers=self._auth_headers() or None,
             timeout=_timeout,
         ) as response:
             if response.status_code != 200:
@@ -299,7 +342,11 @@ class OllamaProvider(EnhancedProvider):
         """
         try:
             import requests
-            response = requests.get(f"{self.base_url}/api/tags", timeout=2)
+            response = requests.get(
+                f"{self.base_url}/api/tags",
+                headers=self._auth_headers() or None,
+                timeout=2,
+            )
             if response.status_code == 200:
                 data = response.json()
                 if "models" in data:

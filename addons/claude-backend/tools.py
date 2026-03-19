@@ -2251,6 +2251,25 @@ def get_gemini_tools(intent_info: dict | None = None):
             for k, v in obj.items():
                 if k in blocked_keys:
                     continue
+                if k == "enum" and isinstance(v, list):
+                    enum_vals = []
+                    for item in v:
+                        if item is None:
+                            continue
+                        if isinstance(item, str) and item.strip() == "":
+                            continue
+                        enum_vals.append(_sanitize_gemini_schema(item))
+                    if enum_vals:
+                        cleaned[k] = enum_vals
+                    continue
+                if k == "required" and isinstance(v, list):
+                    req_vals = []
+                    for item in v:
+                        if isinstance(item, str) and item.strip():
+                            req_vals.append(item)
+                    if req_vals:
+                        cleaned[k] = req_vals
+                    continue
                 cleaned[k] = _sanitize_gemini_schema(v)
             return cleaned
         if isinstance(obj, list):
@@ -6224,7 +6243,7 @@ This helps the user understand and verify the changes. Keep the diff focused on 
 - The MAXIMUM number of tool calls for ANY modification task is 2. If you've made 2 calls, you MUST respond.
 - For other config editing: read_config_file \u2192 write_config_file \u2192 check_config (3 calls max).
 
-Always respond in the same language the user uses.
+Always follow the configured response language instruction, even if the user mixes languages.
 Be concise but informative."""
 
 

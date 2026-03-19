@@ -21,6 +21,7 @@ export GROQ_API_KEY=$(bashio::config 'groq_api_key')
 export MISTRAL_API_KEY=$(bashio::config 'mistral_api_key')
 export OPENROUTER_API_KEY=$(bashio::config 'openrouter_api_key')
 export DEEPSEEK_API_KEY=$(bashio::config 'deepseek_api_key')
+export XAI_API_KEY=$(bashio::config 'xai_api_key')
 export MINIMAX_API_KEY=$(bashio::config 'minimax_api_key')
 export AIHUBMIX_API_KEY=$(bashio::config 'aihubmix_api_key')
 export SILICONFLOW_API_KEY=$(bashio::config 'siliconflow_api_key')
@@ -33,6 +34,7 @@ export CUSTOM_API_KEY=$(bashio::config 'custom_api_key')
 export CUSTOM_API_BASE=$(bashio::config 'custom_api_base')
 export CUSTOM_MODEL_NAME=$(bashio::config 'custom_model_name')
 export OLLAMA_BASE_URL=$(bashio::config 'ollama_base_url')
+export OLLAMA_API_KEY=$(bashio::config 'ollama_api_key')
 # OAuth-only providers
 export GITHUB_COPILOT_TOKEN=""
 export OPENAI_CODEX_TOKEN=""

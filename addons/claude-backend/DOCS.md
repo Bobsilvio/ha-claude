@@ -35,6 +35,7 @@ Amira uses **two layers** of configuration. Most features are now managed direct
 | `mistral_api_key` | Mistral API key |
 | `openrouter_api_key` | OpenRouter API key |
 | `deepseek_api_key` | DeepSeek API key |
+| `xai_api_key` | xAI Grok API key |
 | `perplexity_api_key` | Perplexity API key |
 | `minimax_api_key` | MiniMax API key |
 | `aihubmix_api_key` | AiHubMix API key |
@@ -45,8 +46,11 @@ Amira uses **two layers** of configuration. Most features are now managed direct
 | `zhipu_api_key` | Zhipu GLM API key |
 | `custom_api_key` + `custom_api_base` + `custom_model_name` | Any OpenAI-compatible endpoint |
 | `ollama_base_url` | Ollama server URL (default: `http://localhost:11434`) |
+| `ollama_api_key` | Ollama Cloud API key (optional; empty for local Ollama) |
 | `colored_logs` | Pretty-print add-on logs |
 | `debug_mode` / `log_level` | `normal` / `verbose` / `debug` |
+
+If `ollama_api_key` is set while `ollama_base_url` is still the local default, Amira automatically uses `https://ollama.com`.
 
 ### Layer 2 — Settings UI (⚙️ icon in chat)
 
@@ -85,7 +89,7 @@ Settings are stored in `/config/amira/settings.json` and persist across restarts
 ### Chat & AI
 
 - **Streaming chat UI** with real-time responses
-- **40+ AI models** from 12+ providers — switch without restarting
+- **40+ AI models** from 23+ providers — switch without restarting
 - **Persistent model selection** — your chosen model is restored after restart
 - **Multi-language UI** — English, Italian, Spanish, French
 - **Voice input** — speak instead of type (in chat bubble)
@@ -230,6 +234,7 @@ Usage is aggregated by day, model, and provider in `/data/usage_stats.json`. Acc
 | **Groq** | Llama 3.1, Mixtral | Free tier | Fastest inference |
 | **Mistral** | Mistral Large/Medium/Small | $2–$8/1M tok | European provider |
 | **DeepSeek** | DeepSeek Chat, Reasoner | $0.14–$0.55/1M tok | Very cost-efficient |
+| **xAI Grok** | Grok-4.x, Grok-3, Grok Code Fast | Pay per use | Official Grok API via `xai_api_key` |
 | **OpenRouter** | 100+ models | Varies | One key for all providers |
 | **Perplexity** | Sonar models | Pay per use | Real-time web search |
 | **Ollama** | Any local model | Free | Privacy, offline, your hardware |

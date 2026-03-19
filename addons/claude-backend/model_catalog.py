@@ -309,6 +309,7 @@ _PROVIDER_MODELS: Dict[str, List[str]] = {
     "mistral": [],
     "openrouter": [],
     "deepseek": [],
+    "xai": [],
     "minimax": [],
     "aihubmix": [],
     "siliconflow": [],

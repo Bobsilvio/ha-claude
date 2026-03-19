@@ -508,11 +508,42 @@ def run_with_model_fallback_streaming(
         t0 = time.time()
         try:
             gen = run(candidate.provider, candidate.model)
-            # Peek at the first event to verify the generator is alive
-            first_event = next(gen)
+            # Probe stream startup:
+            # - if provider yields an error before first content/done, trigger fallback
+            # - otherwise keep buffered startup events and return the stream
+            startup_buffer: List[Any] = []
+            stream_started = False
 
-            def _chain_gen(first, remaining):
-                yield first
+            while not stream_started:
+                try:
+                    ev = next(gen)
+                except StopIteration:
+                    raise Exception("stream ended before first content")
+
+                startup_buffer.append(ev)
+
+                if not isinstance(ev, dict):
+                    # Unexpected shape — consider stream alive and continue
+                    stream_started = True
+                    break
+
+                ev_type = str(ev.get("type", "")).lower()
+
+                # Early provider error: fail this candidate and fallback
+                if ev_type == "error":
+                    msg = str(ev.get("message") or "provider error event before content")
+                    raise Exception(msg)
+
+                # Stream is considered healthy once it produces meaningful output
+                if ev_type in {"content", "text", "delta", "tool_call", "done"}:
+                    stream_started = True
+                    break
+
+                # Status/heartbeat/other metadata events: keep probing
+
+            def _chain_gen(buffered, remaining):
+                for _ev in buffered:
+                    yield _ev
                 yield from remaining
 
             elapsed_ms = (time.time() - t0) * 1000
@@ -522,7 +553,7 @@ def run_with_model_fallback_streaming(
             ))
 
             return FallbackResult(
-                result=_chain_gen(first_event, gen),
+                result=_chain_gen(startup_buffer, gen),
                 provider=candidate.provider,
                 model=candidate.model,
                 success=True,

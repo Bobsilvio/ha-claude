@@ -14,6 +14,7 @@ from typing import Any, Dict, Generator, List, Optional
 
 from .rate_limiter import get_rate_limit_coordinator, RateLimitInfo
 from .error_handler import ErrorTranslator, ErrorType
+from .ollama import resolve_ollama_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class EnhancedProviderManager:
         messages: List[Dict[str, Any]],
         intent_info: Optional[Dict[str, Any]] = None,
         fallback_providers: Optional[List[str]] = None,
+        fallback_models: Optional[Dict[str, str]] = None,
         model: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream with rate-aware fallback.
@@ -95,10 +97,11 @@ class EnhancedProviderManager:
                 event_count = 0
                 content_started = False
                 _fallback_notice_sent = False
+                effective_model = model if prov == provider else (fallback_models or {}).get(prov)
 
                 for event in self._stream_with_provider(
                     prov, messages, intent_info,
-                    model=model if prov == provider else None,
+                    model=effective_model,
                 ):
                     event_count += 1
                     last_event = event
@@ -320,7 +323,7 @@ class EnhancedProviderManager:
             "openai": "OPENAI", "nvidia": "NVIDIA", "anthropic": "ANTHROPIC",
             "google": "GOOGLE", "github": "GITHUB", "groq": "GROQ",
             "mistral": "MISTRAL", "ollama": "OLLAMA", "openrouter": "OPENROUTER",
-            "deepseek": "DEEPSEEK", "minimax": "MINIMAX", "aihubmix": "AIHUBMIX",
+            "deepseek": "DEEPSEEK", "xai": "XAI", "minimax": "MINIMAX", "aihubmix": "AIHUBMIX",
             "siliconflow": "SILICONFLOW", "volcengine": "VOLCENGINE",
             "dashscope": "DASHSCOPE", "moonshot": "MOONSHOT", "zhipu": "ZHIPU",
             "perplexity": "PERPLEXITY", "github_copilot": "GITHUB_COPILOT",
@@ -347,7 +350,10 @@ class EnhancedProviderManager:
 
         # --- instantiate ---
         if provider == "ollama":
-            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            base_url = resolve_ollama_base_url(
+                base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                api_key=api_key,
+            )
             provider_instance = provider_class(api_key=api_key, model=model, base_url=base_url)
         elif provider == "custom":
             api_base = os.getenv("CUSTOM_API_BASE", "")

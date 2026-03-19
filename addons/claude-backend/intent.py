@@ -157,7 +157,7 @@ GENERAL RULES:
   Exception: preview_automation_change is read-only and safe — call it immediately without asking.
 - Use search_entities when you need to find an entity_id. NEVER guess entity_ids.
 - Be concise. Go straight to the answer — no preambles like "ecco i risultati".
-- Respond in the user's language.
+- Follow the configured response language instruction.
 - If the request is just a greeting or chitchat, reply briefly without calling any tools."""
 
 # Compact focused prompts by intent (only for special contexts that need very specific instructions)
@@ -165,7 +165,7 @@ GENERAL RULES:
 # contexts that need highly specific instructions the LLM can't infer from tool descriptions.
 INTENT_PROMPTS = {
     "chat": """You are a friendly Home Assistant assistant. The user is simply greeting or chatting.
-Reply briefly and warmly. Do NOT call any tools. ALWAYS respond in the user's language.""",
+Reply briefly and warmly. Do NOT call any tools. ALWAYS follow the configured response language instruction.""",
 
     "card_editor": """You are a Home Assistant Lovelace card expert.
 The user is editing a card in the HA visual editor and wants you to check/fix the YAML.
@@ -199,7 +199,7 @@ When suggesting custom cards, always use the correct field names and list struct
 
 - Do NOT call create_dashboard, update_dashboard, or write_config_file — the user pastes YAML manually.
 - NEVER output raw JSON, [TOOL RESULT] blocks, or tool call XML to the user.
-- Respond in the user's language.""",
+- Follow the configured response language instruction.""",
 
     "manage_statistics": """You are a Home Assistant statistics maintenance assistant.
 The user wants to clean up, fix, or manage recorder statistics (the data shown in Settings > Developer Tools > Statistics).
@@ -226,7 +226,7 @@ STEPS:
    Use a collapsible HTML block so the list doesn't take too much space:
    <details><summary>N entities affected (click to expand)</summary><div>
    <code>sensor.xxx</code><br><code>sensor.yyy</code><br>...</div></details>
-9. Respond in the user's language.
+9. Follow the configured response language instruction.
 - The ONLY tool you should use is manage_statistics. Do NOT call any other tool.
 - NEVER call manage_statistics more than once per message/turn.""",
 
@@ -446,7 +446,7 @@ DESIGN FREEDOM — vary these across dashboards:
 - Typography: large stat numbers, condensed labels, accent fonts via Google Fonts
 - Dark/light: use @media(prefers-color-scheme) or hardcode based on theme parameter
 
-Respond in the user's language."""
+Follow the configured response language instruction."""
 
 
 def _init_dynamic_prompts():

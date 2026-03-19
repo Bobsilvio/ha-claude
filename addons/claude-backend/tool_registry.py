@@ -550,11 +550,31 @@ class GeminiAdapter(ProviderAdapter):
     def _sanitize_schema(cls, obj: Any) -> Any:
         """Recursively strip blocked JSON Schema keywords for Gemini."""
         if isinstance(obj, dict):
-            return {
-                k: cls._sanitize_schema(v)
-                for k, v in obj.items()
-                if k not in cls._BLOCKED_KEYS
-            }
+            out: Dict[str, Any] = {}
+            for k, v in obj.items():
+                if k in cls._BLOCKED_KEYS:
+                    continue
+                if k == "enum" and isinstance(v, list):
+                    enum_vals = []
+                    for item in v:
+                        if item is None:
+                            continue
+                        if isinstance(item, str) and item.strip() == "":
+                            continue
+                        enum_vals.append(cls._sanitize_schema(item))
+                    if enum_vals:
+                        out[k] = enum_vals
+                    continue
+                if k == "required" and isinstance(v, list):
+                    req_vals = []
+                    for item in v:
+                        if isinstance(item, str) and item.strip():
+                            req_vals.append(item)
+                    if req_vals:
+                        out[k] = req_vals
+                    continue
+                out[k] = cls._sanitize_schema(v)
+            return out
         if isinstance(obj, list):
             return [cls._sanitize_schema(v) for v in obj]
         return obj

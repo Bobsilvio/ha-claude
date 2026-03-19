@@ -86,7 +86,7 @@ def test_adapters(reg):
     assert oai[0]["function"]["name"] == "get_entities"
 
     # OpenAI-compatible providers share adapter
-    for p in ("github", "nvidia", "groq", "mistral", "deepseek", "openrouter"):
+    for p in ("github", "nvidia", "groq", "mistral", "deepseek", "openrouter", "xai", "grok_web"):
         result = reg.format_for_provider(p, ctx)
         assert result[0]["type"] == "function", f"{p} adapter failed"
 
@@ -203,6 +203,24 @@ def test_gemini_sanitize():
     # Valid keys should remain
     assert temp_prop["type"] == "number"
     assert temp_prop["description"] == "Temperature"
+
+    enum_schema = {
+        "type": "object",
+        "properties": {
+            "disabled_by": {
+                "type": "string",
+                "enum": ["user", ""],
+                "description": "Disable or enable",
+            }
+        },
+    }
+    enum_tool = ToolDefinition(
+        name="manage_entity", description="Manage entity",
+        parameters=enum_schema, execute=fake_execute,
+    )
+    enum_formatted = adapter.format_tool(enum_tool)
+    enum_values = enum_formatted["parameters_json_schema"]["properties"]["disabled_by"]["enum"]
+    assert enum_values == ["user"], f"Gemini enum should strip empty values: {enum_values}"
 
     print("  [OK] Gemini schema sanitization")
 

@@ -24,7 +24,7 @@ def _norm_model_key(v: str) -> str:
         return ""
     s = v.strip().lower()
     # Remove common provider prefixes in display strings
-    s = re.sub(r'^(claude|openai|google|nvidia|github models|github copilot|openrouter|groq|mistral|ollama|deepseek|minimax|aihubmix|siliconflow|volcengine|dashscope|moonshot|zhipu|perplexity)\s*:\s*', '', s)
+    s = re.sub(r'^(claude|openai|google|nvidia|github models|github copilot|openrouter|groq|mistral|ollama|deepseek|xai|minimax|aihubmix|siliconflow|volcengine|dashscope|moonshot|zhipu|perplexity)\s*:\s*', '', s)
     # Keep only alnum for resilient compare ("Opus 4.6" == "opus-4-6")
     return re.sub(r'[^a-z0-9]+', '', s)
 
@@ -112,6 +112,8 @@ def api_get_models():
             available_providers.append({"id": "openrouter", "name": "OpenRouter"})
         if _api.DEEPSEEK_API_KEY:
             available_providers.append({"id": "deepseek", "name": "DeepSeek"})
+        if _api.XAI_API_KEY:
+            available_providers.append({"id": "xai", "name": "xAI (Grok)"})
         if _api.MINIMAX_API_KEY:
             available_providers.append({"id": "minimax", "name": "MiniMax"})
         if _api.AIHUBMIX_API_KEY:

@@ -31,6 +31,7 @@ _PROVIDER_CLASSES = {
     "mistral": "providers.mistral:MistralProvider",
     "openrouter": "providers.openrouter:OpenRouterProvider",
     "deepseek": "providers.deepseek:DeepSeekProvider",
+    "xai": "providers.xai:XAIProvider",
     "minimax": "providers.minimax:MinimaxProvider",
     "aihubmix": "providers.aihubmix:AiHubMixProvider",
     "siliconflow": "providers.siliconflow:SiliconFlowProvider",

@@ -138,6 +138,8 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
         "openai": "https://platform.openai.com/settings/billing",
         "anthropic": "https://console.anthropic.com/settings/plans",
         "deepseek": "https://platform.deepseek.com",
+        "xai": "https://console.x.ai",
+        "grok_web": "https://grok.com",
         "groq": "https://console.groq.com",
         "mistral": "https://console.mistral.ai",
         "minimax": "https://platform.minimaxi.com",
@@ -162,6 +164,16 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
     if code == 401:
         return get_lang_text("err_http_401") or "Authentication failed (401)."
     if code == 403:
+        if provider == "grok_web" and (
+            "anti-bot" in low
+            or "request rejected by anti-bot rules" in low
+            or '"code":7' in low
+        ):
+            return (
+                "Grok Web blocked the request (403 anti-bot). "
+                "Use fresh full browser cookies (sso/sso-rw + cf_clearance + __cf_bm) "
+                "from the same public IP/network as Home Assistant."
+            )
         return get_lang_text("err_http_403") or "Access denied (403)."
     if code == 429 and ("insufficient_quota" in low or "insufficient quota" in low or "exceeded your current quota" in low or "run out of credits" in low):
         base = get_lang_text("err_openai_quota") or "❌ Quota exceeded. Your account has run out of credits. Check your billing details."

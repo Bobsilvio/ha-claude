@@ -5,6 +5,7 @@ import json
 import logging
 import queue
 import re
+import shutil
 import time
 import threading
 import uuid
@@ -171,6 +172,9 @@ VERSION = get_version()
 # Configuration
 HA_URL = os.getenv("HA_URL", "http://supervisor/core")
 AI_PROVIDER = os.getenv("AI_PROVIDER", "anthropic").lower()
+if AI_PROVIDER == "grok_web":
+    logger.warning("grok_web provider removed; switching runtime provider to xai")
+    AI_PROVIDER = "xai"
 AI_MODEL = os.getenv("AI_MODEL", "")
 # Track the user's currently selected model (persists after set_model changes)
 SELECTED_MODEL = ""  # Will be set by /api/set_model and used by stream
@@ -184,6 +188,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY", "")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+XAI_API_KEY = os.getenv("XAI_API_KEY", "")
 MINIMAX_API_KEY = os.getenv("MINIMAX_API_KEY", "")
 AIHUBMIX_API_KEY = os.getenv("AIHUBMIX_API_KEY", "")
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
@@ -198,6 +203,19 @@ CUSTOM_API_KEY = os.getenv("CUSTOM_API_KEY", "")
 CUSTOM_API_BASE = os.getenv("CUSTOM_API_BASE", "")
 CUSTOM_MODEL_NAME = os.getenv("CUSTOM_MODEL_NAME", "")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+OLLAMA_API_KEY = os.getenv("OLLAMA_API_KEY", "")
+
+
+def _resolve_ollama_base_url(raw_base_url: str, api_key: str) -> str:
+    """Resolve Ollama base URL for local/cloud usage."""
+    base = (raw_base_url or "").strip() or "http://localhost:11434"
+    key = (api_key or "").strip()
+    if key and base in ("http://localhost:11434", "http://127.0.0.1:11434"):
+        return "https://ollama.com"
+    return base
+
+
+OLLAMA_BASE_URL = _resolve_ollama_base_url(OLLAMA_BASE_URL, OLLAMA_API_KEY)
 NVIDIA_THINKING_MODE = os.getenv("NVIDIA_THINKING_MODE", "False").lower() == "true"
 ANTHROPIC_EXTENDED_THINKING = os.getenv("ANTHROPIC_EXTENDED_THINKING", "False").lower() == "true"
 ANTHROPIC_PROMPT_CACHING = os.getenv("ANTHROPIC_PROMPT_CACHING", "False").lower() == "true"
@@ -218,6 +236,7 @@ TTS_VOICE = os.getenv("TTS_VOICE", "female").lower().strip()
 ENABLE_RAG = os.getenv("ENABLE_RAG", "False").lower() == "true"
 ENABLE_CHAT_BUBBLE = os.getenv("ENABLE_CHAT_BUBBLE", "False").lower() == "true"
 ENABLE_AMIRA_CARD_BUTTON = True
+ENABLE_AMIRA_AUTOMATION_BUTTON = True
 COST_CURRENCY = os.getenv("COST_CURRENCY", "USD").upper()
 
 # Last usage data captured by synchronous chat functions (chat_openai/anthropic/google)
@@ -422,7 +441,11 @@ if _persisted_prompt:
     logger.info(f"Loaded custom system prompt from disk ({len(CUSTOM_SYSTEM_PROMPT)} chars)")
 
 
-def _sync_active_agent_globals() -> None:
+def _sync_active_agent_globals(
+    apply_model: bool = False,
+    persist_selection: bool = False,
+    reinitialize_client: bool = False,
+) -> None:
     """Read the currently active agent from AgentManager and update globals.
 
     Called every time the active agent changes (set_agent endpoint,
@@ -431,6 +454,7 @@ def _sync_active_agent_globals() -> None:
     in sync without reloading the config file from disk.
     """
     global AGENT_NAME, AGENT_AVATAR, AGENT_INSTRUCTIONS, AGENT_SYSTEM_PROMPT_OVERRIDE
+    global AI_PROVIDER, AI_MODEL, SELECTED_PROVIDER, SELECTED_MODEL
     if not AGENT_CONFIG_AVAILABLE:
         return
     try:
@@ -442,6 +466,33 @@ def _sync_active_agent_globals() -> None:
         AGENT_AVATAR = (active.identity.emoji or "\U0001f916").strip()
         AGENT_SYSTEM_PROMPT_OVERRIDE = None
         AGENT_INSTRUCTIONS = (active.instructions or "").strip()
+
+        model_changed = False
+        if apply_model and active.model_config and active.model_config.primary:
+            ref = active.model_config.primary
+            if ref.provider and ref.model:
+                if ref.provider != AI_PROVIDER or ref.model != AI_MODEL:
+                    AI_PROVIDER = ref.provider
+                    AI_MODEL = ref.model
+                    SELECTED_PROVIDER = ref.provider
+                    SELECTED_MODEL = ref.model
+                    model_changed = True
+                else:
+                    # Keep selected runtime values aligned even if unchanged
+                    SELECTED_PROVIDER = ref.provider
+                    SELECTED_MODEL = ref.model
+
+        if model_changed and persist_selection:
+            try:
+                save_runtime_selection(AI_PROVIDER, AI_MODEL)
+            except Exception as e:
+                logger.warning(f"Could not persist runtime selection from active agent: {e}")
+
+        if model_changed and reinitialize_client:
+            try:
+                initialize_ai_client()
+            except Exception as e:
+                logger.warning(f"Could not reinitialize client after active agent sync: {e}")
         try:
             import tools as _tools_mod
             _tools_mod.AI_SIGNATURE = AGENT_NAME
@@ -466,7 +517,7 @@ def load_agents_config() -> Optional[Dict]:
     try:
         mgr = agent_config.get_agent_manager()
         mgr.reload_config()
-        _sync_active_agent_globals()
+        _sync_active_agent_globals(apply_model=True, persist_selection=True, reinitialize_client=True)
         active = mgr.get_active_agent()
         if active:
             logger.info(f"Agent '{active.id}': name={AGENT_NAME}, avatar={AGENT_AVATAR}")
@@ -609,6 +660,10 @@ def load_runtime_selection() -> bool:
     global AI_PROVIDER, AI_MODEL, SELECTED_MODEL, SELECTED_PROVIDER
     provider, model = settings_service.load_runtime_selection()
     if provider and model:
+        if provider == "grok_web":
+            provider = "xai"
+            if not model:
+                model = PROVIDER_DEFAULTS.get("xai", {}).get("model", "grok-4-1-fast-non-reasoning")
         AI_PROVIDER = provider
         AI_MODEL = model
         SELECTED_PROVIDER = provider
@@ -654,6 +709,7 @@ PROVIDER_DEFAULTS = {
     "ollama": {"model": "mistral", "name": "Ollama (Local)"},
     "openrouter": {"model": "anthropic/claude-opus-4.6", "name": "OpenRouter (Gateway)"},
     "deepseek": {"model": "deepseek-chat", "name": "DeepSeek (API)"},
+    "xai": {"model": "grok-4-1-fast-non-reasoning", "name": "xAI (Grok)"},
     "minimax": {"model": "MiniMax-M2.1", "name": "MiniMax (API)"},
     "aihubmix": {"model": "gpt-4o", "name": "AiHubMix (Gateway)"},
     "siliconflow": {"model": "Qwen/Qwen2.5-7B-Instruct", "name": "SiliconFlow (Gateway)"},
@@ -754,6 +810,7 @@ def _refresh_model_cache_at_startup() -> Dict[str, Any]:
             "mistral": MISTRAL_API_KEY,
             "openrouter": OPENROUTER_API_KEY,
             "deepseek": DEEPSEEK_API_KEY,
+            "xai": XAI_API_KEY,
             "minimax": MINIMAX_API_KEY,
             "aihubmix": AIHUBMIX_API_KEY,
             "siliconflow": SILICONFLOW_API_KEY,
@@ -768,11 +825,12 @@ def _refresh_model_cache_at_startup() -> Dict[str, Any]:
             # Web-session provider, no API key required
             "perplexity_web": "__oauth__",
         }
-        # Ollama is local/keyless: refresh only when actively used to avoid startup stalls.
+        # Refresh Ollama models only when Ollama is active to avoid startup stalls.
         if AI_PROVIDER == "ollama":
-            provider_keys["ollama"] = "__local__"
+            provider_keys["ollama"] = OLLAMA_API_KEY or "__local__"
         extra = {
             "ollama_base_url": OLLAMA_BASE_URL,
+            "ollama_api_key": OLLAMA_API_KEY,
             "custom_api_base": CUSTOM_API_BASE,
         }
         results = _refresh_all_model_providers(provider_keys, extra)
@@ -1105,6 +1163,17 @@ MODEL_NAME_MAPPING = {
     "DeepSeek: Chat": "deepseek-chat",
     "DeepSeek: R1": "deepseek-r1",
     "DeepSeek: V3": "deepseek-v3",
+    "xAI: Grok-3": "grok-3",
+    "xAI: Grok-3 Mini": "grok-3-mini",
+    "xAI: Grok Code Fast 1": "grok-code-fast-1",
+    "xAI: Grok 4.20 Multi-Agent 0309": "grok-4.20-multi-agent-0309",
+    "xAI: Grok 4.20 0309 Reasoning": "grok-4.20-0309-reasoning",
+    "xAI: Grok 4.20 0309 Non-Reasoning": "grok-4.20-0309-non-reasoning",
+    "xAI: Grok 4 Fast Reasoning": "grok-4-fast-reasoning",
+    "xAI: Grok 4 Fast Non-Reasoning": "grok-4-fast-non-reasoning",
+    "xAI: Grok 4.1 Fast Reasoning": "grok-4-1-fast-reasoning",
+    "xAI: Grok 4.1 Fast Non-Reasoning": "grok-4-1-fast-non-reasoning",
+    "xAI: Grok 4 0709": "grok-4-0709",
     
     "MiniMax: M2.1": "MiniMax-M2.1",
     "MiniMax: M2": "MiniMax-M2",
@@ -1255,6 +1324,7 @@ _PREFIX_TO_PROVIDER = {
     "Ollama:": "ollama",
     "OpenRouter:": "openrouter",
     "DeepSeek:": "deepseek",
+    "xAI:": "xai",
     "MiniMax:": "minimax",
     "AiHubMix:": "aihubmix",
     "SiliconFlow:": "siliconflow",
@@ -1366,6 +1436,8 @@ def get_model_display_name(provider: str, technical_name: str) -> str:
         return MODEL_DISPLAY_MAPPING[tech]
     if prov == "nvidia":
         return f"NVIDIA: {_humanize_nvidia_model_name(tech)}"
+    if prov == "xai":
+        return f"xAI: {_humanize_nvidia_model_name(tech)}"
     return tech
 
 
@@ -1403,6 +1475,8 @@ def get_api_key() -> str:
         return OPENROUTER_API_KEY
     elif AI_PROVIDER == "deepseek":
         return DEEPSEEK_API_KEY
+    elif AI_PROVIDER == "xai":
+        return XAI_API_KEY
     elif AI_PROVIDER == "minimax":
         return MINIMAX_API_KEY
     elif AI_PROVIDER == "aihubmix":
@@ -1453,7 +1527,7 @@ def get_max_tokens_param(max_tokens_value: int) -> dict:
 
     # Models that require max_completion_tokens instead of max_tokens
     new_api_models = [
-        "o1", "o3", "o4", "gpt-5", "grok-3"
+        "o1", "o3", "o4", "gpt-5", "grok-3", "grok-4"
     ]
 
     # Check if current model uses the new API parameter
@@ -1650,11 +1724,12 @@ def initialize_ai_client():
         )
         logger.info(f"GitHub Models client initialized (model: {get_active_model()})")
     elif AI_PROVIDER == "ollama":
-        # Ollama è locale, non ha API key — il provider viene gestito da providers/manager.py
-        logger.info(f"Ollama provider selected (local, no API key required). Model: {get_active_model()}")
+        # Ollama provider (local or cloud) is handled by providers/manager.py
+        _mode = "cloud" if OLLAMA_API_KEY else "local"
+        logger.info(f"Ollama provider selected ({_mode}). Model: {get_active_model()}")
         ai_client = None
     elif AI_PROVIDER in (
-        "groq", "mistral", "openrouter", "deepseek", "minimax",
+        "groq", "mistral", "openrouter", "deepseek", "xai", "minimax",
         "aihubmix", "siliconflow", "volcengine", "dashscope",
         "moonshot", "zhipu", "github_copilot", "openai_codex",
         "claude_web", "chatgpt_web", "gemini_web", "perplexity_web",
@@ -1782,7 +1857,7 @@ initialize_ai_client()
 # active agent so the first chat request already has the correct system prompt.
 if AGENT_CONFIG_AVAILABLE:
     try:
-        _sync_active_agent_globals()
+        _sync_active_agent_globals(apply_model=True, persist_selection=True, reinitialize_client=True)
         logger.info("Startup: agent globals synced from persisted active agent")
     except Exception as _e:
         logger.warning(f"Startup agent globals sync failed: {_e}")
@@ -3770,7 +3845,17 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     _fb_result = model_fallback.run_with_model_fallback_streaming(
                         provider=_active_provider,
                         model=_active_model,
-                        run=lambda p, m: provider_stream_chat(p, messages, intent_info=intent_info, model=m),
+                        # IMPORTANT: disable ProviderManager auto-fallback here.
+                        # ModelFallback already resolves the chain (agent -> defaults),
+                        # while ProviderManager auto-fallback uses global fallback_config
+                        # and can override agent-specific selections.
+                        run=lambda p, m: provider_stream_chat(
+                            p,
+                            messages,
+                            intent_info=intent_info,
+                            fallback_chain=[],
+                            model=m,
+                        ),
                         agent_id=_agent_id,
                         on_fallback=lambda fp, fm, tp, tm: logger.warning(
                             f"⚡ Fallback: {fp}/{fm} → {tp}/{tm}"
@@ -5384,6 +5469,7 @@ _PROVIDER_SDK_MAP = {
     "groq": None,
     "mistral": None,
     "deepseek": None,
+    "xai": None,
     "openrouter": None,
     "ollama": None,
     "custom": None,
@@ -5503,9 +5589,14 @@ def setup_chat_bubble():
     if _chat_bubble_registered:
         logger.debug("Chat bubble: Already registered, skipping")
         return
-    logger.info(f"Chat bubble setup: ENABLE_CHAT_BUBBLE={ENABLE_CHAT_BUBBLE}, ENABLE_AMIRA_CARD_BUTTON={ENABLE_AMIRA_CARD_BUTTON}")
-    if not ENABLE_CHAT_BUBBLE and not ENABLE_AMIRA_CARD_BUTTON:
-        logger.info("Chat bubble: Both bubble and card button disabled, cleaning up")
+    logger.info(
+        "Chat bubble setup: "
+        f"ENABLE_CHAT_BUBBLE={ENABLE_CHAT_BUBBLE}, "
+        f"ENABLE_AMIRA_CARD_BUTTON={ENABLE_AMIRA_CARD_BUTTON}, "
+        f"ENABLE_AMIRA_AUTOMATION_BUTTON={ENABLE_AMIRA_AUTOMATION_BUTTON}"
+    )
+    if not ENABLE_CHAT_BUBBLE and not ENABLE_AMIRA_CARD_BUTTON and not ENABLE_AMIRA_AUTOMATION_BUTTON:
+        logger.info("Chat bubble: Bubble, card button and automation button disabled, cleaning up")
         cleanup_chat_bubble()
         return
 
@@ -5523,7 +5614,7 @@ def setup_chat_bubble():
             language=LANGUAGE,
             show_bubble=ENABLE_CHAT_BUBBLE,
             show_card_button=ENABLE_AMIRA_CARD_BUTTON,
-            show_automation_button=ENABLE_AMIRA_CARD_BUTTON,
+            show_automation_button=ENABLE_AMIRA_AUTOMATION_BUTTON,
         )
         # Phase 1 split artifacts (kept in sync, not primary resource yet).
         # Keep the first loaded module fully featured: the bubble script has a
@@ -5534,7 +5625,7 @@ def setup_chat_bubble():
             language=LANGUAGE,
             show_bubble=ENABLE_CHAT_BUBBLE,
             show_card_button=ENABLE_AMIRA_CARD_BUTTON,
-            show_automation_button=ENABLE_AMIRA_CARD_BUTTON,
+            show_automation_button=ENABLE_AMIRA_AUTOMATION_BUTTON,
         )
         js_card_content = chat_bubble.get_chat_bubble_js(
             ingress_url=ingress_url,
@@ -5548,7 +5639,7 @@ def setup_chat_bubble():
             language=LANGUAGE,
             show_bubble=False,
             show_card_button=False,
-            show_automation_button=ENABLE_AMIRA_CARD_BUTTON,
+            show_automation_button=ENABLE_AMIRA_AUTOMATION_BUTTON,
         )
 
         # Save split scripts to /config/www/ (served by HA at /local/)
@@ -5688,7 +5779,7 @@ def setup_chat_bubble():
             logger.info(
                 "Chat bubble: Setup complete "
                 f"(bubble={ENABLE_CHAT_BUBBLE}, card_btn={ENABLE_AMIRA_CARD_BUTTON}, "
-                f"automation_btn={ENABLE_AMIRA_CARD_BUTTON}, modular_loader=True)"
+                f"automation_btn={ENABLE_AMIRA_AUTOMATION_BUTTON}, modular_loader=True)"
             )
         else:
             logger.warning("Chat bubble: JS file saved but Lovelace registration may have failed — will retry on next call")
@@ -5781,7 +5872,7 @@ def api_bubble_status():
     return jsonify({
         "bubble_enabled": ENABLE_CHAT_BUBBLE,
         "card_button_enabled": ENABLE_AMIRA_CARD_BUTTON,
-        "automation_button_enabled": ENABLE_AMIRA_CARD_BUTTON,
+        "automation_button_enabled": ENABLE_AMIRA_AUTOMATION_BUTTON,
         "registered_flag": _chat_bubble_registered,
         "ingress_url": ingress_url or "(empty)",
         "js_file": module_files["loader"],  # backward-compat for old UI
@@ -8076,6 +8167,24 @@ def session_chatgpt_web_clear():
 
 
 # ---------------------------------------------------------------------------
+# Grok Web session endpoints
+# ---------------------------------------------------------------------------
+@app.route("/api/session/grok_web/store", methods=["POST"])
+def session_grok_web_store():
+    return jsonify({"error": "grok_web provider removed"}), 410
+
+
+@app.route("/api/session/grok_web/status", methods=["GET"])
+def session_grok_web_status():
+    return jsonify({"configured": False, "removed": True, "error": "grok_web provider removed"}), 200
+
+
+@app.route("/api/session/grok_web/clear", methods=["POST"])
+def session_grok_web_clear():
+    return jsonify({"ok": True, "removed": True}), 200
+
+
+# ---------------------------------------------------------------------------
 # Gemini Web session endpoints
 # ---------------------------------------------------------------------------
 @app.route("/api/session/gemini_web/store", methods=["POST"])
@@ -8363,7 +8472,7 @@ _FALLBACK_CONFIG_FILE = os.path.join(HA_CONFIG_DIR, "amira", "fallback_config.js
 # Default provider priority (same as providers/manager.py)
 _FALLBACK_PRIORITY_DEFAULT = [
     "anthropic", "openai", "google", "deepseek", "github",
-    "groq", "mistral", "openrouter", "nvidia", "perplexity",
+    "groq", "mistral", "openrouter", "xai", "nvidia", "perplexity",
     "minimax", "aihubmix", "siliconflow", "volcengine",
     "dashscope", "moonshot", "zhipu", "ollama", "custom",
 ]
@@ -8374,7 +8483,7 @@ _FALLBACK_KEY_ENV = {
     "google": "GOOGLE_API_KEY", "github": "GITHUB_TOKEN",
     "nvidia": "NVIDIA_API_KEY", "groq": "GROQ_API_KEY",
     "mistral": "MISTRAL_API_KEY", "openrouter": "OPENROUTER_API_KEY",
-    "deepseek": "DEEPSEEK_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
+    "deepseek": "DEEPSEEK_API_KEY", "xai": "XAI_API_KEY", "perplexity": "PERPLEXITY_API_KEY",
     "minimax": "MINIMAX_API_KEY", "aihubmix": "AIHUBMIX_API_KEY",
     "siliconflow": "SILICONFLOW_API_KEY", "volcengine": "VOLCENGINE_API_KEY",
     "dashscope": "DASHSCOPE_API_KEY", "moonshot": "MOONSHOT_API_KEY",
@@ -8385,22 +8494,41 @@ _FALLBACK_KEY_ENV = {
 
 @app.route('/api/fallback_config', methods=['GET'])
 def api_fallback_config_get():
-    """Return current fallback configuration: enabled state and provider priority."""
+    """Return current fallback configuration: enabled state, provider priority, model overrides."""
     enabled = os.getenv("FALLBACK_ENABLED", "true").lower() not in ("false", "0", "no")
 
-    # Load custom priority or use default
+    # Load custom priority / model overrides or use defaults
     custom_priority = []
+    provider_models = {}
     try:
         if os.path.isfile(_FALLBACK_CONFIG_FILE):
             with open(_FALLBACK_CONFIG_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
             custom_priority = data.get("priority", [])
+            pm = data.get("provider_models", {})
+            if isinstance(pm, dict):
+                provider_models = {str(k): str(v) for k, v in pm.items() if isinstance(k, str) and isinstance(v, str) and v.strip()}
+            # Backward compatibility with old experimental shape:
+            # model_priority: [{"provider":"anthropic","model":"claude-opus-4-6"}, ...]
+            if not provider_models:
+                mp = data.get("model_priority", [])
+                if isinstance(mp, list):
+                    for item in mp:
+                        if not isinstance(item, dict):
+                            continue
+                        prov = str(item.get("provider") or "").strip().lower()
+                        mdl = str(item.get("model") or "").strip()
+                        if prov and mdl:
+                            provider_models[prov] = mdl
             if "enabled" in data:
                 enabled = bool(data["enabled"])
     except Exception:
         pass
 
-    priority = custom_priority if custom_priority else _FALLBACK_PRIORITY_DEFAULT
+    if isinstance(custom_priority, list) and custom_priority:
+        priority = [str(p).strip().lower() for p in custom_priority if isinstance(p, str) and str(p).strip()]
+    else:
+        priority = list(_FALLBACK_PRIORITY_DEFAULT)
 
     # Build provider list with status
     providers = []
@@ -8409,7 +8537,12 @@ def api_fallback_config_get():
         env_var = _FALLBACK_KEY_ENV.get(prov, "")
         has_key = bool(env_var and os.getenv(env_var, ""))
         label = PROVIDER_DEFAULTS.get(prov, {}).get("name", prov)
-        providers.append({"id": prov, "configured": has_key, "label": label})
+        providers.append({
+            "id": prov,
+            "configured": has_key,
+            "label": label,
+            "model": provider_models.get(prov, ""),
+        })
         seen.add(prov)
 
     # Add any configured providers not in the priority list
@@ -8418,32 +8551,67 @@ def api_fallback_config_get():
             env_var = _FALLBACK_KEY_ENV.get(prov, "")
             has_key = bool(env_var and os.getenv(env_var, ""))
             label = PROVIDER_DEFAULTS.get(prov, {}).get("name", prov)
-            providers.append({"id": prov, "configured": has_key, "label": label})
+            providers.append({
+                "id": prov,
+                "configured": has_key,
+                "label": label,
+                "model": provider_models.get(prov, ""),
+            })
 
-    return jsonify({"success": True, "enabled": enabled, "providers": providers})
+    return jsonify({
+        "success": True,
+        "enabled": enabled,
+        "providers": providers,
+        "priority": priority,
+        "provider_models": provider_models,
+    })
 
 
 @app.route('/api/fallback_config', methods=['POST'])
 def api_fallback_config_post():
-    """Save fallback configuration (priority order and enabled flag)."""
+    """Save fallback configuration (priority order, enabled flag, model overrides)."""
     data = request.get_json() or {}
     priority = data.get("priority", [])
     enabled = data.get("enabled", True)
+    provider_models = data.get("provider_models", {})
 
     if not isinstance(priority, list):
         return jsonify({"success": False, "error": "priority must be a list"}), 400
+    if provider_models is None:
+        provider_models = {}
+    if not isinstance(provider_models, dict):
+        return jsonify({"success": False, "error": "provider_models must be an object"}), 400
 
     # Validate provider names
     valid_providers = set(_FALLBACK_PRIORITY_DEFAULT) | set(_FALLBACK_KEY_ENV.keys())
     clean_priority = [p for p in priority if isinstance(p, str) and p in valid_providers]
+    clean_provider_models = {}
+    for k, v in provider_models.items():
+        if not isinstance(k, str):
+            continue
+        prov = k.strip().lower()
+        if prov not in valid_providers:
+            continue
+        if v is None:
+            continue
+        mdl = str(v).strip()
+        if mdl:
+            clean_provider_models[prov] = mdl
 
-    config_data = {"priority": clean_priority, "enabled": bool(enabled)}
+    config_data = {
+        "priority": clean_priority,
+        "enabled": bool(enabled),
+        "provider_models": clean_provider_models,
+    }
 
     try:
         os.makedirs(os.path.dirname(_FALLBACK_CONFIG_FILE), exist_ok=True)
         with open(_FALLBACK_CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(config_data, f, indent=2)
-        logger.info(f"Fallback config saved: enabled={enabled}, priority={clean_priority}")
+        logger.info(
+            f"Fallback config saved: enabled={enabled}, priority={clean_priority}, "
+            f"provider_models={list(clean_provider_models.keys())}"
+        )
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Failed to save fallback config: {e}")
@@ -8494,7 +8662,7 @@ def api_settings_get():
                 {"key": "enable_rag", "type": "toggle"},
                 {"key": "enable_chat_bubble", "type": "toggle"},
                 {"key": "enable_amira_card_button", "type": "toggle"},
-                {"key": "fallback_enabled", "type": "toggle"},
+                {"key": "enable_amira_automation_button", "type": "toggle"},
             ],
         },
         {
@@ -8574,7 +8742,7 @@ def api_settings_post():
         logger.info(f"Settings saved and applied: {list(clean.keys())}")
 
         # React to specific settings that need runtime actions
-        if "enable_chat_bubble" in clean or "enable_amira_card_button" in clean:
+        if "enable_chat_bubble" in clean or "enable_amira_card_button" in clean or "enable_amira_automation_button" in clean:
             global _chat_bubble_registered
             _chat_bubble_registered = False  # force re-generation with new flag
             setup_chat_bubble()
@@ -8586,11 +8754,79 @@ def api_settings_post():
                 logger.info("Amira card button: activated via settings UI")
             else:
                 logger.info("Amira card button: deactivated via settings UI")
+            if ENABLE_AMIRA_AUTOMATION_BUTTON:
+                logger.info("Amira automation button: activated via settings UI")
+            else:
+                logger.info("Amira automation button: deactivated via settings UI")
 
         return jsonify({"success": True})
     except Exception as e:
         logger.error(f"Failed to save settings: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/uninstall_cleanup', methods=['POST'])
+def api_uninstall_cleanup():
+    """Cleanup persisted Amira artifacts before uninstall.
+
+    Removes:
+    - Chat bubble resources/files
+    - /config/amira directory (all addon persistent data)
+    Optionally removes dashboards generated under /config/www/dashboards.
+    """
+    data = request.get_json(silent=True) or {}
+    include_dashboards = bool(data.get("include_dashboards", False))
+
+    removed: List[str] = []
+    errors: List[str] = []
+
+    # 1) Remove bubble resources and JS artifacts.
+    try:
+        cleanup_chat_bubble()
+        removed.append("bubble_resources_and_js")
+    except Exception as e:
+        errors.append(f"bubble_cleanup: {e}")
+
+    # 2) Clear in-memory conversation/session state.
+    try:
+        conversations.clear()
+        abort_streams.clear()
+        read_only_sessions.clear()
+        session_last_intent.clear()
+        session_last_preview.clear()
+        removed.append("runtime_memory_state")
+    except Exception as e:
+        errors.append(f"runtime_state: {e}")
+
+    # 3) Remove persisted addon data root.
+    amira_dir = os.path.join(HA_CONFIG_DIR, "amira")
+    try:
+        if os.path.isdir(amira_dir):
+            shutil.rmtree(amira_dir)
+            removed.append(amira_dir)
+    except Exception as e:
+        errors.append(f"{amira_dir}: {e}")
+
+    # 4) Optional: remove generated dashboards folder.
+    if include_dashboards:
+        dashboards_dir = os.path.join(HA_CONFIG_DIR, "www", "dashboards")
+        try:
+            if os.path.isdir(dashboards_dir):
+                shutil.rmtree(dashboards_dir)
+                removed.append(dashboards_dir)
+        except Exception as e:
+            errors.append(f"{dashboards_dir}: {e}")
+
+    logger.info(
+        f"Uninstall cleanup executed: removed={len(removed)} include_dashboards={include_dashboards} "
+        f"errors={len(errors)}"
+    )
+    return jsonify({
+        "success": len(errors) == 0,
+        "removed": removed,
+        "errors": errors,
+        "include_dashboards": include_dashboards,
+    }), (200 if len(errors) == 0 else 207)
 
 
 # Register blueprints

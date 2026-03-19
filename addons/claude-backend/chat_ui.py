@@ -253,6 +253,7 @@ def get_chat_ui():
             "settings_enable_rag": "RAG",
             "settings_enable_chat_bubble": "Chat Bubble",
             "settings_enable_amira_card_button": "Amira Card Button",
+            "settings_enable_amira_automation_button": "Amira Automation Button",
             "settings_enable_mcp": "MCP Servers",
             "settings_fallback_enabled": "Auto Fallback",
             "settings_anthropic_thinking": "Anthropic Thinking",
@@ -288,6 +289,7 @@ def get_chat_ui():
             "settings_desc_enable_rag": "[EXPERIMENTAL] Enable RAG (Retrieval-Augmented Generation) for document search and context injection",
             "settings_desc_enable_chat_bubble": "Show a floating AI chat bubble on every HA page.",
             "settings_desc_enable_amira_card_button": "Show the Amira button inside the Lovelace card editor dialog for AI-assisted card editing.",
+            "settings_desc_enable_amira_automation_button": "Show the Amira button and flowchart helper in the Home Assistant automation editor.",
             "settings_desc_enable_mcp": "Enable MCP (Model Context Protocol) support. When disabled, Amira skips MCP server connections at startup.",
             "mcp_config_path": "Config File",
             "settings_desc_mcp_config_file": "Path to MCP configuration JSON file",
@@ -557,6 +559,7 @@ def get_chat_ui():
             "settings_enable_rag": "RAG",
             "settings_enable_chat_bubble": "Bolla Chat",
             "settings_enable_amira_card_button": "Pulsante Amira Card",
+            "settings_enable_amira_automation_button": "Pulsante Amira Automazioni",
             "settings_enable_mcp": "Server MCP",
             "settings_fallback_enabled": "Fallback Automatico",
             "settings_anthropic_thinking": "Pensiero Anthropic",
@@ -591,6 +594,7 @@ def get_chat_ui():
             "settings_desc_enable_rag": "[SPERIMENTALE] Abilita RAG (Retrieval-Augmented Generation) per ricerca documenti e iniezione contesto",
             "settings_desc_enable_chat_bubble": "Mostra una bolla chat AI flottante su ogni pagina di HA.",
             "settings_desc_enable_amira_card_button": "Mostra il pulsante Amira nel dialog dell'editor card Lovelace per la modifica assistita dall'AI.",
+            "settings_desc_enable_amira_automation_button": "Mostra il pulsante Amira e l'aiuto flowchart nell'editor automazioni di Home Assistant.",
             "settings_desc_enable_mcp": "Abilita il supporto MCP (Model Context Protocol). Se disattivato, Amira non si connette agli MCP server all'avvio.",
             "mcp_config_path": "File di Configurazione",
             "settings_desc_mcp_config_file": "Percorso del file JSON di configurazione MCP",
@@ -1672,7 +1676,7 @@ def get_chat_ui():
         .msg-modal-header button {{ background:none; border:none; font-size:20px; cursor:pointer; color:#666; line-height:1; padding:2px 6px; border-radius:6px; }}
         .msg-modal-header button:hover {{ background:#eee; }}
         .msg-modal-body {{ flex:1; overflow-y:auto; padding:16px 18px; display:flex; flex-direction:column; gap:10px; }}
-        .msg-bubble {{ max-width:80%; padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.5; word-wrap:break-word; }}
+        .msg-bubble {{ max-width:80%; padding:10px 14px; border-radius:16px; font-size:13px; line-height:1.5; word-wrap:break-word; overflow-wrap:anywhere; white-space:pre-wrap; }}
         .msg-bubble.user {{ align-self:flex-end; background:#2196F3; color:#fff; border-bottom-right-radius:4px; }}
         .msg-bubble.assistant {{ align-self:flex-start; background:#f0f0f0; color:#222; border-bottom-left-radius:4px; }}
         .msg-bubble.assistant.error {{ background:#fde8e8; color:#b71c1c; }}
@@ -4362,6 +4366,7 @@ def get_chat_ui():
             {{ file: 'amira/fallback_config.json', icon: '\U0001f504', title: T.config_llm_title || 'LLM Priority', desc: 'fallback_config.json', formBased: 'llm_priority' }},
             {{ file: 'amira_models_cache.json', icon: '\U0001f5c3\ufe0f', title: T.config_model_cache_title || 'Model Cache', desc: '/data/amira_models_cache.json', formBased: 'model_cache' }},
             {{ file: 'amira/settings.json', icon: '\u2699\ufe0f', title: T.config_settings_title || 'Settings', desc: 'settings.json', formBased: 'settings' }},
+            {{ file: 'amira/uninstall_cleanup', icon: '\U0001f9f9', title: 'Uninstall Cleanup', desc: 'remove persisted Amira data', formBased: 'uninstall_cleanup' }},
         ];
         let configActiveFile = null;
         let configOriginalContent = '';
@@ -4434,6 +4439,10 @@ def get_chat_ui():
             }}
             if (cf.formBased === 'model_cache') {{
                 await openModelCacheUI();
+                return;
+            }}
+            if (cf.formBased === 'uninstall_cleanup') {{
+                await openUninstallCleanupUI();
                 return;
             }}
 
@@ -5435,12 +5444,70 @@ def get_chat_ui():
             if (!filePanelContentEl) return;
             filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
 
-            let fbData = {{ enabled: true, providers: [] }};
+            let fbData = {{ enabled: true, providers: [], provider_models: {{}} }};
+            let modelsByProvider = {{}};
+            const normalizeFallbackModels = (payload) => {{
+                const out = {{}};
+                if (!payload || typeof payload !== 'object') return out;
+
+                const secTech = payload.models_sections_technical || {{}};
+                const secDisp = payload.models_sections || {{}};
+                const allTech = payload.models_technical || {{}};
+                const allDisp = payload.models || {{}};
+
+                const providers = new Set([
+                    ...Object.keys(secTech || {{}}),
+                    ...Object.keys(secDisp || {{}}),
+                    ...Object.keys(allTech || {{}}),
+                    ...Object.keys(allDisp || {{}}),
+                ]);
+
+                const toModelObjs = (arrTech, arrDisp) => {{
+                    const techArr = Array.isArray(arrTech) ? arrTech : [];
+                    const dispArr = Array.isArray(arrDisp) ? arrDisp : [];
+                    const res = [];
+                    for (let i = 0; i < techArr.length; i++) {{
+                        const tech = String(techArr[i] || '').trim();
+                        if (!tech) continue;
+                        const name = String(dispArr[i] || tech).trim() || tech;
+                        res.push({{ tech, name }});
+                    }}
+                    return res;
+                }};
+
+                providers.forEach((prov) => {{
+                    const st = secTech && secTech[prov];
+                    const sd = secDisp && secDisp[prov];
+                    let fixed = [];
+                    let dynamic = [];
+
+                    // Preferred shape from /api/get_models:
+                    // models_sections_technical[provider] = {{ fixed: [...], dynamic: [...] }}
+                    if (st && typeof st === 'object' && (Array.isArray(st.fixed) || Array.isArray(st.dynamic))) {{
+                        fixed = toModelObjs(st.fixed, (sd && sd.fixed) || []);
+                        dynamic = toModelObjs(st.dynamic, (sd && sd.dynamic) || []);
+                    }} else {{
+                        // Backward-compatible fallback:
+                        // models_technical[provider] + models[provider]
+                        fixed = toModelObjs((allTech && allTech[prov]) || [], (allDisp && allDisp[prov]) || []);
+                        dynamic = [];
+                    }}
+
+                    out[prov] = {{ fixed, dynamic }};
+                }});
+
+                return out;
+            }};
             try {{
                 const resp = await fetch(apiUrl('api/fallback_config'), {{credentials:'same-origin'}});
                 const data = await resp.json();
                 if (data.success) fbData = data;
             }} catch(e) {{ console.warn('Failed to load fallback config', e); }}
+            try {{
+                const resp = await fetch(apiUrl('api/get_models'), {{credentials:'same-origin'}});
+                const data = await resp.json();
+                modelsByProvider = normalizeFallbackModels(data);
+            }} catch(e) {{ console.warn('Failed to load models for fallback UI', e); }}
 
             filePanelContentEl.innerHTML = '';
             const wrap = document.createElement('div');
@@ -5514,6 +5581,10 @@ def get_chat_ui():
             listEl.style.pointerEvents = fbData.enabled ? 'auto' : 'none';
 
             let providers = fbData.providers || [];
+            providers = providers.map(p => {{
+                const selected = (fbData.provider_models && fbData.provider_models[p.id]) || p.model || '';
+                return {{ ...p, model: selected }};
+            }});
 
             function renderList() {{
                 listEl.innerHTML = '';
@@ -5535,6 +5606,37 @@ def get_chat_ui():
                         nokey.textContent = ' (' + (T.llm_no_key || 'no key') + ')';
                         name.appendChild(nokey);
                     }}
+                    const modelSel = document.createElement('select');
+                    modelSel.className = 'settings-select';
+                    modelSel.style.cssText = 'max-width:280px;min-width:180px;font-size:12px;padding:4px 8px;';
+                    const modelDefaultOpt = document.createElement('option');
+                    modelDefaultOpt.value = '';
+                    modelDefaultOpt.textContent = (T.none || 'Default provider model');
+                    modelSel.appendChild(modelDefaultOpt);
+                    const fixed = (modelsByProvider[p.id] && Array.isArray(modelsByProvider[p.id].fixed)) ? modelsByProvider[p.id].fixed : [];
+                    const dynamic = (modelsByProvider[p.id] && Array.isArray(modelsByProvider[p.id].dynamic)) ? modelsByProvider[p.id].dynamic : [];
+                    const allModels = [...fixed, ...dynamic];
+                    const seenModels = new Set();
+                    allModels.forEach(m => {{
+                        const tech = (typeof m === 'string') ? m : ((m && m.tech) || '');
+                        const label = (typeof m === 'string') ? m : ((m && m.name) || tech);
+                        if (!tech || seenModels.has(tech)) return;
+                        seenModels.add(tech);
+                        const opt = document.createElement('option');
+                        opt.value = tech;
+                        opt.textContent = label + ' (' + tech + ')';
+                        modelSel.appendChild(opt);
+                    }});
+                    if (p.model && !seenModels.has(p.model)) {{
+                        const opt = document.createElement('option');
+                        opt.value = p.model;
+                        opt.textContent = p.model + ' (' + (T.config_current || 'current') + ')';
+                        modelSel.appendChild(opt);
+                    }}
+                    modelSel.value = p.model || '';
+                    modelSel.addEventListener('change', () => {{
+                        p.model = modelSel.value || '';
+                    }});
                     const btnWrap = document.createElement('span');
                     btnWrap.style.cssText = 'display:flex;gap:2px;flex-shrink:0;';
                     const upBtn = document.createElement('button');
@@ -5560,6 +5662,7 @@ def get_chat_ui():
                     li.appendChild(num);
                     li.appendChild(dot);
                     li.appendChild(name);
+                    li.appendChild(modelSel);
                     li.appendChild(btnWrap);
                     listEl.appendChild(li);
                 }});
@@ -5580,9 +5683,14 @@ def get_chat_ui():
                 saveBtn.disabled = true;
                 saveBtn.textContent = '\u23F3 ...';
                 try {{
+                    const providerModels = {{}};
+                    providers.forEach(p => {{
+                        if (p.model) providerModels[p.id] = p.model;
+                    }});
                     const payload = {{
                         enabled: toggleInput.checked,
-                        priority: providers.map(p => p.id)
+                        priority: providers.map(p => p.id),
+                        provider_models: providerModels,
                     }};
                     const resp = await fetch(apiUrl('api/fallback_config'), {{
                         method: 'POST',
@@ -5744,6 +5852,107 @@ def get_chat_ui():
             filePanelContentEl.appendChild(wrap);
         }}
 
+        async function openUninstallCleanupUI() {{
+            if (!filePanelContentEl) return;
+            filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
+
+            filePanelContentEl.innerHTML = '';
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+
+            const hdr = document.createElement('div');
+            hdr.className = 'agent-list-header';
+            hdr.innerHTML = '<h3>\U0001f9f9 Uninstall Cleanup</h3>';
+            wrap.appendChild(hdr);
+
+            const body = document.createElement('div');
+            body.style.cssText = 'flex:1;overflow-y:auto;padding:14px;';
+
+            const info = document.createElement('div');
+            info.style.cssText = 'font-size:13px;line-height:1.6;color:#666;padding:12px;border:1px solid #e6e6e6;border-radius:10px;background:#fafafa;';
+            info.innerHTML =
+                '<b>Use this before uninstalling the addon.</b><br>' +
+                'It removes Amira persisted data in <code>/config/amira</code> and cleans chat bubble resources/files.';
+            body.appendChild(info);
+
+            const dashRow = document.createElement('label');
+            dashRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12px;color:#666;';
+            const dashCheck = document.createElement('input');
+            dashCheck.type = 'checkbox';
+            dashCheck.checked = false;
+            dashRow.appendChild(dashCheck);
+            const dashTxt = document.createElement('span');
+            dashTxt.textContent = 'Also remove /config/www/dashboards (generated dashboards)';
+            dashRow.appendChild(dashTxt);
+            body.appendChild(dashRow);
+
+            const actionRow = document.createElement('div');
+            actionRow.style.cssText = 'margin-top:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;';
+            const runBtn = document.createElement('button');
+            runBtn.className = 'config-save-btn';
+            runBtn.style.cssText = 'background:#c62828;padding:8px 16px;font-size:13px;';
+            runBtn.textContent = '🧹 Run Cleanup';
+            const st = document.createElement('span');
+            st.style.cssText = 'font-size:12px;color:#777;white-space:pre-wrap;';
+            actionRow.appendChild(runBtn);
+            actionRow.appendChild(st);
+            body.appendChild(actionRow);
+
+            runBtn.addEventListener('click', async () => {{
+                const targets = [
+                    '- Risorse Lovelace e file JS della chat bubble',
+                    '- Tutta la cartella /config/amira (chat, conversazioni, impostazioni, agenti, snapshot, documenti, ecc.)',
+                ];
+                if (dashCheck.checked) {{
+                    targets.push('- Cartella /config/www/dashboards (dashboard generate)');
+                }}
+                targets.push('');
+                targets.push('Questa operazione è irreversibile.');
+                targets.push('Continuare?');
+                const confirm1 = window.confirm('Verranno eliminati:\\n\\n' + targets.join('\\n'));
+                if (!confirm1) return;
+                const confirmText = window.prompt('Digita ELIMINA per confermare il cleanup pre-disinstallazione:');
+                if ((confirmText || '').trim().toUpperCase() !== 'ELIMINA') {{
+                    st.style.color = '#f44336';
+                    st.textContent = 'Conferma non valida. Cleanup annullato.';
+                    return;
+                }}
+
+                runBtn.disabled = true;
+                runBtn.textContent = '⏳ ...';
+                st.style.color = '#777';
+                st.textContent = 'Cleanup in corso...';
+
+                try {{
+                    const resp = await fetch(apiUrl('api/uninstall_cleanup'), {{
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        credentials: 'same-origin',
+                        body: JSON.stringify({{ include_dashboards: !!dashCheck.checked }})
+                    }});
+                    const data = await resp.json().catch(() => ({{}}));
+                    const removed = Array.isArray(data.removed) ? data.removed : [];
+                    const errors = Array.isArray(data.errors) ? data.errors : [];
+                    if (resp.ok && (!errors.length)) {{
+                        st.style.color = '#2e7d32';
+                        st.textContent = 'Cleanup completato. Ora puoi disinstallare l\\'addon in sicurezza.\\nRimosso: ' + (removed.join(', ') || 'n/a');
+                    }} else {{
+                        st.style.color = '#ef6c00';
+                        st.textContent = 'Cleanup parziale.\\nRimosso: ' + (removed.join(', ') || 'n/a') + '\\nErrori: ' + (errors.join(' | ') || 'n/a');
+                    }}
+                }} catch(e) {{
+                    st.style.color = '#f44336';
+                    st.textContent = 'Errore cleanup: ' + (e.message || 'Unknown');
+                }} finally {{
+                    runBtn.disabled = false;
+                    runBtn.textContent = '🧹 Run Cleanup';
+                }}
+            }});
+
+            wrap.appendChild(body);
+            filePanelContentEl.appendChild(wrap);
+        }}
+
         async function openSettingsUI() {{
             if (!filePanelContentEl) return;
             filePanelContentEl.innerHTML = '<div style="padding:20px;color:#999;">' + (T.config_loading || 'Loading...') + '</div>';
@@ -5780,8 +5989,8 @@ def get_chat_ui():
                 enable_rag: T.settings_enable_rag || 'RAG',
                 enable_chat_bubble: T.settings_enable_chat_bubble || 'Chat Bubble',
                 enable_amira_card_button: T.settings_enable_amira_card_button || 'Amira Card Button',
+                enable_amira_automation_button: T.settings_enable_amira_automation_button || 'Amira Automation Button',
                 enable_mcp: T.settings_enable_mcp || 'MCP Servers',
-                fallback_enabled: T.settings_fallback_enabled || 'Auto Fallback',
                 anthropic_extended_thinking: T.settings_anthropic_thinking || 'Anthropic Thinking',
                 anthropic_prompt_caching: T.settings_anthropic_caching || 'Prompt Caching',
                 openai_extended_thinking: T.settings_openai_thinking || 'OpenAI Thinking',
@@ -5924,160 +6133,6 @@ def get_chat_ui():
                 sec.appendChild(secHeader);
                 sec.appendChild(secBody);
                 body.appendChild(sec);
-            }});
-
-            // ---- Model Cache panel ----
-            const cacheSec = document.createElement('div');
-            cacheSec.className = 'settings-section';
-            const cacheHdr = document.createElement('div');
-            cacheHdr.className = 'settings-section-header';
-            const cacheTitle = document.createElement('span');
-            cacheTitle.textContent = '\U0001f5c3\ufe0f ' + (T.settings_model_cache_title || 'Model Cache').toUpperCase();
-            cacheHdr.appendChild(cacheTitle);
-            const cacheArrow = document.createElement('span');
-            cacheArrow.className = 'settings-section-arrow';
-            cacheArrow.textContent = '\u25B6';
-            cacheHdr.appendChild(cacheArrow);
-            const cacheBody = document.createElement('div');
-            cacheBody.className = 'settings-section-body';
-            cacheBody.style.display = 'none';
-            cacheSec.appendChild(cacheHdr);
-            cacheSec.appendChild(cacheBody);
-            body.appendChild(cacheSec);
-
-            function _cacheMapToText(title, mp) {{
-                const lines = [];
-                const keys = Object.keys(mp || {{}}).sort();
-                if (!keys.length) return (T.settings_model_cache_empty || 'No models');
-                keys.forEach(k => {{
-                    const arr = Array.isArray(mp[k]) ? mp[k] : [];
-                    lines.push(`[${{k}}] (${{arr.length}})`);
-                    arr.forEach(m => lines.push('  - ' + m));
-                    lines.push('');
-                }});
-                return lines.join('\\n').trim() || (T.settings_model_cache_empty || 'No models');
-            }}
-
-            async function renderModelCacheStatus() {{
-                cacheBody.innerHTML = '<div style="padding:8px 14px;color:#999;">' + (T.settings_model_cache_loading || 'Loading model cache...') + '</div>';
-                try {{
-                    const resp = await fetch(apiUrl('api/models/cache/status'), {{credentials:'same-origin'}});
-                    const data = await resp.json().catch(() => ({{}}));
-                    if (!resp.ok || !data || !data.success) {{
-                        throw new Error((data && (data.error || data.message)) || ('HTTP ' + resp.status));
-                    }}
-                    const fmtUpdatedAt = (raw) => {{
-                        try {{
-                            const d = new Date(raw);
-                            if (Number.isNaN(d.getTime())) return String(raw || '');
-                            return d.toLocaleString([], {{ dateStyle: 'short', timeStyle: 'medium' }});
-                        }} catch(_e) {{
-                            return String(raw || '');
-                        }}
-                    }};
-
-                    const toolbar = document.createElement('div');
-                    toolbar.className = 'model-cache-toolbar';
-
-                    const refreshBtn = document.createElement('button');
-                    refreshBtn.className = 'config-save-btn';
-                    refreshBtn.style.cssText = 'padding:6px 12px;font-size:12px;background:#1976d2;';
-                    refreshBtn.textContent = '\U0001F504 ' + (T.settings_refresh_models_cache || 'Refresh Models Cache');
-
-                    const clearBtn = document.createElement('button');
-                    clearBtn.className = 'config-save-btn';
-                    clearBtn.style.cssText = 'padding:6px 12px;font-size:12px;background:#d32f2f;';
-                    clearBtn.textContent = '\U0001F5D1\uFE0F ' + (T.settings_clear_models_cache || 'Clear Models Cache');
-
-                    const cacheStatus = document.createElement('span');
-                    cacheStatus.className = 'model-cache-status';
-                    const updated = data.updated_at ? (' — ' + (T.settings_model_cache_updated_at || 'Updated') + ': ' + fmtUpdatedAt(data.updated_at)) : '';
-                    cacheStatus.textContent = updated || '';
-
-                    refreshBtn.addEventListener('click', async () => {{
-                        refreshBtn.disabled = true;
-                        refreshBtn.textContent = '\u23F3 ...';
-                        try {{
-                            const r = await fetch(apiUrl('api/models/cache/refresh'), {{
-                                method: 'POST',
-                                headers: {{'Content-Type': 'application/json'}},
-                                credentials: 'same-origin',
-                            }});
-                            const d = await r.json();
-                            if (!d.success) throw new Error(d.error || 'Refresh failed');
-                            cacheStatus.textContent = '\u2705 ' + (T.settings_refresh_models_cache_done || 'Models cache refreshed!');
-                            try {{ _cachedProviders = []; _cachedModels = {{}}; }} catch(_e) {{}}
-                            await renderModelCacheStatus();
-                        }} catch(e) {{
-                            cacheStatus.textContent = '\u274C ' + ((T.settings_refresh_models_cache_error || 'Failed to refresh models cache') + ': ' + (e.message || 'Error'));
-                        }} finally {{
-                            refreshBtn.disabled = false;
-                            refreshBtn.textContent = '\U0001F504 ' + (T.settings_refresh_models_cache || 'Refresh Models Cache');
-                        }}
-                    }});
-
-                    clearBtn.addEventListener('click', async () => {{
-                        const msg = T.settings_clear_models_cache_confirm || 'Clear cached dynamic provider models now?';
-                        if (!window.confirm(msg)) return;
-                        clearBtn.disabled = true;
-                        clearBtn.textContent = '\u23F3 ...';
-                        try {{
-                            const r = await fetch(apiUrl('api/models/cache/clear'), {{
-                                method: 'POST',
-                                headers: {{'Content-Type': 'application/json'}},
-                                credentials: 'same-origin',
-                            }});
-                            const d = await r.json();
-                            if (!d.success) throw new Error(d.error || 'Clear failed');
-                            cacheStatus.textContent = '\u2705 ' + (T.settings_clear_models_cache_done || 'Models cache cleared!');
-                            try {{ _cachedProviders = []; _cachedModels = {{}}; }} catch(_e) {{}}
-                            await renderModelCacheStatus();
-                        }} catch(e) {{
-                            cacheStatus.textContent = '\u274C ' + ((T.settings_clear_models_cache_error || 'Failed to clear models cache') + ': ' + (e.message || 'Error'));
-                        }} finally {{
-                            clearBtn.disabled = false;
-                            clearBtn.textContent = '\U0001F5D1\uFE0F ' + (T.settings_clear_models_cache || 'Clear Models Cache');
-                        }}
-                    }});
-
-                    toolbar.appendChild(refreshBtn);
-                    toolbar.appendChild(clearBtn);
-                    toolbar.appendChild(cacheStatus);
-
-                    const grid = document.createElement('div');
-                    grid.className = 'model-cache-grid';
-
-                    const mkBox = (title, text) => {{
-                        const box = document.createElement('div');
-                        box.className = 'model-cache-box';
-                        const h = document.createElement('h5');
-                        h.textContent = title;
-                        const pre = document.createElement('pre');
-                        pre.textContent = text || (T.settings_model_cache_empty || 'No models');
-                        box.appendChild(h);
-                        box.appendChild(pre);
-                        return box;
-                    }};
-
-                    grid.appendChild(mkBox(T.settings_model_cache_fixed || 'Fixed Models', _cacheMapToText('fixed', data.fixed || {{}})));
-                    grid.appendChild(mkBox(T.settings_model_cache_dynamic || 'Dynamic Models (cache)', _cacheMapToText('dynamic', data.dynamic || {{}})));
-                    grid.appendChild(mkBox(T.settings_model_cache_blocklist || 'Blocked Models', _cacheMapToText('blocklist', data.blocklist || {{}})));
-                    grid.appendChild(mkBox(T.settings_model_cache_uncertain || 'Uncertain Test Results', _cacheMapToText('uncertain', data.uncertain || {{}})));
-                    grid.appendChild(mkBox(T.settings_model_cache_nvidia_tested || 'NVIDIA Tested OK', (Array.isArray(data.nvidia_tested_ok) && data.nvidia_tested_ok.length) ? data.nvidia_tested_ok.map(m => '- ' + m).join('\\n') : (T.settings_model_cache_empty || 'No models')));
-
-                    cacheBody.innerHTML = '';
-                    cacheBody.appendChild(toolbar);
-                    cacheBody.appendChild(grid);
-                }} catch(e) {{
-                    cacheBody.innerHTML = '<div style="padding:8px 14px;color:#f44336;">' + _escHtml(String(e && e.message ? e.message : e)) + '</div>';
-                }}
-            }}
-
-            cacheHdr.addEventListener('click', async () => {{
-                const isOpen = cacheBody.style.display !== 'none';
-                cacheBody.style.display = isOpen ? 'none' : 'block';
-                cacheArrow.textContent = isOpen ? '\u25B6' : '\u25BC';
-                if (!isOpen) await renderModelCacheStatus();
             }});
 
             // Save button
@@ -7609,7 +7664,8 @@ def get_chat_ui():
                                 addMessage('\u274c ' + evt.message, 'system');
                                 // If web session expired server-side, refresh banner immediately
                                 if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
-                                else if (currentProviderId === 'claude_web') checkClaudeWebSession(); else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
+                                else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                                else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
                             }} else if (evt.type === 'done') {{
                                 removeThinking();
 
@@ -8401,6 +8457,7 @@ def get_chat_ui():
             'ollama': '🦙 Ollama (Local)',
             'openrouter': '🔀 OpenRouter',
             'deepseek': '🔍 DeepSeek',
+            'xai': '🧠 xAI (Grok)',
             'minimax': '🎭 MiniMax',
             'aihubmix': '🌐 AiHubMix',
             'siliconflow': '💎 SiliconFlow',
@@ -8465,7 +8522,7 @@ def get_chat_ui():
         let _selectOpen = false;
 
         function _stripProviderPrefix(model) {{
-            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|Claude Web|ChatGPT Web|Gemini Web|Perplexity Web|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
+            return model.replace(/^(Claude|OpenAI|Google|NVIDIA|GitHub Models|GitHub Copilot|OpenAI Codex|Claude Web|ChatGPT Web|Gemini Web|Perplexity Web|GitHub|Groq|Mistral|Ollama|OpenRouter|DeepSeek|xAI|MiniMax|AiHubMix|SiliconFlow|VolcEngine|DashScope|Moonshot|Zhipu):\\s*/, '');
         }}
 
         // Capability badge helper
@@ -8597,7 +8654,7 @@ def get_chat_ui():
                 const providerOrder = [
                     'anthropic', 'openai', 'google', 'nvidia', 'github',
                     'groq', 'mistral', 'ollama', 'openrouter',
-                    'deepseek', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
+                    'deepseek', 'xai', 'minimax', 'aihubmix', 'siliconflow', 'volcengine',
                     'dashscope', 'moonshot', 'zhipu',
                     // --- Web providers (always last) ---
                     'github_copilot', 'openai_codex', 'claude_web', 'chatgpt_web', 'gemini_web', 'perplexity_web'

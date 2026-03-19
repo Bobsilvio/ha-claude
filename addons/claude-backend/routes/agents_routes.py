@@ -131,23 +131,16 @@ def api_agent_set_active():
         if not mgr.set_active_agent(agent_id):
             return jsonify({"success": False, "error": f"Agent '{agent_id}' not found or disabled"}), 404
 
-        # Sync AGENT_SYSTEM_PROMPT_OVERRIDE and other globals immediately
-        _api._sync_active_agent_globals()
+        # Sync agent identity/instructions and (if configured) model/provider.
+        _api._sync_active_agent_globals(
+            apply_model=True,
+            persist_selection=True,
+            reinitialize_client=True,
+        )
 
-        # If agent has a configured model, apply it as the active model
-        # (user can still override via the cascade dropdowns)
         agent = mgr.resolve_agent(agent_id)
         if agent and agent.model_config.primary:
             ref = agent.model_config.primary
-            _api.AI_PROVIDER = ref.provider
-            _api.AI_MODEL = ref.model
-            _api.SELECTED_PROVIDER = ref.provider
-            _api.SELECTED_MODEL = ref.model
-            try:
-                _api.save_runtime_selection(_api.AI_PROVIDER, _api.AI_MODEL)
-                _api.initialize_ai_client()
-            except Exception:
-                pass
             logger.info(f"Agent '{agent_id}' activated -> model {ref.provider}/{ref.model}")
 
         identity = mgr.resolve_identity(agent_id)

@@ -14,6 +14,7 @@ import time
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
 from .error_handler import ErrorTranslator
+from .ollama import resolve_ollama_base_url
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ _PROVIDER_KEY_ENV: Dict[str, str] = {
     "mistral": "MISTRAL_API_KEY",
     "openrouter": "OPENROUTER_API_KEY",
     "deepseek": "DEEPSEEK_API_KEY",
+    "xai": "XAI_API_KEY",
     "perplexity": "PERPLEXITY_API_KEY",
     "minimax": "MINIMAX_API_KEY",
     "aihubmix": "AIHUBMIX_API_KEY",
@@ -43,7 +45,7 @@ _PROVIDER_KEY_ENV: Dict[str, str] = {
 # Preferred fallback order (higher-quality providers first).
 _FALLBACK_PRIORITY = [
     "anthropic", "openai", "google", "deepseek", "github",
-    "groq", "mistral", "openrouter", "nvidia", "perplexity",
+    "groq", "mistral", "openrouter", "xai", "nvidia", "perplexity",
     "minimax", "aihubmix", "siliconflow", "volcengine",
     "dashscope", "moonshot", "zhipu", "ollama", "custom",
 ]
@@ -55,7 +57,10 @@ _FALLBACK_CONFIG_PATH = "/config/amira/fallback_config.json"
 def _load_fallback_config() -> dict:
     """Load fallback config from /config/amira/fallback_config.json.
 
-    Returns dict with optional keys: 'priority' (list), 'enabled' (bool).
+    Returns dict with optional keys:
+    - 'priority' (list[str])
+    - 'enabled' (bool)
+    - 'provider_models' (dict[provider, model_id])
     """
     try:
         if os.path.isfile(_FALLBACK_CONFIG_PATH):
@@ -102,6 +107,42 @@ def _build_fallback_chain(primary: str) -> List[str]:
     return chain
 
 
+def _build_fallback_model_overrides(primary: str) -> Dict[str, str]:
+    """Return fallback model overrides from fallback_config.json.
+
+    The returned map contains only fallback providers (primary excluded).
+    """
+    fb_config = _load_fallback_config()
+    raw = fb_config.get("provider_models", {})
+    out: Dict[str, str] = {}
+
+    # Backward compatibility with old shape:
+    # model_priority: [{"provider":"anthropic","model":"claude-opus-4-6"}, ...]
+    if not isinstance(raw, dict) or not raw:
+        raw = {}
+        mp = fb_config.get("model_priority", [])
+        if isinstance(mp, list):
+            for item in mp:
+                if not isinstance(item, dict):
+                    continue
+                prov = str(item.get("provider") or "").strip().lower()
+                mdl = str(item.get("model") or "").strip()
+                if prov and mdl:
+                    raw[prov] = mdl
+
+    if not isinstance(raw, dict):
+        return out
+
+    for prov, model in raw.items():
+        p = str(prov).strip().lower()
+        m = str(model).strip()
+        if not p or not m or p == primary:
+            continue
+        if p in _PROVIDER_KEY_ENV:
+            out[p] = m
+    return out
+
+
 class ProviderManager:
     """Manager for orchestrating LLM provider selection and streaming.
     
@@ -134,6 +175,7 @@ class ProviderManager:
         messages: List[Dict[str, Any]],
         intent_info: Optional[Dict[str, Any]] = None,
         fallback_providers: Optional[List[str]] = None,
+        fallback_models: Optional[Dict[str, str]] = None,
         model: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream chat with enhanced (v3.17.12+) features.
@@ -149,10 +191,24 @@ class ProviderManager:
         enhanced = self._get_enhanced_manager()
         if enhanced:
             logger.debug("Using enhanced provider orchestration")
-            yield from enhanced.stream_chat_unified(provider, messages, intent_info, fallback_providers, model=model)
+            yield from enhanced.stream_chat_unified(
+                provider,
+                messages,
+                intent_info,
+                fallback_providers,
+                fallback_models=fallback_models,
+                model=model,
+            )
         else:
             logger.debug("Falling back to legacy provider orchestration")
-            yield from self.stream_chat_unified(provider, messages, intent_info, fallback_providers, model=model)
+            yield from self.stream_chat_unified(
+                provider,
+                messages,
+                intent_info,
+                fallback_providers,
+                fallback_models=fallback_models,
+                model=model,
+            )
     
     def get_provider_dashboard(self) -> Dict[str, Any]:
         """Get provider status dashboard (v3.17.12+ feature).
@@ -186,6 +242,7 @@ class ProviderManager:
         messages: List[Dict[str, Any]],
         intent_info: Optional[Dict[str, Any]] = None,
         fallback_providers: Optional[List[str]] = None,
+        fallback_models: Optional[Dict[str, str]] = None,
         model: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream a chat completion with automatic fallback on error.
@@ -213,8 +270,9 @@ class ProviderManager:
                 event_count = 0
                 content_started = False  # True after first content/text event
                 last_error_event = None
+                effective_model = model if prov == provider else (fallback_models or {}).get(prov)
 
-                for event in self._stream_with_provider(prov, messages, intent_info, model=model):
+                for event in self._stream_with_provider(prov, messages, intent_info, model=effective_model):
                     event_count += 1
                     last_event = event
 
@@ -351,6 +409,7 @@ class ProviderManager:
             "ollama": "OLLAMA",
             "openrouter": "OPENROUTER",
             "deepseek": "DEEPSEEK",
+            "xai": "XAI",
             "minimax": "MINIMAX",
             "aihubmix": "AIHUBMIX",
             "siliconflow": "SILICONFLOW",
@@ -389,7 +448,10 @@ class ProviderManager:
         
         # Instantiate provider with credentials
         if provider == "ollama":
-            base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            base_url = resolve_ollama_base_url(
+                base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
+                api_key=api_key,
+            )
             provider_instance = provider_class(api_key=api_key, model=model, base_url=base_url)
         elif provider == "custom":
             api_base = os.getenv("CUSTOM_API_BASE", "")
@@ -486,10 +548,18 @@ def stream_chat(
         fallback_chain = _build_fallback_chain(provider)
         if fallback_chain:
             logger.info(f"Auto-fallback chain: {provider} → {' → '.join(fallback_chain)}")
+    fallback_models = _build_fallback_model_overrides(provider)
 
     manager = get_manager()
     # Prefer rate-aware enhanced path; falls back to legacy internally
-    yield from manager.stream_chat_enhanced(provider, messages, intent_info, fallback_chain, model=model)
+    yield from manager.stream_chat_enhanced(
+        provider,
+        messages,
+        intent_info,
+        fallback_chain,
+        fallback_models=fallback_models,
+        model=model,
+    )
 
 
 def get_manager_stats() -> Dict[str, Any]:

@@ -31,6 +31,9 @@ configuration:
   deepseek_api_key:
     name: Clé API DeepSeek
     description: "Modèles rapides et économiques avec raisonnement avancé (R1, V3) - obtenez sur platform.deepseek.com"
+  xai_api_key:
+    name: Clé API xAI
+    description: "Clé API xAI pour les modèles Grok (Grok-3, Grok-3 Mini) - obtenez sur console.x.ai"
   minimax_api_key:
     name: Clé API MiniMax
     description: "Fournisseur LLM chinois avancé avec support multimodal - obtenez sur platform.minimax.io"

@@ -2,7 +2,7 @@
 
 Multi-provider AI assistant for Home Assistant. Control your smart home, create automations, and manage configurations with natural language.
 
-Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot, OpenAI Codex, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
+Supports **23+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Google Gemini, NVIDIA NIM, GitHub Models, GitHub Copilot, OpenAI Codex, xAI Grok, Groq, Mistral, Ollama, DeepSeek, OpenRouter and more.
 
 **Recent updates**: automation flow chart redesigned (human-readable trigger/condition/action, branch expansion for choose/if/repeat, refresh after Save, relative last-triggered time), plus model catalog cache panel in Settings, provider model test improvements, card-editor chat tab, and HTML dashboard snapshot debug files. See [CHANGELOG](CHANGELOG.md) for full details.
 
@@ -66,8 +66,9 @@ Supports **22+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 | GitHub Models | `github_token` | ✅ Rate limited | [github.com/settings/tokens](https://github.com/settings/tokens) |
 | Groq | `groq_api_key` | ✅ Unlimited | [console.groq.com](https://console.groq.com) |
 | Mistral | `mistral_api_key` | ❌ | [console.mistral.ai](https://console.mistral.ai) |
-| Ollama (local) | `ollama_base_url` | ✅ Local | [ollama.com](https://ollama.com) |
+| Ollama (local/cloud) | `ollama_base_url` + `ollama_api_key` (optional) | ✅ Local | [ollama.com](https://ollama.com) |
 | DeepSeek | `deepseek_api_key` | ❌ | [platform.deepseek.com](https://platform.deepseek.com) |
+| xAI Grok | `xai_api_key` | ❌ | [console.x.ai](https://console.x.ai) |
 | OpenRouter | `openrouter_api_key` | ❌ | [openrouter.ai/keys](https://openrouter.ai/keys) |
 | Perplexity | `perplexity_api_key` | ❌ | [perplexity.ai/api](https://www.perplexity.ai/api) |
 | MiniMax | `minimax_api_key` | ❌ | [minimaxi.com](https://www.minimaxi.com) |
@@ -124,10 +125,13 @@ Amira uses **two layers** of configuration:
 | `nvidia_api_key` | NVIDIA NIM API key |
 | `groq_api_key` | Groq API key |
 | `ollama_base_url` | Ollama server URL (e.g. `http://192.168.1.x:11434`) |
-| + 12 more providers | See providers table above |
+| `ollama_api_key` | Ollama Cloud API key (optional; leave empty for local Ollama) |
+| + 13 more providers | See providers table above |
 | `colored_logs` | Pretty-print add-on logs |
 | `debug_mode` | Verbose logging for troubleshooting |
 | `log_level` | `normal` / `verbose` / `debug` |
+
+Note: if `ollama_api_key` is set and `ollama_base_url` is still the default local URL, Amira auto-switches to `https://ollama.com` (official cloud host).
 
 #### Runtime settings (managed via Settings UI)
 

@@ -31,6 +31,9 @@ configuration:
   deepseek_api_key:
     name: DeepSeek API Key
     description: "Fast and affordable models with advanced reasoning (R1, V3) - get from platform.deepseek.com"
+  xai_api_key:
+    name: xAI API Key
+    description: "xAI Grok API key for Grok models (Grok-3, Grok-3 Mini) - get from console.x.ai"
   minimax_api_key:
     name: MiniMax API Key
     description: "Advanced Chinese LLM provider with multimodal support - get from platform.minimax.io"
