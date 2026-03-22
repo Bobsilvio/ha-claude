@@ -61,6 +61,20 @@ _copilot_session: Optional[Dict[str, Any]] = None   # {token, expires_at_s}
 _cached_models: Optional[List[str]] = None          # models discovered from API
 
 
+def _lang() -> str:
+    l = (os.getenv("LANGUAGE", "en") or "en").lower()
+    return l if l in ("en", "it", "es", "fr") else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    m = {"en": en, "it": it, "es": es, "fr": fr}
+    txt = m.get(_lang(), en)
+    try:
+        return txt.format(**kwargs) if kwargs else txt
+    except Exception:
+        return txt
+
+
 def _load_token_from_disk() -> Optional[Dict[str, Any]]:
     try:
         if os.path.exists(_TOKEN_FILE):
@@ -345,14 +359,27 @@ class GitHubCopilotProvider(EnhancedProvider):
     ) -> Generator[Dict[str, Any], None, None]:
         """Stream chat using GitHub Copilot API."""
         if not HTTPX_AVAILABLE:
-            yield {"type": "error", "message": "httpx not installed (pip install httpx)"}
+            yield {
+                "type": "error",
+                "message": _t(
+                    "httpx not installed (pip install httpx)",
+                    "httpx non installato (pip install httpx)",
+                    "httpx no instalado (pip install httpx)",
+                    "httpx non installe (pip install httpx)",
+                ),
+            }
             return
 
         gh_token = _get_best_gh_token(self.api_key)
         if not gh_token:
             yield {
                 "type": "error",
-                "message": "GitHub Copilot: not authenticated. Use the 🔑 button in Amira chat to log in.",
+                "message": _t(
+                    "GitHub Copilot: not authenticated. Use the 🔑 button in Amira chat to log in.",
+                    "GitHub Copilot: non autenticato. Usa il pulsante 🔑 nella chat Amira per accedere.",
+                    "GitHub Copilot: no autenticado. Usa el boton 🔑 en el chat de Amira para iniciar sesion.",
+                    "GitHub Copilot : non authentifie. Utilise le bouton 🔑 dans le chat Amira pour te connecter.",
+                ),
             }
             return
 
@@ -424,10 +451,12 @@ class GitHubCopilotProvider(EnhancedProvider):
                 get_catalog().remove_model("github_copilot", model_name)
                 yield {
                     "type": "error",
-                    "message": (
-                        f"⚠️ Il modello '{model_name}' non è compatibile con la chat di GitHub Copilot "
-                        f"ed è stato rimosso automaticamente dalla lista. "
-                        f"Seleziona un altro modello."
+                    "message": _t(
+                        "⚠️ Model '{model_name}' is not compatible with GitHub Copilot chat and was automatically removed from the list. Select another model.",
+                        "⚠️ Il modello '{model_name}' non e' compatibile con la chat di GitHub Copilot ed e' stato rimosso automaticamente dalla lista. Seleziona un altro modello.",
+                        "⚠️ El modelo '{model_name}' no es compatible con el chat de GitHub Copilot y se elimino automaticamente de la lista. Selecciona otro modelo.",
+                        "⚠️ Le modele '{model_name}' n'est pas compatible avec le chat GitHub Copilot et a ete supprime automatiquement de la liste. Selectionne un autre modele.",
+                        model_name=model_name,
                     ),
                 }
             else:
@@ -452,9 +481,13 @@ class GitHubCopilotProvider(EnhancedProvider):
         # Guard: Codex models use the /responses API, not /chat/completions
         if "codex" in resolved_model.lower():
             raise RuntimeError(
-                f"Il modello '{resolved_model}' usa l'API /responses di OpenAI "
-                f"e non è compatibile con la chat. "
-                f"Seleziona un altro modello (es. gpt-4o, claude-sonnet-4)."
+                _t(
+                    "Model '{resolved_model}' uses OpenAI /responses API and is not compatible with chat. Select another model (e.g. gpt-4o, claude-sonnet-4).",
+                    "Il modello '{resolved_model}' usa l'API /responses di OpenAI e non e' compatibile con la chat. Seleziona un altro modello (es. gpt-4o, claude-sonnet-4).",
+                    "El modelo '{resolved_model}' usa la API /responses de OpenAI y no es compatible con chat. Selecciona otro modelo (p. ej. gpt-4o, claude-sonnet-4).",
+                    "Le modele '{resolved_model}' utilise l'API /responses d'OpenAI et n'est pas compatible avec le chat. Selectionne un autre modele (ex. gpt-4o, claude-sonnet-4).",
+                    resolved_model=resolved_model,
+                )
             )
         body: Dict[str, Any] = {
             "model": resolved_model,
@@ -475,11 +508,21 @@ class GitHubCopilotProvider(EnhancedProvider):
         ) as response:
             if response.status_code == 401:
                 raise RuntimeError(
-                    "GitHub Copilot: session token rejected. Re-authenticate via the 🔑 button."
+                    _t(
+                        "GitHub Copilot: session token rejected. Re-authenticate via the 🔑 button.",
+                        "GitHub Copilot: token di sessione rifiutato. Riautenticati con il pulsante 🔑.",
+                        "GitHub Copilot: token de sesion rechazado. Vuelve a autenticarte con el boton 🔑.",
+                        "GitHub Copilot : jeton de session rejete. Re-authentifie-toi via le bouton 🔑.",
+                    )
                 )
             if response.status_code == 403:
                 raise RuntimeError(
-                    "GitHub Copilot: access forbidden — check your Copilot subscription."
+                    _t(
+                        "GitHub Copilot: access forbidden - check your Copilot subscription.",
+                        "GitHub Copilot: accesso negato - controlla il tuo abbonamento Copilot.",
+                        "GitHub Copilot: acceso denegado - revisa tu suscripcion de Copilot.",
+                        "GitHub Copilot : acces refuse - verifie ton abonnement Copilot.",
+                    )
                 )
             if response.status_code != 200:
                 error_text = response.read().decode("utf-8", errors="ignore")

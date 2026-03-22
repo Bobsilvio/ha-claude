@@ -190,6 +190,23 @@ def get_chat_bubble_js(
             "flow_template_if_not_equals": "Only if {field} is not {value}",
             "flow_template_event_check": "Custom check on event data",
             "flow_notify_match_summary": "final score with teams, score, scorers and venue",
+            "flow_state_occupied": "Occupied",
+            "flow_state_clear": "Clear",
+            "flow_state_detected": "Detected",
+            "flow_state_open": "Open",
+            "flow_state_closed": "Closed",
+            "flow_state_locked": "Locked",
+            "flow_state_unlocked": "Unlocked",
+            "flow_state_wet": "Wet",
+            "flow_state_dry": "Dry",
+            "flow_state_home": "Home",
+            "flow_state_away": "Away",
+            "flow_state_ok": "OK",
+            "flow_state_low": "Low",
+            "flow_state_charging": "Charging",
+            "flow_state_connected": "Connected",
+            "flow_state_disconnected": "Disconnected",
+            "flow_entity_type": "Type: {type}",
         },
         "it": {
             "placeholder": "Chiedi qualcosa su questa pagina...",
@@ -339,6 +356,23 @@ def get_chat_bubble_js(
             "flow_template_if_not_equals": "Solo se {field} non è {value}",
             "flow_template_event_check": "Controllo personalizzato sui dati evento",
             "flow_notify_match_summary": "risultato finale con squadre, punteggio, marcatori e stadio",
+            "flow_state_occupied": "Occupato",
+            "flow_state_clear": "Libero",
+            "flow_state_detected": "Rilevato",
+            "flow_state_open": "Aperto",
+            "flow_state_closed": "Chiuso",
+            "flow_state_locked": "Bloccato",
+            "flow_state_unlocked": "Sbloccato",
+            "flow_state_wet": "Umido",
+            "flow_state_dry": "Asciutto",
+            "flow_state_home": "In casa",
+            "flow_state_away": "Fuori",
+            "flow_state_ok": "OK",
+            "flow_state_low": "Scarico",
+            "flow_state_charging": "In carica",
+            "flow_state_connected": "Connesso",
+            "flow_state_disconnected": "Disconnesso",
+            "flow_entity_type": "Tipo: {type}",
         },
         "es": {
             "placeholder": "Pregunta sobre esta página...",
@@ -488,6 +522,23 @@ def get_chat_bubble_js(
             "flow_template_if_not_equals": "Solo si {field} no es {value}",
             "flow_template_event_check": "Comprobación personalizada en datos del evento",
             "flow_notify_match_summary": "resultado final con equipos, marcador, goleadores y estadio",
+            "flow_state_occupied": "Ocupado",
+            "flow_state_clear": "Libre",
+            "flow_state_detected": "Detectado",
+            "flow_state_open": "Abierto",
+            "flow_state_closed": "Cerrado",
+            "flow_state_locked": "Bloqueado",
+            "flow_state_unlocked": "Desbloqueado",
+            "flow_state_wet": "Húmedo",
+            "flow_state_dry": "Seco",
+            "flow_state_home": "En casa",
+            "flow_state_away": "Fuera",
+            "flow_state_ok": "OK",
+            "flow_state_low": "Bajo",
+            "flow_state_charging": "Cargando",
+            "flow_state_connected": "Conectado",
+            "flow_state_disconnected": "Desconectado",
+            "flow_entity_type": "Tipo: {type}",
         },
         "fr": {
             "placeholder": "Posez une question sur cette page...",
@@ -637,6 +688,23 @@ def get_chat_bubble_js(
             "flow_template_if_not_equals": "Seulement si {field} n'est pas {value}",
             "flow_template_event_check": "Vérification personnalisée sur les données d'événement",
             "flow_notify_match_summary": "résultat final avec équipes, score, buteurs et stade",
+            "flow_state_occupied": "Occupé",
+            "flow_state_clear": "Libre",
+            "flow_state_detected": "Détecté",
+            "flow_state_open": "Ouvert",
+            "flow_state_closed": "Fermé",
+            "flow_state_locked": "Verrouillé",
+            "flow_state_unlocked": "Déverrouillé",
+            "flow_state_wet": "Humide",
+            "flow_state_dry": "Sec",
+            "flow_state_home": "À la maison",
+            "flow_state_away": "Absent",
+            "flow_state_ok": "OK",
+            "flow_state_low": "Faible",
+            "flow_state_charging": "En charge",
+            "flow_state_connected": "Connecté",
+            "flow_state_disconnected": "Déconnecté",
+            "flow_entity_type": "Type : {type}",
         },
     }
 
@@ -3146,7 +3214,38 @@ def get_chat_bubble_js(
     if (!eid) return '';
     const raw = Array.isArray(eid) ? eid[0] : eid;
     if (!raw) return '';
+    try {{
+      const haEl = document.querySelector('home-assistant');
+      const hass = haEl && haEl.hass;
+      if (hass && hass.states && hass.states[raw]) {{
+        const fn = hass.states[raw].attributes && hass.states[raw].attributes.friendly_name;
+        if (fn && String(fn).trim()) return String(fn).trim();
+      }}
+    }} catch(e) {{}}
     return String(raw).split('.').pop().replace(/_/g, ' ');
+  }}
+
+  function _entityDeviceClass(eid) {{
+    const raw = Array.isArray(eid) ? (eid[0] || '') : (eid || '');
+    if (!raw) return '';
+    try {{
+      const haEl = document.querySelector('home-assistant');
+      const hass = haEl && haEl.hass;
+      if (hass && hass.states && hass.states[raw]) {{
+        return String((hass.states[raw].attributes && hass.states[raw].attributes.device_class) || '').toLowerCase();
+      }}
+    }} catch(e) {{}}
+    return '';
+  }}
+
+  function _entityTypeHint(eid) {{
+    const raw = Array.isArray(eid) ? (eid[0] || '') : (eid || '');
+    if (!raw) return '';
+    const domain = String(raw).split('.')[0] || '';
+    const dc = _entityDeviceClass(raw);
+    if (dc) return domain + ' · ' + dc;
+    if (domain && domain !== 'unknown') return domain;
+    return '';
   }}
 
   function _normalizeEntityIds(v) {{
@@ -3272,11 +3371,88 @@ def get_chat_bubble_js(
 
   function _humanizeStateValue(val, eid) {{
     const v = String(val || '').toLowerCase();
-    const e = String(eid || '').toLowerCase();
-    const isProblemLike = /error|fault|problem|alarm|allarme/.test(e);
-    if (v === 'on') return isProblemLike ? tt('flow_problem', 'Problem') : 'ON';
-    if (v === 'off') return isProblemLike ? tt('flow_no_problem', 'No problem') : 'OFF';
-    return String(val || '');
+    if (!v) return '';
+    const raw = Array.isArray(eid) ? (eid[0] || '') : (eid || '');
+    const dc = _entityDeviceClass(raw);
+    const e = String(raw).toLowerCase();
+    if (v === 'on' || v === 'off') {{
+      const isOn = v === 'on';
+      const tDet = tt('flow_state_detected','Detected'), tClr = tt('flow_state_clear','Clear');
+      const tOp  = tt('flow_state_open','Open'),         tCl  = tt('flow_state_closed','Closed');
+      const dcMap = {{
+        occupancy:        [tt('flow_state_occupied','Occupied'),      tt('flow_state_clear','Clear')],
+        motion:           [tDet,                                      tClr],
+        vibration:        [tDet,                                      tClr],
+        sound:            [tDet,                                      tClr],
+        moving:           [tDet,                                      tClr],
+        running:          [tDet,                                      tClr],
+        door:             [tOp,                                       tCl],
+        window:           [tOp,                                       tCl],
+        garage_door:      [tOp,                                       tCl],
+        opening:          [tOp,                                       tCl],
+        lock:             [tt('flow_state_unlocked','Unlocked'),      tt('flow_state_locked','Locked')],
+        smoke:            [tDet,                                      tt('flow_state_ok','OK')],
+        gas:              [tDet,                                      tt('flow_state_ok','OK')],
+        carbon_monoxide:  [tDet,                                      tt('flow_state_ok','OK')],
+        co:               [tDet,                                      tt('flow_state_ok','OK')],
+        moisture:         [tt('flow_state_wet','Wet'),                tt('flow_state_dry','Dry')],
+        battery:          [tt('flow_state_low','Low'),                tt('flow_state_ok','OK')],
+        battery_charging: [tt('flow_state_charging','Charging'),      tt('flow_state_ok','OK')],
+        connectivity:     [tt('flow_state_connected','Connected'),    tt('flow_state_disconnected','Disconnected')],
+        plug:             [tt('flow_state_connected','Connected'),    tt('flow_state_disconnected','Disconnected')],
+        presence:         [tt('flow_state_home','Home'),              tt('flow_state_away','Away')],
+        problem:          [tt('flow_problem','Problem'),              tt('flow_no_problem','No problem')],
+        safety:           [tDet,                                      tt('flow_state_ok','OK')],
+        tamper:           [tDet,                                      tt('flow_state_ok','OK')],
+        cold:             [tDet,                                      tt('flow_state_ok','OK')],
+        heat:             [tDet,                                      tt('flow_state_ok','OK')],
+        update:           [tDet,                                      tt('flow_state_ok','OK')],
+      }};
+      if (dcMap[dc]) return isOn ? dcMap[dc][0] : dcMap[dc][1];
+      const isProblemLike = /error|fault|problem|alarm|allarme/.test(e);
+      if (isProblemLike) return isOn ? tt('flow_problem','Problem') : tt('flow_no_problem','No problem');
+      return isOn ? 'ON' : 'OFF';
+    }}
+    if (v === 'home')     return tt('flow_state_home','Home');
+    if (v === 'not_home') return tt('flow_state_away','Away');
+    if (v === 'open')     return tt('flow_state_open','Open');
+    if (v === 'closed')   return tt('flow_state_closed','Closed');
+    if (v === 'locked')   return tt('flow_state_locked','Locked');
+    if (v === 'unlocked') return tt('flow_state_unlocked','Unlocked');
+    if (v === 'unavailable') return 'N/D';
+    if (v === 'unknown')  return '?';
+    return String(val || '').replace(/_/g,' ');
+  }}
+
+  function _translateDeviceTriggerType(typ) {{
+    const t = String(typ || '').toLowerCase();
+    const map = {{
+      'occupied':        tt('flow_state_occupied','Occupied'),
+      'not_occupied':    tt('flow_state_clear','Clear'),
+      'is_occupied':     tt('flow_state_occupied','Occupied'),
+      'is_not_occupied': tt('flow_state_clear','Clear'),
+      'motion':          tt('flow_state_detected','Detected'),
+      'no_motion':       tt('flow_state_clear','Clear'),
+      'is_motion':       tt('flow_state_detected','Detected'),
+      'is_no_motion':    tt('flow_state_clear','Clear'),
+      'opened':          tt('flow_state_open','Open'),
+      'closed':          tt('flow_state_closed','Closed'),
+      'turned_on':       'ON',
+      'turned_off':      'OFF',
+      'locked':          tt('flow_state_locked','Locked'),
+      'unlocked':        tt('flow_state_unlocked','Unlocked'),
+      'wet':             tt('flow_state_wet','Wet'),
+      'dry':             tt('flow_state_dry','Dry'),
+      'home':            tt('flow_state_home','Home'),
+      'not_home':        tt('flow_state_away','Away'),
+      'problem':         tt('flow_problem','Problem'),
+      'no_problem':      tt('flow_no_problem','No problem'),
+      'connected':       tt('flow_state_connected','Connected'),
+      'disconnected':    tt('flow_state_disconnected','Disconnected'),
+      'low_battery':     tt('flow_state_low','Low'),
+      'battery_normal':  tt('flow_state_ok','OK'),
+    }};
+    return map[t] || t.replace(/_/g,' ');
   }}
 
   function _eventTriggerName(node, maxLen) {{
@@ -3359,10 +3535,11 @@ def get_chat_bubble_js(
       if (p === 'device' && node.device_id) {{
         const subj = _compactText(node.__subject || '', 40);
         const typ = String(node.type || '').toLowerCase();
+        const tLabel = _translateDeviceTriggerType(typ);
         if (subj && /problem|fault|error|alarm|allarme/.test(typ)) {{
           return tf('flow_problem_subject', 'Problem: {{value}}', {{ value: subj }});
         }}
-        return (node.type || tt('flow_trigger_device_generic', 'Device trigger')).replace(/_/g, ' ');
+        return subj ? (subj + ' = ' + tLabel) : (tLabel || tt('flow_trigger_device_generic', 'Device trigger'));
       }}
       if (eid) return _entityLabel(eid);
       return p ? p.replace(/_/g, ' ') : 'trigger';
@@ -3437,9 +3614,12 @@ def get_chat_bubble_js(
         const e = _entityLabel(node.entity_id) || 'entita';
         const from = (node.from !== undefined && String(node.from) !== '') ? _humanizeStateValue(node.from, node.entity_id) : '';
         const to = (node.to !== undefined && String(node.to) !== '') ? _humanizeStateValue(node.to, node.entity_id) : '';
-        if (from && to) return tf('flow_change_from_to', 'State change', {{ entity: e, from: from, to: to }});
-        if (to) return tf('flow_becomes', 'Starts on state', {{ entity: e, value: to }});
-        return tf('flow_starts_when', 'Starts on state change', {{ entity: e }});
+        let desc;
+        if (from && to) desc = tf('flow_change_from_to', 'State change', {{ entity: e, from: from, to: to }});
+        else if (to) desc = tf('flow_becomes', 'Starts on state', {{ entity: e, value: to }});
+        else desc = tf('flow_starts_when', 'Starts on state change', {{ entity: e }});
+        const hint = _entityTypeHint(node.entity_id);
+        return hint ? desc + '\\n' + tf('flow_entity_type', 'Type: {{type}}', {{ type: hint }}) : desc;
       }}
       if (p === 'time') return node.at ? tf('flow_after', 'After', {{ value: node.at }}) : tt('flow_starts_fixed_time', 'Starts at a fixed time');
       if (p === 'numeric_state') return tt('flow_starts_above_threshold', 'Starts when a numeric threshold is crossed');
@@ -3450,10 +3630,13 @@ def get_chat_bubble_js(
       if (p === 'device') {{
         const subj = _compactText(node.__subject || '', 56);
         const typ = String(node.type || '').toLowerCase();
+        const tLabel = _translateDeviceTriggerType(typ);
         if (subj && /problem|fault|error|alarm|allarme/.test(typ)) {{
           return tf('flow_trigger_device_problem', 'When {{value}} reports a problem', {{ value: subj }});
         }}
-        return tt('flow_trigger_device_generic', 'Device trigger');
+        if (subj) return subj + ' → ' + tLabel;
+        if (node.entity_id) return 'binary_sensor · ' + tLabel;
+        return tLabel || tt('flow_trigger_device_generic', 'Device trigger');
       }}
       return tf('flow_trigger_prefix', 'Trigger', {{ value: (p || tt('flow_event', 'event')) }});
     }}
@@ -3466,8 +3649,16 @@ def get_chat_bubble_js(
         if (after) return tf('flow_valid_after', 'Valid after', {{ value: after }});
         if (before) return tf('flow_valid_before', 'Valid before', {{ value: before }});
       }}
-      if (c === 'state') return tf('flow_check_state_of', 'Checks state', {{ entity: (_entityLabel(node.entity_id) || 'entity') }});
-      if (c === 'numeric_state') return tf('flow_check_threshold_of', 'Checks threshold', {{ entity: (_entityLabel(node.entity_id) || 'entity') }});
+      if (c === 'state') {{
+        const desc = tf('flow_check_state_of', 'Checks state', {{ entity: (_entityLabel(node.entity_id) || 'entity') }});
+        const hint = _entityTypeHint(node.entity_id);
+        return hint ? desc + '\\n' + tf('flow_entity_type', 'Type: {{type}}', {{ type: hint }}) : desc;
+      }}
+      if (c === 'numeric_state') {{
+        const desc = tf('flow_check_threshold_of', 'Checks threshold', {{ entity: (_entityLabel(node.entity_id) || 'entity') }});
+        const hint = _entityTypeHint(node.entity_id);
+        return hint ? desc + '\\n' + tf('flow_entity_type', 'Type: {{type}}', {{ type: hint }}) : desc;
+      }}
       if (c === 'template') {{
         const tpl = _humanizeTemplateCondition(node, 180);
         return tpl ? tf('flow_template_eval', 'Evaluates template: {{value}}', {{ value: tpl }}) : tt('flow_template_condition', 'Template condition');
@@ -3859,11 +4050,12 @@ def get_chat_bubble_js(
     const flowEl = document.createElement('div');
     flowEl.id = AMIRA_FLOW_ID;
     // Render inside the automation editor container (not as a fixed top overlay).
-    flowEl.style.cssText = 'position:relative;z-index:2;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:10px 12px;background:linear-gradient(to right,#f0f4ff,#fafafa);border:1px solid #7c8fff;border-radius:10px;min-height:56px;box-shadow:0 2px 8px rgba(0,0,0,0.08);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:8px 0 10px;';
+    flowEl.style.cssText = 'position:relative;z-index:2;display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:8px 12px 10px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 4px 20px rgba(99,102,241,0.09),0 1px 3px rgba(0,0,0,0.06),inset 0 3px 0 0 #7c8fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;margin:8px 0 10px;';
     if (!document.getElementById('amira-flow-anim-style')) {{
       const st = document.createElement('style');
       st.id = 'amira-flow-anim-style';
-      st.textContent = '@keyframes amiraFlowIn{{from{{opacity:0;transform:translateY(4px)}}to{{opacity:1;transform:translateY(0)}}}}';
+      st.textContent = '@keyframes amiraFlowIn{{from{{opacity:0;transform:translateY(4px)}}to{{opacity:1;transform:translateY(0)}}}}' +
+        '.amira-flow-chip{{animation:amiraFlowIn .15s ease both}}';
       document.head.appendChild(st);
     }}
 
@@ -3937,10 +4129,11 @@ def get_chat_bubble_js(
         const bg = (type === 'action' && node && node.__kind === 'branch_marker')
           ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)'
           : _flowGradient(type);
-        bubble.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;background:' + bg + ';border:1.5px solid ' + bColor + ';font-size:12px;white-space:nowrap;max-width:320px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;transition:transform .14s ease,box-shadow .14s ease;';
+        bubble.className = 'amira-flow-chip';
+        bubble.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;background:' + bg + ';border:1.5px solid ' + bColor + ';font-size:12px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;';
         bubble.title = detail;
         const iconSpan = document.createElement('span');
-        iconSpan.style.cssText = 'font-size:16px;flex-shrink:0;';
+        iconSpan.style.cssText = 'font-size:14px;flex-shrink:0;';
         iconSpan.textContent = isBranchMarker ? '⑂' : _flowIcon(type);
         const textSpan = document.createElement('span');
         textSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;color:var(--primary-text-color,#333);font-weight:500;';
@@ -3948,8 +4141,8 @@ def get_chat_bubble_js(
         textSpan.title = desc || label;
         bubble.appendChild(iconSpan);
         bubble.appendChild(textSpan);
-        bubble.addEventListener('mouseenter', () => {{ bubble.style.transform = 'translateY(-1px)'; bubble.style.boxShadow = '0 3px 8px rgba(0,0,0,0.14)'; }});
-        bubble.addEventListener('mouseleave', () => {{ bubble.style.transform = ''; bubble.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)'; }});
+        bubble.addEventListener('mouseenter', () => {{ bubble.style.transform = 'translateY(-2px)'; bubble.style.boxShadow = '0 5px 14px rgba(0,0,0,0.13)'; bubble.style.borderColor = bColor.replace('a7','52').replace('82','56').replace('9f','5d') || bColor; }});
+        bubble.addEventListener('mouseleave', () => {{ bubble.style.transform = ''; bubble.style.boxShadow = '0 2px 6px rgba(0,0,0,0.07)'; bubble.style.borderColor = bColor; }});
         bubble.addEventListener('click', () => {{
           if (detailInfo.style.display === 'block' && detailInfo.textContent === detail) {{
             detailInfo.style.display = 'none';
@@ -3963,126 +4156,98 @@ def get_chat_bubble_js(
 
       function makeArrow(sym) {{
         const arrow = document.createElement('span');
-        arrow.style.cssText = 'color:var(--secondary-text-color,#999);font-size:18px;flex-shrink:0;font-weight:bold;';
-        arrow.textContent = sym || '\u2192';
+        arrow.style.cssText = 'color:#94a3b8;font-size:16px;flex-shrink:0;line-height:1;user-select:none;';
+        arrow.textContent = sym || '›';
         return arrow;
       }}
 
-      function makeSectionLabel(text) {{
-        const lbl = document.createElement('span');
-        lbl.style.cssText = 'font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--secondary-text-color,#999);writing-mode:horizontal-tb;flex-shrink:0;margin-right:-2px;';
+      function makeSectionLabel(text, color, bg, border) {{
+        const lbl = document.createElement('div');
+        lbl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:' + (bg||'#f1f5f9') + ';border:1px solid ' + (border||'#cbd5e1') + ';color:' + (color||'#475569') + ';font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;align-self:center;';
         lbl.textContent = text;
         return lbl;
       }}
+      function makeConnector() {{
+        const wrap = document.createElement('div');
+        wrap.className = 'amira-flow-conn';
+        wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:0;height:22px;flex-shrink:0;';
+        const line = document.createElement('div');
+        line.style.cssText = 'width:2px;flex:1;background:linear-gradient(180deg,#c7d2fe,#94a3b8);border-radius:1px;';
+        const tip = document.createElement('div');
+        tip.style.cssText = 'font-size:10px;color:#94a3b8;line-height:1;margin-top:-1px;';
+        tip.textContent = '▾';
+        wrap.appendChild(line);
+        wrap.appendChild(tip);
+        return wrap;
+      }}
 
       const detailInfo = document.createElement('div');
-      detailInfo.style.cssText = 'display:none;align-self:center;text-align:center;margin:4px auto 0;padding:6px 10px;border-radius:8px;border:1px dashed #8da2ff;background:#f7f9ff;color:#334155;font-size:11px;white-space:pre-line;max-width:760px;line-height:1.35;';
+      detailInfo.style.cssText = 'display:none;padding:8px 12px;border-radius:10px;border:1px solid #c7d2fe;background:linear-gradient(135deg,#f5f7ff,#eef2ff);color:#1e293b;font-size:11.5px;white-space:pre-line;line-height:1.5;box-shadow:0 2px 8px rgba(99,102,241,0.08);';
 
+      // Status pill — compact, inline
+      const isEnabled = (automationEnabledState === 'on');
       const ltInfo = document.createElement('div');
-      const ltActiveStyle = (automationEnabledState === 'on')
-        ? 'border:1px solid #86efac;background:#dcfce7;color:#14532d;'
-        : 'border:1px solid #c7d2fe;background:#eef2ff;color:#334155;';
-      ltInfo.style.cssText = 'display:inline-flex;align-items:center;padding:6px 10px;border-radius:8px;' + ltActiveStyle + 'font-size:11px;white-space:nowrap;flex-shrink:0;margin-right:4px;';
+      ltInfo.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:12px;background:' + (isEnabled ? '#f0fdf4' : '#f8fafc') + ';border:1px solid ' + (isEnabled ? '#86efac' : '#cbd5e1') + ';font-size:10.5px;white-space:nowrap;flex-shrink:0;align-self:flex-start;';
+      const dot = document.createElement('span');
+      dot.style.cssText = 'width:6px;height:6px;border-radius:50%;background:' + (isEnabled ? '#22c55e' : '#94a3b8') + ';flex-shrink:0;' + (isEnabled ? 'box-shadow:0 0 0 2px #bbf7d0;' : '');
       const absTs = lastTriggered ? _formatLastTriggered(lastTriggered) : tt('flow_never', 'Never');
       const relTs = lastTriggered ? _relativeLastTriggered(lastTriggered) : '';
-      ltInfo.textContent = tt('flow_last_triggered', 'Last triggered') + ': ' + absTs + (relTs ? (' (' + relTs + ')') : '');
+      const ltText = document.createElement('span');
+      ltText.style.cssText = 'color:' + (isEnabled ? '#166534' : '#475569') + ';font-weight:500;';
+      ltText.textContent = relTs || absTs;
+      ltText.title = tt('flow_last_triggered', 'Last triggered') + ': ' + absTs + (relTs ? (' · ' + relTs) : '');
+      ltInfo.appendChild(dot);
+      ltInfo.appendChild(ltText);
       flowEl.appendChild(ltInfo);
 
-      const topBlock = document.createElement('div');
-      topBlock.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;';
+      // Pipeline row — centered, align-items:flex-end keeps arrows level with chips
+      const pipelineRow = document.createElement('div');
+      pipelineRow.style.cssText = 'display:flex;flex-direction:row;align-items:flex-end;flex-wrap:wrap;justify-content:center;gap:8px 10px;';
 
-      // Trigger block (label above bubble)
+      // +N overflow badge — click expands detailInfo with all items
+      function makeOverflowBadge(nodes, type) {{
+        const badge = document.createElement('span');
+        badge.style.cssText = 'display:inline-flex;align-items:center;padding:3px 8px;border-radius:8px;background:#f1f5f9;border:1px solid #cbd5e1;color:#64748b;font-size:11px;font-weight:600;flex-shrink:0;cursor:pointer;transition:opacity .12s;';
+        badge.textContent = '+' + (nodes.length - 1);
+        badge.title = nodes.slice(1).map(n => _describeFlowNode(n, type)).join('\\n');
+        badge.addEventListener('mouseenter', () => {{ badge.style.opacity = '0.7'; }});
+        badge.addEventListener('mouseleave', () => {{ badge.style.opacity = '1'; }});
+        badge.addEventListener('click', () => {{
+          const allDesc = nodes.map(n => _describeFlowDetail(n, type) || _describeFlowNode(n, type)).join('\\n\\n');
+          if (detailInfo.style.display === 'block' && detailInfo.textContent === allDesc) {{ detailInfo.style.display = 'none'; return; }}
+          detailInfo.textContent = allDesc;
+          detailInfo.style.display = 'block';
+        }});
+        return badge;
+      }}
+
+      // Section group: label pill on top, chips row below
+      function makeSectionGroup(nodes, type, labelText, lc, lbg, lbd) {{
+        const grp = document.createElement('div');
+        grp.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex-shrink:0;';
+        grp.appendChild(makeSectionLabel(labelText, lc, lbg, lbd));
+        const chipsRow = document.createElement('div');
+        chipsRow.style.cssText = 'display:inline-flex;align-items:center;gap:5px;';
+        if (nodes.length > 0) chipsRow.appendChild(makeBubble(nodes[0], type, labelText));
+        if (nodes.length > 1) chipsRow.appendChild(makeOverflowBadge(nodes, type));
+        grp.appendChild(chipsRow);
+        return grp;
+      }}
+
+      // Build pipeline: Trigger › Condition › Action
       if (flowTriggers.length) {{
-        const trLabel = document.createElement('div');
-        trLabel.textContent = (T.flow_trigger || 'Trigger').toUpperCase();
-        trLabel.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;color:var(--secondary-text-color,#64748b);text-align:center;';
-        topBlock.appendChild(trLabel);
-
-        const trRow = document.createElement('div');
-        trRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;';
-        flowTriggers.forEach((t, i) => {{
-          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; trRow.appendChild(plus); }}
-          trRow.appendChild(makeBubble(t, 'trigger', T.flow_trigger));
-        }});
-        topBlock.appendChild(trRow);
+        pipelineRow.appendChild(makeSectionGroup(flowTriggers, 'trigger', T.flow_trigger || 'Trigger', '#1d4ed8', '#dbeafe', '#93c5fd'));
       }}
-
-      // Conditions block (below trigger)
       if (conditions.length) {{
-        const down = document.createElement('div');
-        down.textContent = '↓';
-        down.style.cssText = 'font-size:16px;color:var(--secondary-text-color,#94a3b8);line-height:1;';
-        topBlock.appendChild(down);
-
-        const coLabel = document.createElement('div');
-        coLabel.textContent = (T.flow_condition || 'Condition').toUpperCase();
-        coLabel.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:1px;color:var(--secondary-text-color,#64748b);text-align:center;';
-        topBlock.appendChild(coLabel);
-
-        const coRow = document.createElement('div');
-        coRow.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;';
-        conditions.forEach((c, i) => {{
-          if (i > 0) {{ const plus = document.createElement('span'); plus.textContent = '+'; plus.style.cssText = 'color:var(--secondary-text-color,#999);font-size:14px;flex-shrink:0;'; coRow.appendChild(plus); }}
-          coRow.appendChild(makeBubble(c, 'condition', T.flow_condition));
-        }});
-        topBlock.appendChild(coRow);
+        pipelineRow.appendChild(makeArrow('›'));
+        pipelineRow.appendChild(makeSectionGroup(conditions, 'condition', T.flow_condition || 'Condition', '#92400e', '#fef9c3', '#fde68a'));
       }}
-
-      if (flowTriggers.length || conditions.length) flowEl.appendChild(topBlock);
-
-      if (expandedActions.length) {{
-        const actionsBlock = document.createElement('div');
-        actionsBlock.style.cssText = 'display:flex;flex-direction:column;gap:8px;';
-        const actionsHead = document.createElement('div');
-        actionsHead.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;';
-        actionsHead.appendChild(makeSectionLabel(T.flow_action));
-        actionsBlock.appendChild(actionsHead);
-
-        const rows = [];
-        let current = {{ title: tt('flow_actions_title', 'Actions'), branchId: 0, items: [] }};
-        rows.push(current);
-        expandedActions.forEach((a) => {{
-          if (a && a.__kind === 'branch_marker') {{
-            current = {{ title: a.__branch || tt('flow_branch', 'Branch'), branchId: a.__branchId || 0, items: [] }};
-            rows.push(current);
-            return;
-          }}
-          current.items.push(a);
-        }});
-
-        let renderedRows = 0;
-        rows.forEach((row, idx) => {{
-          if (!row.items.length) return;
-          const rowWrap = document.createElement('div');
-          const c = row.branchId ? branchColors[(row.branchId - 1) % branchColors.length] : '#94a3b8';
-          rowWrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;border-left:3px solid ' + c + ';padding:8px 10px;background:rgba(255,255,255,0.45);border-radius:8px;';
-
-          const rowTitle = document.createElement('div');
-          rowTitle.style.cssText = 'font-size:11px;font-weight:700;color:#475569;text-align:center;';
-          rowTitle.textContent = row.title;
-          rowWrap.appendChild(rowTitle);
-
-          const steps = document.createElement('div');
-          steps.style.cssText = 'display:flex;align-items:flex-start;justify-content:center;gap:8px;flex-wrap:wrap;';
-          row.items.forEach((a, i) => {{
-            if (i > 0) steps.appendChild(makeArrow('→'));
-            const nodeWrap = document.createElement('div');
-            nodeWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;max-width:320px;';
-            const b = makeBubble(a, 'action', T.flow_action);
-            nodeWrap.appendChild(b);
-            steps.appendChild(nodeWrap);
-          }});
-          const count = document.createElement('div');
-          count.style.cssText = 'font-size:11px;color:#64748b;margin-top:2px;text-align:center;';
-          count.textContent = row.items.length + ' ' + tt('flow_actions_count', 'actions');
-          rowWrap.appendChild(steps);
-          rowWrap.appendChild(count);
-          actionsBlock.appendChild(rowWrap);
-          renderedRows += 1;
-        }});
-
-        if (renderedRows > 0) flowEl.appendChild(actionsBlock);
+      const mainActions = expandedActions.filter(a => !(a && a.__kind === 'branch_marker'));
+      if (mainActions.length) {{
+        pipelineRow.appendChild(makeArrow('›'));
+        pipelineRow.appendChild(makeSectionGroup(mainActions, 'action', T.flow_action || 'Action', '#14532d', '#dcfce7', '#86efac'));
       }}
+      if (pipelineRow.children.length) flowEl.appendChild(pipelineRow);
 
       if (!flowTriggers.length && !conditions.length && !expandedActions.length) {{
         if (refresh) _removeAllAutomationFlowEls();

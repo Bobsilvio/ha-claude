@@ -104,6 +104,20 @@ _MODEL_HEADERS: Dict[str, Dict[str, str]] = {
 }
 
 
+def _lang() -> str:
+    l = (os.getenv("LANGUAGE", "en") or "en").lower()
+    return l if l in ("en", "it", "es", "fr") else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    m = {"en": en, "it": it, "es": es, "fr": fr}
+    txt = m.get(_lang(), en)
+    try:
+        return txt.format(**kwargs) if kwargs else txt
+    except Exception:
+        return txt
+
+
 def _get_base_timeout() -> int:
     """Read backend timeout setting with sane bounds."""
     try:
@@ -726,14 +740,27 @@ class GeminiWebProvider(EnhancedProvider):
         intent_info: Optional[Dict[str, Any]] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         if not GEMINI_WEBAPI_AVAILABLE and not HTTPX_AVAILABLE:
-            yield {"type": "error", "message": "Gemini Web dependencies not installed (gemini_webapi/httpx)."}
+            yield {
+                "type": "error",
+                "message": _t(
+                    "Gemini Web dependencies not installed (gemini_webapi/httpx).",
+                    "Dipendenze Gemini Web non installate (gemini_webapi/httpx).",
+                    "Dependencias de Gemini Web no instaladas (gemini_webapi/httpx).",
+                    "Dependances Gemini Web non installees (gemini_webapi/httpx).",
+                ),
+            }
             return
 
         s = _stored_session
         if not s or not s.get("psid"):
             yield {
                 "type": "error",
-                "message": "Gemini Web: not authenticated. Use the 🔑 button to connect.",
+                "message": _t(
+                    "Gemini Web: not authenticated. Use the 🔑 button to connect.",
+                    "Gemini Web: non autenticato. Usa il pulsante 🔑 per connetterti.",
+                    "Gemini Web: no autenticado. Usa el boton 🔑 para conectarte.",
+                    "Gemini Web : non authentifie. Utilise le bouton 🔑 pour te connecter.",
+                ),
             }
             return
 
@@ -756,9 +783,14 @@ class GeminiWebProvider(EnhancedProvider):
         if _is_html_intent and _requested_model in {"gemini-3.1-pro", "gemini-3.0-pro"}:
             _effective_model = "gemini-3.0-flash"
             logger.warning(
-                "GeminiWeb: forcing stable model for HTML intent (%s -> %s)",
-                _requested_model,
-                _effective_model,
+                _t(
+                    "GeminiWeb: forcing stable model for HTML intent ({from_model} -> {to_model})",
+                    "GeminiWeb: forzo modello stabile per intent HTML ({from_model} -> {to_model})",
+                    "GeminiWeb: forzando modelo estable para intent HTML ({from_model} -> {to_model})",
+                    "GeminiWeb : forçage d'un modele stable pour l'intention HTML ({from_model} -> {to_model})",
+                    from_model=_requested_model,
+                    to_model=_effective_model,
+                ),
             )
 
         # Normalise tool-call history → plain turns
@@ -808,15 +840,38 @@ class GeminiWebProvider(EnhancedProvider):
                     response_text = _send_message_sdk(s, full_prompt, _effective_model)
                 except Exception as e:
                     sdk_err = e
-                    logger.warning(f"GeminiWeb SDK failed, using legacy fallback: {e}")
+                    logger.warning(
+                        _t(
+                            "GeminiWeb SDK failed, using legacy fallback: {error}",
+                            "SDK GeminiWeb fallito, uso fallback legacy: {error}",
+                            "SDK GeminiWeb fallo, usando fallback legacy: {error}",
+                            "SDK GeminiWeb en echec, utilisation du fallback legacy : {error}",
+                            error=e,
+                        )
+                    )
                     # gemini-3.1-pro can stall on web SDK. Retry once with 3.0-pro alias
                     # before dropping to legacy HTTP flow.
                     try:
                         if str(_effective_model or "").strip() == "gemini-3.1-pro":
-                            logger.warning("GeminiWeb SDK retry with gemini-3.0-pro alias after 3.1 failure")
+                            logger.warning(
+                                _t(
+                                    "GeminiWeb SDK retry with gemini-3.0-pro alias after 3.1 failure",
+                                    "Retry SDK GeminiWeb con alias gemini-3.0-pro dopo errore 3.1",
+                                    "Reintento SDK GeminiWeb con alias gemini-3.0-pro tras fallo 3.1",
+                                    "Nouvelle tentative SDK GeminiWeb avec l'alias gemini-3.0-pro apres l'echec 3.1",
+                                )
+                            )
                             response_text = _send_message_sdk(s, full_prompt, "gemini-3.0-pro")
                     except Exception as _e_alias:
-                        logger.warning(f"GeminiWeb SDK alias retry failed: {_e_alias}")
+                        logger.warning(
+                            _t(
+                                "GeminiWeb SDK alias retry failed: {error}",
+                                "Retry alias SDK GeminiWeb fallito: {error}",
+                                "Reintento alias SDK GeminiWeb fallido: {error}",
+                                "La nouvelle tentative d'alias SDK GeminiWeb a echoue : {error}",
+                                error=_e_alias,
+                            )
+                        )
 
             if not response_text:
                 _sdk_err_s = str(sdk_err or "").lower()
@@ -829,10 +884,22 @@ class GeminiWebProvider(EnhancedProvider):
                     except Exception:
                         _google_key = ""
                     if _google_key:
-                        logger.warning("GeminiWeb unstable -> falling back to official Google provider")
+                        logger.warning(
+                            _t(
+                                "GeminiWeb unstable -> falling back to official Google provider",
+                                "GeminiWeb instabile -> fallback al provider Google ufficiale",
+                                "GeminiWeb inestable -> fallback al proveedor oficial de Google",
+                                "GeminiWeb instable -> bascule vers le fournisseur Google officiel",
+                            )
+                        )
                         yield {
                             "type": "status",
-                            "message": "⚠️ Gemini Web instabile, passo a Google API ufficiale...",
+                            "message": _t(
+                                "⚠️ Gemini Web unstable, switching to official Google API...",
+                                "⚠️ Gemini Web instabile, passo alla Google API ufficiale...",
+                                "⚠️ Gemini Web inestable, cambiando a la API oficial de Google...",
+                                "⚠️ Gemini Web instable, bascule vers l'API Google officielle...",
+                            ),
                         }
                         try:
                             from providers.google import GoogleProvider
@@ -841,12 +908,24 @@ class GeminiWebProvider(EnhancedProvider):
                                 yield _ev
                             return
                         except Exception as _gerr:
-                            logger.warning(f"GeminiWeb->Google fallback failed: {_gerr}")
+                            logger.warning(
+                                _t(
+                                    "GeminiWeb->Google fallback failed: {error}",
+                                    "Fallback GeminiWeb->Google fallito: {error}",
+                                    "Fallback GeminiWeb->Google fallido: {error}",
+                                    "Echec du fallback GeminiWeb->Google : {error}",
+                                    error=_gerr,
+                                )
+                            )
 
                     # No Google fallback available (or failed): return clear instability error.
                     raise RuntimeError(
-                        "Gemini Web unstable (timeout/502). "
-                        "Riprova oppure usa il provider Google con API key."
+                        _t(
+                            "Gemini Web unstable (timeout/502). Retry or use Google provider with API key.",
+                            "Gemini Web instabile (timeout/502). Riprova oppure usa il provider Google con API key.",
+                            "Gemini Web inestable (timeout/502). Reintenta o usa el proveedor Google con API key.",
+                            "Gemini Web instable (timeout/502). Reessayez ou utilisez le fournisseur Google avec une API key.",
+                        )
                     )
                 if not HTTPX_AVAILABLE:
                     raise RuntimeError(f"Gemini SDK unavailable and legacy fallback disabled: {sdk_err}")
@@ -856,7 +935,15 @@ class GeminiWebProvider(EnhancedProvider):
                 yield {"type": "text", "text": response_text}
             yield {"type": "done", "finish_reason": "stop"}
         except Exception as e:
-            logger.error(f"GeminiWeb: error during request: {e}")
+            logger.error(
+                _t(
+                    "GeminiWeb: error during request: {error}",
+                    "GeminiWeb: errore durante la richiesta: {error}",
+                    "GeminiWeb: error durante la solicitud: {error}",
+                    "GeminiWeb : erreur pendant la requete : {error}",
+                    error=e,
+                )
+            )
             yield {"type": "error", "message": str(e)}
 
     # ------------------------------------------------------------------

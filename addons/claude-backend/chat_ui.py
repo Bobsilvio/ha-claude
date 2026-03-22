@@ -2,10 +2,15 @@
 
 import json
 import api
+from core.translations import get_current_language
 
 
 def get_chat_ui():
     """Generate the chat UI with image upload support."""
+    ui_lang = (get_current_language() or getattr(api, "LANGUAGE", "en") or "en").lower()
+    if ui_lang not in ("en", "it", "es", "fr"):
+        ui_lang = "en"
+
     agent_name = getattr(api, "AGENT_NAME", "Amira") or "Amira"
     agent_avatar = getattr(api, "AGENT_AVATAR", "🤖") or "🤖"
 
@@ -24,7 +29,7 @@ def get_chat_ui():
         "es": "🤖 Amira está procesando...",
         "fr": "🤖 Amira réfléchit...",
     }
-    analyzing_msg = analyzing_by_lang.get(api.LANGUAGE, analyzing_by_lang["en"])
+    analyzing_msg = analyzing_by_lang.get(ui_lang, analyzing_by_lang["en"])
 
     ui_messages = {
         "en": {
@@ -62,7 +67,7 @@ def get_chat_ui():
     }
 
     # Get messages for current language
-    msgs = ui_messages.get(api.LANGUAGE, ui_messages["en"])
+    msgs = ui_messages.get(ui_lang, ui_messages["en"])
 
     o4mini_tokens_hint_js = json.dumps(msgs.get("o4mini_tokens_hint", ""))
 
@@ -363,6 +368,14 @@ def get_chat_ui():
             "mcp_command": "Command",
             "mcp_args": "Arguments",
             "mcp_env": "Environment Variables",
+            "mcp_pip_section": "Install pip packages",
+            "mcp_install_btn": "Install",
+            "mcp_no_packages": "No packages specified.",
+            "mcp_installing": "Installing...",
+            "mcp_done": "Done.",
+            "mcp_error": "Error.",
+            "mcp_start_failed": "MCP start failed",
+            "mcp_stop_failed": "MCP stop failed",
             "mcp_no_servers": "No MCP servers configured. Click \"Add Server\" to connect external tools.",
             "tip_mcp_name": "Unique name for this MCP server (e.g. filesystem, web_search).",
             "tip_mcp_command": "Command to start the server (e.g. python, uvx, npx).",
@@ -678,6 +691,14 @@ def get_chat_ui():
             "mcp_command": "Comando",
             "mcp_args": "Argomenti",
             "mcp_env": "Variabili d'Ambiente",
+            "mcp_pip_section": "Installa pacchetti pip",
+            "mcp_install_btn": "Installa",
+            "mcp_no_packages": "Nessun pacchetto specificato.",
+            "mcp_installing": "Installazione in corso...",
+            "mcp_done": "Completato.",
+            "mcp_error": "Errore.",
+            "mcp_start_failed": "Avvio MCP fallito",
+            "mcp_stop_failed": "Arresto MCP fallito",
             "mcp_no_servers": "Nessun server MCP configurato. Clicca \"Aggiungi Server\" per connettere strumenti esterni.",
             "tip_mcp_name": "Nome univoco per il server MCP (es. filesystem, web_search).",
             "tip_mcp_command": "Comando per avviare il server (es. python, uvx, npx).",
@@ -991,6 +1012,14 @@ def get_chat_ui():
             "mcp_command": "Comando",
             "mcp_args": "Argumentos",
             "mcp_env": "Variables de Entorno",
+            "mcp_pip_section": "Instalar paquetes pip",
+            "mcp_install_btn": "Instalar",
+            "mcp_no_packages": "No se especificaron paquetes.",
+            "mcp_installing": "Instalando...",
+            "mcp_done": "Hecho.",
+            "mcp_error": "Error.",
+            "mcp_start_failed": "Error al iniciar MCP",
+            "mcp_stop_failed": "Error al detener MCP",
             "mcp_no_servers": "No hay servidores MCP. Haz clic en \"Añadir Servidor\" para conectar herramientas.",
             "tip_mcp_name": "Nombre único para el servidor MCP (ej. filesystem, web_search).",
             "tip_mcp_command": "Comando para iniciar el servidor (ej. python, uvx, npx).",
@@ -1302,6 +1331,14 @@ def get_chat_ui():
             "mcp_command": "Commande",
             "mcp_args": "Arguments",
             "mcp_env": "Variables d'Environnement",
+            "mcp_pip_section": "Installer des paquets pip",
+            "mcp_install_btn": "Installer",
+            "mcp_no_packages": "Aucun paquet specifie.",
+            "mcp_installing": "Installation en cours...",
+            "mcp_done": "Termine.",
+            "mcp_error": "Erreur.",
+            "mcp_start_failed": "Demarrage MCP echoue",
+            "mcp_stop_failed": "Arret MCP echoue",
             "mcp_no_servers": "Aucun serveur MCP configuré. Cliquez sur \"Ajouter Serveur\" pour connecter des outils.",
             "tip_mcp_name": "Nom unique pour le serveur MCP (ex. filesystem, web_search).",
             "tip_mcp_command": "Commande pour démarrer le serveur (ex. python, uvx, npx).",
@@ -1323,7 +1360,7 @@ def get_chat_ui():
             "tip_agent_channels": "Attribuez cet agent à un canal de messagerie. Chaque canal ne peut avoir qu'un seul agent.",
         },
     }
-    ui_js = ui_js_all.get(api.LANGUAGE, ui_js_all["en"])
+    ui_js = ui_js_all.get(ui_lang, ui_js_all["en"])
     ui_js_json = json.dumps(ui_js, ensure_ascii=False)
 
     # Tool descriptions for agent form (i18n)
@@ -1469,7 +1506,7 @@ def get_chat_ui():
             "get_integration_entities": "Rechercher entités intégration",
         },
     }
-    _tool_descs = _tool_descs_all.get(api.LANGUAGE, _tool_descs_all["en"])
+    _tool_descs = _tool_descs_all.get(ui_lang, _tool_descs_all["en"])
     _tool_descs_json = json.dumps(_tool_descs, ensure_ascii=False)
 
     # Feature flags for UI elements
@@ -3836,7 +3873,7 @@ def get_chat_ui():
             if (!SpeechRec) return;
 
             wakeWordRecognition = new SpeechRec();
-            wakeWordRecognition.lang = '{api.LANGUAGE}' === 'it' ? 'it-IT' : '{api.LANGUAGE}' === 'es' ? 'es-ES' : '{api.LANGUAGE}' === 'fr' ? 'fr-FR' : 'en-US';
+            wakeWordRecognition.lang = '{ui_lang}' === 'it' ? 'it-IT' : '{ui_lang}' === 'es' ? 'es-ES' : '{ui_lang}' === 'fr' ? 'fr-FR' : 'en-US';
             wakeWordRecognition.continuous = true;
             wakeWordRecognition.interimResults = true;
 
@@ -5214,7 +5251,7 @@ def get_chat_ui():
                 '<div style="font-size:11px;color:#999;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📦 ' + (T.mcp_pip_section || 'Installa pacchetti pip') + '</div>'
                 + '<div style="display:flex;gap:6px;align-items:flex-start;">'
                 + '<textarea id="mcpPipInput" rows="2" style="flex:1;font-size:12px;padding:5px 8px;border:1px solid #ddd;border-radius:6px;resize:vertical;" placeholder="mcp-server-sqlite&#10;un-altro-pacchetto"></textarea>'
-                + '<button id="mcpPipBtn" onclick="mcpInstallPkgs()" style="padding:5px 12px;font-size:12px;border:none;border-radius:6px;background:#4f6ef7;color:white;cursor:pointer;white-space:nowrap;">⬇ Installa</button>'
+                + '<button id="mcpPipBtn" onclick="mcpInstallPkgs()" style="padding:5px 12px;font-size:12px;border:none;border-radius:6px;background:#4f6ef7;color:white;cursor:pointer;white-space:nowrap;">⬇ ' + (T.mcp_install_btn || 'Install') + '</button>'
                 + '</div>'
                 + '<pre id="mcpPipLog" style="display:none;margin-top:6px;padding:8px;background:#1a1a2a;color:#a0d8a0;font-size:11px;border-radius:6px;white-space:pre-wrap;max-height:140px;overflow-y:auto;"></pre>';
             wrap.appendChild(installSection);
@@ -5314,7 +5351,7 @@ def get_chat_ui():
                         if (data.status !== 'success') throw new Error(data.message || 'errore');
                         if (typeof onRuntimeChanged === 'function') await onRuntimeChanged();
                     }} catch(err) {{
-                        alert('Start MCP fallito (' + name + '): ' + err.message);
+                        alert((T.mcp_start_failed || 'MCP start failed') + ' (' + name + '): ' + err.message);
                     }} finally {{
                         startBtn.textContent = '▶';
                     }}
@@ -5332,7 +5369,7 @@ def get_chat_ui():
                         if (data.status !== 'success') throw new Error(data.message || 'errore');
                         if (typeof onRuntimeChanged === 'function') await onRuntimeChanged();
                     }} catch(err) {{
-                        alert('Stop MCP fallito (' + name + '): ' + err.message);
+                        alert((T.mcp_stop_failed || 'MCP stop failed') + ' (' + name + '): ' + err.message);
                     }} finally {{
                         stopBtn.textContent = '⏹';
                     }}
@@ -5966,21 +6003,21 @@ def get_chat_ui():
                     targets.push('- Cartella /config/www/dashboards (dashboard generate)');
                 }}
                 targets.push('');
-                targets.push('Questa operazione è irreversibile.');
-                targets.push('Continuare?');
-                const confirm1 = window.confirm('Verranno eliminati:\\n\\n' + targets.join('\\n'));
+                targets.push('This operation is irreversible.');
+                targets.push('Continue?');
+                const confirm1 = window.confirm('The following will be removed:\\n\\n' + targets.join('\\n'));
                 if (!confirm1) return;
-                const confirmText = window.prompt('Digita ELIMINA per confermare il cleanup pre-disinstallazione:');
-                if ((confirmText || '').trim().toUpperCase() !== 'ELIMINA') {{
+                const confirmText = window.prompt('Type DELETE to confirm pre-uninstall cleanup:');
+                if ((confirmText || '').trim().toUpperCase() !== 'DELETE') {{
                     st.style.color = '#f44336';
-                    st.textContent = 'Conferma non valida. Cleanup annullato.';
+                    st.textContent = 'Invalid confirmation. Cleanup canceled.';
                     return;
                 }}
 
                 runBtn.disabled = true;
                 runBtn.textContent = '⏳ ...';
                 st.style.color = '#777';
-                st.textContent = 'Cleanup in corso...';
+                st.textContent = 'Cleanup in progress...';
 
                 try {{
                     const resp = await fetch(apiUrl('api/uninstall_cleanup'), {{
@@ -5994,14 +6031,14 @@ def get_chat_ui():
                     const errors = Array.isArray(data.errors) ? data.errors : [];
                     if (resp.ok && (!errors.length)) {{
                         st.style.color = '#2e7d32';
-                        st.textContent = 'Cleanup completato. Ora puoi disinstallare l\\'addon in sicurezza.\\nRimosso: ' + (removed.join(', ') || 'n/a');
+                        st.textContent = 'Cleanup completed. You can now uninstall the add-on safely.\\nRemoved: ' + (removed.join(', ') || 'n/a');
                     }} else {{
                         st.style.color = '#ef6c00';
-                        st.textContent = 'Cleanup parziale.\\nRimosso: ' + (removed.join(', ') || 'n/a') + '\\nErrori: ' + (errors.join(' | ') || 'n/a');
+                        st.textContent = 'Partial cleanup.\\nRemoved: ' + (removed.join(', ') || 'n/a') + '\\nErrors: ' + (errors.join(' | ') || 'n/a');
                     }}
                 }} catch(e) {{
                     st.style.color = '#f44336';
-                    st.textContent = 'Errore cleanup: ' + (e.message || 'Unknown');
+                    st.textContent = 'Cleanup error: ' + (e.message || 'Unknown');
                 }} finally {{
                     runBtn.disabled = false;
                     runBtn.textContent = '🧹 Run Cleanup';
@@ -6790,7 +6827,7 @@ def get_chat_ui():
             const useBtn = document.createElement('button');
             useBtn.type = 'button';
             useBtn.className = 'suggestion';
-            useBtn.textContent = 'Seleziona';
+            useBtn.textContent = 'Select';
 
             function submitManual() {{
                 const v = (field.value || '').trim();
@@ -7854,9 +7891,9 @@ def get_chat_ui():
             const log   = document.getElementById('mcpPipLog');
             if (!input || !log) return;
             const pkgs = input.value.split('\\n').map(s => s.trim()).filter(Boolean);
-            if (!pkgs.length) {{ log.style.display = 'block'; log.textContent = '⚠ Nessun pacchetto specificato.'; return; }}
+            if (!pkgs.length) {{ log.style.display = 'block'; log.textContent = '⚠ ' + (T.mcp_no_packages || 'No packages specified.'); return; }}
             log.style.display = 'block';
-            log.textContent = '⏳ Installazione in corso...';
+            log.textContent = '⏳ ' + (T.mcp_installing || 'Installing...');
             if (btn) btn.disabled = true;
             try {{
                 const resp = await fetch(apiUrl('api/mcp/install'), {{
@@ -7865,7 +7902,7 @@ def get_chat_ui():
                     body: JSON.stringify({{packages: pkgs}})
                 }});
                 const data = await resp.json();
-                log.textContent = data.output || (resp.ok ? '✔ Fatto.' : '❌ Errore.');
+                log.textContent = data.output || (resp.ok ? ('✔ ' + (T.mcp_done || 'Done.')) : ('❌ ' + (T.mcp_error || 'Error.')));
             }} catch(e) {{
                 log.textContent = '❌ ' + e.message;
             }} finally {{
@@ -8451,7 +8488,7 @@ def get_chat_ui():
                 document.getElementById('messagingChatModal').classList.add('open');
             }} catch(e) {{
                 console.error('Error loading messages:', e);
-                addMessage('❌ Errore nel caricare i messaggi', 'system');
+                addMessage('❌ Error loading messages', 'system');
             }}
         }}
 
@@ -8556,7 +8593,7 @@ def get_chat_ui():
             'github': '🚀 GitHub Models',
             'groq': '⚡ Groq',
             'mistral': '🌊 Mistral',
-            'ollama': '🦙 Ollama (Local)',
+            'ollama': '🦙 Ollama',
             'openrouter': '🔀 OpenRouter',
             'deepseek': '🔍 DeepSeek',
             'xai': '🧠 xAI (Grok)',
@@ -8909,12 +8946,12 @@ def get_chat_ui():
             window.__batchTestStopRequested = false;
             btn.disabled = false;
             btn.textContent = '⏹ Stop test';
-            progressMsgEl = addMessage('\U0001f50d Test avviato: ' + providerLabel, 'system');
+            progressMsgEl = addMessage('\U0001f50d Test started: ' + providerLabel, 'system');
 
             try {{
                 while (true) {{
                     if (window.__batchTestStopRequested) {{
-                        const stopByUserMsg = `⏹ Test ${{providerLabel}} interrotto dall'utente • tested ${{totalTested}}/${{grandTotal || '?'}} • ok ${{totalOk}} • removed ${{totalRemoved}}`;
+                        const stopByUserMsg = `⏹ Test ${{providerLabel}} stopped by user • tested ${{totalTested}}/${{grandTotal || '?'}} • ok ${{totalOk}} • removed ${{totalRemoved}}`;
                         if (progressMsgEl) renderProgressMessage(stopByUserMsg);
                         else addMessage(stopByUserMsg, 'system');
                         break;

@@ -117,8 +117,9 @@ def humanize_provider_error(err: Exception, provider: str) -> str:
         or "not accessible via the /chat/completions endpoint" in low
     ):
         return (
-            "GitHub Copilot: il modello selezionato non è compatibile con l'endpoint chat. "
-            "Seleziona un modello chat-compatible (es. gpt-4.1, gpt-4o, gpt-5.1)."
+            get_lang_text("err_github_copilot_model_incompatible")
+            or "GitHub Copilot: selected model is not compatible with the chat endpoint. "
+               "Choose a chat-compatible model (e.g. gpt-4.1, gpt-4o, gpt-5.1)."
         )
 
     if provider == "github" and (code == 413 or "tokens_limit_reached" in low or "request body too large" in low):

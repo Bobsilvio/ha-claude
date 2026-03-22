@@ -27,6 +27,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import time
 import threading
 from dataclasses import dataclass, field
@@ -34,6 +35,21 @@ from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
+
+
+def _lang() -> str:
+    l = (os.getenv("LANGUAGE", "en") or "en").lower().strip()
+    return l if l in {"en", "it", "es", "fr"} else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    txt = {"en": en, "it": it, "es": es, "fr": fr}.get(_lang(), en)
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
 
 T = TypeVar("T")
 
@@ -129,8 +145,17 @@ def _set_cooldown(provider: str, reason: FailoverReason, duration_sec: float = 3
             reason=reason,
             permanent=permanent,
         )
-    logger.warning(f"ModelFallback: {provider} in cooldown ({reason.value}, "
-                   f"{'permanent' if permanent else f'{duration_sec}s'})")
+    logger.warning(
+        _t(
+            "ModelFallback: {provider} in cooldown ({reason}, {duration})",
+            "ModelFallback: {provider} in cooldown ({reason}, {duration})",
+            "ModelFallback: {provider} en cooldown ({reason}, {duration})",
+            "ModelFallback : {provider} en cooldown ({reason}, {duration})",
+            provider=provider,
+            reason=reason.value,
+            duration=("permanent" if permanent else f"{duration_sec}s"),
+        )
+    )
 
 
 def _is_in_cooldown(provider: str) -> bool:
@@ -144,7 +169,15 @@ def _is_in_cooldown(provider: str) -> bool:
         if time.time() >= state.until:
             # Cooldown expired
             del _cooldowns[provider]
-            logger.info(f"ModelFallback: {provider} cooldown expired, re-enabling")
+            logger.info(
+                _t(
+                    "ModelFallback: {provider} cooldown expired, re-enabling",
+                    "ModelFallback: cooldown scaduto per {provider}, riattivo",
+                    "ModelFallback: cooldown expirado para {provider}, reactivando",
+                    "ModelFallback : cooldown expiré pour {provider}, réactivation",
+                    provider=provider,
+                )
+            )
             return False
         return True
 
@@ -345,7 +378,15 @@ def run_with_model_fallback(
             if is_primary and has_fallbacks and _should_probe(candidate.provider):
                 # Probe: try the primary anyway
                 _mark_probe(candidate.provider)
-                logger.info(f"ModelFallback: probing cooled-down primary {candidate.key()}")
+                logger.info(
+                    _t(
+                        "ModelFallback: probing cooled-down primary {candidate}",
+                        "ModelFallback: provo il primario in cooldown {candidate}",
+                        "ModelFallback: probando primario en cooldown {candidate}",
+                        "ModelFallback : test du primaire en cooldown {candidate}",
+                        candidate=candidate.key(),
+                    )
+                )
             else:
                 # Skip this candidate
                 reason_str = "cooldown"
@@ -416,7 +457,15 @@ def run_with_model_fallback(
 
             # Context overflow: NEVER fallback — smaller model would fail worse
             if reason == FailoverReason.CONTEXT_OVERFLOW:
-                logger.warning(f"ModelFallback: context overflow on {candidate.key()}, aborting fallback")
+                logger.warning(
+                    _t(
+                        "ModelFallback: context overflow on {candidate}, aborting fallback",
+                        "ModelFallback: overflow contesto su {candidate}, interrompo fallback",
+                        "ModelFallback: desbordamiento de contexto en {candidate}, abortando fallback",
+                        "ModelFallback : dépassement de contexte sur {candidate}, arrêt du fallback",
+                        candidate=candidate.key(),
+                    )
+                )
                 raise err
 
             # Set cooldown based on error type
@@ -439,12 +488,30 @@ def run_with_model_fallback(
                     pass
 
             # Continue to next candidate
-            logger.info(f"ModelFallback: {candidate.key()} failed ({reason.value}), "
-                        f"trying next candidate ({i+1}/{len(candidates)})")
+            logger.info(
+                _t(
+                    "ModelFallback: {candidate} failed ({reason}), trying next candidate ({idx}/{total})",
+                    "ModelFallback: {candidate} fallito ({reason}), provo il prossimo ({idx}/{total})",
+                    "ModelFallback: {candidate} falló ({reason}), probando el siguiente ({idx}/{total})",
+                    "ModelFallback : échec de {candidate} ({reason}), tentative suivante ({idx}/{total})",
+                    candidate=candidate.key(),
+                    reason=reason.value,
+                    idx=i + 1,
+                    total=len(candidates),
+                )
+            )
 
     # All candidates exhausted
     summary = _build_failure_summary(attempts, candidates)
-    logger.error(f"ModelFallback: all candidates exhausted: {summary}")
+    logger.error(
+        _t(
+            "ModelFallback: all candidates exhausted: {summary}",
+            "ModelFallback: tutti i candidati esauriti: {summary}",
+            "ModelFallback: todos los candidatos agotados: {summary}",
+            "ModelFallback : tous les candidats sont épuisés : {summary}",
+            summary=summary,
+        )
+    )
 
     return FallbackResult(
         error=last_error or Exception(f"All models failed: {summary}"),
@@ -608,7 +675,16 @@ def run_with_model_fallback_streaming(
                 except Exception:
                     pass
 
-            logger.info(f"ModelFallback: streaming {candidate.key()} failed ({reason.value})")
+            logger.info(
+                _t(
+                    "ModelFallback: streaming {candidate} failed ({reason})",
+                    "ModelFallback: streaming fallito per {candidate} ({reason})",
+                    "ModelFallback: streaming falló para {candidate} ({reason})",
+                    "ModelFallback : échec du streaming pour {candidate} ({reason})",
+                    candidate=candidate.key(),
+                    reason=reason.value,
+                )
+            )
 
     summary = _build_failure_summary(attempts, candidates)
     return FallbackResult(error=last_error or Exception(f"All models failed: {summary}"), attempts=attempts)

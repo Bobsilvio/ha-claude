@@ -27,6 +27,21 @@ from .rate_limiter import get_rate_limit_coordinator
 
 logger = logging.getLogger(__name__)
 
+
+def _lang() -> str:
+    l = (os.getenv("LANGUAGE", "en") or "en").lower().strip()
+    return l if l in {"en", "it", "es", "fr"} else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    txt = {"en": en, "it": it, "es": es, "fr": fr}.get(_lang(), en)
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
+
 try:
     from curl_cffi import requests as cffi_requests
     CFFI_AVAILABLE = True
@@ -106,15 +121,27 @@ def store_access_token(access_token: str, cf_clearance: str = "") -> Dict[str, A
             parsed = json.loads(token)
             jwt = parsed.get("accessToken") or parsed.get("access_token") or ""
             if not jwt:
-                raise ValueError("Campo 'accessToken' non trovato nel JSON. "
-                                 "Hai incollato il contenuto corretto di https://chatgpt.com/api/auth/session?")
+                raise ValueError(
+                    _t(
+                        "Field 'accessToken' not found in JSON. Did you paste the full content from https://chatgpt.com/api/auth/session?",
+                        "Campo 'accessToken' non trovato nel JSON. Hai incollato il contenuto corretto di https://chatgpt.com/api/auth/session?",
+                        "Campo 'accessToken' no encontrado en el JSON. Pegaste el contenido completo de https://chatgpt.com/api/auth/session?",
+                        "Champ 'accessToken' introuvable dans le JSON. As-tu colle le contenu complet de https://chatgpt.com/api/auth/session ?",
+                    )
+                )
             token = jwt.strip()
             session_token = (parsed.get("sessionToken") or "").strip() or None
             logger.info(f"ChatGPTWeb: extracted accessToken from full session JSON "
                         f"(sessionToken={'yes' if session_token else 'no'}).")
         except json.JSONDecodeError:
-            raise ValueError("Il testo incollato sembra JSON ma non è valido. "
-                             "Copia il contenuto completo della pagina https://chatgpt.com/api/auth/session")
+            raise ValueError(
+                _t(
+                    "The pasted text looks like JSON but is invalid. Copy the full content from https://chatgpt.com/api/auth/session",
+                    "Il testo incollato sembra JSON ma non e' valido. Copia il contenuto completo della pagina https://chatgpt.com/api/auth/session",
+                    "El texto pegado parece JSON pero no es valido. Copia el contenido completo de https://chatgpt.com/api/auth/session",
+                    "Le texte colle ressemble a du JSON mais il est invalide. Copie le contenu complet de https://chatgpt.com/api/auth/session",
+                )
+            )
 
     if not token.startswith("eyJ"):
         raise ValueError("Access token should be a JWT (starts with 'eyJ'). "
@@ -278,7 +305,15 @@ class ChatGPTWebProvider(EnhancedProvider):
         intent_info: Optional[Dict[str, Any]] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         if not CFFI_AVAILABLE:
-            yield {"type": "error", "message": "curl_cffi non installato. Riavvia l'addon per installarlo automaticamente."}
+            yield {
+                "type": "error",
+                "message": _t(
+                    "curl_cffi not installed. Restart the add-on to install it automatically.",
+                    "curl_cffi non installato. Riavvia l'addon per installarlo automaticamente.",
+                    "curl_cffi no instalado. Reinicia el add-on para instalarlo automaticamente.",
+                    "curl_cffi non installe. Redemarre l'add-on pour l'installer automatiquement.",
+                ),
+            }
             return
 
         s = _stored_session
@@ -481,25 +516,61 @@ class ChatGPTWebProvider(EnhancedProvider):
         if last_status == 401:
             clear_session()
             raise RuntimeError(
-                "Token scaduto — i JWT di ChatGPT durano poche ore. "
-                "Vai su chatgpt.com/api/auth/session e incolla il nuovo accessToken con il pulsante 🔑."
+                _t(
+                    "Token expired - ChatGPT JWTs last only a few hours. Open chatgpt.com/api/auth/session and paste a fresh accessToken with the 🔑 button.",
+                    "Token scaduto - i JWT di ChatGPT durano poche ore. Vai su chatgpt.com/api/auth/session e incolla il nuovo accessToken con il pulsante 🔑.",
+                    "Token expirado - los JWT de ChatGPT duran pocas horas. Ve a chatgpt.com/api/auth/session y pega un accessToken nuevo con el boton 🔑.",
+                    "Jeton expire - les JWT ChatGPT durent seulement quelques heures. Va sur chatgpt.com/api/auth/session et colle un nouvel accessToken via le bouton 🔑.",
+                )
             )
         if last_status == 403:
             cf_hint = (
-                "\n• Sei sulla stessa rete di HA? Copia il cookie 'cf_clearance' da chatgpt.com "
-                "(DevTools → Application → Cookies) e incollalo nel campo cf_clearance del pulsante 🔑"
+                _t(
+                    "\n• Are you on the same network as HA? Copy 'cf_clearance' from chatgpt.com (DevTools -> Application -> Cookies) and paste it in the 🔑 cf_clearance field",
+                    "\n• Sei sulla stessa rete di HA? Copia il cookie 'cf_clearance' da chatgpt.com (DevTools -> Application -> Cookies) e incollalo nel campo cf_clearance del pulsante 🔑",
+                    "\n• Estas en la misma red que HA? Copia la cookie 'cf_clearance' de chatgpt.com (DevTools -> Application -> Cookies) y pegala en el campo cf_clearance del boton 🔑",
+                    "\n• Es-tu sur le meme reseau que HA ? Copie le cookie 'cf_clearance' depuis chatgpt.com (DevTools -> Application -> Cookies) et colle-le dans le champ cf_clearance du bouton 🔑",
+                )
             ) if not cf_clearance else (
-                "\n• Il cf_clearance potrebbe essere scaduto (dura ~30 min) — ricopialo da DevTools"
+                _t(
+                    "\n• cf_clearance may be expired (~30 min) - copy it again from DevTools",
+                    "\n• Il cf_clearance potrebbe essere scaduto (~30 min) - ricopialo da DevTools",
+                    "\n• cf_clearance puede haber expirado (~30 min) - copialo de nuevo desde DevTools",
+                    "\n• Le cf_clearance peut etre expire (~30 min) - recopie-le depuis DevTools",
+                )
             )
             raise RuntimeError(
-                "❌ ChatGPT Web bloccato (403) — Cloudflare blocca le richieste dal server HA.\n\n"
-                "Soluzioni:\n"
-                "• Usa l'API OpenAI ufficiale (platform.openai.com) — stabile e stesso modello"
+                _t(
+                    "❌ ChatGPT Web blocked (403) - Cloudflare is blocking requests from the HA server.\n\n"
+                    "Solutions:\n"
+                    "• Use official OpenAI API (platform.openai.com) - stable and same model",
+                    "❌ ChatGPT Web bloccato (403) - Cloudflare blocca le richieste dal server HA.\n\n"
+                    "Soluzioni:\n"
+                    "• Usa l'API OpenAI ufficiale (platform.openai.com) - stabile e stesso modello",
+                    "❌ ChatGPT Web bloqueado (403) - Cloudflare bloquea las solicitudes desde el servidor HA.\n\n"
+                    "Soluciones:\n"
+                    "• Usa la API oficial de OpenAI (platform.openai.com) - estable y mismo modelo",
+                    "❌ ChatGPT Web bloque (403) - Cloudflare bloque les requetes depuis le serveur HA.\n\n"
+                    "Solutions :\n"
+                    "• Utilise l'API OpenAI officielle (platform.openai.com) - stable et meme modele",
+                )
                 + cf_hint +
-                "\n• Attendi 10-15 minuti se l'errore è comparso di recente"
+                _t(
+                    "\n• Wait 10-15 minutes if the error appeared recently",
+                    "\n• Attendi 10-15 minuti se l'errore e' comparso di recente",
+                    "\n• Espera 10-15 minutos si el error aparecio hace poco",
+                    "\n• Attends 10-15 minutes si l'erreur est apparue recemment",
+                )
             )
         if last_status == 429:
-            raise RuntimeError("ChatGPT rate limit. Attendi qualche minuto e riprova.")
+            raise RuntimeError(
+                _t(
+                    "ChatGPT rate limit. Wait a few minutes and retry.",
+                    "ChatGPT rate limit. Attendi qualche minuto e riprova.",
+                    "Rate limit de ChatGPT. Espera unos minutos y vuelve a intentarlo.",
+                    "Limite de debit ChatGPT. Attends quelques minutes puis reessaie.",
+                )
+            )
         if last_status != 200:
             err = resp.text[:300] if hasattr(resp, 'text') else str(last_status)
             raise RuntimeError(f"HTTP {last_status}: {err}")

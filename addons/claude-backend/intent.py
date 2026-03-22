@@ -456,8 +456,11 @@ def _init_dynamic_prompts():
     """Initialize prompts that depend on api.get_lang_text (called after api module is loaded)."""
     # Add language instruction to chat prompt
     lang_instr = api.get_lang_text("respond_instruction")
+    lang_lock = api.get_lang_text("strict_language_lock")
     if lang_instr and lang_instr not in INTENT_PROMPTS["chat"]:
         INTENT_PROMPTS["chat"] += "\n\n" + lang_instr
+    if lang_lock and lang_lock not in INTENT_PROMPTS["chat"]:
+        INTENT_PROMPTS["chat"] += "\n\n" + lang_lock
 
 
 def detect_intent(user_message: str, smart_context: str, previous_intent: str | None = None) -> dict:
@@ -720,8 +723,11 @@ def get_prompt_for_intent(intent_info: dict) -> str:
     if prompt:
         # Enforce configured LANGUAGE even in focused prompts
         lang_instruction = api.get_lang_text("respond_instruction")
+        lang_lock = api.get_lang_text("strict_language_lock")
         if lang_instruction and lang_instruction not in prompt:
-            return prompt + "\n\n" + lang_instruction
+            prompt = prompt + "\n\n" + lang_instruction
+        if lang_lock and lang_lock not in prompt:
+            prompt = prompt + "\n\n" + lang_lock
         return prompt
     return _tools.get_system_prompt()
 
@@ -1203,9 +1209,20 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
             _ent_json = (json.dumps(_capped, ensure_ascii=False, separators=(',', ':'))
                          if len(_capped) > 20
                          else json.dumps(_capped, ensure_ascii=False, indent=1))
-            _extra = f" [mostrando prime {len(_capped)}]" if len(_integration_matches) > 80 else ""
+            _extra = ""
+            if len(_integration_matches) > 80:
+                _extra = {
+                    "it": f" [mostrando prime {len(_capped)}]",
+                    "es": f" [mostrando las primeras {len(_capped)}]",
+                    "fr": f" [affichage des {len(_capped)} premières]",
+                }.get(api.LANGUAGE, f" [showing first {len(_capped)}]")
+            _found_header = {
+                "it": "## ENTITA TROVATE",
+                "es": "## ENTIDADES ENCONTRADAS",
+                "fr": "## ENTITES TROUVEES",
+            }.get(api.LANGUAGE, "## FOUND ENTITIES")
             context_parts.append(
-                f"## ENTITÀ TROVATE (keyword: {', '.join(_msg_words[:5])}, totale: {len(_integration_matches)}){_extra}\n"
+                f"{_found_header} (keyword: {', '.join(_msg_words[:5])}, total: {len(_integration_matches)}){_extra}\n"
                 + _ent_json
             )
             # Save entity_ids for tools.py to use as authoritative fallback
@@ -1220,7 +1237,12 @@ def build_smart_context(user_message: str, intent: str = None, max_chars: int = 
                                    "friendly_name": s.get("attributes", {}).get("friendly_name", "")}
                                   for s in states if s.get("entity_id", "").startswith(f"{domain}.")][:30]
                 if domain_entities:
-                    context_parts.append(f"## ENTITÀ {domain.upper()}\n{json.dumps(domain_entities, ensure_ascii=False, indent=1)}")
+                    _domain_header = {
+                        "it": f"## ENTITA {domain.upper()}",
+                        "es": f"## ENTIDADES {domain.upper()}",
+                        "fr": f"## ENTITES {domain.upper()}",
+                    }.get(api.LANGUAGE, f"## ENTITIES {domain.upper()}")
+                    context_parts.append(f"{_domain_header}\n{json.dumps(domain_entities, ensure_ascii=False, indent=1)}")
 
     except Exception as e:
         logger.warning(f"Smart context error: {e}")

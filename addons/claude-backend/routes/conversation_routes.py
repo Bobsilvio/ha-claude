@@ -23,6 +23,20 @@ conversation_bp = Blueprint('conversations', __name__)
 
 # Mutable shared state imported by reference
 from api import conversations, session_last_intent
+def _lang() -> str:
+    import api as _api
+    l = (getattr(_api, "LANGUAGE", "en") or "en").lower().strip()
+    return l if l in {"en", "it", "es", "fr"} else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    txt = {"en": en, "it": it, "es": es, "fr": fr}.get(_lang(), en)
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
 
 
 @conversation_bp.route('/api/conversation/process', methods=['POST'])
@@ -50,7 +64,13 @@ def api_conversation_process():
         response_text = _api.chat_with_ai(text, conv_id)
     except Exception as e:
         logger.error(f"[ConversationAgent] Error: {e}")
-        response_text = f"Mi dispiace, si e' verificato un errore: {str(e)[:100]}"
+        response_text = _t(
+            "Sorry, an error occurred: {error}",
+            "Mi dispiace, si e' verificato un errore: {error}",
+            "Lo siento, ocurrio un error: {error}",
+            "Desole, une erreur est survenue : {error}",
+            error=str(e)[:100],
+        )
 
     # Return in HA conversation agent response format
     return jsonify({
@@ -82,7 +102,7 @@ def api_conversations_list():
         if sid.startswith(("whatsapp_", "telegram_")):
             continue
         # Extract first user message as title (strip [CONTEXT: ...] blocks)
-        title = "Nuova conversazione"
+        title = _t("New conversation", "Nuova conversazione", "Nueva conversacion", "Nouvelle conversation")
         for msg in msgs:
             if msg.get("role") == "user":
                 content = msg.get("content", "")

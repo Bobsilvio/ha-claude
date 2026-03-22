@@ -118,6 +118,7 @@ class OllamaProvider(EnhancedProvider):
         return (
             "You are Amira, a smart and friendly Home Assistant assistant.\n"
             f"Always answer in {target_lang}.\n"
+            f"Do not switch away from {target_lang} unless the user explicitly asks to change language.\n"
             "If the user asks you to control devices or sensors, describe the requested "
             "action; you don't have direct device control in this local mode.\n"
             "Be concise, helpful, and direct."

@@ -494,34 +494,34 @@ class ClaudeWebProvider(EnhancedProvider):
                             mins = int((delta.total_seconds() % 3600) // 60)
                             if hours > 24:
                                 days = hours // 24
-                                reset_info = f" Il limite si resetta tra {days} giorni ({reset_dt.strftime('%d/%m alle %H:%M')})."
+                                reset_info = f" Reset in {days} day(s) ({reset_dt.strftime('%d/%m at %H:%M')})."
                             elif hours > 0:
-                                reset_info = f" Il limite si resetta tra {hours}h {mins}min."
+                                reset_info = f" Reset in {hours}h {mins}m."
                             else:
-                                reset_info = f" Il limite si resetta tra {mins} minuti."
+                                reset_info = f" Reset in {mins} minute(s)."
                     except (ValueError, OSError):
                         pass
 
                 limit_type = ""
                 if "seven_day" in claim:
-                    limit_type = " (limite settimanale)"
+                    limit_type = " (weekly limit)"
                 elif "daily" in claim:
-                    limit_type = " (limite giornaliero)"
+                    limit_type = " (daily limit)"
 
                 return (
-                    f"Limite di utilizzo Claude.ai superato{limit_type}.{reset_info}\n"
-                    f"Usa un altro provider o attendi il reset."
+                    f"Claude.ai usage limit reached{limit_type}.{reset_info}\n"
+                    f"Use another provider or wait for reset."
                 )
             except (json.JSONDecodeError, KeyError, TypeError):
                 pass
-            return "Limite di utilizzo Claude.ai superato. Riprova più tardi."
+            return "Claude.ai usage limit reached. Please try again later."
 
         if status_code == 500:
-            return "Errore interno di Claude.ai. Riprova tra qualche minuto."
+            return "Claude.ai internal server error. Please retry in a few minutes."
         if status_code == 502:
-            return "Claude.ai non raggiungibile (502). Riprova tra qualche minuto."
+            return "Claude.ai unreachable (502). Please retry in a few minutes."
         if status_code == 503:
-            return "Claude.ai al momento sovraccarico (503). Riprova tra qualche minuto."
+            return "Claude.ai is currently overloaded (503). Please retry in a few minutes."
 
         # Generic: truncate but don't show raw JSON
         # Try to extract a readable 'message' from JSON
@@ -529,10 +529,10 @@ class ClaudeWebProvider(EnhancedProvider):
             parsed = json.loads(raw_body)
             msg = (parsed.get("error") or {}).get("message", "") if isinstance(parsed.get("error"), dict) else str(parsed.get("error", ""))
             if msg and len(msg) < 300:
-                return f"Claude.ai errore HTTP {status_code}: {msg}"
+                return f"Claude.ai HTTP error {status_code}: {msg}"
         except (json.JSONDecodeError, TypeError):
             pass
-        return f"Claude.ai errore HTTP {status_code}"
+        return f"Claude.ai HTTP error {status_code}"
 
     def _resolve_model(self) -> str:
         m = self.model or self._FALLBACK_MODELS[0]

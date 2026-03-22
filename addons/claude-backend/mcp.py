@@ -856,11 +856,11 @@ def pip_install_packages(packages: list) -> dict:
             continue
         pkg_name = pkg.split("[")[0].strip()
         if pkg in _pip_installed_this_session:
-            lines.append(f"✔ {pkg} già installato (sessione)")
+            lines.append(f"✔ {pkg} already installed (session)")
             continue
         if _is_pkg_installed(pkg_name):
             _pip_installed_this_session.add(pkg)
-            lines.append(f"✔ {pkg} già installato")
+            lines.append(f"✔ {pkg} already installed")
             continue
         lines.append(f"▶ pip install {pkg} ...")
         try:
@@ -872,7 +872,7 @@ def pip_install_packages(packages: list) -> dict:
             )
             out = (result.stdout + result.stderr).strip()
             if result.returncode != 0:
-                lines.append(f"✗ ERRORE:\n{out}")
+                lines.append(f"✗ ERROR:\n{out}")
                 all_ok = False
             else:
                 _pip_installed_this_session.add(pkg)

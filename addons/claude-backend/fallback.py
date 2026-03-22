@@ -9,12 +9,28 @@ Inspired by nanobot: Minimal, efficient, practical implementation.
 
 import json
 import logging
+import os
 import time
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timedelta
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+
+def _lang() -> str:
+    l = (os.getenv("LANGUAGE", "en") or "en").lower().strip()
+    return l if l in {"en", "it", "es", "fr"} else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    txt = {"en": en, "it": it, "es": es, "fr": fr}.get(_lang(), en)
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
 
 
 class ErrorType(Enum):
@@ -95,16 +111,40 @@ class ProviderHealth:
             # 5 minute cooldown for rate limiting
             self.unavailable_until = datetime.now() + timedelta(minutes=5)
             self.is_available = False
-            logger.warning(f"{self.provider_name}: Rate limited, temporarily disabled for 5 min")
+            logger.warning(
+                _t(
+                    "{provider}: rate limited, temporarily disabled for 5 min",
+                    "{provider}: limite di velocita', disabilitato temporaneamente per 5 min",
+                    "{provider}: limite de velocidad, deshabilitado temporalmente 5 min",
+                    "{provider} : limite de debit, desactive temporairement 5 min",
+                    provider=self.provider_name,
+                )
+            )
         elif error_type == ErrorType.AUTH_FAILED:
             # Permanently disable on auth failure
             self.is_available = False
-            logger.error(f"{self.provider_name}: Authentication failed, permanently disabled")
+            logger.error(
+                _t(
+                    "{provider}: authentication failed, permanently disabled",
+                    "{provider}: autenticazione fallita, disabilitato in modo permanente",
+                    "{provider}: autenticacion fallida, deshabilitado permanentemente",
+                    "{provider} : authentification echouee, desactive de facon permanente",
+                    provider=self.provider_name,
+                )
+            )
         elif self.consecutive_failures > 10:
             # Disable after too many failures
             self.unavailable_until = datetime.now() + timedelta(minutes=10)
             self.is_available = False
-            logger.warning(f"{self.provider_name}: Too many failures, disabled for 10 min")
+            logger.warning(
+                _t(
+                    "{provider}: too many failures, disabled for 10 min",
+                    "{provider}: troppi errori, disabilitato per 10 min",
+                    "{provider}: demasiados fallos, deshabilitado por 10 min",
+                    "{provider} : trop d'echecs, desactive pour 10 min",
+                    provider=self.provider_name,
+                )
+            )
     
     def is_ready(self) -> bool:
         """Check if provider is ready to use."""
@@ -112,7 +152,15 @@ class ProviderHealth:
             if self.unavailable_until and datetime.now() > self.unavailable_until:
                 self.is_available = True
                 self.consecutive_failures = 0
-                logger.info(f"{self.provider_name}: Recovered, re-enabling")
+                logger.info(
+                    _t(
+                        "{provider}: recovered, re-enabling",
+                        "{provider}: recuperato, riattivo",
+                        "{provider}: recuperado, reactivando",
+                        "{provider} : recupere, reactivation",
+                        provider=self.provider_name,
+                    )
+                )
                 return True
             return False
         return True
@@ -163,7 +211,14 @@ class ProviderFallback:
                 available.append(provider)
         
         if not available:
-            logger.warning("No providers available, returning all (recovery mode)")
+            logger.warning(
+                _t(
+                    "No providers available, returning all (recovery mode)",
+                    "Nessun provider disponibile, ritorno tutti (modalita' recupero)",
+                    "No hay proveedores disponibles, devolviendo todos (modo recuperacion)",
+                    "Aucun fournisseur disponible, retour de tous (mode recuperation)",
+                )
+            )
             return self.provider_order
         
         return available
@@ -228,14 +283,34 @@ class ProviderFallback:
                     self.health[provider].record_success()
                     self.call_counts[provider] += 1
                     
-                    logger.info(f"✅ {provider}: Success in {elapsed:.2f}s (attempt {attempt + 1})")
+                    logger.info(
+                        _t(
+                            "✅ {provider}: success in {elapsed:.2f}s (attempt {attempt})",
+                            "✅ {provider}: successo in {elapsed:.2f}s (tentativo {attempt})",
+                            "✅ {provider}: exito en {elapsed:.2f}s (intento {attempt})",
+                            "✅ {provider} : succes en {elapsed:.2f}s (tentative {attempt})",
+                            provider=provider,
+                            elapsed=elapsed,
+                            attempt=attempt + 1,
+                        )
+                    )
                     return result, provider
                     
                 except Exception as e:
                     elapsed = time.time() - start_time
                     error_type = ProviderError.classify(e, provider)
                     
-                    logger.warning(f"⚠️ {provider}: {error_type.value} - {str(e)[:100]}")
+                    logger.warning(
+                        _t(
+                            "⚠️ {provider}: {error_type} - {error}",
+                            "⚠️ {provider}: {error_type} - {error}",
+                            "⚠️ {provider}: {error_type} - {error}",
+                            "⚠️ {provider} : {error_type} - {error}",
+                            provider=provider,
+                            error_type=error_type.value,
+                            error=str(e)[:100],
+                        )
+                    )
                     
                     self.health[provider].record_failure(e, error_type)
                     last_error = (e, error_type)
@@ -250,7 +325,15 @@ class ProviderFallback:
                         break  # Try next provider
         
         # All providers exhausted
-        logger.error(f"❌ All providers exhausted. Last error: {last_error}")
+        logger.error(
+            _t(
+                "❌ All providers exhausted. Last error: {error}",
+                "❌ Tutti i provider esauriti. Ultimo errore: {error}",
+                "❌ Todos los proveedores agotados. Ultimo error: {error}",
+                "❌ Tous les fournisseurs sont epuises. Derniere erreur : {error}",
+                error=last_error,
+            )
+        )
         return None, "failed"
     
     def record_cost(self, provider: str, cost: float) -> None:
@@ -293,7 +376,15 @@ def initialize_fallback_chain(provider_order: List[str]) -> ProviderFallback:
     """Initialize global fallback chain."""
     global _fallback_chain
     _fallback_chain = ProviderFallback(provider_order)
-    logger.info(f"Fallback chain initialized: {' → '.join(provider_order)}")
+    logger.info(
+        _t(
+            "Fallback chain initialized: {chain}",
+            "Catena fallback inizializzata: {chain}",
+            "Cadena de fallback inicializada: {chain}",
+            "Chaine de fallback initialisee : {chain}",
+            chain=" -> ".join(provider_order),
+        )
+    )
     return _fallback_chain
 
 

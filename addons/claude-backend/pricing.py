@@ -171,8 +171,19 @@ MODEL_PRICING: Dict[str, Dict[str, float]] = {
     "Mistral-7B-Instruct-v0.3": {"input": 0.14, "output": 0.14},
 }
 
-FREE_PROVIDERS = {"nvidia", "ollama", "github_copilot", "github", "claude_web", "chatgpt_web",
-                  "groq"}  # Groq free tier — no billing for most models
+FREE_PROVIDERS = {
+    "nvidia",
+    "ollama",
+    "github_copilot",
+    "github",
+    "claude_web",
+    "chatgpt_web",
+    "gemini_web",
+    "perplexity_web",
+    "grok_web",
+    "claude_web_native",
+    "groq",
+}  # Groq free tier + web/subscription providers (no per-token billing)
 
 CURRENCY_RATES = {"USD": 1.0, "EUR": 0.92}
 
@@ -309,6 +320,13 @@ def calculate_cost_breakdown(
         "cache_read_cost": 0.0, "cache_write_cost": 0.0,
         "total_cost": 0.0, "currency": currency,
     }
+    provider = (provider or "").strip().lower()
+
+    # Web/subscription providers don't expose reliable per-token billing to users.
+    # Treat all *_web providers as flat subscription (no pay-per-token accounting).
+    if provider.endswith("_web"):
+        return zero
+
     if provider in FREE_PROVIDERS:
         return zero
 

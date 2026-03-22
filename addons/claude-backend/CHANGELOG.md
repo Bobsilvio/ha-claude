@@ -2,6 +2,42 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.24 — Flow widget redesign, i18n unification, multilingual runtime, provider fixes
+
+### Automation Flow widget (chat_bubble)
+- Redesigned layout: compact **2-line pipeline** — status pill on top, centered `TRIGGER › CONDITION › ACTION` below
+- Section labels (TRIGGER / CONDITION / ACTION) now appear **above** their chips for clearer visual hierarchy
+- Entity chips now resolve **`friendly_name`** from `hass.states` instead of showing raw entity_id slugs
+- Added **semantic state translation** based on `device_class`: `ON/OFF` now shown as Occupied/Clear, Open/Closed, Wet/Dry, Locked/Unlocked, etc. across all 4 languages
+- Added **`_translateDeviceTriggerType`**: device triggers (e.g. `type: occupied`) are now translated correctly instead of showing raw type strings
+- Added **`_entityDeviceClass`** and **`_entityTypeHint`** helpers; detail tooltip shows entity domain + device_class
+- **`+N` overflow badge**: when a section has multiple items, shows first chip + clickable `+N` badge that expands the full list
+- Added 17 new `flow_state_*` translation keys in EN / IT / ES / FR (`occupied`, `detected`, `open`, `closed`, `locked`, `wet`, `dry`, `home`, `away`, `ok`, `low`, `charging`, `connected`, `disconnected`, …)
+- Fixed syntax error: unescaped newlines inside JS string literals
+
+### Translation system
+- **Unified translation dict** in `core/translations.py`: merged `LANGUAGE_TEXT` + `_LANGUAGE_TEXT_EXTRA` into a single canonical dict (134 keys per language); removed the `.update()` patch loop
+- Fixed **language mixing bugs** in `es` and `fr` sections (French strings were incorrectly placed in the Spanish block and vice versa)
+- Added `_SUPPORTED_LANGS` guard to prevent unsupported language codes from being used at runtime
+- Added new backend strings: `strict_language_lock`, `warn_no_tool_called_with_guidance`, `html_*`, `scheduler_*`, `err_github_copilot_model_incompatible`, and more
+
+### Multilingual runtime
+- `fallback.py` and `model_fallback.py`: log messages now use inline `_t(en, it, es, fr)` helper — all provider cooldown / auth-failure / rate-limit warnings are fully localized
+- `manager_enhanced.py`: rate-limit skip logs use `get_lang_text` translation wrapper
+- `intent.py`: strict language lock injected into all intent prompts; entity search headers localized per language; `set_current_language` synced at API config-change time
+- `tools.py`: added `TOOL_DESCRIPTIONS_EN` map for localized tool progress labels
+
+### Provider / API fixes
+- Fixed `NameError: name 'SYSTEM_PROMPT' is not defined` on Google Gemini provider (`api.py:2575`) — replaced with `tools.get_system_prompt()`
+- Response instructions and voice guidelines in system prompt refined for natural spoken language (no entity IDs, no technical parentheses, concise confirmations)
+- Ollama provider renamed from `🦙 Ollama (Local)` → `🦙 Ollama` in the UI provider list
+
+### Other
+- `pricing.py`, `mcp.py`, `routes/conversation_routes.py`: minor localization and robustness improvements
+- `providers/chatgpt_web.py`, `claude_web.py`, `gemini_web.py`, `github_copilot.py`: compatibility and reliability fixes
+
+---
+
 ## 4.6.23 — Messaging UI split + Discord listener compatibility + docs alignment
 
 ### Settings UI (Messaging)

@@ -15,8 +15,23 @@ from typing import Any, Dict, Generator, List, Optional
 from .rate_limiter import get_rate_limit_coordinator, RateLimitInfo
 from .error_handler import ErrorTranslator, ErrorType
 from .ollama import resolve_ollama_base_url
+try:
+    from core.translations import get_lang_text
+except Exception:  # pragma: no cover - safe fallback if translations are unavailable
+    def get_lang_text(_key: str) -> str:
+        return ""
 
 logger = logging.getLogger(__name__)
+
+
+def _tw(key: str, default: str, **kwargs) -> str:
+    txt = get_lang_text(key) or default
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
 
 
 class EnhancedProviderManager:
@@ -87,8 +102,12 @@ class EnhancedProviderManager:
 
                 if not can_request:
                     logger.warning(
-                        f"EnhancedProviderManager: {prov} rate limited, "
-                        f"skipping (wait {wait_time:.1f}s)"
+                        _tw(
+                            "log_enhanced_rate_limited_skipping",
+                            "EnhancedProviderManager: {provider} rate limited, skipping (wait {wait:.1f}s)",
+                            provider=prov,
+                            wait=wait_time,
+                        )
                     )
                     self._record_rate_limited(prov)
                     last_exception = Exception(f"Rate limited (wait {wait_time:.1f}s)")
@@ -119,13 +138,25 @@ class EnhancedProviderManager:
 
                     # Error event: forward only if content already started, else try fallback
                     if event.get("type") == "error":
+                        _localized_error_event = {
+                            "type": "error",
+                            "message": ErrorTranslator.translate_error(
+                                str(event.get("message", "") or "provider error event"),
+                                provider=prov,
+                                language=os.getenv("LANGUAGE", "en").lower(),
+                            ),
+                        }
                         if content_started:
-                            yield event
+                            yield _localized_error_event
                         else:
-                            last_error_event = event
+                            last_error_event = _localized_error_event
                             logger.warning(
-                                f"EnhancedProviderManager: {prov} returned error before content: "
-                                f"{event.get('message', '')}"
+                                _tw(
+                                    "log_enhanced_error_before_content",
+                                    "EnhancedProviderManager: {provider} returned error before content: {error}",
+                                    provider=prov,
+                                    error=event.get("message", ""),
+                                )
                             )
                         self._record_failure(prov, event.get("message", "provider error event"))
                         last_exception = Exception(event.get("message", "provider error event"))
@@ -149,8 +180,12 @@ class EnhancedProviderManager:
                         # explicit error if this was the last one).
                         if not content_started:
                             logger.warning(
-                                f"EnhancedProviderManager: {prov} done without content "
-                                f"({event_count} events) — treating as empty response"
+                                _tw(
+                                    "log_enhanced_done_without_content",
+                                    "EnhancedProviderManager: {provider} done without content ({events} events) - treating as empty response",
+                                    provider=prov,
+                                    events=event_count,
+                                )
                             )
                             self._record_failure(prov, "empty_response")
                             last_exception = Exception("Empty response from provider")
@@ -163,8 +198,12 @@ class EnhancedProviderManager:
                     # for-loop completed without break: stream ended without done
                     if event_count > 0:
                         logger.warning(
-                            f"EnhancedProviderManager: {prov} incomplete "
-                            f"({event_count} events, no done)"
+                            _tw(
+                                "log_enhanced_incomplete_stream",
+                                "EnhancedProviderManager: {provider} incomplete ({events} events, no done)",
+                                provider=prov,
+                                events=event_count,
+                            )
                         )
                         self._record_failure(prov, "incomplete_stream")
                         last_exception = Exception("Incomplete stream")
@@ -175,8 +214,14 @@ class EnhancedProviderManager:
                 is_retryable = self.translator.is_retryable(error_msg)
                 
                 logger.warning(
-                    f"EnhancedProviderManager: {prov} failed "
-                    f"({error_type}, retryable={is_retryable}): {error_msg}"
+                    _tw(
+                        "log_enhanced_provider_failed",
+                        "EnhancedProviderManager: {provider} failed ({error_type}, retryable={retryable}): {error}",
+                        provider=prov,
+                        error_type=error_type,
+                        retryable=is_retryable,
+                        error=error_msg,
+                    )
                 )
                 
                 self._record_failure(prov, error_msg)
@@ -195,11 +240,18 @@ class EnhancedProviderManager:
         self.last_error = error_msg
         self.last_error_time = time.time()
 
+        language = os.getenv("LANGUAGE", "en").lower()
+        failed_prov = providers_to_try[-1] if providers_to_try else "generic"
         if last_error_event:
-            yield last_error_event
+            # Normalize provider-native error text to configured UI language.
+            raw_msg = str(last_error_event.get("message", "") or error_msg)
+            yield {
+                "type": "error",
+                "message": ErrorTranslator.translate_error(
+                    raw_msg, provider=failed_prov, language=language
+                ),
+            }
         else:
-            language = os.getenv("LANGUAGE", "en").lower()
-            failed_prov = providers_to_try[-1] if providers_to_try else "generic"
             yield {
                 "type": "error",
                 "message": ErrorTranslator.translate_error(

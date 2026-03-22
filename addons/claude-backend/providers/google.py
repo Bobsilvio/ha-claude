@@ -4,6 +4,7 @@ Extends EnhancedProvider for automatic retry, caching, and intelligent fallback.
 """
 
 import logging
+import os
 from typing import Any, Dict, List, Optional, Generator
 
 from .enhanced import EnhancedProvider
@@ -11,6 +12,21 @@ from .error_handler import ErrorTranslator
 from .rate_limiter import get_rate_limit_coordinator
 
 logger = logging.getLogger(__name__)
+
+
+def _lang() -> str:
+    l = (os.getenv("LANGUAGE", "en") or "en").lower().strip()
+    return l if l in {"en", "it", "es", "fr"} else "en"
+
+
+def _t(en: str, it: str, es: str, fr: str, **kwargs) -> str:
+    txt = {"en": en, "it": it, "es": es, "fr": fr}.get(_lang(), en)
+    if not kwargs:
+        return txt
+    try:
+        return txt.format(**kwargs)
+    except Exception:
+        return txt
 
 
 class GoogleProvider(EnhancedProvider):
@@ -83,9 +99,13 @@ class GoogleProvider(EnhancedProvider):
         # the standard streamGenerateContent endpoint.
         if model.startswith("deep-research"):
             raise RuntimeError(
-                f"Il modello '{model}' supporta solo la Interactions API di Google "
-                f"e non è compatibile con la chat. "
-                f"Seleziona un modello Gemini standard (es. gemini-2.0-flash)."
+                _t(
+                    "Model '{model}' only supports Google Interactions API and is not chat compatible. Select a standard Gemini model (e.g. gemini-2.0-flash).",
+                    "Il modello '{model}' supporta solo la Interactions API di Google e non e' compatibile con la chat. Seleziona un modello Gemini standard (es. gemini-2.0-flash).",
+                    "El modelo '{model}' solo admite Google Interactions API y no es compatible con chat. Selecciona un modelo Gemini estandar (p. ej. gemini-2.0-flash).",
+                    "Le modele '{model}' ne prend en charge que Google Interactions API et n'est pas compatible chat. Selectionnez un modele Gemini standard (ex. gemini-2.0-flash).",
+                    model=model,
+                )
             )
         system = ""
         contents = []
@@ -185,7 +205,14 @@ class GoogleProvider(EnhancedProvider):
                     or "exceeded your current quota" in error_text
                     or "RESOURCE_EXHAUSTED" in error_text
                 ):
-                    raise RuntimeError(f"Google: quota esaurita. Controlla il piano e la fatturazione su ai.google.dev. (HTTP 429)")
+                    raise RuntimeError(
+                        _t(
+                            "Google: quota exhausted. Check plan and billing on ai.google.dev. (HTTP 429)",
+                            "Google: quota esaurita. Controlla piano e fatturazione su ai.google.dev. (HTTP 429)",
+                            "Google: cuota agotada. Revisa plan y facturacion en ai.google.dev. (HTTP 429)",
+                            "Google : quota epuisee. Verifiez le forfait et la facturation sur ai.google.dev. (HTTP 429)",
+                        )
+                    )
                 raise RuntimeError(f"Google HTTP {response.status_code}: {error_text[:300]}")
             captured_usage = None
             final_finish_reason = "stop"
@@ -284,9 +311,11 @@ class GoogleProvider(EnhancedProvider):
             )
             yield {
                 "type": "error",
-                "message": (
-                    "Google/Gemini returned malformed_function_call (nessun tool valido). "
-                    "Riprova oppure riduci il prompt."
+                "message": _t(
+                    "Google/Gemini returned malformed_function_call (no valid tool). Retry or reduce prompt.",
+                    "Google/Gemini ha restituito malformed_function_call (nessun tool valido). Riprova o riduci il prompt.",
+                    "Google/Gemini devolvio malformed_function_call (sin herramienta valida). Reintenta o reduce el prompt.",
+                    "Google/Gemini a retourne malformed_function_call (aucun outil valide). Reessayez ou reduisez le prompt.",
                 ),
             }
             return

@@ -24,7 +24,7 @@ import intent
 from providers import stream_chat as provider_stream_chat
 import pricing
 import chat_ui
-from core.translations import LANGUAGE_TEXT, get_lang_text, tr
+from core.translations import LANGUAGE_TEXT, get_lang_text, tr, set_current_language
 from core.image_helpers import parse_image_data, format_message_with_image_anthropic, format_message_with_image_openai, format_message_with_image_google
 from core.model_utils import normalize_model_name, get_model_provider, validate_model_provider_compatibility, get_active_model
 from core.error_utils import humanize_provider_error, _extract_http_error_code, _extract_remote_message
@@ -359,6 +359,9 @@ def _apply_settings(settings: dict) -> None:
             continue
         # Set Python global
         _g[gvar] = value
+        if key == "language":
+            # Keep core.translations runtime language aligned with API runtime config
+            set_current_language(value)
         # Set os.environ for inline os.getenv() calls
         if isinstance(value, bool):
             os.environ[gvar] = "true" if value else "false"
@@ -2569,7 +2572,7 @@ def chat_google(messages: List[Dict]) -> tuple:
         except Exception as e:
             logger.debug(f"Registry Gemini format failed, using legacy: {e}")
     config = types.GenerateContentConfig(
-        system_instruction=SYSTEM_PROMPT,
+        system_instruction=tools.get_system_prompt(),
         tools=[tool],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
@@ -3484,17 +3487,17 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             "- Be EXTREMELY concise: 1-2 sentences max.\n"
             "- Give only the essential information requested.\n"
             "- NEVER include entity_id, technical identifiers, or HA internal names (e.g. switch.xxx, light.xxx, sensor.xxx).\n"
-            "- NEVER put technical info in parentheses like '(switch.luce_cucina: off)' or '(sensor.temp: 22)'.\n"
-            "- NEVER list all entities/devices/switches — just summarize (e.g. 'Hai 5 luci accese' instead of listing them).\n"
+            "- NEVER put technical info in parentheses like '(switch.kitchen_light: off)' or '(sensor.temp: 22)'.\n"
+            "- NEVER list all entities/devices/switches — just summarize (e.g. 'You have 5 lights on' instead of listing them).\n"
             "- Do NOT use markdown, bullet points, numbered lists, code blocks, or special formatting.\n"
             "- ABSOLUTELY NO EMOJI — never use 😊🎉👍 or any emoji/emoticon. The TTS will try to read them.\n"
             "- Do NOT use slashes '/' in the response.\n"
-            "- Use natural spoken Italian (or the user's language), as if talking to a person.\n"
-            "- For temperatures: 'In soggiorno ci sono 22 gradi' (no entity IDs).\n"
-            "- For states: 'La luce della cameretta è accesa' (no technical names).\n"
-            "- For actions: confirm briefly: 'Fatto, ho spento la luce della cameretta'.\n"
+            "- Use natural spoken language matching the configured language, as if talking to a person.\n"
+            "- For temperatures: 'Living room is 22 degrees' (no entity IDs).\n"
+            "- For states: 'Bedroom light is on' (no technical names).\n"
+            "- For actions: confirm briefly: 'Done, I turned off the bedroom light'.\n"
             "- For queries about multiple items: give a summary count and mention only the most relevant ones by their friendly name.\n"
-            "- Never say 'ecco i risultati' or similar preambles — go straight to the answer.\n"
+            "- Never use generic preambles like 'here are the results' — go straight to the answer.\n"
         )
         intent_info["prompt"] = intent_info["prompt"] + voice_instruction
 
@@ -3968,7 +3971,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     # If fallback engine itself fails, fall through to direct call
                     if model_fallback.is_context_overflow(_fb_err):
                         raise  # context overflow: abort immediately
-                    logger.warning(f"Fallback engine error, trying direct: {_fb_err}")
+                    logger.warning(
+                        tr(
+                            "log_fallback_engine_error_try_direct",
+                            "Fallback engine error, trying direct: {error}",
+                            error=_fb_err,
+                        )
+                    )
                     provider_gen = provider_stream_chat(
                         AI_PROVIDER, messages,
                         intent_info=intent_info,
@@ -4037,7 +4046,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             )
                             if intent_info is not None:
                                 intent_info["prompt"] = (_cur_prompt + "\n\n" + _retry_rule).strip() if _cur_prompt else _retry_rule
-                            logger.warning("HTML dashboard retry: malformed_function_call with no tool_calls, forcing strict tool call")
+                            logger.warning(
+                                tr(
+                                    "log_html_retry_malformed_tool_call",
+                                    "HTML dashboard retry: malformed_function_call with no tool_calls, forcing strict tool call",
+                                )
+                            )
                             _text_buffer = []
                             _streamed_text_parts = []
                             break
@@ -4152,7 +4166,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                     full_buf, _re_html_nt.IGNORECASE
                                 ))
                                 if _has_html_nt:
-                                    yield {"type": "status", "message": "💾 HTML ricevuto, provo a salvarlo..."}
+                                    yield {"type": "status", "message": tr("status_html_received_saving", "💾 HTML received, trying to save...")}
                                 elif _display:
                                     yield {"type": "token", "content": _display}
                                 # Some models ask "Procedo?" instead of calling the tool.
@@ -4251,7 +4265,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             ))
                             if _is_no_tool_provider and _has_html:
                                 # Do not claim success before the actual save result.
-                                yield {"type": "status", "message": "💾 HTML ricevuto, provo a salvarlo..."}
+                                yield {"type": "status", "message": tr("status_html_received_saving", "💾 HTML received, trying to save...")}
                             else:
                                 # No HTML found → clarifying question or tool-capable provider;
                                 # flush the buffer normally so the user sees the response.
@@ -4408,7 +4422,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 and not _html_dashboard_saved_this_turn
             ):
                 try:
-                    yield {"type": "status", "message": "💾 Auto-finalizing HTML draft dashboard..."}
+                    yield {"type": "status", "message": tr("status_html_auto_finalizing", "💾 Auto-finalizing HTML draft dashboard...")}
                     _auto_final = tools.execute_tool("create_html_dashboard", {"name": _html_draft_pending_name})
                     _auto_obj = json.loads(_auto_final) if isinstance(_auto_final, str) else _auto_final
                     if isinstance(_auto_obj, dict) and str(_auto_obj.get("status", "")).lower() == "success":
@@ -4416,16 +4430,28 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         _html_draft_pending_name = ""
                         _saved_url = _auto_obj.get("dashboard_url") or _auto_obj.get("url") or ""
                         if _saved_url:
-                            yield {"type": "status", "message": f"✅ Dashboard saved: {_saved_url}"}
+                            yield {"type": "status", "message": tr("status_html_dashboard_saved_url", "✅ Dashboard saved: {url}", url=_saved_url)}
                         else:
-                            yield {"type": "status", "message": "✅ HTML dashboard saved successfully."}
+                            yield {"type": "status", "message": tr("status_html_dashboard_saved_ok", "✅ HTML dashboard saved successfully.")}
                         logger.info("HTML draft auto-finalized successfully")
                     else:
-                        logger.warning(f"HTML draft auto-finalize failed: {_auto_final}")
-                        yield {"type": "status", "message": "⚠️ Draft dashboard was not auto-finalized."}
+                        logger.warning(
+                            tr(
+                                "log_html_auto_finalize_failed",
+                                "HTML draft auto-finalize failed: {error}",
+                                error=_auto_final,
+                            )
+                        )
+                        yield {"type": "status", "message": tr("status_html_auto_finalize_skipped", "⚠️ Draft dashboard was not auto-finalized.")}
                 except Exception as _df_err:
-                    logger.warning(f"HTML draft auto-finalize error: {_df_err}")
-                    yield {"type": "status", "message": f"⚠️ Draft auto-finalize error: {_df_err}"}
+                    logger.warning(
+                        tr(
+                            "log_html_auto_finalize_error",
+                            "HTML draft auto-finalize error: {error}",
+                            error=_df_err,
+                        )
+                    )
+                    yield {"type": "status", "message": tr("status_html_auto_finalize_error", "⚠️ Draft auto-finalize error: {error}", error=_df_err)}
 
             if not _pending_tool_calls:
                 break  # No tool calls → conversation complete
@@ -4471,7 +4497,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                 f"HTML draft loop detected for '{_draft_name}' "
                                 f"(round {_tool_round}) — forcing finalize now"
                             )
-                            yield {"type": "status", "message": "💾 Draft loop detected: auto-finalizing HTML dashboard..."}
+                            yield {"type": "status", "message": tr("status_html_draft_loop_finalize", "💾 Draft loop detected: auto-finalizing HTML dashboard...")}
                             _auto_final = tools.execute_tool("create_html_dashboard", {"name": _draft_name})
                             _auto_obj = json.loads(_auto_final) if isinstance(_auto_final, str) else _auto_final
                             if isinstance(_auto_obj, dict) and str(_auto_obj.get("status", "")).lower() == "success":
@@ -4479,9 +4505,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                                 _html_draft_pending_name = ""
                                 _url = _auto_obj.get("dashboard_url") or _auto_obj.get("url") or ""
                                 _msg = (
-                                    f"HTML dashboard created successfully: {_url}"
+                                    tr("status_html_dashboard_created_url", "HTML dashboard created successfully: {url}", url=_url)
                                     if _url else
-                                    "HTML dashboard created successfully."
+                                    tr("status_html_dashboard_created_ok", "HTML dashboard created successfully.")
                                 )
                                 _streamed_text_parts.append(_msg)
                                 yield {"type": "token", "content": _msg}
@@ -4493,8 +4519,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
                 _duplicate_count += 1
                 logger.warning(
-                    f"Tool loop detected (round {_tool_round}, dup #{_duplicate_count}): "
-                    f"all {len(_pending_tool_calls)} call(s) are duplicates — forcing final answer"
+                    tr(
+                        "log_tool_loop_detected",
+                        "Tool loop detected (round {round}, dup #{dup}): all {count} call(s) are duplicates - forcing final answer",
+                        round=_tool_round,
+                        dup=_duplicate_count,
+                        count=len(_pending_tool_calls),
+                    )
                 )
 
                 # ── No-tool providers (github_copilot, etc.): the model ignores
@@ -4505,7 +4536,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 if _is_no_tool_provider:
                     if _duplicate_count >= 2:
                         # Already tried once — force-break now
-                        logger.warning("No-tool provider: 2nd duplicate → breaking loop")
+                        logger.warning(
+                            tr(
+                                "log_no_tool_provider_second_duplicate_break",
+                                "No-tool provider: 2nd duplicate -> breaking loop",
+                            )
+                        )
                         # Emit whatever text the model accumulated (cleaned)
                         if text_so_far:
                             from providers.tool_simulator import clean_display_text as _cdt_brk
@@ -4522,7 +4558,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 # the model is truly stuck — force-break as well.
                 # text_so_far was already streamed to the client — don't re-yield it.
                 elif _duplicate_count >= 2:
-                    logger.warning("Native provider: 2nd duplicate → breaking loop")
+                    logger.warning(
+                        tr(
+                            "log_native_provider_second_duplicate_break",
+                            "Native provider: 2nd duplicate -> breaking loop",
+                        )
+                    )
                     _fallback_text = _build_readonly_loop_fallback(_last_success_read_tool)
                     if _fallback_text:
                         yield {"type": "token", "content": _fallback_text}
@@ -4801,11 +4842,8 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         logger.info(f"Tool result [{fn_name}]: {_log_result}")
                         continue
 
-                # Show status to user (registry provides Italian labels)
-                if _tool_registry is not None:
-                    _status_label = _tool_registry.get_user_description(fn_name)
-                else:
-                    _status_label = tools.TOOL_DESCRIPTIONS.get(fn_name, fn_name)
+                # Show localized status to user (runtime language aware).
+                _status_label = tools.get_tool_status_label(fn_name, LANGUAGE)
                 yield {"type": "status", "message": f"🔧 {_status_label}..."}
                 logger.info(f"Tool (round {_tool_round}): {fn_name} {list(tc_args.keys())}")
 
@@ -4899,9 +4937,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             _eid = _eid or str(_tgt.get("entity_id") or _dat.get("entity_id") or "").strip()
                             _svc_full = f"{_dom}.{_svc}" if _dom and _svc else (_svc or _dom or "service")
                             if _eid:
-                                _round_write_confirms.append(f"✅ Eseguito `{_svc_full}` su `{_eid}`.")
+                                _round_write_confirms.append(tr("status_service_executed_on", "✅ Executed `{service}` on `{entity}`.", service=_svc_full, entity=_eid))
                             else:
-                                _round_write_confirms.append(f"✅ Eseguito `{_svc_full}`.")
+                                _round_write_confirms.append(tr("status_service_executed", "✅ Executed `{service}`.", service=_svc_full))
                         else:
                             _msg = str(_result_obj.get("message") or "").strip()
                             if _msg:
@@ -5186,7 +5224,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                             _svc_obj = json.loads(_svc_raw) if isinstance(_svc_raw, str) else _svc_raw
                             _ok = isinstance(_svc_obj, dict) and str(_svc_obj.get("status", "")).lower() == "success" and not _svc_obj.get("error")
                             if _ok:
-                                assembled = f"✅ Eseguito `{_dom}.{_svc}` su `{_best_eid}`."
+                                assembled = tr("status_service_executed_on", "✅ Executed `{service}` on `{entity}`.", service=f"{_dom}.{_svc}", entity=_best_eid)
                                 _write_tools_executed.append("call_service")
                                 logger.info(
                                     "No-tool fallback action executed: %s on %s (provider=%s)",
@@ -5203,7 +5241,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 and intent_name not in ("chat", "create_html_dashboard")
                 and (_looks_like_fake_success or _user_asked_action)
             ):
-                _warn = get_lang_text("warn_no_tool_called") or (
+                _warn = get_lang_text("warn_no_tool_called_with_guidance") or get_lang_text("warn_no_tool_called") or (
                     "⚠️ Action NOT executed: this provider replied in text without calling Home Assistant tools. "
                     "No changes were applied. "
                     "Try a provider with tool-calling support or confirm guided execution."
@@ -5370,7 +5408,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         _entities = list(dict.fromkeys(_entities))
 
                         try:
-                            yield {"type": "status", "message": "💾 Salvo la dashboard HTML…"}
+                            yield {"type": "status", "message": tr("status_html_saving", "💾 Saving HTML dashboard...")}
                             _save_args = {
                                 "title": _title,
                                 "name": _slug,
@@ -6472,6 +6510,7 @@ def api_set_config():
             new_lang = data['language'].lower()
             if new_lang in ['en', 'it', 'es', 'fr']:
                 LANGUAGE = new_lang
+                set_current_language(new_lang)
                 updated.append(f"language={LANGUAGE}")
                 logger.info(f"Language changed to: {LANGUAGE}")
             else:
@@ -7533,7 +7572,7 @@ def api_nvidia_test_model():
                 "success": False,
                 "blocklisted": False,
                 "model": model_id,
-                "message": f"Test NVIDIA fallito (HTTP {resp.status_code}).",
+                "message": tr("provider_test_failed_http", provider_name="NVIDIA", code=resp.status_code),
             }), 200
 
         data = resp.json() if resp.content else {}
@@ -7547,7 +7586,7 @@ def api_nvidia_test_model():
             "success": False,
             "blocklisted": False,
             "model": model_id,
-            "message": f"Test NVIDIA errore: {type(e).__name__}: {e}",
+            "message": f"NVIDIA test error: {type(e).__name__}: {e}",
         }), 200
 
 

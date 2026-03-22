@@ -5,6 +5,7 @@ import json
 import logging
 import requests
 from datetime import datetime, timedelta
+from typing import Optional
 
 import api
 
@@ -1355,7 +1356,7 @@ def _stamp_description(description: str, action: str = "create") -> str:
     return stamp
 
 
-# User-friendly tool descriptions (Italian)
+# User-friendly tool descriptions (default Italian + runtime i18n helper)
 TOOL_DESCRIPTIONS = {
     "get_entities": "Carico dispositivi",
     "get_entity_state": "Leggo stato dispositivo",
@@ -1410,6 +1411,185 @@ TOOL_DESCRIPTIONS = {
     "get_logged_users": "Utenti connessi",
     "get_error_log": "Log errori (interattivo)",
 }
+
+TOOL_DESCRIPTIONS_EN = {
+    "get_entities": "Loading entities",
+    "get_entity_state": "Reading entity state",
+    "call_service": "Executing service call",
+    "search_entities": "Searching entities",
+    "get_integration_entities": "Searching integration entities",
+    "get_automations": "Loading automations",
+    "update_automation": "Updating automation",
+    "create_automation": "Creating automation",
+    "trigger_automation": "Triggering automation",
+    "delete_automation": "Deleting automation",
+    "get_scripts": "Loading scripts",
+    "run_script": "Running script",
+    "update_script": "Updating script",
+    "create_script": "Creating script",
+    "delete_script": "Deleting script",
+    "get_dashboards": "Loading dashboards",
+    "get_dashboard_config": "Reading dashboard config",
+    "update_dashboard": "Updating dashboard",
+    "create_dashboard": "Creating dashboard",
+    "read_html_dashboard": "Reading HTML dashboard",
+    "create_html_dashboard": "Creating custom HTML dashboard",
+    "delete_dashboard": "Deleting dashboard",
+    "get_frontend_resources": "Checking installed cards",
+    "get_scenes": "Loading scenes",
+    "activate_scene": "Activating scene",
+    "get_areas": "Loading areas/rooms",
+    "manage_areas": "Managing areas/rooms",
+    "get_history": "Loading history",
+    "get_statistics": "Loading statistics",
+    "manage_statistics": "Managing statistics",
+    "send_notification": "Sending notification",
+    "send_channel_message": "Sending channel message",
+    "read_config_file": "Reading config file",
+    "write_config_file": "Saving config file",
+    "list_config_files": "Listing config files",
+    "check_config": "Validating configuration",
+    "create_backup": "Creating backup",
+    "get_available_services": "Loading services",
+    "get_events": "Loading events",
+    "manage_entity": "Managing entity",
+    "get_devices": "Loading devices",
+    "shopping_list": "Managing shopping list",
+    "browse_media": "Browsing media",
+    "list_snapshots": "Listing snapshots",
+    "restore_snapshot": "Restoring snapshot",
+    "manage_helpers": "Managing helpers",
+    "get_repairs": "Loading repairs",
+    "dismiss_repair": "Dismissing repair",
+    "get_ha_logs": "Reading system logs",
+    "fire_event": "Firing event",
+    "get_logged_users": "Loading logged users",
+    "get_error_log": "Reading error log",
+}
+
+TOOL_DESCRIPTIONS_ES = {
+    "get_entities": "Cargando entidades",
+    "get_entity_state": "Leyendo estado de entidad",
+    "call_service": "Ejecutando servicio",
+    "search_entities": "Buscando entidades",
+    "get_integration_entities": "Buscando entidades de integración",
+    "get_automations": "Cargando automatizaciones",
+    "update_automation": "Actualizando automatización",
+    "create_automation": "Creando automatización",
+    "trigger_automation": "Ejecutando automatización",
+    "delete_automation": "Eliminando automatización",
+    "get_scripts": "Cargando scripts",
+    "run_script": "Ejecutando script",
+    "update_script": "Actualizando script",
+    "create_script": "Creando script",
+    "delete_script": "Eliminando script",
+    "get_dashboards": "Cargando paneles",
+    "get_dashboard_config": "Leyendo configuración del panel",
+    "update_dashboard": "Actualizando panel",
+    "create_dashboard": "Creando panel",
+    "read_html_dashboard": "Leyendo panel HTML",
+    "create_html_dashboard": "Creando panel HTML personalizado",
+    "delete_dashboard": "Eliminando panel",
+    "get_frontend_resources": "Verificando tarjetas instaladas",
+    "get_scenes": "Cargando escenas",
+    "activate_scene": "Activando escena",
+    "get_areas": "Cargando áreas/habitaciones",
+    "manage_areas": "Gestionando áreas/habitaciones",
+    "get_history": "Cargando historial",
+    "get_statistics": "Cargando estadísticas",
+    "manage_statistics": "Gestionando estadísticas",
+    "send_notification": "Enviando notificación",
+    "send_channel_message": "Enviando mensaje al canal",
+    "read_config_file": "Leyendo archivo de configuración",
+    "write_config_file": "Guardando archivo de configuración",
+    "list_config_files": "Listando archivos de configuración",
+    "check_config": "Validando configuración",
+    "create_backup": "Creando copia de seguridad",
+    "get_available_services": "Cargando servicios",
+    "get_events": "Cargando eventos",
+    "manage_entity": "Gestionando entidad",
+    "get_devices": "Cargando dispositivos",
+    "shopping_list": "Gestionando lista de compras",
+    "browse_media": "Explorando contenido multimedia",
+    "list_snapshots": "Listando snapshots",
+    "restore_snapshot": "Restaurando snapshot",
+    "manage_helpers": "Gestionando helpers",
+    "get_repairs": "Cargando reparaciones",
+    "dismiss_repair": "Descartando reparación",
+    "get_ha_logs": "Leyendo logs del sistema",
+    "fire_event": "Lanzando evento",
+    "get_logged_users": "Cargando usuarios conectados",
+    "get_error_log": "Leyendo log de errores",
+}
+
+TOOL_DESCRIPTIONS_FR = {
+    "get_entities": "Chargement des entités",
+    "get_entity_state": "Lecture de l'état de l'entité",
+    "call_service": "Exécution du service",
+    "search_entities": "Recherche d'entités",
+    "get_integration_entities": "Recherche d'entités d'intégration",
+    "get_automations": "Chargement des automatisations",
+    "update_automation": "Mise à jour de l'automatisation",
+    "create_automation": "Création de l'automatisation",
+    "trigger_automation": "Exécution de l'automatisation",
+    "delete_automation": "Suppression de l'automatisation",
+    "get_scripts": "Chargement des scripts",
+    "run_script": "Exécution du script",
+    "update_script": "Mise à jour du script",
+    "create_script": "Création du script",
+    "delete_script": "Suppression du script",
+    "get_dashboards": "Chargement des tableaux de bord",
+    "get_dashboard_config": "Lecture de la configuration du tableau de bord",
+    "update_dashboard": "Mise à jour du tableau de bord",
+    "create_dashboard": "Création du tableau de bord",
+    "read_html_dashboard": "Lecture du tableau de bord HTML",
+    "create_html_dashboard": "Création d'un tableau de bord HTML personnalisé",
+    "delete_dashboard": "Suppression du tableau de bord",
+    "get_frontend_resources": "Vérification des cartes installées",
+    "get_scenes": "Chargement des scènes",
+    "activate_scene": "Activation de la scène",
+    "get_areas": "Chargement des zones/pièces",
+    "manage_areas": "Gestion des zones/pièces",
+    "get_history": "Chargement de l'historique",
+    "get_statistics": "Chargement des statistiques",
+    "manage_statistics": "Gestion des statistiques",
+    "send_notification": "Envoi de la notification",
+    "send_channel_message": "Envoi du message au canal",
+    "read_config_file": "Lecture du fichier de configuration",
+    "write_config_file": "Enregistrement du fichier de configuration",
+    "list_config_files": "Liste des fichiers de configuration",
+    "check_config": "Validation de la configuration",
+    "create_backup": "Création de la sauvegarde",
+    "get_available_services": "Chargement des services",
+    "get_events": "Chargement des événements",
+    "manage_entity": "Gestion de l'entité",
+    "get_devices": "Chargement des appareils",
+    "shopping_list": "Gestion de la liste de courses",
+    "browse_media": "Navigation des médias",
+    "list_snapshots": "Liste des snapshots",
+    "restore_snapshot": "Restauration du snapshot",
+    "manage_helpers": "Gestion des helpers",
+    "get_repairs": "Chargement des réparations",
+    "dismiss_repair": "Ignorer la réparation",
+    "get_ha_logs": "Lecture des logs système",
+    "fire_event": "Déclenchement de l'événement",
+    "get_logged_users": "Chargement des utilisateurs connectés",
+    "get_error_log": "Lecture du journal des erreurs",
+}
+
+TOOL_DESCRIPTIONS_BY_LANG = {
+    "en": TOOL_DESCRIPTIONS_EN,
+    "it": TOOL_DESCRIPTIONS,
+    "es": TOOL_DESCRIPTIONS_ES,
+    "fr": TOOL_DESCRIPTIONS_FR,
+}
+
+
+def get_tool_status_label(tool_name: str, lang: Optional[str] = None) -> str:
+    """Return localized user-facing label for tool execution status."""
+    _lang = (lang or getattr(api, "LANGUAGE", "en") or "en").lower()
+    m = TOOL_DESCRIPTIONS_BY_LANG.get(_lang) or TOOL_DESCRIPTIONS_BY_LANG["en"]
+    return m.get(tool_name) or TOOL_DESCRIPTIONS_BY_LANG["en"].get(tool_name) or tool_name
 
 
 
@@ -1984,7 +2164,7 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "create_html_dashboard",
-        "description": "Create and SAVE a custom HTML dashboard file (real .html on disk) with real-time entity monitoring.\n\nSAVE RULE (MANDATORY): this tool must produce a real saved file under /config/www/dashboards/ and sidebar entry. Do NOT just describe the dashboard in text.\n\nRAW-ONLY MODE (MANDATORY): built-in structured/template generation is disabled. You MUST provide full custom HTML via one of:\n1) html_url/file_url (download HTML from URL)\n2) html_base64/file_base64 (decode HTML from base64)\n3) html inline\nIf raw HTML is missing or malformed, the tool returns an error and DOES NOT create a dashboard.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nDESIGN MODE:\n- Raw HTML mode (use 'html' param): generate complete HTML/CSS/JS from scratch with your own creative design.\n\nDESIGN PHILOSOPHY — Every dashboard must look like it was designed by a professional UI designer:\n\n🎨 COLORS (mandatory): Use vibrant gradient backgrounds and colored cards. NEVER use plain white/grey. Define CSS variables (:root { --bg, --card, --accent, --text }) and use __ACCENT__ / __ACCENT_RGB__ for the user's theme.\n\n✨ WOW EFFECT: Add CSS animations — elements fade/slide in on page load (transform+opacity), live data indicators pulse, cards lift on hover (transform: translateY + box-shadow). Use glassmorphism cards (backdrop-filter: blur(12px) + semi-transparent background).\n\n📑 TABS (default for 3+ topics): Build a single-page tab router with a styled top navigation bar. Use JS show/hide (display:none → grid/block) for instant switching — no page reload. Active tab gets accent underline + background.\n\n🔍 POPUPS/MODALS (add when useful): Click-to-expand for detail views, historical charts on entity click, or info overlays. Use a backdrop-blur overlay + centered card with a close button (×). Good for: trend history, energy breakdown, device detail.\n\n📊 CHARTS (when data benefits from visualization): Include for historical trends, comparisons, energy flow, sensor history. Use Chart.js with gradient fills and smooth curves. Not required for pure control panels or status boards.\n\n🏗️ LAYOUT: Use CSS grid with card hierarchy — hero KPI banner → visual charts/gauges → detail cards. Avoid flat entity lists.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nCRITICAL — ENTITIES: The pre-loaded context (## ENTITÀ TROVATE) already contains the correct entity_ids. You MUST:\n1. Copy ALL entity_ids from ## ENTITÀ TROVATE into the entities[] parameter of this tool call\n2. Use __ENTITIES_JSON__ placeholder in the HTML — the server replaces it with the validated list\n3. In JS, iterate over ENTITIES array (from __ENTITIES_JSON__) — NEVER filter /api/states by device_class or any attribute. The ENTITIES array IS the correct filtered list.\n4. NEVER hardcode entity_ids — use __ENTITIES_JSON__ so the server controls the list\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.",
+        "description": "Create and SAVE a custom HTML dashboard file (real .html on disk) with real-time entity monitoring.\n\nSAVE RULE (MANDATORY): this tool must produce a real saved file under /config/www/dashboards/ and sidebar entry. Do NOT just describe the dashboard in text.\n\nRAW-ONLY MODE (MANDATORY): built-in structured/template generation is disabled. You MUST provide full custom HTML via one of:\n1) html_url/file_url (download HTML from URL)\n2) html_base64/file_base64 (decode HTML from base64)\n3) html inline\nIf raw HTML is missing or malformed, the tool returns an error and DOES NOT create a dashboard.\n\nMULTI-PAGE STRATEGIES:\n- Option A (HTML tabs): Create a SINGLE HTML file with a JS tab router — use show/hide div sections with a top nav bar. Call this tool ONCE. Best for self-contained dashboards.\n- Option B (HA sidebar pages): Call this tool MULTIPLE TIMES, once per section, each with a unique name/title. Each call creates a separate entry in the HA sidebar. Best when the user wants independent navigation.\nAlways ask the user which option they prefer before generating HTML for multi-page requests.\n\nDESIGN MODE:\n- Raw HTML mode (use 'html' param): generate complete HTML/CSS/JS from scratch with your own creative design.\n\nDESIGN PHILOSOPHY — Every dashboard must look like it was designed by a professional UI designer:\n\n🎨 COLORS (mandatory): Use vibrant gradient backgrounds and colored cards. NEVER use plain white/grey. Define CSS variables (:root { --bg, --card, --accent, --text }) and use __ACCENT__ / __ACCENT_RGB__ for the user's theme.\n\n✨ WOW EFFECT: Add CSS animations — elements fade/slide in on page load (transform+opacity), live data indicators pulse, cards lift on hover (transform: translateY + box-shadow). Use glassmorphism cards (backdrop-filter: blur(12px) + semi-transparent background).\n\n📑 TABS (default for 3+ topics): Build a single-page tab router with a styled top navigation bar. Use JS show/hide (display:none → grid/block) for instant switching — no page reload. Active tab gets accent underline + background.\n\n🔍 POPUPS/MODALS (add when useful): Click-to-expand for detail views, historical charts on entity click, or info overlays. Use a backdrop-blur overlay + centered card with a close button (×). Good for: trend history, energy breakdown, device detail.\n\n📊 CHARTS (when data benefits from visualization): Include for historical trends, comparisons, energy flow, sensor history. Use Chart.js with gradient fills and smooth curves. Not required for pure control panels or status boards.\n\n🏗️ LAYOUT: Use CSS grid with card hierarchy — hero KPI banner → visual charts/gauges → detail cards. Avoid flat entity lists.\n\nCHUNKED MODE (for large HTML): If your HTML is longer than 6000 characters, split it into parts:\n- Call 1: create_html_dashboard(title, name, entities, html='<part1: head+CSS+start of body>', draft=true)\n- Call 2: create_html_dashboard(name='same-slug', html='<part2: rest of template>', draft=true)\n- Call 3: create_html_dashboard(name='same-slug', html='<part3: script+closing tags>') ← no draft = finalize and save\nEach chunk should be under 6000 chars. The tool concatenates all parts.\n\nRaw HTML placeholders (the tool replaces them):\n- __ENTITIES_JSON__ (JSON array of entity_ids — MANDATORY)\n- __TITLE__ (HTML-escaped), __TITLE_JSON__ (JSON string for JS)\n- __ACCENT__ (hex color e.g. #22c55e), __ACCENT_RGB__ (r,g,b for rgba())\n- __THEME_CSS__ (CSS properties WITHOUT :root wrapper, e.g. --bg:#0f172a;--text:#e2e8f0. Use as: :root{__THEME_CSS__})\n- __LANG__ (en/it/es/fr), __FOOTER__ (HTML-escaped footer)\n\nCRITICAL — ENTITIES: The pre-loaded context (## FOUND ENTITIES) already contains the correct entity_ids. You MUST:\n1. Copy ALL entity_ids from ## FOUND ENTITIES into the entities[] parameter of this tool call\n2. Use __ENTITIES_JSON__ placeholder in the HTML — the server replaces it with the validated list\n3. In JS, iterate over ENTITIES array (from __ENTITIES_JSON__) — NEVER filter /api/states by device_class or any attribute. The ENTITIES array IS the correct filtered list.\n4. NEVER hardcode entity_ids — use __ENTITIES_JSON__ so the server controls the list\n\nIMPORTANT: Do NOT use var(--primary-background-color) or HA frontend CSS vars — they don't exist in /local/ pages. Define your own colors.\nRaw HTML must include: Vue 3 CDN, WebSocket to /api/websocket, Bearer token via getTokenAsync() (supports both localStorage.hassTokens for browser and window.externalApp/webkit for HA Companion App). Never block on token — always fall back to polling if token unavailable.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -6409,6 +6589,7 @@ Be concise but informative."""
 def get_compact_prompt():
     """Generate compact prompt with language-specific instructions."""
     lang_instruction = api.get_lang_text("respond_instruction")
+    strict_language_lock = api.get_lang_text("strict_language_lock")
     show_yaml_rule = api.get_lang_text("show_yaml_rule")
     confirm_entity_rule = api.get_lang_text("confirm_entity_rule")
     confirm_delete_rule = api.get_lang_text("confirm_delete_rule")
@@ -6424,9 +6605,11 @@ def get_compact_prompt():
 {confirm_delete_rule}
 When users ask about specific devices, use search_entities. Use get_history for past data.
 To create a dashboard, ALWAYS first search entities to find real entity IDs, then use create_dashboard with proper Lovelace cards.
-To create a CUSTOM HTML dashboard: use __ENTITIES_JSON__ placeholder in HTML. Copy ALL entity_ids from ## ENTITÀ TROVATE into entities[]. In JS iterate ENTITIES array — NEVER filter /api/states by device_class.
+To create a CUSTOM HTML dashboard: use __ENTITIES_JSON__ placeholder in HTML. Copy ALL entity_ids from ## FOUND ENTITIES into entities[]. In JS iterate ENTITIES array — NEVER filter /api/states by device_class.
 IMPORTANT: If the user says no / annulla / cancel / nein / non / no thanks after a preview or confirmation request, do NOT call update_automation or any write tool. Just acknowledge and stop.
-{lang_instruction} Be concise."""
+{lang_instruction}
+{strict_language_lock}
+Be concise."""
 
 
 def get_compact_prompt_with_files():
@@ -6434,6 +6617,7 @@ def get_compact_prompt_with_files():
     before_text = api.get_lang_text("before")
     after_text = api.get_lang_text("after")
     lang_instruction = api.get_lang_text("respond_instruction")
+    strict_language_lock = api.get_lang_text("strict_language_lock")
     show_yaml_rule = api.get_lang_text("show_yaml_rule")
     confirm_entity_rule = api.get_lang_text("confirm_entity_rule")
     confirm_delete_rule = api.get_lang_text("confirm_delete_rule")
@@ -6468,9 +6652,11 @@ When you MODIFY configs, show ONLY the changed sections in diff format:
 
 For NEW creations, show the complete YAML.
 
-For CUSTOM HTML dashboards: use __ENTITIES_JSON__ placeholder, copy ALL entity_ids from ## ENTITÀ TROVATE into entities[], iterate ENTITIES array in JS — NEVER filter /api/states by device_class.
+For CUSTOM HTML dashboards: use __ENTITIES_JSON__ placeholder, copy ALL entity_ids from ## FOUND ENTITIES into entities[], iterate ENTITIES array in JS — NEVER filter /api/states by device_class.
 
-{lang_instruction} Be concise."""
+{lang_instruction}
+{strict_language_lock}
+Be concise."""
 
 
 # Compact tool definitions for low-token providers
@@ -6803,11 +6989,12 @@ Always create visually appealing layouts using grids and stacks:
         return compact_prompt
     # For other providers (full tier), add language instruction and critical rules to base prompt
     lang_instruction = api.get_lang_text("respond_instruction")
+    strict_language_lock = api.get_lang_text("strict_language_lock")
     show_yaml_rule = api.get_lang_text("show_yaml_rule")
     confirm_entity_rule = api.get_lang_text("confirm_entity_rule")
     confirm_delete_rule = api.get_lang_text("confirm_delete_rule")
     example_vs_create_rule = api.get_lang_text("example_vs_create_rule")
-    return api.get_config_structure_section() + api.get_config_includes_text() + base_prompt + f"\n\n{example_vs_create_rule}\n{show_yaml_rule}\n{confirm_entity_rule}\n{confirm_delete_rule}\n\n{lang_instruction}"
+    return api.get_config_structure_section() + api.get_config_includes_text() + base_prompt + f"\n\n{example_vs_create_rule}\n{show_yaml_rule}\n{confirm_entity_rule}\n{confirm_delete_rule}\n\n{lang_instruction}\n{strict_language_lock}"
 
 
 def get_openai_tools_for_provider():
