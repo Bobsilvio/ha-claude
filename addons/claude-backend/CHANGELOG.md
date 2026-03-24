@@ -2,6 +2,14 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.28 — Fix supervisor ingress spam + bubble setup crash
+
+### Bug fixes
+- **Fixed continuous ingress errors in supervisor logs**: the anonymous 10 s sync-poll `setInterval` introduced in 4.6.26 was never cleared even after `removeBubbleFromDOM()` ran — with 2+ browser tabs/devices offset by ~5 s, this produced a steady stream of `Cannot connect` errors in the supervisor log indefinitely; the interval is now stored as `_syncPollInterval` and cancelled on first health-check failure
+- **Fixed `setup_chat_bubble` crash on startup**: a JS comment containing `{type:'node'}` inside the Python f-string was parsed by Python as `format(type, "'node'")` → `unsupported format string passed to type.__format__`; escaped to `{{type:'node'}}`
+
+---
+
 ## 4.6.27 — Bubble/buttons auto-hide when addon is stopped or deleted
 
 ### Bubble & injected buttons cleanup
