@@ -9968,12 +9968,19 @@ def get_chat_ui():
                 // Poll every 10s for model/provider changes made from other UIs (e.g. bubble)
                 let _statusFailures = 0;
                 let _sdkWarningShown = false;
+                const _webSessionInterval = setInterval(async () => {{
+                    if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
+                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
+                    else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
+                    else if (currentProviderId === 'perplexity_web') checkPerplexityWebSession();
+                }}, 30000);
                 const _statusInterval = setInterval(async () => {{
                     try {{
                         const r = await fetch(apiUrl('api/status'), {{credentials:'same-origin'}});
                         if (!r.ok) {{ _statusFailures++; }} else {{ _statusFailures = 0; }}
-                        if (_statusFailures >= 3) {{
+                        if (_statusFailures >= 1) {{
                             clearInterval(_statusInterval);
+                            clearInterval(_webSessionInterval);
                             _appendSystemRaw('⚠️ Server non raggiungibile. Ricarica la pagina per riconnetterti.');
                             return;
                         }}
@@ -9997,19 +10004,15 @@ def get_chat_ui():
                         }}
                     }} catch(e) {{
                         _statusFailures++;
-                        if (_statusFailures >= 3) {{
+                        if (_statusFailures >= 1) {{
                             clearInterval(_statusInterval);
+                            clearInterval(_webSessionInterval);
                             _appendSystemRaw('⚠️ Server non raggiungibile. Ricarica la pagina per riconnetterti.');
                         }}
                     }}
                 }}, 10000);
                 // Poll session status every 30s for web providers so the banner reappears when token expires
-                setInterval(async () => {{
-                    if (currentProviderId === 'chatgpt_web') checkChatGPTWebSession();
-                    else if (currentProviderId === 'claude_web') checkClaudeWebSession();
-                    else if (currentProviderId === 'gemini_web') checkGeminiWebSession();
-                    else if (currentProviderId === 'perplexity_web') checkPerplexityWebSession();
-                }}, 30000);
+                // (interval stored above as _webSessionInterval for cleanup on server disconnect)
             }} catch (e) {{
                 const msg = (e && e.message) ? e.message : String(e);
                 _appendSystemRaw('❌ UI boot error: ' + msg);

@@ -2,6 +2,41 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.27 — Bubble/buttons auto-hide when addon is stopped or deleted
+
+### Bubble & injected buttons cleanup
+- **Instant hide on addon stop**: reduced health-check `MAX_FAILS` from 2 to 1 — the floating bubble and all injected buttons disappear within 1–2 seconds of the addon becoming unreachable (connection refused is detected immediately)
+- **Model/provider sync poll stopped**: the anonymous 10 s `setInterval` that polled `/api/status` to detect model changes was never cleared; it is now stored as `_syncPollInterval` and cancelled in `removeBubbleFromDOM()`
+- **Route poll stopped**: the 1 s DOM-inspection interval that re-injects card/automation buttons on navigation is now stored as `_routePollInterval` and cancelled on first health-check failure, preventing buttons from being re-injected after the backend goes down
+- **Card editor & automation buttons removed**: `removeBubbleFromDOM()` now also calls `removeCardEditorButton()` and `removeAutomationIntegration()`, so the "🤖 Amira" button in the card editor and the toolbar button in the automation editor are removed together with the bubble
+- **Chat UI polling fixed**: the main chat UI (`chat_ui.py`) now stops its `/api/status` poll and web-session poll after the first failure (was 3 failures / 30 s), and both intervals are cancelled together
+- **Auto-cleanup on addon delete (SIGTERM handler)**: `server.py` now registers a `SIGTERM` signal handler that calls `cleanup_chat_bubble()` before exiting — when HA stops or deletes the addon it sends SIGTERM first, so the Lovelace resource registration and all JS files under `/config/www/` are removed cleanly; on next page load no bubble scripts are loaded at all
+
+---
+
+## 4.6.26 — Flow widget: visual fork for choose/if/else branches
+
+### Automation Flow widget (chat_bubble)
+- **Visual bifurcation for `choose` and `if/else`**: instead of flattening branches into a linear sequence, the flow now renders a true fork — one SVG bezier arrow per branch diverging from the `choose`/`if` node, one row above and one below
+- Each branch gets a **colored label badge** showing the humanized condition (`if tentativi < 3`, `Else`, etc.) followed by its action circles in a horizontal row connected by dashed arrows
+- Branch colors use the `BRANCH_GRADS` palette (purple/orange/pink/blue) to visually distinguish alternative paths
+- `repeat` nodes also render their sequence as a single-branch fork with a "Loop branch" label
+- Internal architecture rewritten: flat `allNodes` array → `segments` array with `{type:'node'}` or `{type:'fork', branches:[...]}`, making the layout extensible for future branch types
+- `_renderSegFork` dynamically computes the fork SVG height based on the number of branches
+
+---
+
+## 4.6.25 — Flow widget: smart action summary for complex automations
+
+### Automation Flow widget (chat_bubble)
+- **Actions section now shows top-level actions only** — complex automations with `choose` / `if` / `repeat` no longer explode into 10+ individual chips
+- `choose` node → compact chip: "Scegli (N)" with branch conditions and action counts in the tooltip (e.g. `1. tentativi < 3 → 6 az.`)
+- `if/else` node → chip with condition label; tooltip shows then/else action counts
+- `repeat` node → chip reuses existing `flow_repeat_count` / `flow_repeat_while` / `flow_repeat_until` labels
+- Added `flow_choose` translation key (EN: Choose / IT: Scegli / ES: Elige / FR: Choisir)
+
+---
+
 ## 4.6.24 — Flow widget redesign, i18n unification, multilingual runtime, provider fixes
 
 ### Automation Flow widget (chat_bubble)

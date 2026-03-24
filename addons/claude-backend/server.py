@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import os
 import platform
+import signal
 import sys
 import traceback
 
@@ -144,6 +145,18 @@ def main() -> None:
 
     # Register floating chat bubble (if enabled)
     api.setup_chat_bubble()
+
+    # Cleanup bubble resources on graceful shutdown (SIGTERM sent by HA on stop/delete)
+    def _sigterm_handler(signum, frame):
+        api.logger.info("SIGTERM received — cleaning up Amira Lovelace resources before exit")
+        try:
+            api.cleanup_chat_bubble()
+            api.logger.info("Chat bubble cleanup complete")
+        except Exception as e:
+            api.logger.warning(f"Cleanup on shutdown failed: {e}")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, _sigterm_handler)
 
     # Start Telegram / WhatsApp / Discord bots if configured
     api.start_messaging_bots()

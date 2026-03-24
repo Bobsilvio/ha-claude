@@ -55,6 +55,11 @@ def get_chat_bubble_js(
             "thinking": "Thinking",
             "new_chat": "New chat",
             "error_connection": "Connection error. Retrying...",
+            "request_failed": "Request failed ({status}): {body}",
+            "rate_limit_error": "Rate limit exceeded. Please wait a moment before trying again.",
+            "connection_lost": "Connection lost. Try again.",
+            "connected": "Connected",
+            "waiting_response": "Waiting for response",
             "page_reload": "Updated! Reloading page...",
             "drag_hint": "Hold to drag",
             "voice_start": "Speak now...",
@@ -162,6 +167,7 @@ def get_chat_bubble_js(
             "flow_valid_after": "Valid only after {value}",
             "flow_valid_before": "Valid only before {value}",
             "flow_if": "If {value}",
+            "flow_choose": "Choose",
             "flow_else": "Else",
             "flow_branch_choose": "Choose branch #{index}",
             "flow_branch_default": "Choose default branch",
@@ -221,6 +227,11 @@ def get_chat_bubble_js(
             "thinking": "Sto pensando",
             "new_chat": "Nuova chat",
             "error_connection": "Errore di connessione. Riprovo...",
+            "request_failed": "Richiesta fallita ({status}): {body}",
+            "rate_limit_error": "Limite di velocità superato. Attendi un momento prima di riprovare.",
+            "connection_lost": "Connessione interrotta. Riprova.",
+            "connected": "Connesso",
+            "waiting_response": "In attesa della risposta",
             "page_reload": "Aggiornato! Ricarico la pagina...",
             "drag_hint": "Tieni premuto per spostare",
             "voice_start": "Parla ora...",
@@ -328,6 +339,7 @@ def get_chat_bubble_js(
             "flow_valid_after": "Valida solo dopo {value}",
             "flow_valid_before": "Valida solo prima di {value}",
             "flow_if": "Se {value}",
+            "flow_choose": "Scegli",
             "flow_else": "Altrimenti",
             "flow_branch_choose": "Ramo choose #{index}",
             "flow_branch_default": "Ramo default choose",
@@ -387,6 +399,11 @@ def get_chat_bubble_js(
             "thinking": "Pensando",
             "new_chat": "Nuevo chat",
             "error_connection": "Error de conexión. Reintentando...",
+            "request_failed": "Solicitud fallida ({status}): {body}",
+            "rate_limit_error": "Límite de velocidad superado. Espera un momento antes de reintentar.",
+            "connection_lost": "Conexión interrumpida. Inténtalo de nuevo.",
+            "connected": "Conectado",
+            "waiting_response": "Esperando respuesta",
             "page_reload": "Actualizado! Recargando página...",
             "drag_hint": "Mantén presionado para mover",
             "voice_start": "Habla ahora...",
@@ -494,6 +511,7 @@ def get_chat_bubble_js(
             "flow_valid_after": "Válido solo después de {value}",
             "flow_valid_before": "Válido solo antes de {value}",
             "flow_if": "Si {value}",
+            "flow_choose": "Elige",
             "flow_else": "Si no",
             "flow_branch_choose": "Rama choose #{index}",
             "flow_branch_default": "Rama predeterminada choose",
@@ -553,6 +571,11 @@ def get_chat_bubble_js(
             "thinking": "Réflexion",
             "new_chat": "Nouveau chat",
             "error_connection": "Erreur de connexion. Réessai...",
+            "request_failed": "Requête échouée ({status}) : {body}",
+            "rate_limit_error": "Limite de débit dépassée. Veuillez attendre un moment avant de réessayer.",
+            "connection_lost": "Connexion interrompue. Réessaie.",
+            "connected": "Connecté",
+            "waiting_response": "En attente de réponse",
             "page_reload": "Mis à jour! Rechargement...",
             "drag_hint": "Maintenez pour déplacer",
             "voice_start": "Parlez maintenant...",
@@ -660,6 +683,7 @@ def get_chat_bubble_js(
             "flow_valid_after": "Valide uniquement après {value}",
             "flow_valid_before": "Valide uniquement avant {value}",
             "flow_if": "Si {value}",
+            "flow_choose": "Choisir",
             "flow_else": "Sinon",
             "flow_branch_choose": "Branche choose #{index}",
             "flow_branch_default": "Branche par défaut choose",
@@ -2362,7 +2386,7 @@ def get_chat_bubble_js(
   // Cleared only when navigating away from the logs page or on new chat.
   let _cachedLogEntry = null;
 
-  setInterval(() => {{
+  const _routePollInterval = setInterval(() => {{
     const curPath = window.location.pathname;
     if (curPath !== lastPath) {{
       // Navigated to a different page — clear log cache
@@ -2874,7 +2898,7 @@ def get_chat_bubble_js(
       ? 'align-self:flex-end;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:6px 10px;border-radius:12px 12px 2px 12px;font-size:13px;max-width:85%;word-break:break-word;'
       : 'align-self:flex-start;background:var(--secondary-background-color,#f0f0f0);color:var(--primary-text-color,#212121);padding:6px 10px;border-radius:12px 12px 12px 2px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.5;';
     if (role === 'user') d.textContent = text;
-    else d.innerHTML = _renderInlineMd(text);
+    else d.innerHTML = renderMarkdown(text);
     _cardMsgsEl.appendChild(d);
     _cardMsgsEl.scrollTop = _cardMsgsEl.scrollHeight;
     return d;
@@ -3574,9 +3598,24 @@ def get_chat_bubble_js(
         return d ? (tt('flow_wait', 'Wait') + ' ' + d) : tt('flow_wait', 'Wait');
       }}
       if (node.wait_template) return tt('flow_template_condition', 'Template condition');
-      if (node.choose) return 'choose';
-      if (node.repeat) return 'repeat';
-      if (node.if) return 'if/then';
+      if (node.choose) {{
+        const n = Array.isArray(node.choose) ? node.choose.length : 0;
+        const hasDefault = Array.isArray(node.default) && node.default.length;
+        return tt('flow_choose','Choose') + ' (' + (n + (hasDefault ? 1 : 0)) + ')';
+      }}
+      if (node.repeat) {{
+        const rep = node.repeat || {{}};
+        if (rep.count !== undefined && rep.count !== null) return tf('flow_repeat_count','Repeat {{value}} times', {{ value: String(rep.count) }});
+        if (rep.while) return tf('flow_repeat_while','Repeat while {{value}}', {{ value: _humanizeConditionOne(Array.isArray(rep.while) ? rep.while[0] : rep.while) }});
+        if (rep.for_each !== undefined) return tt('flow_repeat_foreach','Repeat for each item');
+        if (Array.isArray(rep.until) && rep.until.length) return tf('flow_repeat_until','Repeat until {{value}}', {{ value: _humanizeConditionOne(rep.until[0]) }});
+        return tt('flow_repeat_foreach','Repeat');
+      }}
+      if (node.if) {{
+        const ifConds = Array.isArray(node.if) ? node.if : [node.if];
+        const ifTxt = _compactText(ifConds.map(_humanizeConditionOne).join(' & '), 32);
+        return ifTxt ? tf('flow_if','If {{value}}', {{ value: ifTxt }}) : 'if/else';
+      }}
       if (node.scene) return 'scene: ' + (node.scene.split('.').pop() || '');
       if (node.event) return tf('flow_event_named', 'Event: {{value}}', {{ value: node.event }});
       return 'action';
@@ -3726,6 +3765,38 @@ def get_chat_bubble_js(
         const title = _compactText(node.data.title, 64);
         const msg = _compactText(node.data.message, 180);
         return (title ? (title + ' — ') : '') + (msg || tt('flow_with_message', 'Action with message'));
+      }}
+      if (node.choose) {{
+        const lines = [];
+        (node.choose || []).forEach((ch, i) => {{
+          const conds = Array.isArray(ch.conditions) ? ch.conditions : (ch.conditions ? [ch.conditions] : []);
+          const condTxt = conds.length ? conds.map(_humanizeConditionOne).join(' & ') : '...';
+          const acts = Array.isArray(ch.sequence) ? ch.sequence.length : 0;
+          lines.push((i + 1) + '. ' + condTxt + (acts ? ' \u2192 ' + acts + ' az.' : ''));
+        }});
+        if (Array.isArray(node.default) && node.default.length) {{
+          lines.push(tt('flow_else','Else') + ' \u2192 ' + node.default.length + ' az.');
+        }}
+        return tt('flow_choose','Choose') + ':\\n' + lines.join('\\n');
+      }}
+      if (node.if) {{
+        const ifConds = Array.isArray(node.if) ? node.if : [node.if];
+        const condTxt = ifConds.map(_humanizeConditionOne).join(' & ');
+        const thenActs = Array.isArray(node.then) ? node.then.length : 0;
+        const elseActs = Array.isArray(node.else) ? node.else.length : 0;
+        let out = tf('flow_if','If {{value}}', {{ value: condTxt }}) + ' \u2192 ' + thenActs + ' az.';
+        if (elseActs) out += '\\n' + tt('flow_else','Else') + ' \u2192 ' + elseActs + ' az.';
+        return out;
+      }}
+      if (node.repeat) {{
+        const rep = node.repeat || {{}};
+        const seqActs = Array.isArray(rep.sequence) ? rep.sequence.length : 0;
+        let repLabel = '';
+        if (rep.count !== undefined && rep.count !== null) repLabel = tf('flow_repeat_count','Repeat {{value}} times', {{ value: String(rep.count) }});
+        else if (rep.while) repLabel = tf('flow_repeat_while','Repeat while {{value}}', {{ value: _humanizeConditionOne(Array.isArray(rep.while) ? rep.while[0] : rep.while) }});
+        else if (Array.isArray(rep.until) && rep.until.length) repLabel = tf('flow_repeat_until','Repeat until {{value}}', {{ value: _humanizeConditionOne(rep.until[0]) }});
+        else repLabel = tt('flow_repeat_foreach','Repeat for each item');
+        return repLabel + (seqActs ? ' (' + seqActs + ' az.)' : '');
       }}
       return tt('flow_automation_action', 'Automation action');
     }}
@@ -4112,75 +4183,6 @@ def get_chat_bubble_js(
       const actions = Array.isArray(_acRaw) ? _acRaw : (_acRaw ? [_acRaw] : []);
       const expandedActions = _expandActionNodes(actions);
 
-      const branchColors = ['#60a5fa', '#34d399', '#f59e0b', '#a78bfa', '#f472b6'];
-
-      function makeBubble(node, type, label) {{
-        const bubble = document.createElement('div');
-        const isBranchMarker = (type === 'action' && node && node.__kind === 'branch_marker');
-        const desc = isBranchMarker
-          ? (node.__branch || _describeFlowNode(node, type))
-          : _describeFlowNode(node, type);
-        const detail = isBranchMarker
-          ? (node.__detail || desc || label)
-          : (_describeFlowDetail(node, type) || desc || label);
-        const bColor = (type === 'action' && node && node.__branchId)
-          ? branchColors[(node.__branchId - 1) % branchColors.length]
-          : _flowBorderColor(type);
-        const bg = (type === 'action' && node && node.__kind === 'branch_marker')
-          ? 'linear-gradient(135deg,#eef2ff,#e0e7ff)'
-          : _flowGradient(type);
-        bubble.className = 'amira-flow-chip';
-        bubble.style.cssText = 'display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;background:' + bg + ';border:1.5px solid ' + bColor + ';font-size:12px;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,0.06);cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;';
-        bubble.title = detail;
-        const iconSpan = document.createElement('span');
-        iconSpan.style.cssText = 'font-size:14px;flex-shrink:0;';
-        iconSpan.textContent = isBranchMarker ? '⑂' : _flowIcon(type);
-        const textSpan = document.createElement('span');
-        textSpan.style.cssText = 'overflow:hidden;text-overflow:ellipsis;color:var(--primary-text-color,#333);font-weight:500;';
-        textSpan.textContent = desc || label;
-        textSpan.title = desc || label;
-        bubble.appendChild(iconSpan);
-        bubble.appendChild(textSpan);
-        bubble.addEventListener('mouseenter', () => {{ bubble.style.transform = 'translateY(-2px)'; bubble.style.boxShadow = '0 5px 14px rgba(0,0,0,0.13)'; bubble.style.borderColor = bColor.replace('a7','52').replace('82','56').replace('9f','5d') || bColor; }});
-        bubble.addEventListener('mouseleave', () => {{ bubble.style.transform = ''; bubble.style.boxShadow = '0 2px 6px rgba(0,0,0,0.07)'; bubble.style.borderColor = bColor; }});
-        bubble.addEventListener('click', () => {{
-          if (detailInfo.style.display === 'block' && detailInfo.textContent === detail) {{
-            detailInfo.style.display = 'none';
-            return;
-          }}
-          detailInfo.textContent = detail;
-          detailInfo.style.display = 'block';
-        }});
-        return bubble;
-      }}
-
-      function makeArrow(sym) {{
-        const arrow = document.createElement('span');
-        arrow.style.cssText = 'color:#94a3b8;font-size:16px;flex-shrink:0;line-height:1;user-select:none;';
-        arrow.textContent = sym || '›';
-        return arrow;
-      }}
-
-      function makeSectionLabel(text, color, bg, border) {{
-        const lbl = document.createElement('div');
-        lbl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;background:' + (bg||'#f1f5f9') + ';border:1px solid ' + (border||'#cbd5e1') + ';color:' + (color||'#475569') + ';font-size:10px;font-weight:700;letter-spacing:0.5px;text-transform:uppercase;align-self:center;';
-        lbl.textContent = text;
-        return lbl;
-      }}
-      function makeConnector() {{
-        const wrap = document.createElement('div');
-        wrap.className = 'amira-flow-conn';
-        wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:0;height:22px;flex-shrink:0;';
-        const line = document.createElement('div');
-        line.style.cssText = 'width:2px;flex:1;background:linear-gradient(180deg,#c7d2fe,#94a3b8);border-radius:1px;';
-        const tip = document.createElement('div');
-        tip.style.cssText = 'font-size:10px;color:#94a3b8;line-height:1;margin-top:-1px;';
-        tip.textContent = '▾';
-        wrap.appendChild(line);
-        wrap.appendChild(tip);
-        return wrap;
-      }}
-
       const detailInfo = document.createElement('div');
       detailInfo.style.cssText = 'display:none;padding:8px 12px;border-radius:10px;border:1px solid #c7d2fe;background:linear-gradient(135deg,#f5f7ff,#eef2ff);color:#1e293b;font-size:11.5px;white-space:pre-line;line-height:1.5;box-shadow:0 2px 8px rgba(99,102,241,0.08);';
 
@@ -4195,58 +4197,214 @@ def get_chat_bubble_js(
       const ltText = document.createElement('span');
       ltText.style.cssText = 'color:' + (isEnabled ? '#166534' : '#475569') + ';font-weight:500;';
       ltText.textContent = relTs || absTs;
-      ltText.title = tt('flow_last_triggered', 'Last triggered') + ': ' + absTs + (relTs ? (' · ' + relTs) : '');
+      ltText.title = tt('flow_last_triggered', 'Last triggered') + ': ' + absTs + (relTs ? (' \u00b7 ' + relTs) : '');
       ltInfo.appendChild(dot);
       ltInfo.appendChild(ltText);
       flowEl.appendChild(ltInfo);
 
-      // Pipeline row — centered, align-items:flex-end keeps arrows level with chips
-      const pipelineRow = document.createElement('div');
-      pipelineRow.style.cssText = 'display:flex;flex-direction:row;align-items:flex-end;flex-wrap:wrap;justify-content:center;gap:8px 10px;';
+      // === Circular wave pipeline ===
+      // Branch gradient palette for sub-actions (choose/if/repeat)
+      const BRANCH_GRADS = [
+        ['linear-gradient(135deg,#a78bfa,#7c3aed)', 'rgba(124,58,237,0.30)'],
+        ['linear-gradient(135deg,#fb923c,#ea580c)', 'rgba(234,88,12,0.30)'],
+        ['linear-gradient(135deg,#f472b6,#db2777)', 'rgba(219,39,119,0.30)'],
+        ['linear-gradient(135deg,#38bdf8,#0284c7)', 'rgba(2,132,199,0.30)'],
+      ];
+      const BRANCH_DEFAULT_GS = ['linear-gradient(135deg,#94a3b8,#475569)', 'rgba(71,85,105,0.30)'];
 
-      // +N overflow badge — click expands detailInfo with all items
-      function makeOverflowBadge(nodes, type) {{
-        const badge = document.createElement('span');
-        badge.style.cssText = 'display:inline-flex;align-items:center;padding:3px 8px;border-radius:8px;background:#f1f5f9;border:1px solid #cbd5e1;color:#64748b;font-size:11px;font-weight:600;flex-shrink:0;cursor:pointer;transition:opacity .12s;';
-        badge.textContent = '+' + (nodes.length - 1);
-        badge.title = nodes.slice(1).map(n => _describeFlowNode(n, type)).join('\\n');
-        badge.addEventListener('mouseenter', () => {{ badge.style.opacity = '0.7'; }});
-        badge.addEventListener('mouseleave', () => {{ badge.style.opacity = '1'; }});
-        badge.addEventListener('click', () => {{
-          const allDesc = nodes.map(n => _describeFlowDetail(n, type) || _describeFlowNode(n, type)).join('\\n\\n');
-          if (detailInfo.style.display === 'block' && detailInfo.textContent === allDesc) {{ detailInfo.style.display = 'none'; return; }}
-          detailInfo.textContent = allDesc;
-          detailInfo.style.display = 'block';
+      // Build segments: {type:'node'} or {type:'fork', branches:[...]}
+      const segments = [];
+      function _buildSegs(list, nodeType) {{
+        if (!Array.isArray(list)) return;
+        list.forEach(function(node) {{
+          if (!node || typeof node !== 'object') return;
+          if (nodeType === 'action' && Array.isArray(node.choose) && node.choose.length) {{
+            segments.push({{type:'node', node:node, nodeType:nodeType}});
+            const fork = {{type:'fork', branches:[]}};
+            node.choose.forEach(function(ch, bi) {{
+              const conds = Array.isArray(ch.conditions) ? ch.conditions : (ch.conditions ? [ch.conditions] : []);
+              const condTxt = conds.length ? conds.map(_humanizeConditionOne).join(' & ') : 'condizione';
+              const lbl = tf('flow_if','If',{{value:condTxt}});
+              const grSh = BRANCH_GRADS[bi % BRANCH_GRADS.length];
+              const brNodes = (Array.isArray(ch.sequence) ? ch.sequence : []).map(function(a) {{ return {{node:a,grad:grSh[0],shadow:grSh[1]}}; }});
+              fork.branches.push({{label:lbl, grad:grSh[0], shadow:grSh[1], nodes:brNodes}});
+            }});
+            if (Array.isArray(node.default) && node.default.length) {{
+              const grSh = BRANCH_DEFAULT_GS;
+              const brNodes = node.default.map(function(a) {{ return {{node:a,grad:grSh[0],shadow:grSh[1]}}; }});
+              fork.branches.push({{label:tt('flow_else','Else'), grad:grSh[0], shadow:grSh[1], nodes:brNodes}});
+            }}
+            if (fork.branches.length) segments.push(fork);
+          }} else if (nodeType === 'action' && node.if) {{
+            segments.push({{type:'node', node:node, nodeType:nodeType}});
+            const fork = {{type:'fork', branches:[]}};
+            const ifConds = Array.isArray(node.if) ? node.if : [node.if];
+            const ifTxt = ifConds.map(_humanizeConditionOne).join(' & ') || 'condizione';
+            const grSh0 = BRANCH_GRADS[0];
+            const thenNodes = (Array.isArray(node.then) ? node.then : []).map(function(a) {{ return {{node:a,grad:grSh0[0],shadow:grSh0[1]}}; }});
+            fork.branches.push({{label:tf('flow_if','If',{{value:ifTxt}}), grad:grSh0[0], shadow:grSh0[1], nodes:thenNodes}});
+            if (Array.isArray(node.else) && node.else.length) {{
+              const grSh1 = BRANCH_GRADS[1];
+              const elseNodes = node.else.map(function(a) {{ return {{node:a,grad:grSh1[0],shadow:grSh1[1]}}; }});
+              fork.branches.push({{label:tt('flow_else','Else'), grad:grSh1[0], shadow:grSh1[1], nodes:elseNodes}});
+            }}
+            if (fork.branches.length) segments.push(fork);
+          }} else if (nodeType === 'action' && node.repeat && typeof node.repeat === 'object') {{
+            segments.push({{type:'node', node:node, nodeType:nodeType}});
+            const grSh = BRANCH_GRADS[0];
+            const repNodes = (Array.isArray((node.repeat||{{}}).sequence) ? node.repeat.sequence : []).map(function(a) {{ return {{node:a,grad:grSh[0],shadow:grSh[1]}}; }});
+            if (repNodes.length) segments.push({{type:'fork', branches:[{{label:tt('flow_repeat_branch','Loop branch'), grad:grSh[0], shadow:grSh[1], nodes:repNodes}}]}});
+          }} else {{
+            segments.push({{type:'node', node:node, nodeType:nodeType}});
+          }}
         }});
-        return badge;
+      }}
+      flowTriggers.forEach(function(n) {{ _buildSegs([n],'trigger'); }});
+      conditions.forEach(function(n) {{ _buildSegs([n],'condition'); }});
+      actions.forEach(function(n) {{ _buildSegs([n],'action'); }});
+
+      const typeColors = {{
+        trigger:   {{ grads: ['linear-gradient(135deg,#4f8ef7,#1d4ed8)', 'linear-gradient(135deg,#6366f1,#4338ca)', 'linear-gradient(135deg,#8b5cf6,#6d28d9)'], shadow: 'rgba(59,130,246,0.32)',  label: T.flow_trigger   || 'Trigger',   icon: '\u26a1' }},
+        condition: {{ grads: ['linear-gradient(135deg,#fbbf24,#d97706)', 'linear-gradient(135deg,#f97316,#c2410c)', 'linear-gradient(135deg,#ec4899,#be185d)'], shadow: 'rgba(245,158,11,0.32)', label: T.flow_condition || 'Condition', icon: '\U0001f550' }},
+        action:    {{ grads: ['linear-gradient(135deg,#34d399,#059669)', 'linear-gradient(135deg,#22d3ee,#0284c7)', 'linear-gradient(135deg,#a3e635,#65a30d)'], shadow: 'rgba(16,185,129,0.32)',  label: T.flow_action    || 'Action',     icon: '\U0001f4a1' }}
+      }};
+      const typeCounters = {{ trigger: 0, condition: 0, action: 0 }};
+      const WAVE = 20;
+
+      const pipelineRow = document.createElement('div');
+      pipelineRow.style.cssText = 'display:flex;align-items:center;padding:20px 8px 12px;overflow-x:auto;gap:0;min-height:136px;justify-content:flex-start;flex-wrap:nowrap;';
+
+      let _si = 0, _lastWY = 0;
+
+      function _mkConnSvg(fromY, toY, dashed) {{
+        const W=44,H=110,mid=H/2,y1=mid-fromY,y2=mid-toY,cx=W*0.55;
+        const sv=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        sv.setAttribute('width',String(W)); sv.setAttribute('height',String(H));
+        sv.style.cssText='flex-shrink:0;overflow:visible;align-self:center;';
+        const p=document.createElementNS('http://www.w3.org/2000/svg','path');
+        p.setAttribute('d','M0,'+y1+' C'+cx+','+y1+' '+cx+','+y2+' '+W+','+y2);
+        p.setAttribute('stroke',dashed?'#ddd6fe':'#cbd5e1');
+        p.setAttribute('stroke-width',dashed?'1.5':'2');
+        if(dashed)p.setAttribute('stroke-dasharray','4 3');
+        p.setAttribute('fill','none');
+        const a=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+        a.setAttribute('points',W+','+y2+' '+(W-7)+','+(y2-4)+' '+(W-7)+','+(y2+4));
+        a.setAttribute('fill',dashed?'#c4b5fd':'#94a3b8');
+        sv.appendChild(p); sv.appendChild(a);
+        return sv;
       }}
 
-      // Section group: label pill on top, chips row below
-      function makeSectionGroup(nodes, type, labelText, lc, lbg, lbd) {{
-        const grp = document.createElement('div');
-        grp.style.cssText = 'display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex-shrink:0;';
-        grp.appendChild(makeSectionLabel(labelText, lc, lbg, lbd));
-        const chipsRow = document.createElement('div');
-        chipsRow.style.cssText = 'display:inline-flex;align-items:center;gap:5px;';
-        if (nodes.length > 0) chipsRow.appendChild(makeBubble(nodes[0], type, labelText));
-        if (nodes.length > 1) chipsRow.appendChild(makeOverflowBadge(nodes, type));
-        grp.appendChild(chipsRow);
-        return grp;
+      function _renderSegNode(seg) {{
+        const tc = typeColors[seg.nodeType] || typeColors.action;
+        const ci = typeCounters[seg.nodeType]++;
+        const grad = tc.grads[ci % tc.grads.length];
+        const shadow = tc.shadow;
+        const wY = (_si%2===0)?-WAVE:WAVE;
+        if (_si>0) pipelineRow.appendChild(_mkConnSvg(_lastWY,wY,false));
+        _lastWY=wY; _si++;
+        const wrap=document.createElement('div');
+        wrap.style.cssText='display:flex;flex-direction:column;align-items:center;gap:3px;transform:translateY('+wY+'px);flex-shrink:0;';
+        const iconEl=document.createElement('div');
+        iconEl.textContent=tc.icon;
+        iconEl.style.cssText='font-size:14px;line-height:1;margin-bottom:2px;';
+        const desc=_describeFlowNode(seg.node,seg.nodeType);
+        const detail=_describeFlowDetail(seg.node,seg.nodeType)||desc;
+        const sd=desc.length>22?desc.substring(0,20)+'\u2026':desc;
+        const circ=document.createElement('div');
+        circ.style.cssText='width:64px;height:64px;border-radius:50%;background:'+grad+';display:flex;align-items:center;justify-content:center;padding:5px;box-sizing:border-box;box-shadow:0 4px 16px '+shadow+';cursor:pointer;transition:transform .15s ease,box-shadow .15s ease;';
+        circ.title=detail;
+        const de=document.createElement('div'); de.textContent=sd;
+        de.style.cssText='color:#fff;font-size:9px;font-weight:600;text-align:center;line-height:1.25;word-break:break-word;pointer-events:none;';
+        circ.appendChild(de);
+        const tl=document.createElement('div'); tl.textContent=tc.label.toUpperCase();
+        tl.style.cssText='font-size:8px;font-weight:700;letter-spacing:0.5px;color:#64748b;margin-top:1px;';
+        wrap.appendChild(iconEl); wrap.appendChild(circ); wrap.appendChild(tl);
+        circ.addEventListener('mouseenter',()=>{{circ.style.transform='scale(1.1)';circ.style.boxShadow='0 6px 22px '+shadow;}});
+        circ.addEventListener('mouseleave',()=>{{circ.style.transform='';circ.style.boxShadow='0 4px 16px '+shadow;}});
+        circ.addEventListener('click',()=>{{
+          if(detailInfo.style.display==='block'&&detailInfo.textContent===detail){{detailInfo.style.display='none';return;}}
+          detailInfo.textContent=detail; detailInfo.style.display='block';
+        }});
+        pipelineRow.appendChild(wrap);
       }}
 
-      // Build pipeline: Trigger › Condition › Action
-      if (flowTriggers.length) {{
-        pipelineRow.appendChild(makeSectionGroup(flowTriggers, 'trigger', T.flow_trigger || 'Trigger', '#1d4ed8', '#dbeafe', '#93c5fd'));
+      function _renderSegFork(seg) {{
+        if(_si>0) pipelineRow.appendChild(_mkConnSvg(_lastWY,0,false));
+        _lastWY=0; _si++;
+        const N=seg.branches.length, brH=72, gap=8;
+        const totalH=N*brH+(N-1)*gap;
+        const fkW=30;
+        // Fork diverge SVG — one bezier per branch
+        const fkSvg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+        fkSvg.setAttribute('width',String(fkW)); fkSvg.setAttribute('height',String(totalH));
+        fkSvg.style.cssText='flex-shrink:0;overflow:visible;align-self:center;';
+        const midY=totalH/2;
+        seg.branches.forEach(function(br,bi){{
+          const brY=bi*(brH+gap)+brH/2;
+          const fp=document.createElementNS('http://www.w3.org/2000/svg','path');
+          fp.setAttribute('d','M0,'+midY+' C'+(fkW*0.6)+','+midY+' '+(fkW*0.6)+','+brY+' '+fkW+','+brY);
+          fp.setAttribute('stroke','#a78bfa'); fp.setAttribute('stroke-width','2');
+          fp.setAttribute('stroke-dasharray','5 3'); fp.setAttribute('fill','none');
+          const fa=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+          fa.setAttribute('points',fkW+','+brY+' '+(fkW-7)+','+(brY-4)+' '+(fkW-7)+','+(brY+4));
+          fa.setAttribute('fill','#8b5cf6');
+          fkSvg.appendChild(fp); fkSvg.appendChild(fa);
+        }});
+        pipelineRow.appendChild(fkSvg);
+        // Branches column — one row per branch
+        const brCol=document.createElement('div');
+        brCol.style.cssText='display:flex;flex-direction:column;gap:'+gap+'px;flex-shrink:0;align-self:center;';
+        seg.branches.forEach(function(br){{
+          const brRow=document.createElement('div');
+          brRow.style.cssText='display:flex;align-items:center;gap:0;';
+          // Condition label badge
+          const bdg=document.createElement('div');
+          const sl=br.label.length>22?br.label.substring(0,20)+'\u2026':br.label;
+          bdg.textContent=sl; bdg.title=br.label;
+          bdg.style.cssText='background:'+br.grad+';color:#fff;font-size:8px;font-weight:700;padding:3px 7px;border-radius:10px;white-space:nowrap;flex-shrink:0;margin-right:4px;max-width:88px;overflow:hidden;text-overflow:ellipsis;';
+          brRow.appendChild(bdg);
+          // Action circles in this branch
+          br.nodes.forEach(function(item,ni){{
+            if(ni>0){{
+              const msv=document.createElementNS('http://www.w3.org/2000/svg','svg');
+              msv.setAttribute('width','22'); msv.setAttribute('height','48');
+              msv.style.cssText='flex-shrink:0;overflow:visible;align-self:center;';
+              const mp=document.createElementNS('http://www.w3.org/2000/svg','path');
+              mp.setAttribute('d','M0,24 L22,24'); mp.setAttribute('stroke','#ddd6fe');
+              mp.setAttribute('stroke-width','1.5'); mp.setAttribute('stroke-dasharray','4 3'); mp.setAttribute('fill','none');
+              const ma=document.createElementNS('http://www.w3.org/2000/svg','polygon');
+              ma.setAttribute('points','22,24 15,20 15,28'); ma.setAttribute('fill','#c4b5fd');
+              msv.appendChild(mp); msv.appendChild(ma);
+              brRow.appendChild(msv);
+            }}
+            const ndesc=_describeFlowNode(item.node,'action');
+            const ndetail=_describeFlowDetail(item.node,'action')||ndesc;
+            const nsd=ndesc.length>16?ndesc.substring(0,14)+'\u2026':ndesc;
+            const nw=document.createElement('div');
+            nw.style.cssText='display:flex;flex-direction:column;align-items:center;flex-shrink:0;';
+            const nc=document.createElement('div');
+            nc.style.cssText='width:48px;height:48px;border-radius:50%;background:'+item.grad+';display:flex;align-items:center;justify-content:center;padding:4px;box-sizing:border-box;box-shadow:0 3px 10px '+item.shadow+';cursor:pointer;transition:transform .15s ease;opacity:0.92;';
+            nc.title=ndetail;
+            const nde=document.createElement('div'); nde.textContent=nsd;
+            nde.style.cssText='color:#fff;font-size:7.5px;font-weight:600;text-align:center;line-height:1.2;word-break:break-word;pointer-events:none;';
+            nc.appendChild(nde); nw.appendChild(nc);
+            nc.addEventListener('mouseenter',()=>{{nc.style.transform='scale(1.1)';}});
+            nc.addEventListener('mouseleave',()=>{{nc.style.transform='';}});
+            nc.addEventListener('click',()=>{{
+              if(detailInfo.style.display==='block'&&detailInfo.textContent===ndetail){{detailInfo.style.display='none';return;}}
+              detailInfo.textContent=ndetail; detailInfo.style.display='block';
+            }});
+            brRow.appendChild(nw);
+          }});
+          brCol.appendChild(brRow);
+        }});
+        pipelineRow.appendChild(brCol);
       }}
-      if (conditions.length) {{
-        pipelineRow.appendChild(makeArrow('›'));
-        pipelineRow.appendChild(makeSectionGroup(conditions, 'condition', T.flow_condition || 'Condition', '#92400e', '#fef9c3', '#fde68a'));
-      }}
-      const mainActions = expandedActions.filter(a => !(a && a.__kind === 'branch_marker'));
-      if (mainActions.length) {{
-        pipelineRow.appendChild(makeArrow('›'));
-        pipelineRow.appendChild(makeSectionGroup(mainActions, 'action', T.flow_action || 'Action', '#14532d', '#dcfce7', '#86efac'));
-      }}
+
+      segments.forEach(function(seg){{
+        if(seg.type==='fork') _renderSegFork(seg); else _renderSegNode(seg);
+      }});
+
       if (pipelineRow.children.length) flowEl.appendChild(pipelineRow);
 
       if (!flowTriggers.length && !conditions.length && !expandedActions.length) {{
@@ -4292,7 +4450,7 @@ def get_chat_bubble_js(
       ? 'align-self:flex-end;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:8px 12px;border-radius:14px 14px 2px 14px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.45;'
       : 'align-self:flex-start;background:var(--secondary-background-color,#f0f0f0);color:var(--primary-text-color,#212121);padding:8px 12px;border-radius:14px 14px 14px 2px;font-size:13px;max-width:85%;word-break:break-word;line-height:1.5;';
     if (role === 'user') d.textContent = text;
-    else d.innerHTML = _renderInlineMd(text);
+    else d.innerHTML = renderMarkdown(text);
     _autoMsgsEl.appendChild(d);
     _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
     return d;
@@ -4309,111 +4467,124 @@ def get_chat_bubble_js(
       const prefix = buildContextPrefix(ctx);
       const fullMsg = prefix ? prefix + '\\n\\n' + text : text;
       const _session = getAutoSessionId();
+      let gotAnyEvent = false;
+      let gotAnyToken = false;
+      setTimeout(() => {{
+        try {{
+          if (!gotAnyEvent && thinkEl) thinkEl.textContent = T.waiting_response || 'Waiting for response';
+        }} catch (e) {{}}
+      }}, 8000);
       const response = await fetch(API_BASE + '/api/chat/stream', {{
         method: 'POST',
         headers: {{ 'Content-Type': 'application/json' }},
         body: JSON.stringify({{ message: fullMsg, session_id: _session }})
       }});
-      if (!response.ok) throw new Error('HTTP ' + response.status);
+      if (!response.ok) {{
+        const bodyText = await response.text().catch(() => '');
+        if (response.status === 429) {{
+          throw new Error(T.rate_limit_error || 'Rate limit exceeded. Please wait a moment before trying again.');
+        }}
+        const tmpl = T.request_failed || 'Request failed ({{status}}): {{body}}';
+        const msg = tmpl
+          .replace('{{status}}', String(response.status))
+          .replace('{{body}}', bodyText ? bodyText.slice(0, 100) : '');
+        throw new Error(msg);
+      }}
+
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.includes('text/event-stream')) {{
+        const data = await response.json().catch(() => ({{}}));
+        if (data && data.response) {{
+          if (thinkEl) thinkEl.innerHTML = renderMarkdown(data.response);
+        }} else if (data && data.error) {{
+          if (thinkEl) thinkEl.textContent = data.error;
+        }} else {{
+          if (thinkEl) thinkEl.textContent = T.connection_lost || T.error_connection;
+        }}
+        if (_autoMsgsEl) _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
+        return;
+      }}
+
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = '', assistantText = '';
+      let buffer = '', assistantText = '', pendingDiffHtml = '';
       let firstToken = true;
+      let usageRendered = false;
 
       while (true) {{
         const {{ done, value }} = await reader.read();
-        if (done) {{
-          if (buffer.trim()) {{
-            let _flushUsage = null;
-            for (const line of buffer.split('\\n')) {{
-              if (!line.startsWith('data: ')) continue;
-              try {{
-                const evt = JSON.parse(line.slice(6));
-                if (evt.type === 'token') {{ assistantText += evt.content || ''; }}
-                else if (evt.type === 'done') {{
-                  if (evt.full_text) {{ assistantText = evt.full_text; }}
-                  if (evt.usage) {{ _flushUsage = evt.usage; }}
-                }}
-              }} catch(e) {{}}
-            }}
-            if (thinkEl && assistantText) {{
-              thinkEl.innerHTML = _renderInlineMd(assistantText);
-            }}
-            if (thinkEl && _flushUsage && (_flushUsage.input_tokens || _flushUsage.output_tokens)) {{
-              const u = _flushUsage;
-              const iTokens = (u.input_tokens || 0).toLocaleString();
-              const oTokens = (u.output_tokens || 0).toLocaleString();
-              let usageTxt = iTokens + ' in / ' + oTokens + ' out';
-              if (u.cost !== undefined && u.cost > 0) {{
-                const sym = u.currency === 'EUR' ? '\u20ac' : '$';
-                usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
-              }} else if (u.cost === 0) {{
-                usageTxt += ' \u2022 free';
-              }}
-              const uDiv = document.createElement('div');
-              uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
-              uDiv.textContent = usageTxt;
-              thinkEl.appendChild(uDiv);
-            }}
-          }}
-          break;
-        }}
-
         buffer += decoder.decode(value, {{ stream: true }});
-        const lines = buffer.split('\\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {{
-          if (!line.startsWith('data: ')) continue;
-          try {{
-            const evt = JSON.parse(line.slice(6));
-            if (evt.type === 'token') {{
-              if (firstToken) {{ firstToken = false; }}
-              assistantText += evt.content || '';
-              if (thinkEl) thinkEl.innerHTML = _renderInlineMd(assistantText);
-              if (_autoMsgsEl) _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
-            }} else if (evt.type === 'clear') {{
-              assistantText = '';
-              if (thinkEl) thinkEl.innerHTML = T.thinking + '\u2026';
-            }} else if (evt.type === 'done') {{
-              if (evt.full_text) {{
-                assistantText = evt.full_text;
-                if (thinkEl) thinkEl.innerHTML = _renderInlineMd(assistantText);
-              }}
-              if (thinkEl && evt.usage && (evt.usage.input_tokens || evt.usage.output_tokens)) {{
-                const u = evt.usage;
-                const iTokens = (u.input_tokens || 0).toLocaleString();
-                const oTokens = (u.output_tokens || 0).toLocaleString();
-                let usageTxt = iTokens + ' in / ' + oTokens + ' out';
-                if (u.cost !== undefined && u.cost > 0) {{
-                  const sym = u.currency === 'EUR' ? '\u20ac' : '$';
-                  usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
-                }} else if (u.cost === 0) {{
-                  usageTxt += ' \u2022 free';
+        while (buffer.includes('\\n\\n')) {{
+          const idx = buffer.indexOf('\\n\\n');
+          const chunk = buffer.substring(0, idx);
+          buffer = buffer.substring(idx + 2);
+          for (const line of chunk.split('\\n')) {{
+            if (!line.startsWith('data: ')) continue;
+            try {{
+              const evt = JSON.parse(line.slice(6));
+              gotAnyEvent = true;
+              if (evt.type === 'token') {{
+                gotAnyToken = true;
+                if (firstToken) firstToken = false;
+                assistantText += evt.content || '';
+                if (thinkEl) thinkEl.innerHTML = renderMarkdown(pendingDiffHtml + assistantText);
+                if (_autoMsgsEl) _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
+              }} else if (evt.type === 'diff_html') {{
+                gotAnyToken = true;
+                if (firstToken) firstToken = false;
+                pendingDiffHtml += (evt.content || '') + '\\n\\n';
+                if (thinkEl) thinkEl.innerHTML = renderMarkdown(pendingDiffHtml + assistantText);
+              }} else if (evt.type === 'clear') {{
+                assistantText = '';
+                pendingDiffHtml = '';
+                if (thinkEl) thinkEl.innerHTML = (T.thinking || 'Thinking') + '\u2026';
+              }} else if (evt.type === 'done') {{
+                if (evt.full_text) {{
+                  assistantText = evt.full_text;
                 }}
-                const uDiv = document.createElement('div');
-                uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
-                uDiv.textContent = usageTxt;
-                thinkEl.appendChild(uDiv);
+                if (thinkEl) thinkEl.innerHTML = renderMarkdown(pendingDiffHtml + assistantText);
+                if (thinkEl && !usageRendered && evt.usage && (evt.usage.input_tokens || evt.usage.output_tokens)) {{
+                  const u = evt.usage;
+                  const iTokens = (u.input_tokens || 0).toLocaleString();
+                  const oTokens = (u.output_tokens || 0).toLocaleString();
+                  let usageTxt = iTokens + ' in / ' + oTokens + ' out';
+                  if (u.cost !== undefined && u.cost > 0) {{
+                    const sym = u.currency === 'EUR' ? '\u20ac' : '$';
+                    usageTxt += ' \u2022 ' + sym + u.cost.toFixed(4);
+                  }} else if (u.cost === 0) {{
+                    usageTxt += ' \u2022 free';
+                  }}
+                  const uDiv = document.createElement('div');
+                  uDiv.style.cssText = 'font-size:10px;color:var(--secondary-text-color,#999);text-align:right;margin-top:3px;';
+                  uDiv.textContent = usageTxt;
+                  thinkEl.appendChild(uDiv);
+                  usageRendered = true;
+                }}
+              }} else if (evt.type === 'error') {{
+                if (thinkEl) thinkEl.textContent = evt.message || T.error_connection;
+              }} else if (evt.type === 'status') {{
+                const msg = evt.message || evt.content || evt.status || evt.text || '';
+                if (firstToken && thinkEl) thinkEl.textContent = '\u23f3 ' + msg;
+              }} else if (evt.type === 'tool' || evt.type === 'tool_call') {{
+                const desc = evt.description || evt.name || 'tool';
+                if (firstToken && thinkEl) thinkEl.textContent = '\U0001f527 ' + desc;
+              }} else if (evt.type === 'fallback_notice') {{
+                const fallbackMsg = evt.message || evt.content || '';
+                if (firstToken && fallbackMsg && thinkEl) thinkEl.textContent = fallbackMsg;
               }}
-            }} else if (evt.type === 'error') {{
-              if (thinkEl) thinkEl.textContent = evt.message || T.error_connection;
-            }} else if (evt.type === 'status') {{
-              const msg = evt.message || evt.content || '';
-              if (firstToken && thinkEl) thinkEl.textContent = msg + '\u2026';
-            }} else if (evt.type === 'tool') {{
-              const desc = evt.description || evt.name || 'tool';
-              if (firstToken && thinkEl) thinkEl.textContent = '\U0001f527 ' + desc + '\u2026';
-            }}
-          }} catch (parseErr) {{}}
+            }} catch (parseErr) {{}}
+          }}
         }}
+        if (done) break;
       }}
-      if (!assistantText && thinkEl) {{
-        thinkEl.textContent = T.error_connection;
+      if (!gotAnyEvent && thinkEl) {{
+        thinkEl.textContent = T.connection_lost || T.error_connection;
+      }} else if (!gotAnyToken && !assistantText && thinkEl) {{
+        thinkEl.textContent = T.connection_lost || T.error_connection;
       }}
     }} catch(e) {{
       console.error('[Amira auto sidebar] send error:', e);
-      if (thinkEl) thinkEl.textContent = T.error_connection + ' (' + e.message + ')';
+      if (thinkEl) thinkEl.textContent = (e && e.message) ? String(e.message) : (T.error_connection || 'Connection error');
     }}
     if (_autoMsgsEl) _autoMsgsEl.scrollTop = _autoMsgsEl.scrollHeight;
   }}
@@ -5508,7 +5679,7 @@ def get_chat_bubble_js(
 
   // ---- Addon Health Check: Remove bubble if addon is down ----
   let addonHealthCheckFails = 0;
-  const MAX_FAILS = 2;
+  const MAX_FAILS = 1;
   async function checkAddonHealth() {{
     try {{
       const resp = await fetch(API_BASE + '/api/status', {{
@@ -5537,11 +5708,13 @@ def get_chat_bubble_js(
 
   function removeBubbleFromDOM() {{
     console.log('[Bubble] Addon unreachable, removing bubble from DOM');
+    clearInterval(healthCheckInterval);
+    clearInterval(_routePollInterval);
+    clearInterval(_syncPollInterval);
+    removeCardEditorButton();
+    removeAutomationIntegration();
     const root = document.getElementById('ha-claude-bubble');
-    if (root) {{
-      root.remove();
-      clearInterval(healthCheckInterval);
-    }}
+    if (root) root.remove();
   }}
 
   // Start health check every 30 seconds
@@ -5853,7 +6026,7 @@ def get_chat_bubble_js(
   }})();
 
   // Poll every 10s for model/provider changes made from chat_ui or other tabs
-  setInterval(async () => {{
+  const _syncPollInterval = setInterval(async () => {{
     try {{
       const r = await fetch(API_BASE + '/api/status', {{credentials:'same-origin'}});
       if (!r.ok) return;
