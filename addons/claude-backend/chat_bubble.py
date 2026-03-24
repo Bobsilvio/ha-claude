@@ -4212,7 +4212,7 @@ def get_chat_bubble_js(
       ];
       const BRANCH_DEFAULT_GS = ['linear-gradient(135deg,#94a3b8,#475569)', 'rgba(71,85,105,0.30)'];
 
-      // Build segments: {type:'node'} or {type:'fork', branches:[...]}
+      // Build segments: {{type:'node'}} or {{type:'fork', branches:[...]}}
       const segments = [];
       function _buildSegs(list, nodeType) {{
         if (!Array.isArray(list)) return;
