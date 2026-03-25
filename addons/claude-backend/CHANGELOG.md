@@ -2,6 +2,15 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.29 — Remove deprecated armhf arch + fix macOS junk files in translations
+
+### Supervisor / config fixes
+- **Removed deprecated `armhf` arch value** from `config.yaml` — HA supervisor was warning on every reload; supported architectures are now `aarch64` and `amd64` only
+- **Auto-cleanup of macOS AppleDouble files** (`._*.yaml`) at startup: the s6-overlay run script now runs `find /app/translations -name '._*' -delete` before launching the server — these binary files are created by macOS Finder when copying files to SMB/AFP shares and caused YAML parse errors in the supervisor
+- **Added `translations/.gitignore`** with `._*` to prevent these files from being accidentally committed
+
+---
+
 ## 4.6.28 — Fix supervisor ingress spam + bubble setup crash
 
 ### Bug fixes

@@ -1,6 +1,6 @@
 # Home Assistant Add-on configuration
 name: Amira
-version: "4.6.28"
+version: "4.6.29"
 slug: claude-backend
 description: >-
   Amira - AI-powered smart home assistant with Claude, ChatGPT, Gemini,
@@ -10,7 +10,6 @@ init: false
 arch:
   - aarch64
   - amd64
-  - armhf
 startup: application
 apparmor: false
 boot: auto

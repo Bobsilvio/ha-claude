@@ -53,6 +53,9 @@ bashio::log.info "LOG_LEVEL: ${LOG_LEVEL}"
 bashio::log.info "SUPERVISOR_TOKEN: $([ -n "${SUPERVISOR_TOKEN}" ] && echo 'present' || echo 'MISSING')"
 bashio::log.info "Runtime settings managed via /config/amira/settings.json"
 
+# Remove macOS AppleDouble metadata files (._*) that Finder creates on SMB/AFP shares
+find /app/translations -name '._*' -delete 2>/dev/null || true
+
 cd /app
 
 exec python3 server.py
