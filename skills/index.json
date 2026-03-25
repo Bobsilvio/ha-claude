@@ -1,0 +1,53 @@
+{
+  "version": "1",
+  "updated": "2026-03-25",
+  "skills": [
+    {
+      "name": "mushroom",
+      "version": "1.0.0",
+      "description": {
+        "en": "Expert assistant for Mushroom UI Cards in Home Assistant Lovelace",
+        "it": "Assistente esperto per le Mushroom UI Cards in Home Assistant Lovelace",
+        "es": "Asistente experto para Mushroom UI Cards en Home Assistant Lovelace",
+        "fr": "Assistant expert pour les Mushroom UI Cards dans Home Assistant Lovelace"
+      },
+      "author": "amira-community",
+      "tags": ["lovelace", "cards", "ui", "dashboard", "mushroom"],
+      "min_version": "4.6.0",
+      "raw_url": "https://raw.githubusercontent.com/Bobsilvio/ha-claude/main/skills/mushroom/SKILL.md",
+      "preview_url": "https://github.com/Bobsilvio/ha-claude/blob/main/skills/mushroom/SKILL.md"
+    }
+    ,
+    {
+      "name": "html-js-card",
+      "version": "1.0.0",
+      "description": {
+        "en": "Expert assistant for HTML-JS Card — custom Lovelace cards with HTML, CSS and JavaScript",
+        "it": "Assistente esperto per HTML-JS Card — card Lovelace personalizzate con HTML, CSS e JavaScript",
+        "es": "Asistente experto para HTML-JS Card — tarjetas Lovelace personalizadas con HTML, CSS y JavaScript",
+        "fr": "Assistant expert pour HTML-JS Card — cartes Lovelace personnalisées avec HTML, CSS et JavaScript"
+      },
+      "author": "Bobsilvio",
+      "tags": ["lovelace", "cards", "html", "javascript", "css", "dashboard"],
+      "min_version": "4.6.0",
+      "raw_url": "https://raw.githubusercontent.com/Bobsilvio/ha-claude/main/skills/html-js-card/SKILL.md",
+      "preview_url": "https://github.com/Bobsilvio/ha-claude/blob/main/skills/html-js-card/SKILL.md"
+    }
+    ,
+    {
+      "name": "swiss-army-knife-card",
+      "version": "1.0.0",
+      "description": {
+        "en": "Expert assistant for Swiss Army Knife Card — pixel-precise SVG Lovelace cards with shapes, gauges, sliders and animated tools",
+        "it": "Assistente esperto per Swiss Army Knife Card — card Lovelace SVG con forme, gauge, slider e tool animati a posizionamento preciso",
+        "es": "Asistente experto para Swiss Army Knife Card — tarjetas Lovelace SVG con formas, medidores, sliders y herramientas animadas",
+        "fr": "Assistant expert pour Swiss Army Knife Card — cartes Lovelace SVG avec formes, jauges, sliders et outils animés"
+      },
+      "author": "Bobsilvio",
+      "tags": ["lovelace", "cards", "svg", "shapes", "gauge", "slider", "animation", "dashboard"],
+      "min_version": "4.6.0",
+      "raw_url": "https://raw.githubusercontent.com/Bobsilvio/ha-claude/main/skills/swiss-army-knife-card/SKILL.md",
+      "preview_url": "https://github.com/Bobsilvio/ha-claude/blob/main/skills/swiss-army-knife-card/SKILL.md"
+    }
+  ]
+}

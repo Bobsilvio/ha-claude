@@ -22,6 +22,7 @@ from routes.usage_routes import usage_bp
 from routes.dashboard_routes import dashboard_bp
 from routes.file_routes import file_bp
 from routes.scheduled_routes import scheduled_bp
+from routes.skills_routes import skills_bp
 
 
 # Mapping of blueprint areas to route definitions
@@ -201,6 +202,13 @@ ROUTE_REGISTRATIONS = {
         (file_bp, '/api/files/list', 'api_files_list', ['GET']),
         (file_bp, '/api/files/read', 'api_files_read', ['GET']),
     ],
+    'skills': [
+        # /api/skills/store MUST come before /api/skills/<name> to avoid routing collision
+        (skills_bp, '/api/skills/store', 'api_skills_store', ['GET']),
+        (skills_bp, '/api/skills', 'api_skills_list', ['GET']),
+        (skills_bp, '/api/skills/install', 'api_skills_install', ['POST']),
+        (skills_bp, '/api/skills/<name>', 'api_skills_delete', ['DELETE']),
+    ],
     'scheduled': [
         (scheduled_bp, '/api/scheduled/stats', 'api_scheduled_stats', ['GET']),
         (scheduled_bp, '/api/scheduled/tasks', 'api_scheduled_tasks_list', ['GET']),
@@ -245,3 +253,4 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(file_bp)
     app.register_blueprint(scheduled_bp)
+    app.register_blueprint(skills_bp)

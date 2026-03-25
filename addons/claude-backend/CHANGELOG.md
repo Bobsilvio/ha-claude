@@ -2,6 +2,20 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.30 — Skills system + SAK/HTML-JS/Mushroom skills + fix Skills UI crash
+
+### Skills system
+- **New Skills system**: install/uninstall AI skills from GitHub registry directly from the Settings panel (🧩 Skills tab); each skill injects expert documentation into the AI prompt when invoked with `/skill-name` in chat
+- **Skills store**: fetches available skills from `https://raw.githubusercontent.com/Bobsilvio/ha-claude/main/skills/index.json` with 5-minute cache
+- **Three skills published**: `swiss-army-knife-card` (SAK — coordinate system, 19+ tool types, colorstops, sparkline, templates, animations), `html-js-card` (HTML+CSS+JS Lovelace cards), `mushroom` (Mushroom UI Cards)
+- **`/command` invocation**: typing `/swiss-army-knife-card create a temperature card` in chat automatically injects the skill documentation before the AI response
+- **Autocomplete**: typing `/` in the chat input shows installed skills with name + description
+
+### Bug fix
+- **Fixed Skills panel crash** (`NameError: name 'language' is not defined`): the JS `lang` variable in the Skills panel was referencing the Python variable `language` which does not exist — corrected to `ui_lang`
+
+---
+
 ## 4.6.29 — Remove deprecated armhf arch + fix macOS junk files in translations
 
 ### Supervisor / config fixes

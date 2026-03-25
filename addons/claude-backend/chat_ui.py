@@ -197,6 +197,22 @@ def get_chat_ui():
             "device_updated": "Device updated",
             # Dark mode
             "dark_mode": "Dark mode",
+            # Skills tab
+            "tab_skills": "🧩 Skills",
+            "skills_installed": "Installed",
+            "skills_store": "Store",
+            "skills_install_btn": "Install",
+            "skills_installed_badge": "Installed",
+            "skills_delete_btn": "Remove",
+            "skills_delete_confirm": "Remove this skill?",
+            "skills_empty": "No skills installed. Browse the store below.",
+            "skills_store_empty": "No skills available in the store.",
+            "skills_store_loading": "Loading store...",
+            "skills_store_error": "Could not load the store. Check your internet connection.",
+            "skills_refresh": "Refresh",
+            "skills_by": "by",
+            "skills_requires_version": "Requires Amira v{version}",
+            "skills_hint": "Type /skill-name in the chat to use a skill",
             # Costs tab
             "tab_costs": "Costs",
             "costs_today": "Today",
@@ -520,6 +536,22 @@ def get_chat_ui():
             "device_updated": "Dispositivo aggiornato",
             # Dark mode
             "dark_mode": "Tema scuro",
+            # Skills tab
+            "tab_skills": "🧩 Skill",
+            "skills_installed": "Installate",
+            "skills_store": "Store",
+            "skills_install_btn": "Installa",
+            "skills_installed_badge": "Installata",
+            "skills_delete_btn": "Rimuovi",
+            "skills_delete_confirm": "Rimuovere questa skill?",
+            "skills_empty": "Nessuna skill installata. Sfoglia lo store qui sotto.",
+            "skills_store_empty": "Nessuna skill disponibile nello store.",
+            "skills_store_loading": "Caricamento store...",
+            "skills_store_error": "Impossibile caricare lo store. Controlla la connessione internet.",
+            "skills_refresh": "Aggiorna",
+            "skills_by": "di",
+            "skills_requires_version": "Richiede Amira v{version}",
+            "skills_hint": "Scrivi /nome-skill nella chat per usare una skill",
             # Costs tab
             "tab_costs": "Costi",
             "costs_today": "Oggi",
@@ -843,6 +875,22 @@ def get_chat_ui():
             "device_updated": "Dispositivo actualizado",
             # Dark mode
             "dark_mode": "Tema oscuro",
+            # Skills tab
+            "tab_skills": "🧩 Skills",
+            "skills_installed": "Instaladas",
+            "skills_store": "Tienda",
+            "skills_install_btn": "Instalar",
+            "skills_installed_badge": "Instalada",
+            "skills_delete_btn": "Eliminar",
+            "skills_delete_confirm": "¿Eliminar esta skill?",
+            "skills_empty": "No hay skills instaladas. Explora la tienda a continuación.",
+            "skills_store_empty": "No hay skills disponibles en la tienda.",
+            "skills_store_loading": "Cargando tienda...",
+            "skills_store_error": "No se pudo cargar la tienda. Comprueba tu conexión a internet.",
+            "skills_refresh": "Actualizar",
+            "skills_by": "por",
+            "skills_requires_version": "Requiere Amira v{version}",
+            "skills_hint": "Escribe /nombre-skill en el chat para usar una skill",
             # Costs tab
             "tab_costs": "Costes",
             "costs_today": "Hoy",
@@ -1164,6 +1212,22 @@ def get_chat_ui():
             "device_updated": "Appareil mis à jour",
             # Dark mode
             "dark_mode": "Mode sombre",
+            # Skills tab
+            "tab_skills": "🧩 Skills",
+            "skills_installed": "Installées",
+            "skills_store": "Boutique",
+            "skills_install_btn": "Installer",
+            "skills_installed_badge": "Installée",
+            "skills_delete_btn": "Supprimer",
+            "skills_delete_confirm": "Supprimer cette skill ?",
+            "skills_empty": "Aucune skill installée. Parcourez la boutique ci-dessous.",
+            "skills_store_empty": "Aucune skill disponible dans la boutique.",
+            "skills_store_loading": "Chargement de la boutique...",
+            "skills_store_error": "Impossible de charger la boutique. Vérifiez votre connexion internet.",
+            "skills_refresh": "Actualiser",
+            "skills_by": "par",
+            "skills_requires_version": "Nécessite Amira v{version}",
+            "skills_hint": "Tapez /nom-skill dans le chat pour utiliser une skill",
             # Costs tab
             "tab_costs": "Coûts",
             "costs_today": "Aujourd'hui",
@@ -3246,6 +3310,7 @@ def get_chat_ui():
                 <button class="sidebar-tab" data-tab="backups" onclick="switchSidebarTab('backups')">\U0001f4be {ui_js['tab_backups']}</button>
                 <button class="sidebar-tab" data-tab="devices" onclick="switchSidebarTab('devices')">⚙️ {ui_js['tab_devices']}</button>
                 <button class="sidebar-tab" data-tab="costs" onclick="switchSidebarTab('costs')">💰 {ui_js['tab_costs']}</button>
+                <button class="sidebar-tab" data-tab="skills" onclick="switchSidebarTab('skills')">{ui_js['tab_skills']}</button>
                 <button class="sidebar-tab" data-tab="config" onclick="switchSidebarTab('config')">{ui_js['tab_config']}</button>
             </div>
             <div class="sidebar-content active" id="tabChat">
@@ -3271,6 +3336,9 @@ def get_chat_ui():
             </div>
             <div class="sidebar-content" id="tabCosts">
                 <div class="costs-panel" id="costsPanel"></div>
+            </div>
+            <div class="sidebar-content" id="tabSkills">
+                <div id="skillsPanel" style="padding:10px 12px;"></div>
             </div>
             <div class="sidebar-content" id="tabConfig">
                 <div class="config-list" id="configList"></div>
@@ -7879,6 +7947,9 @@ def get_chat_ui():
             }} else if (tabName === 'costs') {{
                 document.getElementById('tabCosts').classList.add('active');
                 loadCostsPanel();
+            }} else if (tabName === 'skills') {{
+                document.getElementById('tabSkills').classList.add('active');
+                loadSkillsPanel();
             }} else if (tabName === 'config') {{
                 document.getElementById('tabConfig').classList.add('active');
                 loadConfigList();
@@ -7909,6 +7980,216 @@ def get_chat_ui():
                 if (btn) btn.disabled = false;
             }}
         }}
+
+        // ---- Skills panel ----
+        let _installedSkills = [];
+
+        async function loadSkillsPanel() {{
+            const panel = document.getElementById('skillsPanel');
+            if (!panel) return;
+            panel.innerHTML = '<div style="padding:16px;text-align:center;color:#999;">' + (T.skills_store_loading || 'Loading...') + '</div>';
+            try {{
+                const [instResp, storeResp] = await Promise.all([
+                    fetch(apiUrl('api/skills')),
+                    fetch(apiUrl('api/skills/store'))
+                ]);
+                const instData  = instResp.ok  ? await instResp.json()  : {{}};
+                const storeData = storeResp.ok ? await storeResp.json() : {{}};
+                const installed = instData.skills  || [];
+                const store     = storeData.skills || [];
+                _installedSkills = installed;
+                const instNames  = new Set(installed.map(s => s.name));
+
+                const lang = '{ui_lang}';
+                function _sdesc(s) {{
+                    if (s.description && typeof s.description === 'object') {{
+                        return s.description[lang] || s.description['en'] || '';
+                    }}
+                    return s.description || '';
+                }}
+
+                // ---- installed section ----
+                let html = '<div style="font-size:12px;color:#888;margin-bottom:6px;">' + (T.skills_hint || '') + '</div>';
+                html += '<div style="font-weight:600;font-size:13px;margin-bottom:8px;color:#444;">📦 ' + (T.skills_installed || 'Installed') + '</div>';
+                if (installed.length === 0) {{
+                    html += '<div style="color:#999;font-size:12px;margin-bottom:12px;">' + (T.skills_empty || 'No skills installed.') + '</div>';
+                }} else {{
+                    installed.forEach(s => {{
+                        html += `<div style="background:#f0f4ff;border-radius:8px;padding:9px 11px;margin-bottom:7px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                                <div>
+                                    <span style="font-weight:600;font-size:13px;">/${{s.name}}</span>
+                                    <span style="font-size:11px;color:#888;margin-left:6px;">v${{s.version || ''}}</span>
+                                    ${{s.author ? '<span style="font-size:11px;color:#aaa;margin-left:4px;">' + (T.skills_by||'by') + ' ' + s.author + '</span>' : ''}}
+                                </div>
+                                <button onclick="deleteSkill('${{s.name}}')" style="background:#fee2e2;color:#991b1b;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">${{T.skills_delete_btn||'Remove'}}</button>
+                            </div>
+                            <div style="font-size:12px;color:#555;margin-top:4px;">${{_sdesc(s)}}</div>
+                            ${{(s.tags||[]).map(t=>`<span style="background:#e8f0fe;color:#1a73e8;border-radius:4px;padding:1px 5px;font-size:10px;margin-right:3px;">${{t}}</span>`).join('')}}
+                        </div>`;
+                    }});
+                }}
+
+                // ---- store section ----
+                html += '<div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px;">';
+                html += '<div style="font-weight:600;font-size:13px;color:#444;">🏪 ' + (T.skills_store||'Store') + '</div>';
+                html += '<button onclick="loadSkillsPanel()" style="background:#f0f0f0;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">' + (T.skills_refresh||'Refresh') + '</button>';
+                html += '</div>';
+
+                if (storeData.error && store.length === 0) {{
+                    html += '<div style="color:#c62828;font-size:12px;">' + (T.skills_store_error||'Could not load store.') + '</div>';
+                }} else if (store.length === 0) {{
+                    html += '<div style="color:#999;font-size:12px;">' + (T.skills_store_empty||'No skills available.') + '</div>';
+                }} else {{
+                    store.forEach(s => {{
+                        const isInst = instNames.has(s.name);
+                        html += `<div style="background:#fafafa;border:1px solid #e8e8e8;border-radius:8px;padding:9px 11px;margin-bottom:7px;">
+                            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                                <div>
+                                    <span style="font-weight:600;font-size:13px;">/${{s.name}}</span>
+                                    <span style="font-size:11px;color:#888;margin-left:6px;">v${{s.version||''}}</span>
+                                    ${{s.author ? '<span style="font-size:11px;color:#aaa;margin-left:4px;">' + (T.skills_by||'by') + ' ' + s.author + '</span>' : ''}}
+                                </div>
+                                ${{isInst
+                                    ? '<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:3px 9px;font-size:11px;">' + (T.skills_installed_badge||'Installed') + '</span>'
+                                    : '<button onclick=\'installSkill("' + s.name + '","' + (s.raw_url||'') + '")\' style="background:#4caf50;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">' + (T.skills_install_btn||'Install') + '</button>'
+                                }}
+                            </div>
+                            <div style="font-size:12px;color:#555;margin-top:4px;">${{_sdesc(s)}}</div>
+                            ${{(s.tags||[]).map(t=>`<span style="background:#e8f0fe;color:#1a73e8;border-radius:4px;padding:1px 5px;font-size:10px;margin-right:3px;">${{t}}</span>`).join('')}}
+                        </div>`;
+                    }});
+                }}
+                panel.innerHTML = html;
+            }} catch(e) {{
+                panel.innerHTML = '<div style="color:#c62828;padding:12px;">' + (T.skills_store_error||'Error loading skills.') + '</div>';
+            }}
+        }}
+
+        async function installSkill(name, rawUrl) {{
+            try {{
+                const resp = await fetch(apiUrl('api/skills/install'), {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{name, raw_url: rawUrl}})
+                }});
+                const data = await resp.json();
+                if (data.success) {{
+                    await loadSkillsPanel();
+                }} else {{
+                    alert('❌ ' + (data.error || 'Install failed'));
+                }}
+            }} catch(e) {{
+                alert('❌ ' + e.message);
+            }}
+        }}
+
+        async function deleteSkill(name) {{
+            if (!confirm((T.skills_delete_confirm||'Remove this skill?') + ' /' + name)) return;
+            try {{
+                const resp = await fetch(apiUrl('api/skills/' + encodeURIComponent(name)), {{method: 'DELETE'}});
+                if (resp.ok) {{
+                    await loadSkillsPanel();
+                }} else {{
+                    const data = await resp.json();
+                    alert('❌ ' + (data.error || 'Delete failed'));
+                }}
+            }} catch(e) {{
+                alert('❌ ' + e.message);
+            }}
+        }}
+
+        // ---- Skills autocomplete ----
+        (function() {{
+            const textarea = document.getElementById('input');
+            if (!textarea) return;
+
+            const dropdown = document.createElement('div');
+            dropdown.id = 'skillsAutocomplete';
+            dropdown.style.cssText = 'display:none;position:absolute;bottom:100%;left:0;right:0;background:#fff;border:1px solid #e0e0e0;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.12);z-index:1000;max-height:220px;overflow-y:auto;margin-bottom:4px;';
+            textarea.parentElement.style.position = 'relative';
+            textarea.parentElement.appendChild(dropdown);
+
+            let _acIdx = -1;
+            let _acItems = [];
+
+            function _renderDropdown(matches) {{
+                _acItems = matches;
+                _acIdx = -1;
+                if (!matches.length) {{ dropdown.style.display = 'none'; return; }}
+                dropdown.innerHTML = matches.map((s, i) => {{
+                    const lang = '{ui_lang}';
+                    const desc = (s.description && typeof s.description === 'object')
+                        ? (s.description[lang] || s.description['en'] || '')
+                        : (s.description || '');
+                    return `<div class="skill-ac-item" data-idx="${{i}}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #f0f0f0;">
+                        <span style="font-weight:600;color:#667eea;">/${{s.name}}</span>
+                        <span style="font-size:11px;color:#888;margin-left:6px;">${{desc}}</span>
+                    </div>`;
+                }}).join('');
+                dropdown.querySelectorAll('.skill-ac-item').forEach(el => {{
+                    el.addEventListener('mousedown', e => {{
+                        e.preventDefault();
+                        const idx = parseInt(el.dataset.idx);
+                        _applyItem(idx);
+                    }});
+                    el.addEventListener('mouseenter', () => {{
+                        _acIdx = parseInt(el.dataset.idx);
+                        _highlight();
+                    }});
+                }});
+                dropdown.style.display = 'block';
+            }}
+
+            function _highlight() {{
+                dropdown.querySelectorAll('.skill-ac-item').forEach((el, i) => {{
+                    el.style.background = i === _acIdx ? '#f0f4ff' : '';
+                }});
+            }}
+
+            function _applyItem(idx) {{
+                if (idx < 0 || idx >= _acItems.length) return;
+                textarea.value = '/' + _acItems[idx].name + ' ';
+                dropdown.style.display = 'none';
+                textarea.focus();
+                // Move cursor to end
+                textarea.selectionStart = textarea.selectionEnd = textarea.value.length;
+            }}
+
+            textarea.addEventListener('input', function() {{
+                const val = textarea.value;
+                if (!val.startsWith('/') || val.includes(' ')) {{ dropdown.style.display = 'none'; return; }}
+                const partial = val.slice(1).toLowerCase();
+                const matches = _installedSkills.filter(s => s.name.startsWith(partial));
+                _renderDropdown(matches);
+            }});
+
+            textarea.addEventListener('keydown', function(e) {{
+                if (dropdown.style.display === 'none') return;
+                if (e.key === 'ArrowDown') {{
+                    e.preventDefault();
+                    _acIdx = Math.min(_acIdx + 1, _acItems.length - 1);
+                    _highlight();
+                }} else if (e.key === 'ArrowUp') {{
+                    e.preventDefault();
+                    _acIdx = Math.max(_acIdx - 1, 0);
+                    _highlight();
+                }} else if (e.key === 'Tab' || (e.key === 'Enter' && _acIdx >= 0)) {{
+                    if (_acIdx >= 0) {{
+                        e.preventDefault();
+                        _applyItem(_acIdx);
+                    }}
+                }} else if (e.key === 'Escape') {{
+                    dropdown.style.display = 'none';
+                }}
+            }});
+
+            document.addEventListener('click', function(e) {{
+                if (!dropdown.contains(e.target) && e.target !== textarea) {{
+                    dropdown.style.display = 'none';
+                }}
+            }});
+        }})();
 
         async function loadCostsPanel() {{
             const panel = document.getElementById('costsPanel');
@@ -10025,6 +10306,9 @@ def get_chat_ui():
         window.changeModel = changeModel;
         window.handleButtonClick = handleButtonClick;
         window.switchSidebarTab = switchSidebarTab;
+        window.installSkill = installSkill;
+        window.deleteSkill  = deleteSkill;
+        window.loadSkillsPanel = loadSkillsPanel;
         window.newChat = newChat;
         window.toggleSidebar = toggleSidebar;
         window.sendSuggestion = sendSuggestion;

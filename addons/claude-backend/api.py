@@ -75,6 +75,12 @@ except ImportError:
     MCP_AVAILABLE = False
 
 try:
+    import skills
+    SKILLS_AVAILABLE = True
+except ImportError:
+    SKILLS_AVAILABLE = False
+
+try:
     import fallback
     FALLBACK_AVAILABLE = True
 except ImportError:
@@ -3500,6 +3506,23 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             "- Never use generic preambles like 'here are the results' — go straight to the answer.\n"
         )
         intent_info["prompt"] = intent_info["prompt"] + voice_instruction
+
+    # Inject skill instructions into system prompt if message starts with /skill-name
+    if SKILLS_AVAILABLE:
+        _skill_name, _remaining = skills.parse_skill_command(user_message)
+        if _skill_name:
+            _enriched_prompt = skills.inject_skill_into_prompt(
+                _skill_name, intent_info.get("prompt") or ""
+            )
+            if _enriched_prompt is not None:
+                intent_info["prompt"] = _enriched_prompt
+                # Replace the user message with the remaining text (without /command prefix)
+                if _remaining:
+                    user_message = _remaining
+                yield {"type": "status", "message": f"Skill: {_skill_name}"}
+                logger.info(f"Skill '{_skill_name}' injected into system prompt")
+            else:
+                yield {"type": "status", "message": tr("skill_not_found").format(name=_skill_name)}
 
     # Step 3: Save original message and build enriched version for API
     if image_data:
