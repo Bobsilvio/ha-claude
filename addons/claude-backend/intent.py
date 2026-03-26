@@ -500,6 +500,9 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
         if bracket_end != -1:
             clean_msg = clean_msg[bracket_end + 1:]
     msg = clean_msg.strip().lower()
+    # Detect skill command prefix (/skill-name ...) — used to suppress keyword-based routing
+    # that could falsely trigger on the skill name itself (e.g. /html-js-card → "html" keyword).
+    _is_skill_cmd = bool(re.match(r"^/[a-z][a-z0-9_-]+", msg))
     has_yaml_fence = "```yaml" in msg or "```yml" in msg
     has_html_fence = "```html" in msg
 
@@ -602,7 +605,7 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
                              "add", "remove", "use the same", "same entities", "same sensors",
                              "modifie", "change", "ajoute", "utilise les même",
                              "modifica", "cambia", "añade", "usa los mismos"]
-        if any(s in msg for s in follow_up_signals):
+        if not _is_skill_cmd and any(s in msg for s in follow_up_signals):
             logger.info(f"Follow-up detected — carrying forward intent: {previous_intent}")
             return {"intent": previous_intent, "tools": INTENT_TOOL_SETS[previous_intent],
                     "prompt": INTENT_PROMPTS.get(previous_intent), "specific_target": False}
@@ -628,9 +631,6 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
     # Already handled above with high priority, before follow-up continuity.
 
     # --- HTML DASHBOARD CREATION/MODIFICATION (kept for specialized prompt) ---
-    # Skip if message starts with a skill command (/skill-name ...) — the skill name
-    # itself may contain keywords like "html" that would falsely trigger this routing.
-    _is_skill_cmd = bool(re.match(r"^/[a-z][a-z0-9_-]+", msg))
     # The create_html_dashboard prompt is very specific (~100 lines of CSS/JS/Vue guidance)
     # so we keep keyword detection for it rather than relying on the LLM alone.
     html_keywords = ["html", "vue", "javascript", "js", "react", "svelte",
