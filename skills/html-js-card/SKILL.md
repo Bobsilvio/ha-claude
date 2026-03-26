@@ -1,6 +1,6 @@
 ---
 name: html-js-card
-version: 1.6.0
+version: 1.6.1
 description:
   en: "Expert assistant for HTML-JS Card — custom Home Assistant Lovelace cards with HTML, CSS and JavaScript"
   it: "Assistente esperto per HTML-JS Card — card Lovelace personalizzate con HTML, CSS e JavaScript"
@@ -27,6 +27,15 @@ If the user wants energy flow → implement it with **inline SVG inside `content
 If the user wants ApexCharts → load it via **`scripts:`** and render it inside `content:`.
 If the user wants a header/title → HTML inside `content:`, not a separate mushroom card.
 Everything goes inside one (or more) `custom:html-js-card` cards.
+
+**ALWAYS wrap the complete YAML in a fenced code block:**
+````
+```yaml
+type: custom:html-js-card
+...
+```
+````
+**NEVER output YAML as plain text.** Plain-text YAML cannot be copied and breaks the user's workflow.
 
 ---
 
