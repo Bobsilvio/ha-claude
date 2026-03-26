@@ -2,6 +2,13 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.39 — Remove entity picker UI from chat
+
+### UX
+- **Removed entity picker**: the sensor/entity buttons + free-text field + "Select" button that appeared below AI messages are no longer shown — they were triggering incorrectly after YAML card responses
+
+---
+
 ## 4.6.38 — Bubble: fix YAML as bullet points + fix language forcing Italian on all users
 
 ### Bug fixes
