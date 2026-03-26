@@ -2,6 +2,14 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.35 — Skills store: nascondi skill già installate
+
+### Bug fixes / UX
+- **Store non mostra le skill già installate**: le skill installate senza aggiornamenti vengono rimosse dalla lista store per evitare duplicati; compaiono solo nello store se è disponibile un aggiornamento (con pulsante "⬆ Aggiorna")
+- Se tutte le skill dello store sono già installate e aggiornate, lo store mostra "Nessuna skill disponibile"
+
+---
+
 ## 4.6.34 — Skills update detection + banner notifica
 
 ### Nuove funzionalità

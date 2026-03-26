@@ -8101,28 +8101,35 @@ def get_chat_ui():
                 }} else if (store.length === 0) {{
                     html += '<div style="color:#999;font-size:12px;">' + (T.skills_store_empty||'No skills available.') + '</div>';
                 }} else {{
-                    store.forEach(s => {{
-                        const isInst   = instNames.has(s.name);
-                        const hasUpd   = isInst && _semverGt(s.version || '0', instVersionMap.get(s.name) || '0');
-                        const actionEl = hasUpd
-                            ? `<button class="sak-inst-btn" data-name="${{s.name}}" data-url="${{s.raw_url||''}}" style="background:#ff9800;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">⬆ ${{T.skills_update_btn||'Update'}}</button>`
-                            : isInst
-                                ? `<span style="background:#d1fae5;color:#065f46;border-radius:5px;padding:3px 9px;font-size:11px;">${{T.skills_installed_badge||'Installed'}}</span>`
-                                : `<button class="sak-inst-btn" data-name="${{s.name}}" data-url="${{s.raw_url||''}}" style="background:#4caf50;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">${{T.skills_install_btn||'Install'}}</button>`;
-                        html += `<div style="background:#fafafa;border:1px solid ${{hasUpd?'#ffe082':'#e8e8e8'}};border-radius:8px;padding:9px 11px;margin-bottom:7px;">
-                            <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
-                                <div>
-                                    <span style="font-weight:600;font-size:13px;">/${{s.name}}</span>
-                                    <span style="font-size:11px;color:#888;margin-left:6px;">v${{s.version||''}}</span>
-                                    ${{hasUpd ? `<span style="font-size:10px;color:#e65100;margin-left:4px;">(v${{instVersionMap.get(s.name)}} → v${{s.version}})</span>` : ''}}
-                                    ${{s.author ? '<span style="font-size:11px;color:#aaa;margin-left:4px;">' + (T.skills_by||'by') + ' ' + s.author + '</span>' : ''}}
-                                </div>
-                                ${{actionEl}}
-                            </div>
-                            <div style="font-size:12px;color:#555;margin-top:4px;">${{_sdesc(s)}}</div>
-                            ${{(s.tags||[]).map(t=>`<span style="background:#e8f0fe;color:#1a73e8;border-radius:4px;padding:1px 5px;font-size:10px;margin-right:3px;">${{t}}</span>`).join('')}}
-                        </div>`;
+                    const storeVisible = store.filter(s => {{
+                        const isInst = instNames.has(s.name);
+                        const hasUpd = isInst && _semverGt(s.version || '0', instVersionMap.get(s.name) || '0');
+                        return !isInst || hasUpd;
                     }});
+                    if (storeVisible.length === 0) {{
+                        html += '<div style="color:#999;font-size:12px;">' + (T.skills_store_empty||'No new skills available.') + '</div>';
+                    }} else {{
+                        storeVisible.forEach(s => {{
+                            const isInst   = instNames.has(s.name);
+                            const hasUpd   = isInst && _semverGt(s.version || '0', instVersionMap.get(s.name) || '0');
+                            const actionEl = hasUpd
+                                ? `<button class="sak-inst-btn" data-name="${{s.name}}" data-url="${{s.raw_url||''}}" style="background:#ff9800;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">⬆ ${{T.skills_update_btn||'Update'}}</button>`
+                                : `<button class="sak-inst-btn" data-name="${{s.name}}" data-url="${{s.raw_url||''}}" style="background:#4caf50;color:#fff;border:none;border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;">${{T.skills_install_btn||'Install'}}</button>`;
+                            html += `<div style="background:#fafafa;border:1px solid ${{hasUpd?'#ffe082':'#e8e8e8'}};border-radius:8px;padding:9px 11px;margin-bottom:7px;">
+                                <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+                                    <div>
+                                        <span style="font-weight:600;font-size:13px;">/${{s.name}}</span>
+                                        <span style="font-size:11px;color:#888;margin-left:6px;">v${{s.version||''}}</span>
+                                        ${{hasUpd ? `<span style="font-size:10px;color:#e65100;margin-left:4px;">(v${{instVersionMap.get(s.name)}} → v${{s.version}})</span>` : ''}}
+                                        ${{s.author ? '<span style="font-size:11px;color:#aaa;margin-left:4px;">' + (T.skills_by||'by') + ' ' + s.author + '</span>' : ''}}
+                                    </div>
+                                    ${{actionEl}}
+                                </div>
+                                <div style="font-size:12px;color:#555;margin-top:4px;">${{_sdesc(s)}}</div>
+                                ${{(s.tags||[]).map(t=>`<span style="background:#e8f0fe;color:#1a73e8;border-radius:4px;padding:1px 5px;font-size:10px;margin-right:3px;">${{t}}</span>`).join('')}}
+                            </div>`;
+                        }});
+                    }}
                 }}
                 panel.innerHTML = html;
                 panel.querySelectorAll('.sak-del-btn').forEach(btn => {{
