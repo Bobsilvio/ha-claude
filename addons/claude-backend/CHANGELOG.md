@@ -2,6 +2,14 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.40 — Skill context persists for follow-up messages in a session
+
+### New feature
+- **Active skill re-injected on follow-up messages**: when a skill is activated via `/html-js-card` (or any skill command), the skill's SKILL.md instructions are automatically re-injected for every subsequent message in the same session — so the AI keeps following the skill rules (e.g. use `scripts:` not `<script src>`) even when the user replies with "si", "add a chart", etc. without repeating the slash command
+- Skill session is cleared on new chat / global reset
+
+---
+
 ## 4.6.39 — Remove entity picker UI from chat
 
 ### UX

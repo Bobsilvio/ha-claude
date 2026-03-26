@@ -1916,6 +1916,8 @@ _browser_console_errors: list = []
 session_last_intent: Dict[str, str] = {}
 # Last preview signature per session (to ensure update matches shown preview)
 session_last_preview: Dict[str, Dict[str, Any]] = {}
+# Active skill per session — re-injected on follow-up messages so the LLM keeps the skill context
+session_active_skill: Dict[str, str] = {}
 _PREVIEW_MATCH_TTL_SECONDS = 3600
 
 # Current session ID for thread-safe access in execute_tool (Flask sync workers)
@@ -3526,22 +3528,36 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         )
         intent_info["prompt"] = intent_info["prompt"] + voice_instruction
 
-    # Inject skill instructions into system prompt if message starts with /skill-name
+    # Inject skill instructions into system prompt.
+    # - If message starts with /skill-name: activate/update the skill for this session.
+    # - If no /command but a skill is already active for this session: re-inject it so
+    #   follow-up messages (e.g. "si", "add a chart") keep the full skill context.
     if SKILLS_AVAILABLE:
         _skill_name, _remaining = skills.parse_skill_command(user_message)
         if _skill_name:
+            # Explicit skill command — activate
             _enriched_prompt = skills.inject_skill_into_prompt(
                 _skill_name, intent_info.get("prompt") or ""
             )
             if _enriched_prompt is not None:
                 intent_info["prompt"] = _enriched_prompt
-                # Replace the user message with the remaining text (without /command prefix)
+                session_active_skill[session_id] = _skill_name
                 if _remaining:
                     user_message = _remaining
                 yield {"type": "status", "message": f"Skill: {_skill_name}"}
                 logger.info(f"Skill '{_skill_name}' injected into system prompt")
             else:
+                session_active_skill.pop(session_id, None)
                 yield {"type": "status", "message": tr("skill_not_found").format(name=_skill_name)}
+        elif session_id in session_active_skill:
+            # Follow-up message — re-inject the active skill silently
+            _active_skill = session_active_skill[session_id]
+            _enriched_prompt = skills.inject_skill_into_prompt(
+                _active_skill, intent_info.get("prompt") or ""
+            )
+            if _enriched_prompt is not None:
+                intent_info["prompt"] = _enriched_prompt
+                logger.info(f"Skill '{_active_skill}' re-injected for follow-up in session {session_id}")
 
     # Step 3: Save original message and build enriched version for API
     if image_data:
@@ -8202,6 +8218,7 @@ def clear_conversation():
     """Clear conversation history."""
     sid = (request.get_json() or {}).get("session_id", "default")
     conversations.pop(sid, None)
+    session_active_skill.pop(sid, None)
     return jsonify({"status": "cleared"}), 200
 
 
@@ -9232,6 +9249,7 @@ def api_uninstall_cleanup():
         read_only_sessions.clear()
         session_last_intent.clear()
         session_last_preview.clear()
+        session_active_skill.clear()
         removed.append("runtime_memory_state")
     except Exception as e:
         errors.append(f"runtime_state: {e}")
