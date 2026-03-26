@@ -3545,6 +3545,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 if _remaining:
                     user_message = _remaining
                 yield {"type": "status", "message": f"Skill: {_skill_name}"}
+                yield {"type": "skill_active", "name": _skill_name}
                 logger.info(f"Skill '{_skill_name}' injected into system prompt")
             else:
                 session_active_skill.pop(session_id, None)
@@ -3557,6 +3558,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             )
             if _enriched_prompt is not None:
                 intent_info["prompt"] = _enriched_prompt
+                yield {"type": "skill_active", "name": _active_skill}
                 logger.info(f"Skill '{_active_skill}' re-injected for follow-up in session {session_id}")
 
     # Step 3: Save original message and build enriched version for API

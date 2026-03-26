@@ -213,6 +213,7 @@ def get_chat_ui():
             "skills_update_banner": "Skill update available:",
             "skills_update_go": "Go to Skills",
             "skills_update_btn": "Update",
+            "skill_mode_hint": "Open a new chat to change topic",
             "skills_refresh": "Refresh",
             "skills_by": "by",
             "skills_requires_version": "Requires Amira v{version}",
@@ -556,6 +557,7 @@ def get_chat_ui():
             "skills_update_banner": "Aggiornamento skill disponibile:",
             "skills_update_go": "Vai alle Skill",
             "skills_update_btn": "Aggiorna",
+            "skill_mode_hint": "Apri una nuova chat per cambiare argomento",
             "skills_refresh": "Aggiorna",
             "skills_by": "di",
             "skills_requires_version": "Richiede Amira v{version}",
@@ -899,6 +901,7 @@ def get_chat_ui():
             "skills_update_banner": "Actualización de skill disponible:",
             "skills_update_go": "Ir a Skills",
             "skills_update_btn": "Actualizar",
+            "skill_mode_hint": "Abre un nuevo chat para cambiar de tema",
             "skills_refresh": "Actualizar",
             "skills_by": "por",
             "skills_requires_version": "Requiere Amira v{version}",
@@ -1240,6 +1243,7 @@ def get_chat_ui():
             "skills_update_banner": "Mise à jour de skill disponible :",
             "skills_update_go": "Aller aux Skills",
             "skills_update_btn": "Mettre à jour",
+            "skill_mode_hint": "Ouvre un nouveau chat pour changer de sujet",
             "skills_refresh": "Actualiser",
             "skills_by": "par",
             "skills_requires_version": "Nécessite Amira v{version}",
@@ -3375,6 +3379,12 @@ def get_chat_ui():
                 <span id="skillsUpdateText" style="flex:1;"></span>
                 <button id="skillsUpdateGoBtn" onclick="switchSidebarTab('skills')" style="background:#ff9800;color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">{ui_js.get('skills_update_go','Vai alle Skill')}</button>
                 <button onclick="document.getElementById('skillsUpdateBanner').style.display='none'" style="background:none;border:none;font-size:15px;cursor:pointer;color:#888;line-height:1;">&#x2715;</button>
+            </div>
+            <div id="skillActiveBanner" style="display:none;align-items:center;gap:8px;background:#ede7f6;border-bottom:1px solid #ce93d8;padding:6px 14px;font-size:12px;color:#4a148c;flex-shrink:0;">
+                <span style="font-size:14px;">🧩</span>
+                <span id="skillActiveName" style="flex:1;font-weight:600;"></span>
+                <span style="opacity:0.7;font-size:11px;">{ui_js.get('skill_mode_hint','Apri una nuova chat per cambiare argomento')}</span>
+                <button onclick="newChat()" style="background:#7b1fa2;color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">{ui_js.get('new_chat','Nuova chat')}</button>
             </div>
             <div class="chat-container" id="chat">
         <div class="message system">
@@ -7821,6 +7831,13 @@ def get_chat_ui():
                                     ? ('<div class="progress-steps">' + renderStepLines(pendingSteps) + '</div>')
                                     : '';
                                 div.innerHTML = prefix + formatMarkdown(fullText);
+                            }} else if (evt.type === 'skill_active') {{
+                                const banner = document.getElementById('skillActiveBanner');
+                                const nameEl = document.getElementById('skillActiveName');
+                                if (banner && nameEl && evt.name) {{
+                                    nameEl.textContent = '🧩 Skill: ' + evt.name;
+                                    banner.style.display = 'flex';
+                                }}
                             }} else if (evt.type === 'error') {{
                                 removeThinking();
                                 addMessage('\u274c ' + evt.message, 'system');
@@ -8867,6 +8884,9 @@ def get_chat_ui():
             currentSessionId = Date.now().toString();
             safeLocalStorageSet('currentSessionId', currentSessionId);
             resetConversationUsage();
+            // Hide skill active banner — new session has no active skill
+            const _skillBanner = document.getElementById('skillActiveBanner');
+            if (_skillBanner) _skillBanner.style.display = 'none';
             chat.innerHTML = `<div class="message system">
                 {msgs['welcome']}<br>
                 ${{getProviderModelLine()}}<br>

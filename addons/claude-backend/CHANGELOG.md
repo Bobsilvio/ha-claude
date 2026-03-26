@@ -2,6 +2,15 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.41 — Skill active banner in chat
+
+### New feature
+- **Skill mode banner**: when a skill is active (e.g. `/html-js-card`), a purple banner appears at the top of the chat showing "🧩 Skill: html-js-card" with a hint to open a new chat to change topic, and a "New chat" button
+- Banner is shown on skill activation and on every follow-up message where the skill is re-injected
+- Banner disappears automatically on new chat
+
+---
+
 ## 4.6.40 — Skill context persists for follow-up messages in a session
 
 ### New feature
