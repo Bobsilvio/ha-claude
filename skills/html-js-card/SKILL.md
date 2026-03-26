@@ -1,6 +1,6 @@
 ---
 name: html-js-card
-version: 1.3.0
+version: 1.4.0
 description:
   en: "Expert assistant for HTML-JS Card — custom Home Assistant Lovelace cards with HTML, CSS and JavaScript"
   it: "Assistente esperto per HTML-JS Card — card Lovelace personalizzate con HTML, CSS e JavaScript"
@@ -240,11 +240,84 @@ content: |
   </script>
 ```
 
+## Graphics and visualization support
+
+HTML-JS Card supports all standard web graphics techniques:
+
+| Technique | How to use | Best for |
+|-----------|-----------|---------|
+| **Inline SVG** | directly in `content:` | static/animated diagrams, flow charts, gauges, icons |
+| **Animated SVG** | CSS `@keyframes` or `<animate>` tags | live indicators, spinning icons, progress arcs |
+| **Chart.js** | `scripts:` CDN | line, bar, doughnut, radar charts |
+| **D3.js** | `scripts:` CDN | complex data-driven SVG, hierarchical diagrams |
+| **ApexCharts** | `scripts:` CDN | interactive charts with zoom/tooltip |
+| **Mermaid** | `scripts:` CDN | flow charts, sequence diagrams, Gantt |
+
+### Inline SVG example: animated power flow arc
+
+```yaml
+type: custom:html-js-card
+height: 160px
+entities:
+  - sensor.epcube_solarpower
+content: |
+  <style>
+    #arc-label { font-size: 22px; font-weight: 700; fill: var(--primary-text-color); }
+    #arc-sub   { font-size: 12px; fill: var(--secondary-text-color); }
+    #arc-track { stroke: var(--divider-color); }
+    #arc-fill  { stroke: var(--success-color); transition: stroke-dashoffset .4s ease; }
+  </style>
+  <svg viewBox="0 0 120 80" width="100%" style="max-height:140px;display:block;margin:auto;">
+    <!-- background arc -->
+    <path id="arc-track" d="M15,75 A55,55 0 0,1 105,75"
+          fill="none" stroke-width="10" stroke-linecap="round"/>
+    <!-- value arc (dasharray=172.8 = half circumference of r=55) -->
+    <path id="arc-fill" d="M15,75 A55,55 0 0,1 105,75"
+          fill="none" stroke-width="10" stroke-linecap="round"
+          stroke-dasharray="172.8" stroke-dashoffset="172.8"/>
+    <text id="arc-label" x="60" y="68" text-anchor="middle">—</text>
+    <text id="arc-sub"   x="60" y="80" text-anchor="middle">W solare</text>
+  </svg>
+  <script>
+    function updateCard(ents) {
+      const val = parseFloat(ents['sensor.epcube_solarpower']?.state);
+      const max = 5000; // adjust to inverter peak
+      card.querySelector('#arc-label').textContent = isFinite(val) ? Math.round(val) : '—';
+      const pct = isFinite(val) ? Math.max(0, Math.min(1, val / max)) : 0;
+      card.querySelector('#arc-fill').style.strokeDashoffset = 172.8 * (1 - pct);
+    }
+    updateCard(entities);
+    card.addEventListener('hass-update', e => updateCard(e.detail.entities));
+  </script>
+```
+
+### Mermaid flow chart example
+
+```yaml
+type: custom:html-js-card
+height: 300px
+scripts:
+  - https://cdnjs.cloudflare.com/ajax/libs/mermaid/10.9.1/mermaid.min.js
+content: |
+  <div id="diagram" style="width:100%;overflow:auto;"></div>
+  <script>
+    mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+    const def = `flowchart LR
+      Solar([☀️ Solare]) --> Battery[(🔋 Batteria)]
+      Solar --> House([🏠 Casa])
+      Battery --> House
+      Grid([⚡ Rete]) --> House`;
+    mermaid.render('mmd', def).then(({ svg }) => {
+      card.querySelector('#diagram').innerHTML = svg;
+    });
+  </script>
+```
+
 ## Rules when generating HTML-JS Card YAML
 
 1. ALWAYS use `type: custom:html-js-card`.
 2. List in `entities:` ONLY the entities needed — these become available in the `entities` variable.
-3. For external libraries (Chart.js, D3, etc.) use `scripts:` — they load once and are deduplicated.
+3. For external libraries (Chart.js, D3, ApexCharts, Mermaid, etc.) use `scripts:` — they load once and are deduplicated.
 4. Always save `window._hjc_hass = hass` if click handlers or async callbacks need to call services.
 5. Always listen to `hass-update` for reactive updates — do NOT use `setInterval` to poll HA state.
 6. Use HA CSS variables (`var(--primary-color)`, etc.) for proper dark/light mode support.
@@ -253,6 +326,9 @@ content: |
 9. Use only entity IDs provided in the DATA/CONTEXT block injected into the message — never invent or guess entity IDs. If no entity data is available, ask the user to specify them.
 10. If the user wants a chart, use Chart.js via CDN unless they specify another library.
 11. ALWAYS use `card.querySelector('#id')` to access DOM elements — NEVER `document.getElementById`.
+12. For energy flow diagrams, animated gauges, or custom shapes: prefer inline SVG — no external library needed.
+13. For flow charts and diagrams: use Mermaid.js via `scripts:`.
+14. For D3.js: use `https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js` via `scripts:`.
 
 ## ❌ NEVER do this (common mistakes that break the card)
 
