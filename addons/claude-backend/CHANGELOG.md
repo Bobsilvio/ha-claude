@@ -2,6 +2,13 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.45 — Skill mode: skip tool simulator in all web providers
+
+### Improvement
+- All web providers (`chatgpt_web`, `gemini_web`, `grok_web`, `perplexity_web`) now skip the tool simulator system prompt when a skill is active — same fix applied in 4.6.44 for `claude_web`. Only SKILL.md instructions are sent, reducing token waste and removing conflicting context.
+
+---
+
 ## 4.6.44 — Skill mode: skip tool schemas to save tokens
 
 ### Improvement

@@ -869,7 +869,10 @@ class GrokWebProvider(EnhancedProvider):
             tool_schemas = (intent_info or {}).get("tool_schemas") or []
             intent_base_prompt = (intent_info or {}).get("prompt", "")
             sim_prompt = get_simulator_system_prompt(tool_schemas)
-            if intent_name_local == "create_html_dashboard":
+            if (intent_info or {}).get("active_skill"):
+                # Skill mode: only SKILL.md instructions needed — no tool simulator.
+                prepend = (intent_base_prompt.strip() + "\n\n") if intent_base_prompt else ""
+            elif intent_name_local == "create_html_dashboard":
                 prepend = (
                     (intent_base_prompt.strip() + "\n\n") if intent_base_prompt else ""
                 ) + (

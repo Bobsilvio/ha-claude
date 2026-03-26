@@ -315,7 +315,10 @@ class PerplexityWebProvider(EnhancedProvider):
             intent_base_prompt = (intent_info or {}).get("prompt", "")
             from providers.tool_simulator import get_simulator_system_prompt
             sim_prompt = get_simulator_system_prompt(tool_schemas)
-            if intent_name_local == "create_html_dashboard":
+            if (intent_info or {}).get("active_skill"):
+                # Skill mode: only SKILL.md instructions needed — no tool simulator.
+                prepend = (intent_base_prompt.strip() + "\n\n") if intent_base_prompt else ""
+            elif intent_name_local == "create_html_dashboard":
                 # Keep HTML flow raw text in this provider (auto-save handled in api.py).
                 prepend = (
                     (intent_base_prompt.strip() + "\n\n") if intent_base_prompt else ""

@@ -802,10 +802,14 @@ class GeminiWebProvider(EnhancedProvider):
         tool_schemas      = (intent_info or {}).get("tool_schemas") or []
         intent_base_prompt = (intent_info or {}).get("prompt", "")
 
-        sim_prompt = get_simulator_system_prompt(tool_schemas)
-        combined_system = sim_prompt
-        if intent_base_prompt:
-            combined_system = intent_base_prompt + "\n\n" + combined_system
+        if (intent_info or {}).get("active_skill"):
+            # Skill mode: only SKILL.md instructions needed — no tool simulator.
+            combined_system = intent_base_prompt or ""
+        else:
+            sim_prompt = get_simulator_system_prompt(tool_schemas)
+            combined_system = sim_prompt
+            if intent_base_prompt:
+                combined_system = intent_base_prompt + "\n\n" + combined_system
         if system_prompt:
             combined_system = combined_system + "\n\n" + system_prompt
 
