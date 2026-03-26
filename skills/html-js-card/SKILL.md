@@ -1,6 +1,6 @@
 ---
 name: html-js-card
-version: 1.2.0
+version: 1.3.0
 description:
   en: "Expert assistant for HTML-JS Card — custom Home Assistant Lovelace cards with HTML, CSS and JavaScript"
   it: "Assistente esperto per HTML-JS Card — card Lovelace personalizzate con HTML, CSS e JavaScript"
@@ -43,16 +43,30 @@ The `content` field is **required**. All other fields are optional.
 
 ## Runtime variables
 
-These five variables are always available inside `content` scripts:
+These variables are always available inside `content` scripts:
 
 | Variable | Type | Description |
 |----------|------|-------------|
 | `hass` | Object | Full Home Assistant instance. Read states, call services. |
 | `entities` | Object | Dictionary of declared entity states, keyed by entity_id. |
-| `card` | HTMLElement | The `#hjc-content` DOM container. Use for `innerHTML`, `querySelector`, `appendChild`. |
+| `card` | HTMLElement | The `#hjc-content` DOM container. Use for `querySelector`, `innerHTML`, `appendChild`. |
 | `config` | Object | The YAML card configuration object. |
 | `shadow` | ShadowRoot | Shadow DOM root of the card. |
 | `moreInfo(entity_id)` | Function | Opens the HA "more info" dialog for an entity. |
+
+## Accessing DOM elements
+
+The card uses **shadow DOM**, so `document.getElementById` cannot find elements inside the card.
+**Always use `card.querySelector('#id')`** to access elements by ID.
+
+```javascript
+// ✅ CORRECT — use card.querySelector
+const el = card.querySelector('#my-element');
+el.textContent = 'Hello';
+
+// ❌ WRONG — document.getElementById returns null inside shadow DOM
+const el = document.getElementById('my-element'); // always null!
+```
 
 ## Reading entity states
 
@@ -96,7 +110,7 @@ The card fires a `hass-update` event whenever entity states change or `update_in
 card.addEventListener('hass-update', (e) => {
   const { hass, entities } = e.detail;
   // update the UI with fresh data
-  document.getElementById('value').textContent = entities['sensor.temperature']?.state || '—';
+  card.querySelector('#value').textContent = entities['sensor.temperature']?.state || '—';
 });
 ```
 
@@ -110,7 +124,7 @@ window._hjc_hass = hass;
 card.addEventListener('hass-update', (e) => { window._hjc_hass = e.detail.hass; });
 
 // Use inside click handlers
-document.getElementById('btn').addEventListener('click', () => {
+card.querySelector('#btn').addEventListener('click', () => {
   window._hjc_hass.callService('light', 'toggle', { entity_id: 'light.living_room' });
 });
 ```
@@ -165,28 +179,22 @@ content: |
   <script>
     window._hjc_hass = hass;
 
-    card.addEventListener('hass-update', (e) => {
-      window._hjc_hass = e.detail.hass;
-      const { entities } = e.detail;
-      document.getElementById('temp').textContent =
-        (entities['sensor.temperature']?.state || '—') + ' °C';
-      document.getElementById('light-state').textContent =
-        entities['light.living_room']?.state || '—';
-    });
+    function updateCard(ents) {
+      card.querySelector('#temp').textContent =
+        (ents['sensor.temperature']?.state || '—') + ' °C';
+      card.querySelector('#light-state').textContent =
+        ents['light.living_room']?.state || '—';
+    }
 
-    document.getElementById('toggle-btn').addEventListener('click', () => {
+    card.querySelector('#toggle-btn').addEventListener('click', () => {
       window._hjc_hass.callService('light', 'toggle', { entity_id: 'light.living_room' });
     });
 
-    // Initial render
-    if (entities['sensor.temperature']) {
-      document.getElementById('temp').textContent =
-        entities['sensor.temperature'].state + ' °C';
-    }
-    if (entities['light.living_room']) {
-      document.getElementById('light-state').textContent =
-        entities['light.living_room'].state;
-    }
+    updateCard(entities); // initial render
+    card.addEventListener('hass-update', (e) => {
+      window._hjc_hass = e.detail.hass;
+      updateCard(e.detail.entities);
+    });
   </script>
 ```
 
@@ -213,7 +221,7 @@ content: |
       if (history.length > 20) history.shift();
 
       if (!chart) {
-        const ctx = document.getElementById('chart').getContext('2d');
+        const ctx = card.querySelector('#chart').getContext('2d');
         chart = new Chart(ctx, {
           type: 'line',
           data: {
@@ -244,8 +252,23 @@ content: |
 8. Always show the complete YAML in a ```yaml code block.
 9. Use only entity IDs provided in the DATA/CONTEXT block injected into the message — never invent or guess entity IDs. If no entity data is available, ask the user to specify them.
 10. If the user wants a chart, use Chart.js via CDN unless they specify another library.
+11. ALWAYS use `card.querySelector('#id')` to access DOM elements — NEVER `document.getElementById`.
 
 ## ❌ NEVER do this (common mistakes that break the card)
+
+### Wrong: `document.getElementById` inside shadow DOM
+```javascript
+// ❌ WRONG — document.getElementById returns null inside the card (shadow DOM)
+document.getElementById('solar').textContent = '…';
+document.getElementById('btn').addEventListener('click', () => { … });
+const ctx = document.getElementById('chart').getContext('2d');
+```
+```javascript
+// ✅ CORRECT — use card.querySelector('#id')
+card.querySelector('#solar').textContent = '…';
+card.querySelector('#btn').addEventListener('click', () => { … });
+const ctx = card.querySelector('#chart').getContext('2d');
+```
 
 ### Wrong: `states` variable does not exist
 ```javascript

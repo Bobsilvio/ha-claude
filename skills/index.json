@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "updated": "2026-03-25",
+  "updated": "2026-03-26",
   "skills": [
     {
       "name": "mushroom",
@@ -20,7 +20,7 @@
     ,
     {
       "name": "html-js-card",
-      "version": "1.2.0",
+      "version": "1.3.0",
       "description": {
         "en": "Expert assistant for HTML-JS Card — custom Lovelace cards with HTML, CSS and JavaScript",
         "it": "Assistente esperto per HTML-JS Card — card Lovelace personalizzate con HTML, CSS e JavaScript",
