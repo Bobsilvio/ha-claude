@@ -3373,7 +3373,7 @@ def get_chat_ui():
             <div id="skillsUpdateBanner" style="display:none;align-items:center;gap:8px;background:#fff8e1;border-bottom:1px solid #ffe082;padding:7px 14px;font-size:12px;color:#5d4037;flex-shrink:0;">
                 <span style="font-size:15px;">🔔</span>
                 <span id="skillsUpdateText" style="flex:1;"></span>
-                <button id="skillsUpdateGoBtn" onclick="document.getElementById('settingsBtn').click();setTimeout(()=>{{document.querySelectorAll('.settings-tab[data-tab]').forEach(t=>{{if(t.dataset.tab==='skills')t.click()}});}},200)" style="background:#ff9800;color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">{ui_js.get('skills_update_go','Vai alle Skill')}</button>
+                <button id="skillsUpdateGoBtn" onclick="switchSidebarTab('skills')" style="background:#ff9800;color:#fff;border:none;border-radius:5px;padding:3px 10px;font-size:11px;cursor:pointer;white-space:nowrap;">{ui_js.get('skills_update_go','Vai alle Skill')}</button>
                 <button onclick="document.getElementById('skillsUpdateBanner').style.display='none'" style="background:none;border:none;font-size:15px;cursor:pointer;color:#888;line-height:1;">&#x2715;</button>
             </div>
             <div class="chat-container" id="chat">
