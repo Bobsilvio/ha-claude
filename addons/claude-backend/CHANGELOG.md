@@ -2,6 +2,18 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.48 — Skill YAML auto-repair for weak-format outputs (e.g. NVIDIA)
+
+### Bug fix
+- **One-shot skill YAML repair retry**: when a skill is active and the model returns missing/malformed card YAML (or wrong card type), Amira now performs one automatic repair round instead of returning broken output.
+- Validation checks include:
+  - presence of a fenced ` ```yaml ... ``` ` block,
+  - YAML parse validity,
+  - skill-specific card type constraints (`custom:mushroom-*` for mushroom, exact `custom:html-js-card` for html-js-card).
+- This improves reliability with weaker formatting models (notably some NVIDIA models) that may merge lines or ignore fence/type constraints.
+
+---
+
 ## 4.6.47 — No-tool auto-continue on truncated outputs (`max_tokens`/`length`)
 
 ### Bug fix

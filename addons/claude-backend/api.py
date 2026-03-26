@@ -3883,6 +3883,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         _deferred_done_event = None      # postpone done for HTML autosave flows
         _skip_tool_extraction = False    # after dedup, skip ToolSimulator next round
         _no_tool_continuation_used = False  # one-shot continuation for max_tokens truncation
+        _skill_yaml_repair_used = False  # one-shot format repair for skill card YAML
         _last_write_result = None        # last WRITE tool result (for fallback display)
         _last_success_read_tool = None   # last successful read tool snapshot for loop fallback
         _preview_round_done = False      # True after preview_automation_change executes
@@ -4441,6 +4442,68 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                         else:
                             logger.debug(f"⚠️ Done event without usage: finish_reason={event.get('finish_reason')}")
                         if not _pending_tool_calls:
+                            # Skill-mode YAML guardrail (one-shot):
+                            # weaker models may ignore fenced YAML or emit malformed card YAML.
+                            _active_skill = (intent_info or {}).get("active_skill")
+                            if _active_skill and not _skill_yaml_repair_used:
+                                _assembled_skill = "".join(_streamed_text_parts).strip()
+                                _needs_skill_repair = False
+                                try:
+                                    import re as _re_skill_yaml
+                                    import yaml as _yaml_skill
+                                    _m_skill_yaml = _re_skill_yaml.search(
+                                        r"```yaml\s*([\s\S]*?)```",
+                                        _assembled_skill,
+                                        _re_skill_yaml.IGNORECASE,
+                                    )
+                                    _yaml_text = (_m_skill_yaml.group(1).strip() if _m_skill_yaml else "")
+                                    if not _yaml_text:
+                                        _needs_skill_repair = True
+                                    else:
+                                        _parsed = _yaml_skill.safe_load(_yaml_text)
+                                        if not isinstance(_parsed, dict):
+                                            _needs_skill_repair = True
+                                        else:
+                                            _tval = str(_parsed.get("type", "") or "").strip().lower()
+                                            if _active_skill == "mushroom":
+                                                if not _tval.startswith("custom:mushroom-"):
+                                                    _needs_skill_repair = True
+                                            elif _active_skill == "html-js-card":
+                                                if _tval != "custom:html-js-card":
+                                                    _needs_skill_repair = True
+                                except Exception:
+                                    _needs_skill_repair = True
+
+                                if _needs_skill_repair:
+                                    _skill_yaml_repair_used = True
+                                    _repair_prompt = (
+                                        "[SKILL FORMAT REPAIR]\n"
+                                        f"Your previous output for skill '{_active_skill}' was not valid/usable YAML.\n"
+                                        "Regenerate from scratch and output ONLY one valid Lovelace YAML block.\n"
+                                        "- MUST be wrapped in ```yaml ... ``` fences.\n"
+                                        "- Do NOT add explanations before or after the code block.\n"
+                                        "- Use only entity_ids from CONTEXT/DATA.\n"
+                                    )
+                                    if _active_skill == "mushroom":
+                                        _repair_prompt += "- Card type MUST start with: type: custom:mushroom-\n"
+                                    if _active_skill == "html-js-card":
+                                        _repair_prompt += "- Card type MUST be exactly: type: custom:html-js-card\n"
+                                    if _assembled_skill:
+                                        messages.append({"role": "assistant", "content": _assembled_skill})
+                                    messages.append({"role": "user", "content": _repair_prompt})
+                                    _streamed_text_parts = []
+                                    logger.warning(
+                                        f"Skill YAML repair retry triggered for skill='{_active_skill}'"
+                                    )
+                                    yield {
+                                        "type": "status",
+                                        "message": tr(
+                                            "status_skill_format_repair",
+                                            "⚠️ Fixing card format automatically...",
+                                        ),
+                                    }
+                                    continue
+
                             # Validate entity IDs before emitting "done"
                             try:
                                 _assembled_for_check = "".join(_streamed_text_parts).strip()
