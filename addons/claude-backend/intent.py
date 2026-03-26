@@ -677,6 +677,15 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
                 "prompt": INTENT_PROMPTS["manage_statistics"], "specific_target": False}
 
     # --- LLM-FIRST: all other requests get ALL tools + unified guidance ---
+    # --- SKILL COMMAND --- /skill-name: route to chat (no tools needed, just generate code/text)
+    # The skill documentation is injected into the system prompt by api.py.
+    # Using 'auto' with 53 tools causes no-tool providers (Codex, web sessions) to trigger
+    # the safety warning when they respond with code text instead of tool calls.
+    if _is_skill_cmd:
+        logger.info("Skill command detected — routing to chat intent (no tools)")
+        return {"intent": "chat", "tools": INTENT_TOOL_SETS["chat"],
+                "prompt": INTENT_PROMPTS["chat"], "specific_target": False}
+
     # The LLM sees every available tool and decides autonomously what to call.
     # No keyword-based intent routing — the model chooses the right tools natively.
     logger.info("LLM-first mode — all tools available, LLM decides autonomously")
