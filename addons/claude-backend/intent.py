@@ -628,6 +628,9 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
     # Already handled above with high priority, before follow-up continuity.
 
     # --- HTML DASHBOARD CREATION/MODIFICATION (kept for specialized prompt) ---
+    # Skip if message starts with a skill command (/skill-name ...) — the skill name
+    # itself may contain keywords like "html" that would falsely trigger this routing.
+    _is_skill_cmd = bool(re.match(r"^/[a-z][a-z0-9_-]+", msg))
     # The create_html_dashboard prompt is very specific (~100 lines of CSS/JS/Vue guidance)
     # so we keep keyword detection for it rather than relying on the LLM alone.
     html_keywords = ["html", "vue", "javascript", "js", "react", "svelte",
@@ -656,7 +659,7 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
                     has_dash = True
         except Exception:
             pass
-    if has_html_kw or has_html_ref or (has_dash and has_html_kw):
+    if not _is_skill_cmd and (has_html_kw or has_html_ref or (has_dash and has_html_kw)):
         logger.info("HTML dashboard keywords detected — routing to create_html_dashboard")
         return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
                 "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
