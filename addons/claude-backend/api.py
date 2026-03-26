@@ -3814,6 +3814,13 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             except Exception as _mcp_inject_err:
                 logger.warning(f"MCP tool schema injection failed: {_mcp_inject_err}")
 
+            # When a skill is active the model only needs to generate content (YAML cards,
+            # HTML, etc.) — HA control tools are irrelevant and waste tokens.
+            if intent_info.get("active_skill"):
+                intent_info["tool_schemas"] = []
+                intent_info["tools"] = []
+                logger.debug(f"Skill '{intent_info['active_skill']}' active — tool_schemas cleared")
+
             # MCP guidance boost (generic): keep full toolset, but add a strict
             # instruction when the user clearly asks for external data/actions
             # typically served by MCP servers (DB/filesystem/repo/etc.).

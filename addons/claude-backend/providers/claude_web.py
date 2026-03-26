@@ -268,15 +268,19 @@ class ClaudeWebProvider(EnhancedProvider):
             system_prompt = no_tool_html + ("\n\n" + system_prompt if system_prompt else "")
 
         else:
-            # ── Universal Tool Simulator for all other intents ──────────────────────
-            from providers.tool_simulator import get_simulator_system_prompt
-            sim_prompt = get_simulator_system_prompt(tool_schemas)
-
             intent_base_prompt = (intent_info or {}).get("prompt", "")
 
-            combined = sim_prompt
-            if intent_base_prompt:
-                combined = intent_base_prompt + "\n\n" + combined
+            if (intent_info or {}).get("active_skill"):
+                # Skill mode: only the SKILL.md instructions are needed — no tool simulator.
+                combined = intent_base_prompt or ""
+            else:
+                # ── Universal Tool Simulator for all other intents ──────────────────────
+                from providers.tool_simulator import get_simulator_system_prompt
+                sim_prompt = get_simulator_system_prompt(tool_schemas)
+                combined = sim_prompt
+                if intent_base_prompt:
+                    combined = intent_base_prompt + "\n\n" + combined
+
             system_prompt = combined + ("\n\n" + system_prompt if system_prompt else "")
 
         # ── Anti-artifact header — prepended FIRST so it overrides claude.ai training ─

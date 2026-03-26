@@ -2,6 +2,14 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.44 — Skill mode: skip tool schemas to save tokens
+
+### Improvement
+- When a skill is active (e.g. `/html-js-card`), all HA tool schemas are cleared (`tool_schemas = []`) before sending to any provider — the model only needs to generate content (YAML, HTML), not control devices.
+- `claude_web` provider: also skips the tool simulator system prompt entirely in skill mode — further reducing token usage and removing conflicting context.
+
+---
+
 ## 4.6.43 — Fix: skill card type ignored when using claude_web provider
 
 ### Bug fix
