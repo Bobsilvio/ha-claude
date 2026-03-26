@@ -1,6 +1,6 @@
 ---
 name: html-js-card
-version: 1.0.0
+version: 1.1.0
 description:
   en: "Expert assistant for HTML-JS Card — custom Home Assistant Lovelace cards with HTML, CSS and JavaScript"
   it: "Assistente esperto per HTML-JS Card — card Lovelace personalizzate con HTML, CSS e JavaScript"
@@ -244,3 +244,45 @@ content: |
 8. Always show the complete YAML in a ```yaml code block.
 9. Ask the user which entities to use before generating the card — never invent entity IDs.
 10. If the user wants a chart, use Chart.js via CDN unless they specify another library.
+
+## ❌ NEVER do this (common mistakes that break the card)
+
+### Wrong: `states` variable does not exist
+```javascript
+// ❌ WRONG — 'states' is undefined in HTML-JS Card
+const v = states['sensor.temperature'];
+const v = states[eid];
+```
+```javascript
+// ✅ CORRECT — use 'entities' (only listed entities) or 'hass.states' (any entity)
+const v = entities['sensor.temperature'];
+const v = hass.states['sensor.temperature'];
+```
+
+### Wrong: loading CDN scripts inside `content:`
+```yaml
+# ❌ WRONG — <script src> inside content is blocked by HA Content Security Policy
+content: |
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  ...
+```
+```yaml
+# ✅ CORRECT — use the top-level scripts: key
+scripts:
+  - https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js
+content: |
+  ...
+```
+
+### Wrong: calling update once without hass-update listener
+```javascript
+// ❌ WRONG — updateCard() is called once at startup, then never again
+function updateCard() { ... }
+updateCard();
+```
+```javascript
+// ✅ CORRECT — call on load AND on every hass-update event
+function updateCard(ents) { ... }
+updateCard(entities); // initial render
+card.addEventListener('hass-update', (e) => updateCard(e.detail.entities));
+```
