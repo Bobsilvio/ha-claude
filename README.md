@@ -64,7 +64,7 @@ Supports **23+ AI providers** and **60+ models**: Anthropic Claude, OpenAI, Goog
 
 ## Video Guide Ita
 
-[![Watch the demo](https://img.youtube.com/vi/p2h9s-42g1U/hqdefault.jpg)](https://youtu.be/p2h9s-42g1U)
+[![Watch the demo](https://img.youtube.com/vi/p2h9s-42g1U/hqdefault.jpg)]([https://youtu.be/p2h9s-42g1U](https://youtu.be/Vh7OqmvVLWY))
 
 Click the image to watch the video on YouTube.
 
