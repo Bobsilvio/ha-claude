@@ -89,7 +89,7 @@ LANGUAGE_TEXT = {
         "warn_no_tool_called": "⚠️ The model described a change but did not actually apply it. Nothing was modified in Home Assistant. Please try again.",
         "warn_no_tool_called_with_guidance": "⚠️ Action NOT executed: this provider replied in text without calling Home Assistant tools. No changes were applied. Try a provider with tool-calling support or confirm guided execution.",
 
-        "strict_language_lock": "LANGUAGE LOCK (CRITICAL): Reply only in English by default. Do not switch to another language unless the user explicitly asks you to change language.",
+        "strict_language_lock": "Reply in English by default. If the user writes in a different language, respond in their language.",
         "err_github_copilot_model_incompatible": "GitHub Copilot: selected model is not compatible with the chat endpoint. Choose a chat-compatible model (e.g. gpt-4.1, gpt-4o, gpt-5.1).",
         "err_unknown_error": "Unknown error",
         "skill_not_found": "⚠️ Skill '/{name}' not found. Install it from Settings → Skills.",
@@ -237,7 +237,7 @@ LANGUAGE_TEXT = {
         "warn_no_tool_called": "⚠️ Il modello ha descritto una modifica ma non l'ha eseguita. Nessuna modifica è stata applicata a Home Assistant. Riprova.",
         "warn_no_tool_called_with_guidance": "⚠️ Azione NON eseguita: questo provider ha risposto in testo senza chiamare i tool di Home Assistant. Nessuna modifica è stata applicata. Prova un provider con supporto tool-calling oppure conferma l'esecuzione guidata.",
 
-        "strict_language_lock": "BLOCCO LINGUA (CRITICO): Rispondi solo in Italiano per impostazione predefinita. Non cambiare lingua a meno che l'utente non lo richieda esplicitamente.",
+        "strict_language_lock": "Rispondi in Italiano per impostazione predefinita. Se l'utente scrive in un'altra lingua, rispondi nella sua lingua.",
         "err_github_copilot_model_incompatible": "GitHub Copilot: il modello selezionato non è compatibile con l'endpoint chat. Seleziona un modello chat-compatible (es. gpt-4.1, gpt-4o, gpt-5.1).",
         "err_unknown_error": "Errore sconosciuto",
         "skill_not_found": "⚠️ Skill '/{name}' non trovata. Installala da Impostazioni → Skill.",
@@ -384,7 +384,7 @@ LANGUAGE_TEXT = {
         "warn_no_tool_called": "⚠️ El modelo describió un cambio pero no lo aplicó. No se modificó nada en Home Assistant. Inténtalo de nuevo.",
         "warn_no_tool_called_with_guidance": "⚠️ Acción NO ejecutada: este proveedor respondió en texto sin llamar a las herramientas de Home Assistant. No se aplicó ningún cambio. Prueba un proveedor con soporte de tool-calling o confirma la ejecución guiada.",
 
-        "strict_language_lock": "BLOQUEO DE IDIOMA (CRÍTICO): Responde solo en Español por defecto. No cambies de idioma a menos que el usuario lo pida explícitamente.",
+        "strict_language_lock": "Responde en Español por defecto. Si el usuario escribe en otro idioma, responde en su idioma.",
         "err_http_402": "❌ Saldo insuficiente. Recarga tu crédito en el sitio del proveedor o cambia a otro proveedor.",
         "err_github_copilot_model_incompatible": "GitHub Copilot: el modelo seleccionado no es compatible con el endpoint de chat. Elige un modelo compatible (ej. gpt-4.1, gpt-4o, gpt-5.1).",
         "err_unknown_error": "Error desconocido",
@@ -532,7 +532,7 @@ LANGUAGE_TEXT = {
         "warn_no_tool_called": "⚠️ Le modèle a décrit une modification mais ne l'a pas exécutée. Rien n'a été modifié dans Home Assistant. Réessaie.",
         "warn_no_tool_called_with_guidance": "⚠️ Action NON exécutée : ce fournisseur a répondu en texte sans appeler les outils Home Assistant. Aucune modification n'a été appliquée. Essaie un fournisseur avec support des appels d'outils ou confirme l'exécution guidée.",
 
-        "strict_language_lock": "VERROU DE LANGUE (CRITIQUE) : Réponds uniquement en Français par défaut. Ne change pas de langue sauf demande explicite de l'utilisateur.",
+        "strict_language_lock": "Réponds en Français par défaut. Si l'utilisateur écrit dans une autre langue, réponds dans sa langue.",
         "err_http_402": "❌ Solde insuffisant. Rechargez votre crédit sur le site du fournisseur ou passez à un autre fournisseur.",
         "err_github_copilot_model_incompatible": "GitHub Copilot : le modèle sélectionné n'est pas compatible avec l'endpoint chat. Choisissez un modèle compatible (ex. gpt-4.1, gpt-4o, gpt-5.1).",
         "err_unknown_error": "Erreur inconnue",
