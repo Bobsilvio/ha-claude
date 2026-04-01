@@ -8458,11 +8458,11 @@ def get_chat_ui():
 
         async function loadChatList() {{
             try {{
-                const resp = await fetch(apiUrl('api/conversations'));
+                const resp = await fetch(apiUrl('api/conversations?source=chat'));
                 if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
-                _allConversations = data.conversations || [];
-                const chatConvs = _allConversations.filter(c => c.source === 'chat');
+                const chatConvs = data.conversations || [];
+                _allConversations = chatConvs;
                 renderConversationList(chatConvs, document.getElementById('chatList'), 'chat');
             }} catch(e) {{
                 console.error('Error loading chat list:', e);
@@ -8471,11 +8471,10 @@ def get_chat_ui():
 
         async function loadBubbleList() {{
             try {{
-                const resp = await fetch(apiUrl('api/conversations'));
+                const resp = await fetch(apiUrl('api/conversations?source=bubble'));
                 if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
-                _allConversations = data.conversations || [];
-                const bubbleConvs = _allConversations.filter(c => c.source === 'bubble');
+                const bubbleConvs = data.conversations || [];
                 renderConversationList(bubbleConvs, document.getElementById('bubbleList'), 'bubble');
             }} catch(e) {{
                 console.error('Error loading bubble list:', e);
@@ -8484,11 +8483,10 @@ def get_chat_ui():
 
         async function loadAmiraList() {{
             try {{
-                const resp = await fetch(apiUrl('api/conversations'));
+                const resp = await fetch(apiUrl('api/conversations?source=card'));
                 if (!resp.ok) throw new Error('conversations failed: ' + resp.status);
                 const data = await resp.json();
-                _allConversations = data.conversations || [];
-                const amiraConvs = _allConversations.filter(c => c.source === 'card');
+                const amiraConvs = data.conversations || [];
                 renderConversationList(amiraConvs, document.getElementById('amiraList'), 'amira');
             }} catch(e) {{
                 console.error('Error loading Amira list:', e);

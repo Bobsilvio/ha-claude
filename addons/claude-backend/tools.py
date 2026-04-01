@@ -2050,11 +2050,12 @@ HA_TOOLS_DESCRIPTION = [
     },
     {
         "name": "read_config_file",
-        "description": "Read a Home Assistant configuration file (e.g. configuration.yaml, automations.yaml, scripts.yaml, secrets.yaml, ui-lovelace.yaml, or any YAML/JSON file in the config directory). Returns file content as text.",
+        "description": "Read a Home Assistant configuration file (e.g. configuration.yaml, automations.yaml, scripts.yaml, secrets.yaml, ui-lovelace.yaml, or any YAML/JSON file in the config directory). Returns up to 30000 chars. If the response includes '[TRUNCATED]', call again with offset=<next_offset> to read the rest.",
         "parameters": {
             "type": "object",
             "properties": {
-                "filename": {"type": "string", "description": "File path relative to HA config dir (e.g. 'configuration.yaml', 'ui-lovelace.yaml', 'dashboards/energy.yaml')."}
+                "filename": {"type": "string", "description": "File path relative to HA config dir (e.g. 'configuration.yaml', 'ui-lovelace.yaml', 'dashboards/energy.yaml')."},
+                "offset": {"type": "integer", "description": "Character offset to start reading from (default 0). Use the next_offset value from a previous truncated response to read the next chunk."}
             },
             "required": ["filename"]
         }
@@ -5547,11 +5548,27 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     content = f.read()
-                # Truncate very large files
-                if len(content) > 15000:
-                    content = content[:15000] + f"\n\n... [TRUNCATED - file is {len(content)} chars total]"
-                return json.dumps({"filename": filename, "content": content,
-                                   "size": os.path.getsize(filepath)}, ensure_ascii=False, default=str)
+                total_size = len(content)
+                # Support optional offset for reading large files in chunks
+                offset = int(tool_input.get("offset", 0) or 0)
+                chunk_size = 30000
+                if offset > 0:
+                    content = content[offset:]
+                truncated = len(content) > chunk_size
+                if truncated:
+                    content = content[:chunk_size]
+                next_offset = offset + chunk_size
+                result = {"filename": filename, "content": content, "size": total_size}
+                if truncated:
+                    result["truncated"] = True
+                    result["next_offset"] = next_offset
+                    result["content"] += (
+                        f"\n\n... [FILE TRUNCATED — {total_size - next_offset} chars remaining. "
+                        f"Call read_config_file again with offset={next_offset} to read the next chunk.]"
+                    )
+                elif offset > 0:
+                    result["offset"] = offset
+                return json.dumps(result, ensure_ascii=False, default=str)
             except Exception as e:
                 return json.dumps({"error": f"Failed to read '{filename}': {str(e)}"})
 
@@ -6741,8 +6758,8 @@ HA_TOOLS_EXTENDED = HA_TOOLS_COMPACT + [
     },
     {
         "name": "read_config_file",
-        "description": "Read content of a config file (YAML, JSON, etc). Returns file content as text.",
-        "parameters": {"type": "object", "properties": {"filename": {"type": "string"}}, "required": ["filename"]}
+        "description": "Read content of a config file (YAML, JSON, etc). Returns up to 30000 chars. If truncated, call again with offset=<next_offset>.",
+        "parameters": {"type": "object", "properties": {"filename": {"type": "string"}, "offset": {"type": "integer"}}, "required": ["filename"]}
     },
     {
         "name": "get_automations",

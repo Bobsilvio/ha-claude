@@ -2146,9 +2146,22 @@ def save_conversations():
     tmp_path = f"{CONVERSATIONS_FILE}.tmp"
     try:
         os.makedirs(os.path.dirname(CONVERSATIONS_FILE), exist_ok=True)
-        # Keep only last N sessions (configurable), 50 messages each
+        # Keep only last N sessions (configurable), 50 messages each.
+        # Sort by session timestamp so all sources (bubble, card, chat) are treated
+        # equally and older sessions are evicted regardless of insertion order.
+        def _session_ts(sid: str) -> int:
+            if sid.startswith(("bubble_", "card_")) and "_" in sid:
+                try:
+                    return int(sid.split("_")[1], 36)
+                except Exception:
+                    pass
+            try:
+                return int(sid)
+            except Exception:
+                return 0
+        sorted_sessions = sorted(conversations.items(), key=lambda x: _session_ts(x[0]))
         trimmed: Dict[str, List[Dict]] = {}
-        for sid, msgs in list(conversations.items())[-MAX_CONVERSATIONS:]:
+        for sid, msgs in sorted_sessions[-MAX_CONVERSATIONS:]:
             if not isinstance(msgs, list):
                 continue
             # Strip image data from messages to reduce file size
