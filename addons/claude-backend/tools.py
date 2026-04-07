@@ -1360,6 +1360,7 @@ def _stamp_description(description: str, action: str = "create") -> str:
 TOOL_DESCRIPTIONS = {
     "get_entities": "Carico dispositivi",
     "get_entity_state": "Leggo stato dispositivo",
+    "get_attribute": "Leggo attributo dispositivo",
     "call_service": "Eseguo comando",
     "search_entities": "Cerco dispositivi",
     "get_integration_entities": "Cerco entità integrazione",
@@ -1415,6 +1416,7 @@ TOOL_DESCRIPTIONS = {
 TOOL_DESCRIPTIONS_EN = {
     "get_entities": "Loading entities",
     "get_entity_state": "Reading entity state",
+    "get_attribute": "Reading entity attribute",
     "call_service": "Executing service call",
     "search_entities": "Searching entities",
     "get_integration_entities": "Searching integration entities",
@@ -1470,6 +1472,7 @@ TOOL_DESCRIPTIONS_EN = {
 TOOL_DESCRIPTIONS_ES = {
     "get_entities": "Cargando entidades",
     "get_entity_state": "Leyendo estado de entidad",
+    "get_attribute": "Leyendo atributo de entidad",
     "call_service": "Ejecutando servicio",
     "search_entities": "Buscando entidades",
     "get_integration_entities": "Buscando entidades de integración",
@@ -1525,6 +1528,7 @@ TOOL_DESCRIPTIONS_ES = {
 TOOL_DESCRIPTIONS_FR = {
     "get_entities": "Chargement des entités",
     "get_entity_state": "Lecture de l'état de l'entité",
+    "get_attribute": "Lecture de l'attribut de l'entité",
     "call_service": "Exécution du service",
     "search_entities": "Recherche d'entités",
     "get_integration_entities": "Recherche d'entités d'intégration",
@@ -1623,6 +1627,24 @@ HA_TOOLS_DESCRIPTION = [
                 "entity_id": {
                     "type": "string",
                     "description": "The entity ID (e.g. 'light.living_room')."
+                }
+            },
+            "required": ["entity_id"]
+        }
+    },
+    {
+        "name": "get_attribute",
+        "description": "Get a specific attribute (or all attributes) of a Home Assistant entity. Use when you need attributes not returned by get_entity_state, such as last_triggered, battery_level, supported_features, rgb_color, etc.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "entity_id": {
+                    "type": "string",
+                    "description": "The entity ID (e.g. 'automation.my_automation')."
+                },
+                "attribute": {
+                    "type": "string",
+                    "description": "Specific attribute name to read (e.g. 'last_triggered'). If omitted, all attributes are returned."
                 }
             },
             "required": ["entity_id"]
@@ -2723,6 +2745,35 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                               "id")  # 'id' is critical for automations
                 slim["attributes"] = {k: v for k, v in attrs.items() if k in useful_keys}
                 return json.dumps(slim, ensure_ascii=False, default=str)
+            return json.dumps(result, ensure_ascii=False, default=str)
+
+        elif tool_name == "get_attribute":
+            # Alias / extension of get_entity_state: returns all attributes or a specific one.
+            # Added to handle models (e.g. Qwen) that hallucinate this tool name instead of
+            # get_entity_state, and to expose fields like last_triggered that get_entity_state filters out.
+            entity_id = tool_input.get("entity_id", "")
+            attribute = tool_input.get("attribute", "").strip()
+            result = api.call_ha_api("GET", f"states/{entity_id}")
+            if isinstance(result, dict):
+                attrs = result.get("attributes", {})
+                state = result.get("state")
+                last_changed = result.get("last_changed", "")
+                if attribute:
+                    val = attrs.get(attribute)
+                    return json.dumps({
+                        "entity_id": entity_id,
+                        "state": state,
+                        "last_changed": last_changed,
+                        "attribute": attribute,
+                        "value": val,
+                    }, ensure_ascii=False, default=str)
+                else:
+                    return json.dumps({
+                        "entity_id": entity_id,
+                        "state": state,
+                        "last_changed": last_changed,
+                        "attributes": attrs,
+                    }, ensure_ascii=False, default=str)
             return json.dumps(result, ensure_ascii=False, default=str)
 
         elif tool_name == "call_service":

@@ -2,6 +2,13 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.97 — New tool: get_attribute
+
+### New feature
+- **`get_attribute` tool** (`tools.py`): new read-only tool that returns all attributes of an entity, or a specific attribute by name. Accepts `entity_id` (required) and `attribute` (optional, e.g. `"last_triggered"`). Unlike `get_entity_state` which filters to a fixed set of useful keys, `get_attribute` returns the raw attribute value — useful for fields like `last_triggered`, `battery_level`, `rgb_color`, `supported_features`, etc. Added as an alias/extension to handle models (e.g. Qwen) that call this tool name instead of `get_entity_state`.
+
+---
+
 ## 4.6.96 — Fix: HTML dashboard false-positive intent + update_dashboard safety
 
 ### Bug fixes
