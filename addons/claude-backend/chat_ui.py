@@ -8093,10 +8093,14 @@ def get_chat_ui():
                                 addThinkingStep(desc);
                             }} else if (evt.type === 'clear') {{
                                 // Keep thinking visible; reset streamed text state.
-                                // Save partial text so we can restore it at 'done' if the
-                                // next round produces no new content (e.g. all tool calls dropped).
-                                if (fullText) {{ savedText = fullText; savedDiv = div; }}
-                                if (div) {{ div.innerHTML = ''; }}
+                                // If text was already shown ("Ottimo..."), keep that bubble
+                                // visible and start fresh — next tokens create a new bubble.
+                                if (fullText) {{
+                                    savedText = fullText; savedDiv = div;
+                                    div = null;  // next tokens will create a new bubble
+                                }} else if (div) {{
+                                    div.innerHTML = '';
+                                }}
                                 fullText = '';
                                 hasTools = false;
                             }} else if (evt.type === 'status') {{

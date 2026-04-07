@@ -2,6 +2,22 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.7.2 — In-flight context compaction for multi-round tool calls
+
+### Fix
+- **In-flight tool result compaction** (`api.py`): in multi-round conversations, tool results from all rounds except the most recent one are now condensed in-place before each subsequent API call. This prevents the accumulated context from growing too large and causing 2-minute read timeouts (the symptom seen with Qwen3.6-plus:free on complex automation tasks). The most recent round's results are always kept full so the model has complete data to work with.
+- Previously, 4.7.0 compaction only applied when saving to history (between sessions). This extends it to the active `messages` array within the same multi-round request.
+
+---
+
+## 4.7.1 — Preserve intermediate text bubbles during multi-round tool calls
+
+### Fix
+- **Intermediate assistant text no longer disappears** (`chat_ui.py`): when the model generates text ("Ottimo, procedo...") before calling tools, that bubble now stays visible in the chat instead of being erased by the `clear` event. Subsequent content from the next round appears in a new bubble below it. Previously the intermediate text was lost both from the chat and from the log.
+- **Server-side log for intermediate text** (`api.py`): added `💬 Intermediate text before tool round` log line so the text is traceable even if the chat is not visible.
+
+---
+
 ## 4.7.0 — Conversation history compaction for large tool results
 
 ### Improvement

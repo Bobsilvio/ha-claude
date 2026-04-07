@@ -3114,6 +3114,88 @@ def _compact_messages_for_history(messages: list) -> list:
     return compacted
 
 
+def _compact_messages_inflight(messages: list, start_idx: int = 0) -> None:
+    """Condense tool results from PREVIOUS rounds in-place to reduce context size.
+
+    Only operates on messages[start_idx:] (messages added during this request).
+    The most recent batch of tool results — those associated with the last assistant
+    tool_calls message — is kept intact so the model can reason over full data.
+    All earlier batches are condensed with _condense_tool_result_for_history.
+
+    Operates in-place (mutates dicts in messages).  start_idx should be
+    conv_length_before so that stored history dicts are never touched.
+    """
+    new_msgs = messages[start_idx:]
+
+    # Find tool_call_ids / tool_use_ids from the LAST assistant message with tool_calls
+    _last_tc_ids: set = set()
+    _last_tool_use_ids: set = set()
+    for msg in reversed(new_msgs):
+        if msg.get("role") != "assistant":
+            continue
+        # OpenAI/OpenRouter format
+        tcs = msg.get("tool_calls") or []
+        if tcs:
+            for tc in tcs:
+                if isinstance(tc, dict):
+                    _last_tc_ids.add(tc.get("id", ""))
+            break
+        # Anthropic format
+        content = msg.get("content", "")
+        if isinstance(content, list):
+            uses = [b for b in content if isinstance(b, dict) and b.get("type") == "tool_use"]
+            if uses:
+                for u in uses:
+                    _last_tool_use_ids.add(u.get("id", ""))
+                break
+
+    if not _last_tc_ids and not _last_tool_use_ids:
+        return  # no previous rounds to compact
+
+    _total_saved = 0
+
+    for msg in new_msgs:
+        role = msg.get("role", "")
+
+        # OpenAI/OpenRouter format: role=tool
+        if role == "tool":
+            tid = msg.get("tool_call_id", "")
+            if tid in _last_tc_ids:
+                continue  # keep last round's results intact
+            content = msg.get("content", "")
+            if isinstance(content, str) and len(content) > MAX_TOOL_RESULT_HISTORY_CHARS:
+                tname = msg.get("name", "")
+                condensed = _condense_tool_result_for_history(tname, content)
+                if condensed != content:
+                    _total_saved += len(content) - len(condensed)
+                    msg["content"] = condensed
+
+        # Anthropic format: role=user, content=[{type:tool_result}]
+        elif role == "user" and isinstance(msg.get("content"), list):
+            changed = False
+            new_blocks = []
+            for block in msg["content"]:
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    tid = block.get("tool_use_id", "")
+                    if tid not in _last_tool_use_ids:
+                        rc = block.get("content", "")
+                        if isinstance(rc, str) and len(rc) > MAX_TOOL_RESULT_HISTORY_CHARS:
+                            condensed = _condense_tool_result_for_history("", rc)
+                            if condensed != rc:
+                                _total_saved += len(rc) - len(condensed)
+                                block = {**block, "content": condensed}
+                                changed = True
+                new_blocks.append(block)
+            if changed:
+                msg["content"] = new_blocks
+
+    if _total_saved > 0:
+        logger.info(
+            f"🗜️ In-flight context compaction: freed ~{_total_saved // 1000}k chars "
+            f"from previous rounds"
+        )
+
+
 def _collect_from_stream(user_message: str, session_id: str) -> str:
     """Blocking wrapper: collects all text from stream_chat_with_ai.
     Used by Telegram/WhatsApp for manager.py providers (groq, mistral, claude_web, etc.)."""
@@ -4377,6 +4459,12 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
         while _tool_round < _MAX_TOOL_ROUNDS:
             _tool_round += 1
 
+            # Compact tool results from earlier rounds to prevent context overflow.
+            # Keeps the most recent batch intact; condenses all older ones.
+            # Only kicks in from round 2 onwards (nothing to compact on first call).
+            if _tool_round > 1:
+                _compact_messages_inflight(messages, conv_length_before)
+
             # Use unified provider interface (replaces old provider_*.py functions)
             # Passa il modello attivo esplicitamente così il provider non usa default errati
             #
@@ -5028,6 +5116,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             # --- Execute tool calls and prepare next round ---
             text_so_far = "".join(_streamed_text_parts)
             _streamed_text_parts = []
+            if text_so_far.strip():
+                _preview = text_so_far.strip()[:120].replace("\n", " ")
+                logger.info(f"💬 Intermediate text before tool round (kept in chat): \"{_preview}\"")
 
             # For no-tool providers, clean <tool_call> XML from assistant history
             # so the model doesn't see raw XML in its conversation context.
