@@ -2,6 +2,15 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.6.96 — Fix: HTML dashboard false-positive intent + update_dashboard safety
+
+### Bug fixes
+- **False-positive HTML dashboard routing** (`intent.py`): messages that quoted or mentioned "JS templates", "javascript", etc. while asking about a Lovelace YAML dashboard were incorrectly routed to the `create_html_dashboard` intent, restricting Claude to only 5 tools and hiding `get_dashboard_config`/`update_dashboard`. The detection now requires EITHER an explicit HTML file reference (`/local/dashboards`, `.html`) OR both an HTML keyword AND a dashboard keyword — a single HTML keyword alone no longer triggers routing.
+- **`update_dashboard` empty-views guard** (`tools.py`): when Claude hit the output token limit mid-generation, the tool call was emitted with `views=[]`, silently wiping the dashboard. The tool now refuses immediately with an explicit error message when `views` is empty, leaving the dashboard unchanged and asking the user to split the update into smaller turns.
+- **Raised `max_tokens` ceiling** (`providers/anthropic.py`, `providers/openai.py`): base limit increased from 8192 → 32768 (32k), HTML dashboard intent from 16384 → 65536 (64k). The old 8192 limit was a claude-3 legacy value; claude-opus-4-6 supports 32k and claude-sonnet-4-6 supports 64k output tokens. This prevents truncation when generating large Lovelace YAML rewrites with `update_dashboard`.
+
+---
+
 ## 4.6.95 — Fix: incoming message log now from api module with CHAT level
 
 ### Bug fix

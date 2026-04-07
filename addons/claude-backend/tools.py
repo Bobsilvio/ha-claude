@@ -5541,6 +5541,22 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
 
             logger.info(f"📊 Updating dashboard: url_path='{url_path}', new_views={len(views)}")
 
+            # Safety guard: refuse to apply an empty views array.
+            # This happens when the LLM hits max_tokens mid-generation and emits a truncated
+            # tool call — the JSON gets parsed but views=[] because the list was never written.
+            # Applying views=[] would wipe the dashboard silently; we refuse instead.
+            if not views:
+                logger.warning(f"⚠️ update_dashboard refused: views is empty (likely truncated response). url_path='{url_path}'")
+                return json.dumps({
+                    "status": "error",
+                    "message": (
+                        "update_dashboard refused: the views array is empty. "
+                        "This usually means the response was cut off before the full YAML could be generated "
+                        "(max_tokens reached). No changes were made to the dashboard. "
+                        "Please retry with fewer simultaneous changes, or split the update across multiple turns."
+                    )
+                })
+
             # Auto-snapshot: save current dashboard config before modifying
             try:
                 snap_params = {}

@@ -83,7 +83,7 @@ class OpenAIProvider(EnhancedProvider):
             isinstance(intent_info, dict)
             and str(intent_info.get("intent", "")).lower() == "create_html_dashboard"
         )
-        _max_tokens = 16384 if _is_html_intent else 8192
+        _max_tokens = 65536 if _is_html_intent else 32768
         yield from self._openai_compat_stream(
             "https://api.openai.com/v1",
             self.api_key,

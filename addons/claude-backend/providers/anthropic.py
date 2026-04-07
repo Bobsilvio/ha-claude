@@ -275,8 +275,11 @@ class AnthropicProvider(EnhancedProvider):
             isinstance(intent_info, dict)
             and str(intent_info.get("intent", "")).lower() == "create_html_dashboard"
         )
-        # HTML dashboards can be long; raise output ceiling for this intent.
-        _max_tokens = 16384 if _is_html_intent else 8192
+        # claude-opus-4-6 supports 32k output tokens, claude-sonnet-4-6 supports 64k.
+        # 8192 was a legacy limit for claude-3; raise the base to 32k so that large
+        # Lovelace YAML rewrites (update_dashboard) don't get truncated mid-generation.
+        # HTML dashboards get 64k to handle multi-chunk Vue/CSS payloads.
+        _max_tokens = 65536 if _is_html_intent else 32768
         kwargs: Dict[str, Any] = {"model": model, "messages": conv_msgs, "max_tokens": _max_tokens}
         if system:
             kwargs["system"] = system

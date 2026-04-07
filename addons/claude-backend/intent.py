@@ -761,11 +761,14 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
                     has_dash = True
         except Exception:
             pass
-    # When the user has a file open ([FILE:...] context), only route to HTML dashboard
-    # if they explicitly use HTML/JS keywords — not just because "card" or "dashboard"
-    # appear in the message (those words are common in YAML files and in Lovelace requests).
-    _html_dash_gate = has_html_kw if _has_file_context else (has_html_kw or has_html_ref)
-    if not _is_skill_cmd and (_html_dash_gate or (has_dash and has_html_kw)):
+    # Route to HTML dashboard only when there is a clear signal:
+    # - file context: require explicit HTML/JS keywords (same as before)
+    # - no file context: require EITHER an explicit HTML file reference (/local/dashboards or .html)
+    #   OR both an HTML keyword AND a dashboard keyword together.
+    # This prevents false positives when the user quotes a previous AI response that happened to
+    # mention "JS templates", "javascript", etc. while asking about a Lovelace YAML dashboard.
+    _html_dash_gate = has_html_kw if _has_file_context else (has_html_ref or (has_html_kw and has_dash))
+    if not _is_skill_cmd and _html_dash_gate:
         logger.info("HTML dashboard keywords detected — routing to create_html_dashboard")
         return {"intent": "create_html_dashboard", "tools": INTENT_TOOL_SETS["create_html_dashboard"],
                 "prompt": INTENT_PROMPTS.get("create_html_dashboard"), "specific_target": False}
