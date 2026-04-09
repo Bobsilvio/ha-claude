@@ -3649,6 +3649,7 @@ def _has_explicit_automation_target(user_message: str) -> bool:
     """True only when user clearly targets an existing automation."""
     raw = str(user_message or "")
     msg = _normalize_user_message_for_routing(raw)
+    raw_lower = raw.lower()
     # Bubble context explicitly scoped to one automation
     if re.search(r'\[context:[^\]]*automation\s+id=["\']*\d+', raw, re.IGNORECASE):
         return True
@@ -3656,6 +3657,18 @@ def _has_explicit_automation_target(user_message: str) -> bool:
     if re.search(r'\bautomation\.[a-z0-9_]+\b', msg):
         return True
     if re.search(r'\b(?:id|automation_id)\s*[:=]?\s*\d{4,}\b', msg):
+        return True
+    # Bare numeric automation ID (10+ digits) with automation/automatizmus context
+    if re.search(r'\d{10,}', msg) and any(m in msg for m in (
+        "automaz", "automation", "automatiz", "automatismus", "automatizmust",
+    )):
+        return True
+    # Pending-context booster: check the RAW message (including [CONTEXT:...] blocks)
+    # because _normalize strips them. If the injected context mentions an automation ID,
+    # the user has already confirmed a specific target from the previous turn.
+    if "[CONTEXT:" in raw and re.search(r'\d{10,}', raw_lower) and any(m in raw_lower for m in (
+        "automaz", "automation", "automatiz", "automatismus", "preview",
+    )):
         return True
     # Quoted automation name + modify intent is explicit enough
     quoted_name = re.search(r'["“][^"”]{3,}["”]', raw)
