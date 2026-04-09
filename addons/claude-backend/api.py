@@ -3663,11 +3663,6 @@ def _has_explicit_automation_target(user_message: str) -> bool:
         "automaz", "automation", "automatiz", "automatismus", "automatizmust",
     )):
         return True
-    # Pending-context booster: check the RAW message (including [CONTEXT:...] blocks)
-    # because _normalize strips them. The booster only fires on confirmation replies,
-    # so the presence of [CONTEXT:] + a numeric automation ID is reliable enough.
-    if "[CONTEXT:" in raw and re.search(r'\d{10,}', raw_lower):
-        return True
     # Quoted automation name + modify intent is explicit enough
     quoted_name = re.search(r'["“][^"”]{3,}["”]', raw)
     modify_terms = sorted(_all_lang_keywords("modify") | {
@@ -3786,6 +3781,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                 )
                 logger.info(f"Pending-context booster injected for session {session_id}")
 
+    # Flag: confirmation reply with pending context → bypass automation-target guard
+    _is_boosted_confirmation = "[CONTEXT: Pending request" in user_message
+
     # Get previous intent for confirmation continuity
     prev_intent = session_last_intent.get(session_id)
 
@@ -3885,7 +3883,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
     # Store this intent for next message's confirmation continuity
     session_last_intent[session_id] = intent_name
-    _has_explicit_auto_target = _has_explicit_automation_target(user_message)
+    _has_explicit_auto_target = _is_boosted_confirmation or _has_explicit_automation_target(user_message)
     _looks_new_auto_req = _looks_like_new_automation_request(user_message)
     _intent_tools = intent_info.get("tools")
     # tools=None means "all tools" (LLM-first), tools=[] means "no tools" (chat)
