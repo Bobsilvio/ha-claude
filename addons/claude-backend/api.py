@@ -3631,12 +3631,14 @@ def _looks_like_new_automation_request(user_message: str) -> bool:
         "aggiungi automazione", "un'altra automazione", "un altra automazione", "altra automazione",
         "nueva automatización", "nuevas automatizaciones", "crear automatización", "añadir automatización",
         "nouvelle automatisation", "nouvelles automatisations", "créer automatisation", "ajouter automatisation",
+        "új automatizálás", "új automatizálást", "automatizálás létrehozása", "hozz létre automatizálást",
     }
     modify_signals = set(_all_lang_keywords("modify")) | {
         "modifica automazione", "modify automation", "update automation",
         "aggiorna automazione", "cambia automazione",
         "modificar automatización", "actualizar automatización",
         "modifier automatisation", "mettre à jour automatisation",
+        "módosítsd az automatizálást", "automatizálás módosítása", "változtasd az automatizálást",
     }
     has_create = any(s in msg for s in create_signals)
     has_modify = any(s in msg for s in modify_signals)
@@ -3660,6 +3662,7 @@ def _has_explicit_automation_target(user_message: str) -> bool:
     modify_terms = sorted(_all_lang_keywords("modify") | {
         "modifica", "modify", "update", "aggiorna", "cambia", "edit",
         "modificar", "actualizar", "modifier", "changer", "mettre à jour",
+        "módosítsd", "módosít", "változtasd", "szerkeszd", "frissítsd",
     }, key=len, reverse=True)
     has_modify_intent = any(t and t in msg for t in modify_terms)
     return bool(quoted_name and has_modify_intent)
@@ -3676,6 +3679,7 @@ def _extract_pending_context_from_assistant(text: str) -> Optional[str]:
         "confirm", "confirm?", "proceed", "apply", "shall i",
         "confirma", "confirmas", "proceder", "procedo con",
         "confirme", "procède", "appliquer",
+        "jóváhagyod", "alkalmazzam", "módosítsam", "végrehajtom", "mehet",
     )
     if "?" not in t and not any(k in tl for k in ask_terms):
         return None
