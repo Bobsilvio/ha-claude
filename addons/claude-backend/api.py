@@ -3664,11 +3664,9 @@ def _has_explicit_automation_target(user_message: str) -> bool:
     )):
         return True
     # Pending-context booster: check the RAW message (including [CONTEXT:...] blocks)
-    # because _normalize strips them. If the injected context mentions an automation ID,
-    # the user has already confirmed a specific target from the previous turn.
-    if "[CONTEXT:" in raw and re.search(r'\d{10,}', raw_lower) and any(m in raw_lower for m in (
-        "automaz", "automation", "automatiz", "automatismus", "preview",
-    )):
+    # because _normalize strips them. The booster only fires on confirmation replies,
+    # so the presence of [CONTEXT:] + a numeric automation ID is reliable enough.
+    if "[CONTEXT:" in raw and re.search(r'\d{10,}', raw_lower):
         return True
     # Quoted automation name + modify intent is explicit enough
     quoted_name = re.search(r'["“][^"”]{3,}["”]', raw)
