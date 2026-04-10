@@ -680,7 +680,8 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
             if _re_intent.match(r'^\\s*\\d+\\s*$', msg) or any(s in msg for s in [
                 "analizza", "vedi", "mostra", "dettaglio", "investig", "il primo", "il secondo",
                 "numero", "entry", "errore", "analyze", "show", "detail", "investigate",
-                "analyse", "montre", "détail", "analiza", "muestra", "detalle"
+                "analyse", "montre", "détail", "analiza", "muestra", "detalle",
+                "elemezd", "nézd", "mutasd", "részlet", "vizsgáld"
             ]):
                 logger.info(f"Debug selection detected — carrying forward system_debug intent")
                 return {"intent": "system_debug", "tools": INTENT_TOOL_SETS["system_debug"],
@@ -692,7 +693,9 @@ def detect_intent(user_message: str, smart_context: str, previous_intent: str | 
                              "stessi sensor", "gli stessi", "le stesse", "modify it", "change it",
                              "add", "remove", "use the same", "same entities", "same sensors",
                              "modifie", "change", "ajoute", "utilise les même",
-                             "modifica", "cambia", "añade", "usa los mismos"]
+                             "modifica", "cambia", "añade", "usa los mismos",
+                             "módosítsd", "változtasd", "add hozzá", "távolítsd", "cseréld",
+                             "ugyanaz", "ugyanazok", "próbáld", "alkalmaz"]
         if not _is_skill_cmd and any(s in msg for s in follow_up_signals):
             logger.info(f"Follow-up detected — carrying forward intent: {previous_intent}")
             return {"intent": previous_intent, "tools": INTENT_TOOL_SETS[previous_intent],

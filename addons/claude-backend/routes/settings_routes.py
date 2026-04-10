@@ -399,6 +399,7 @@ def api_settings_get():
                      {"value": "it", "label": "Italiano"},
                      {"value": "es", "label": "Español"},
                      {"value": "fr", "label": "Français"},
+                     {"value": "hu", "label": "Magyar"},
                  ]},
                 {"key": "interaction_mode", "type": "select",
                  "options": [

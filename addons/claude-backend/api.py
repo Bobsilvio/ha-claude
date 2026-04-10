@@ -3631,12 +3631,14 @@ def _looks_like_new_automation_request(user_message: str) -> bool:
         "aggiungi automazione", "un'altra automazione", "un altra automazione", "altra automazione",
         "nueva automatización", "nuevas automatizaciones", "crear automatización", "añadir automatización",
         "nouvelle automatisation", "nouvelles automatisations", "créer automatisation", "ajouter automatisation",
+        "új automatizálás", "új automatizálást", "automatizálás létrehozása", "hozz létre automatizálást",
     }
     modify_signals = set(_all_lang_keywords("modify")) | {
         "modifica automazione", "modify automation", "update automation",
         "aggiorna automazione", "cambia automazione",
         "modificar automatización", "actualizar automatización",
         "modifier automatisation", "mettre à jour automatisation",
+        "módosítsd az automatizálást", "automatizálás módosítása", "változtasd az automatizálást",
     }
     has_create = any(s in msg for s in create_signals)
     has_modify = any(s in msg for s in modify_signals)
@@ -3647,6 +3649,7 @@ def _has_explicit_automation_target(user_message: str) -> bool:
     """True only when user clearly targets an existing automation."""
     raw = str(user_message or "")
     msg = _normalize_user_message_for_routing(raw)
+    raw_lower = raw.lower()
     # Bubble context explicitly scoped to one automation
     if re.search(r'\[context:[^\]]*automation\s+id=["\']*\d+', raw, re.IGNORECASE):
         return True
@@ -3655,11 +3658,17 @@ def _has_explicit_automation_target(user_message: str) -> bool:
         return True
     if re.search(r'\b(?:id|automation_id)\s*[:=]?\s*\d{4,}\b', msg):
         return True
+    # Bare numeric automation ID (10+ digits) with automation/automatizmus context
+    if re.search(r'\d{10,}', msg) and any(m in msg for m in (
+        "automaz", "automation", "automatiz", "automatismus", "automatizmust",
+    )):
+        return True
     # Quoted automation name + modify intent is explicit enough
     quoted_name = re.search(r'["“][^"”]{3,}["”]', raw)
     modify_terms = sorted(_all_lang_keywords("modify") | {
         "modifica", "modify", "update", "aggiorna", "cambia", "edit",
         "modificar", "actualizar", "modifier", "changer", "mettre à jour",
+        "módosítsd", "módosít", "változtasd", "szerkeszd", "frissítsd",
     }, key=len, reverse=True)
     has_modify_intent = any(t and t in msg for t in modify_terms)
     return bool(quoted_name and has_modify_intent)
@@ -3676,6 +3685,7 @@ def _extract_pending_context_from_assistant(text: str) -> Optional[str]:
         "confirm", "confirm?", "proceed", "apply", "shall i",
         "confirma", "confirmas", "proceder", "procedo con",
         "confirme", "procède", "appliquer",
+        "jóváhagyod", "alkalmazzam", "módosítsam", "végrehajtom", "mehet",
     )
     if "?" not in t and not any(k in tl for k in ask_terms):
         return None
@@ -3692,7 +3702,7 @@ def _is_short_followup_reply(user_message: str) -> bool:
     words = [w for w in txt.split(" ") if w]
     if len(words) <= 8 and len(txt) <= 80:
         return True
-    followup_markers = ("manca", "seconda", "2", "continua", "vai avanti", "next", "missing")
+    followup_markers = ("manca", "seconda", "2", "continua", "vai avanti", "next", "missing", "folytasd", "tovább", "következő", "most próbáld", "hiányzik")
     return any(m in txt for m in followup_markers)
 
 
@@ -3700,7 +3710,7 @@ def _is_confirmation_reply(user_message: str) -> bool:
     txt = _normalize_user_message_for_routing(user_message)
     if not txt:
         return False
-    confirms = _all_lang_keywords("confirm") | {"yes", "ok", "okay", "si", "sì", "oui", "vale"}
+    confirms = _all_lang_keywords("confirm") | {"yes", "ok", "okay", "si", "sì", "oui", "vale", "igen", "rendben", "oké", "mehet", "csináld", "rajta", "persze", "próbáld", "tovább"}
     return txt in confirms
 
 
@@ -3770,6 +3780,9 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     f"[/CONTEXT]"
                 )
                 logger.info(f"Pending-context booster injected for session {session_id}")
+
+    # Flag: confirmation reply with pending context → bypass automation-target guard
+    _is_boosted_confirmation = "[CONTEXT: Pending request" in user_message
 
     # Get previous intent for confirmation continuity
     prev_intent = session_last_intent.get(session_id)
@@ -3870,7 +3883,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
 
     # Store this intent for next message's confirmation continuity
     session_last_intent[session_id] = intent_name
-    _has_explicit_auto_target = _has_explicit_automation_target(user_message)
+    _has_explicit_auto_target = _is_boosted_confirmation or _has_explicit_automation_target(user_message)
     _looks_new_auto_req = _looks_like_new_automation_request(user_message)
     _intent_tools = intent_info.get("tools")
     # tools=None means "all tools" (LLM-first), tools=[] means "no tools" (chat)

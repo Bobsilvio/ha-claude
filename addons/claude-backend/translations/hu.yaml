@@ -1,0 +1,159 @@
+configuration:
+
+  language:
+    name: Nyelv
+    description: AI válasz nyelve (angol, olasz, spanyol, francia vagy magyar)
+
+  anthropic_api_key:
+    name: Anthropic API kulcs
+    description: API kulcs a console.anthropic.com-ról (mentsd el akkor is ha nem használod, a gyors váltáshoz)
+  openai_api_key:
+    name: OpenAI API kulcs
+    description: API kulcs a platform.openai.com-ról (mentsd el akkor is ha nem használod, a gyors váltáshoz)
+  google_api_key:
+    name: Google API kulcs
+    description: API kulcs az aistudio.google.com-ról (mentsd el akkor is ha nem használod, a gyors váltáshoz)
+  github_token:
+    name: GitHub Token
+    description: Personal Access Token a github.com/settings/tokens-ről (mentsd el akkor is ha nem használod, a gyors váltáshoz)
+  nvidia_api_key:
+    name: NVIDIA API kulcs
+    description: API kulcs a build.nvidia.com-ról (ingyenes - mentsd el akkor is ha nem használod, a gyors váltáshoz)
+  groq_api_key:
+    name: Groq API kulcs
+    description: "Ingyenes és gyors LLM provider ingyenes Whisper hangátírással - szerezhető a console.groq.com-ról"
+  mistral_api_key:
+    name: Mistral API kulcs
+    description: "Mistral gyors nyílt forráskódú modellek - szerezhető a console.mistral.ai-ról"
+  openrouter_api_key:
+    name: OpenRouter API kulcs
+    description: "Globális átjáró 100+ modellel minden providertől (Claude, GPT, Llama, Mistral, stb.) - szerezhető az openrouter.ai-ról"
+  deepseek_api_key:
+    name: DeepSeek API kulcs
+    description: "Gyors és megfizethető modellek fejlett következtetéssel (R1, V3) - szerezhető a platform.deepseek.com-ról"
+  xai_api_key:
+    name: xAI API kulcs
+    description: "xAI Grok API kulcs Grok modellekhez (Grok-3, Grok-3 Mini) - szerezhető a console.x.ai-ról"
+  minimax_api_key:
+    name: MiniMax API kulcs
+    description: "Fejlett kínai LLM provider multimodális támogatással - szerezhető a platform.minimax.io-ról"
+  aihubmix_api_key:
+    name: AiHubMix API kulcs
+    description: "Univerzális API átjáró minden fő modellel (ChatGPT, Claude, Gemini, stb.) - szerezhető az aihubmix.com-ról"
+  siliconflow_api_key:
+    name: SiliconFlow API kulcs
+    description: "Kínai átjáró nyílt forráskódú modellekhez (Qwen, Llama, Mistral) nagy sebességgel - szerezhető a siliconflow.cn-ről"
+  volcengine_api_key:
+    name: VolcEngine API kulcs
+    description: "Aliyun vállalati átjáró LLM-ekhez - szerezhető a volcengine.com-ról"
+  dashscope_api_key:
+    name: DashScope API kulcs
+    description: "Aliyun Qwen modellek vizuális/multimodális támogatással - szerezhető a dashscope.console.aliyun.com-ról"
+  moonshot_api_key:
+    name: Moonshot API kulcs
+    description: "Moonshot Kimi modell (gyors következtetés, legjobb kínaiul) - szerezhető a platform.moonshot.cn-ről"
+  zhipu_api_key:
+    name: Zhipu API kulcs
+    description: "Zhipu GLM modellek vizuális támogatással - szerezhető az open.bigmodel.cn-ről"
+  perplexity_api_key:
+    name: Perplexity API kulcs
+    description: "Sonar modellek valós idejű webes kereséssel (sonar-pro, sonar-reasoning-pro, r1-1776) - szerezhető a perplexity.ai/api-ról"
+
+  custom_api_key:
+    name: Egyéni végpont API kulcs
+    description: "API kulcs az egyéni OpenAI-kompatibilis végpontodhoz (pl. LM Studio, vLLM, LocalAI) - hagyd üresen ha nem használsz egyéni végpontot"
+  custom_api_base:
+    name: Egyéni végpont alap URL
+    description: "Az egyéni OpenAI-kompatibilis API alap URL-je (pl. http://localhost:1234/v1) - hagyd üresen ha nem használsz egyéni végpontot"
+  custom_model_name:
+    name: Egyéni modell neve
+    description: "Modell azonosító az egyéni végpontodhoz (pl. mistral-7b-instruct, llama3) - hagyd üresen ha nem használsz egyéni végpontot"
+
+  ollama_base_url:
+    name: Ollama szerver URL
+    description: "Helyi Ollama szerver URL-je (alapértelmezett: http://localhost:11434) - nem kell API kulcs, helyileg fut"
+
+  nvidia_thinking_mode:
+    name: NVIDIA gondolkodási mód
+    description: "Gondolkodási mód engedélyezése az AI következtetési folyamatának megjelenítéséhez (lassabb, de átláthatóbb)"
+  anthropic_extended_thinking:
+    name: Anthropic kiterjesztett gondolkodás
+    description: "Claude Opus kiterjesztett gondolkodás engedélyezése összetett következtetési feladatokhoz (lassabb, több tokent használ)"
+  anthropic_prompt_caching:
+    name: Anthropic prompt gyorsítótárazás
+    description: "Hosszú ismétlődő utasítások gyorsítótárazása költségmegtakarításért és gyorsabb válaszokért"
+  openai_extended_thinking:
+    name: OpenAI kiterjesztett gondolkodás
+    description: "o1/o3 gondolkodási mód engedélyezése összetett problémamegoldáshoz (lassabb, több tokent használ)"
+
+  enable_file_access:
+    name: Fájl hozzáférés engedélyezése
+    description: AI számára engedélyezett Home Assistant konfigurációs fájlok olvasása/írása (automatizálások, scriptek, YAML)
+  enable_memory:
+    name: Memória engedélyezése
+    description: "[KÍSÉRLETI] Állandó memória engedélyezése - az AI csak azt jegyzi meg, amit a MEMORY.md-be írsz. Korábbi beszélgetések SOHA nem kerülnek a promptba."
+  enable_file_upload:
+    name: Fájl feltöltés engedélyezése
+    description: "[KÍSÉRLETI] Dokumentumok feltöltésének engedélyezése (PDF, DOCX, TXT, MD, YAML) AI elemzéshez"
+  enable_voice_input:
+    name: Hang bemenet engedélyezése
+    description: "Mikrofon gomb engedélyezése hangüzenetekhez (Groq Whisper, OpenAI/Google tartalékkal) - HTTPS szükséges"
+  tts_voice:
+    name: Hang típusa
+    description: "Válaszd ki a hangot az AI beszédválaszokhoz: női (alapértelmezett) vagy férfi. A hang automatikusan a nyelvedhez igazodik (Edge TTS - ingyenes, nem kell API kulcs)."
+  enable_rag:
+    name: RAG engedélyezése
+    description: "[KÍSÉRLETI] RAG (Retrieval-Augmented Generation) engedélyezése dokumentum kereséshez és kontextus beillesztéshez"
+  enable_chat_bubble:
+    name: Chat buborék
+    description: "Lebegő AI chat buborék megjelenítése minden Home Assistant oldalon. Kontextus-tudatos: felismeri az automatizálásokat, scripteket, dashboardokat. Hang bemenet, markdown megjelenítés és élő agent váltás. Mobilon rejtett."
+  enable_mcp:
+    name: MCP engedélyezése
+    description: "MCP (Model Context Protocol) támogatás engedélyezése. Kikapcsolva az Amira nem próbál MCP szerverekhez csatlakozni induláskor, eltávolítva a felesleges csatlakozási hibákat a naplóból."
+
+  timeout:
+    name: Kérés időtúllépés
+    description: API kérés időtúllépés másodpercben (alapértelmezett 30, növeld ha a válaszok lassúak)
+  max_retries:
+    name: Max újrapróbálkozás
+    description: Sikertelen API hívások maximális újrapróbálkozási száma (alapértelmezett 3)
+  max_snapshots_per_file:
+    name: Max mentés fájlonként
+    description: "Fájlonkénti maximális biztonsági mentés pillanatképek száma (pl. 5 mentés az automations.yaml-hoz, 5 a scripts.yaml-hoz). A legrégebbiek automatikusan törlődnek a limit elérésekor."
+  max_conversations:
+    name: Max beszélgetések
+    description: "Előzményekben tárolt beszélgetések maximális száma (1-100)"
+
+  cost_currency:
+    name: Költség pénzneme
+    description: "Pénznem a token költség megjelenítéséhez (USD, EUR, GBP vagy JPY)"
+  mcp_config_file:
+    name: MCP konfigurációs fájl
+    description: "MCP konfigurációs JSON fájl elérési útja (alapértelmezett: /config/amira/mcp_config.json) - hozd létre ezt a fájlt az egyéni MCP szervereidhez"
+
+  telegram_bot_token:
+    name: Telegram Bot Token
+    description: "Telegram bot token a @BotFather-től - hagyd üresen a Telegram üzenetküldés letiltásához"
+  twilio_account_sid:
+    name: Twilio Account SID
+    description: "Twilio Account SID a WhatsApp integrációhoz - szerezhető a console.twilio.com-ról"
+  twilio_auth_token:
+    name: Twilio Auth Token
+    description: "Twilio Auth Token a WhatsApp integrációhoz - szerezhető a console.twilio.com-ról"
+  twilio_whatsapp_from:
+    name: Twilio WhatsApp szám
+    description: "Twilio WhatsApp szám (pl. +1234567890) - hagyd üresen a WhatsApp letiltásához"
+
+  colored_logs:
+    name: Színes naplók
+    description: Színes emoji jelzők engedélyezése az addon naplóban (🟢 siker, 🔴 hiba, stb.)
+  debug_mode:
+    name: Hibakeresési mód
+    description: Részletes naplózás engedélyezése hibaelhárításhoz (nagyobb naplókat hoz létre)
+  log_level:
+    name: Naplózási szint
+    description: "Napló részletessége: normal (szűrt), verbose (összes napló), debug (payload adatokkal)"
+
+  api_port:
+    name: API port
+    description: "Az addon által használt port a belső API-hoz (alapértelmezett: 5010) - csak akkor módosítsd, ha ütközik egy másik addonnal"
