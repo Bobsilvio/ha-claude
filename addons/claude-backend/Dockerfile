@@ -82,6 +82,10 @@ COPY core /app/core
 COPY services /app/services
 COPY routes /app/routes
 
+# Copy translations and strip macOS AppleDouble resource fork files
+COPY translations /app/translations
+RUN find /app/translations -name '._*' -delete 2>/dev/null || true
+
 # Copy rootfs (s6-overlay v3 service structure)
 COPY rootfs /
 

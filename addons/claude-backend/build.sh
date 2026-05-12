@@ -11,6 +11,10 @@ echo "Building Claude Backend Add-on..."
 echo "Version: $VERSION"
 echo "Image: $REGISTRY/$NAMESPACE/$IMAGE_NAME:$VERSION"
 
+# Remove macOS AppleDouble metadata files (._*) before building
+find . -name '._*' -delete 2>/dev/null || true
+echo "Cleaned up macOS AppleDouble files."
+
 # Build for multiple architectures
 docker buildx build \
   --push \

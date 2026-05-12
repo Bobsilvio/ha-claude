@@ -65,6 +65,8 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+# macOS AppleDouble resource fork files (created by Finder on SMB/AFP shares)
+._*
 
 # Backup files
 *.bak
