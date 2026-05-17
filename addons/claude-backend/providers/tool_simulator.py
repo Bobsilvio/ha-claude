@@ -58,6 +58,28 @@ _TOOL_CALL_RE = re.compile(
 )
 
 # ---------------------------------------------------------------------------
+# Regex for claude.ai native XML format: <function_calls><invoke …>…</invoke></function_calls>
+# Used when the model ignores the <tool_call> instruction and falls back to its own XML.
+# ---------------------------------------------------------------------------
+_FUNCTION_CALLS_RE = re.compile(
+    r"<function_calls>[\s\S]*?</function_calls>",
+    re.IGNORECASE,
+)
+# Partial/incomplete block (stream cut before closing tag) — greedy, matches to end of string
+_FUNCTION_CALLS_PARTIAL_RE = re.compile(
+    r"<function_calls>[\s\S]*",
+    re.IGNORECASE,
+)
+_INVOKE_RE = re.compile(
+    r'<invoke\s+name=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</invoke>',
+    re.IGNORECASE,
+)
+_PARAM_RE = re.compile(
+    r'<parameter\s+name=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</parameter>',
+    re.IGNORECASE,
+)
+
+# ---------------------------------------------------------------------------
 # Universal system-prompt fragment
 # ---------------------------------------------------------------------------
 
@@ -226,12 +248,46 @@ def extract_tool_calls(text: str) -> List[Dict[str, Any]]:
         })
         logger.info(f"ToolSimulator: found tool_call '{name}' (block #{i})")
 
+    # ── Also parse claude.ai native <function_calls><invoke> format ──
+    # claude.ai sometimes falls back to its own XML even when instructed to use <tool_call>.
+    if not calls:
+        for fc_match in _FUNCTION_CALLS_RE.finditer(text):
+            fc_text = fc_match.group(0)
+            for j, invoke_match in enumerate(_INVOKE_RE.finditer(fc_text)):
+                inv_name = invoke_match.group(1).strip()
+                params_text = invoke_match.group(2)
+                arguments: Dict[str, Any] = {}
+                for param_match in _PARAM_RE.finditer(params_text):
+                    p_name = param_match.group(1).strip()
+                    p_val = param_match.group(2).strip()
+                    try:
+                        arguments[p_name] = json.loads(p_val)
+                    except (json.JSONDecodeError, ValueError):
+                        arguments[p_name] = p_val
+                if inv_name:
+                    calls.append({
+                        "id": f"invoke_{j}",
+                        "name": inv_name,
+                        "arguments": json.dumps(arguments, ensure_ascii=False),
+                    })
+                    logger.info(f"ToolSimulator: found <invoke> '{inv_name}' (block #{j})")
+
     return calls
 
 
+def _strip_function_calls(text: str) -> str:
+    """Remove <function_calls> blocks (complete and partial) from text."""
+    # Remove complete blocks first
+    cleaned = _FUNCTION_CALLS_RE.sub("", text)
+    # Remove any remaining partial/incomplete block (stream cut before closing tag)
+    cleaned = _FUNCTION_CALLS_PARTIAL_RE.sub("", cleaned)
+    return cleaned
+
+
 def clean_response_text(text: str) -> str:
-    """Remove <tool_call> blocks from the text before displaying to the user."""
+    """Remove <tool_call> and <function_calls> blocks from the text before displaying to the user."""
     cleaned = _TOOL_CALL_RE.sub("", text)
+    cleaned = _strip_function_calls(cleaned)
     # Collapse multiple blank lines left by removal
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()
@@ -246,8 +302,9 @@ _TOOL_RESULT_RE = re.compile(
 
 
 def clean_display_text(text: str) -> str:
-    """Remove both <tool_call> and [TOOL RESULT] blocks for user display."""
+    """Remove <tool_call>, <function_calls>, and [TOOL RESULT] blocks for user display."""
     cleaned = _TOOL_CALL_RE.sub("", text)
+    cleaned = _strip_function_calls(cleaned)
     cleaned = _TOOL_RESULT_RE.sub("", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned.strip()

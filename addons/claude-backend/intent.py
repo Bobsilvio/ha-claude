@@ -530,15 +530,23 @@ def _is_conversational(msg: str) -> bool:
     return any(s in msg for s in CONV_SIGNALS)
 
 
+_BASE_CHAT_PROMPT = INTENT_PROMPTS["chat"]
+
+
 def _init_dynamic_prompts():
-    """Initialize prompts that depend on api.get_lang_text (called after api module is loaded)."""
-    # Add language instruction to chat prompt
+    """Rebuild INTENT_PROMPTS['chat'] with the CURRENT language instructions.
+
+    Rebuilds from the saved base each call so changing language at runtime
+    doesn't leave stale instructions from the previous language stacked on top.
+    """
     lang_instr = api.get_lang_text("respond_instruction")
     lang_lock = api.get_lang_text("strict_language_lock")
-    if lang_instr and lang_instr not in INTENT_PROMPTS["chat"]:
-        INTENT_PROMPTS["chat"] += "\n\n" + lang_instr
-    if lang_lock and lang_lock not in INTENT_PROMPTS["chat"]:
-        INTENT_PROMPTS["chat"] += "\n\n" + lang_lock
+    prompt = _BASE_CHAT_PROMPT
+    if lang_instr:
+        prompt += "\n\n" + lang_instr
+    if lang_lock:
+        prompt += "\n\n" + lang_lock
+    INTENT_PROMPTS["chat"] = prompt
 
 
 def detect_intent(user_message: str, smart_context: str, previous_intent: str | None = None) -> dict:

@@ -503,11 +503,55 @@ class ClaudeWebProvider(EnhancedProvider):
                     logger.error(f"ClaudeWeb retry failed: {e3}")
                     yield {"type": "error", "message": f"Claude.ai Web error: {e3}"}
             else:
+                # For transient HTTP errors (429, 502, 503) retry with exponential backoff
+                # inside stream_chat itself — the manager calls stream_chat directly so
+                # stream_chat_with_caching's retry loop is never reached.
+                _err_s = str(e)
+                if "429" in _err_s or "502" in _err_s or "503" in _err_s or "rate limit" in _err_s.lower():
+                    import time as _t
+                    _last_err = e
+                    for _ri in range(1, 4):  # up to 3 retries: wait 2, 4, 8 s
+                        _wait = 2 ** _ri
+                        logger.warning(f"ClaudeWeb: transient error ({_err_s[:60]}), retry {_ri}/3 in {_wait}s…")
+                        _t.sleep(_wait)
+                        try:
+                            yield from self._stream_response(url, session_key, body)
+                            return
+                        except RuntimeError as _re:
+                            _last_err = _re
+                            _err_s = str(_re)
+                            if not ("429" in _err_s or "502" in _err_s or "503" in _err_s or "rate limit" in _err_s.lower()):
+                                break
+                        except Exception as _ex:
+                            _last_err = _ex
+                            break
+                    logger.error(f"ClaudeWeb: transient error persisted after retries: {_last_err}")
+                    yield {"type": "error", "message": f"Claude.ai Web error: {_last_err}"}
+                else:
+                    logger.error(f"ClaudeWeb: Error during streaming: {e}")
+                    yield {"type": "error", "message": f"Claude.ai Web error: {e}"}
+        except Exception as e:
+            _err_s = str(e)
+            if "429" in _err_s or "502" in _err_s or "503" in _err_s or "rate limit" in _err_s.lower():
+                import time as _t
+                _last_err = e
+                for _ri in range(1, 4):
+                    _wait = 2 ** _ri
+                    logger.warning(f"ClaudeWeb: transient error ({_err_s[:60]}), retry {_ri}/3 in {_wait}s…")
+                    _t.sleep(_wait)
+                    try:
+                        yield from self._stream_response(url, session_key, body)
+                        return
+                    except Exception as _ex:
+                        _last_err = _ex
+                        _err_s = str(_ex)
+                        if not ("429" in _err_s or "502" in _err_s or "503" in _err_s or "rate limit" in _err_s.lower()):
+                            break
+                logger.error(f"ClaudeWeb: transient error persisted after retries: {_last_err}")
+                yield {"type": "error", "message": f"Claude.ai Web error: {_last_err}"}
+            else:
                 logger.error(f"ClaudeWeb: Error during streaming: {e}")
                 yield {"type": "error", "message": f"Claude.ai Web error: {e}"}
-        except Exception as e:
-            logger.error(f"ClaudeWeb: Error during streaming: {e}")
-            yield {"type": "error", "message": f"Claude.ai Web error: {e}"}
 
     def _stream_response(
         self, url: str, session_key: str, body: Dict[str, Any]
