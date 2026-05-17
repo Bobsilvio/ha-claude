@@ -627,6 +627,27 @@ def _log_request_start() -> None:
         )
 
 
+@app.before_request
+def _auth_guard():
+    """Block non-ingress requests lacking a valid X-Amira-Token header."""
+    try:
+        from services.auth_service import is_ingress_request, is_exempt_path, validate_token
+    except Exception:
+        return  # auth_service unavailable → open (graceful degradation)
+
+    if request.method == "OPTIONS":
+        return  # CORS preflight — never require token
+    if is_ingress_request(request):
+        return  # HA ingress already auth'd by HA session
+    if is_exempt_path(request.path):
+        return  # webhook with own signature auth
+
+    token = request.headers.get("X-Amira-Token")
+    if not validate_token(token):
+        logger.warning(f"Amira: 401 on {request.method} {request.path} from {request.remote_addr}")
+        return jsonify({"error": "Unauthorized", "hint": "Set X-Amira-Token header"}), 401
+
+
 @app.after_request
 def _log_request_end(response: Response) -> Response:
     try:
@@ -4154,6 +4175,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
     try:
         last_usage = None  # Will capture usage from done event
         _streamed_text_parts: list = []  # accumulate streamed tokens for saving
+        _all_intermediate_text: list = []  # text from intermediate rounds (before tool calls), preserved across round resets
 
         # Clean messages for all providers: remove orphaned tool_calls / tool
         # responses that would cause 400 errors on OpenAI-compatible APIs.
@@ -4965,7 +4987,14 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
                     # message is kept and the answer disappears).
                     error_text = event.get("message", raw_msg) or raw_msg
                     if error_text and not _streamed_text_parts:
-                        _streamed_text_parts.append("\u274c " + error_text)
+                        if _all_intermediate_text:
+                            # Preserve intermediate text already shown to the user
+                            # (from rounds before tool calls) so the response doesn't
+                            # disappear on reload when only the final LLM call fails.
+                            _streamed_text_parts.extend(_all_intermediate_text)
+                            _streamed_text_parts.append("\n\n\u274c " + error_text)
+                        else:
+                            _streamed_text_parts.append("\u274c " + error_text)
                     break  # stop on error
                 elif event.get("type") == "text":
                     # Normalize "text" → "token" so the UI receives the expected event format.
@@ -5088,6 +5117,7 @@ def stream_chat_with_ai(user_message: str, session_id: str = "default", image_da
             text_so_far = "".join(_streamed_text_parts)
             _streamed_text_parts = []
             if text_so_far.strip():
+                _all_intermediate_text.append(text_so_far)
                 _preview = text_so_far.strip()[:120].replace("\n", " ")
                 logger.chat(f"💬 {_preview}")
 

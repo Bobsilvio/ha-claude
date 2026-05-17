@@ -86,7 +86,7 @@ class WhatsAppBot:
         params: Dict[str, Any],
         signature: str,
         *,
-        skip_if_empty: bool = True,
+        skip_if_empty: bool = False,
     ) -> bool:
         """Validate Twilio webhook signature.
 

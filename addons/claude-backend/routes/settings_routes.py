@@ -390,6 +390,14 @@ def api_settings_get():
             else:
                 current[key] = default
 
+    # Mask secrets: never send plaintext tokens/keys to the browser
+    _SECRET_KEYS = {
+        "telegram_bot_token", "twilio_auth_token", "discord_bot_token",
+    }
+    for sk in _SECRET_KEYS:
+        if sk in current and current[sk]:
+            current[sk] = "***"
+
     sections = [
         {
             "id": "language", "icon": "\U0001F30D", "fields": [
@@ -445,6 +453,7 @@ def api_settings_get():
                 {"key": "twilio_account_sid", "type": "text"},
                 {"key": "twilio_auth_token", "type": "password"},
                 {"key": "twilio_whatsapp_from", "type": "text"},
+                {"key": "twilio_sandbox_mode", "type": "toggle"},
                 {"key": "enable_discord", "type": "toggle"},
                 {"key": "discord_bot_token", "type": "password"},
                 {"key": "discord_allowed_channel_ids", "type": "text"},

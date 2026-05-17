@@ -2,6 +2,35 @@
 
 > **⚠️ After updating, rebuild the add-on** (Settings → Add-ons → Amira → Rebuild) to apply new dependencies.
 
+## 4.8.0 — Security hardening: API auth token + Twilio signature fix
+
+### Security
+- **API auth token** (`services/auth_service.py`): a random 32-byte token is generated on first startup and saved in `/config/amira/settings.json` (`amira_api_token`). Direct calls to `/api/*` from outside HA ingress now require the `X-Amira-Token` header. Requests through the HA ingress proxy are trusted automatically (no header needed). Emergency bypass: set `AUTH_ENFORCED=false` environment variable. The chat UI JS automatically injects the token into all `fetch` calls.
+- **Twilio webhook signature now enforced** (`whatsapp_bot.py`): `validate_webhook_signature` default changed from `skip_if_empty=True` to `False` — missing `X-Twilio-Signature` header now returns 403. Enable `twilio_sandbox_mode` in Settings if you need the old sandbox behavior.
+- **Secrets masked in `/api/settings` GET** (`routes/settings_routes.py`): `telegram_bot_token`, `twilio_auth_token`, `discord_bot_token`, `amira_api_token` are returned as `"***"` if configured, preventing credential leak via the settings endpoint.
+
+### New settings
+- `amira_api_token` — auto-generated API token (read-only in UI, masked)
+- `twilio_sandbox_mode` — set `true` to accept Twilio Sandbox webhooks without signature validation
+
+---
+
+## 4.7.5 — Parse and strip claude.ai native XML tool calls
+
+### Fix
+- **`<function_calls>` XML no longer leaks into chat** (`providers/tool_simulator.py`): when claude.ai ignores the `<tool_call>` JSON instruction and falls back to its own `<function_calls><invoke name="…"><parameter…>` XML format, the tool simulator now parses it correctly and executes the tool call. Previously the XML was unrecognised, not extracted as a tool call, and passed through `clean_display_text` verbatim — causing raw `<function_calls>` markup to appear in the chat bubble.
+- **Partial/incomplete XML stripped on stream cut**: if the stream ends before the closing `</function_calls>` tag (e.g., due to a 429 retry disconnect), the orphaned `<function_calls>` opening block is now stripped by `_FUNCTION_CALLS_PARTIAL_RE` and never reaches the user.
+
+---
+
+## 4.7.4 — Preserve intermediate response on final-round error + claude_web 429 retry
+
+### Fix
+- **Intermediate text no longer disappears when the last LLM call fails** (`api.py`): in multi-round tool-calling flows, text streamed to the user before tool execution ("Ho trovato le entità…") was stored in `_streamed_text_parts`. When tool calls were dispatched, that list was reset for the next round. If the final LLM call (after the last tool result) then failed with a provider error, `_streamed_text_parts` was empty and only the error message was saved — causing the entire assistant response to be replaced by "❌ Si è verificato un errore" on page reload. Now all intermediate text is accumulated in `_all_intermediate_text` across rounds. On error with empty `_streamed_text_parts`, the intermediate text is restored and the error is appended, so the saved conversation matches what was already shown to the user.
+- **claude_web 429/502/503 now retries with backoff** (`providers/claude_web.py`): transient HTTP errors (429, 502, 503) from `_stream_response` were caught inside `stream_chat` and immediately converted to a yielded error event — bypassing all retry logic. The `stream_chat_with_caching` retry loop was never reachable because the manager calls `stream_chat` directly. Now, for transient errors, `stream_chat` retries internally with exponential backoff (2s, 4s, 8s, up to 3 attempts) before emitting a final error event.
+
+---
+
 ## 4.7.3 — Extend in-flight compaction to all rounds including the latest
 
 ### Fix

@@ -214,10 +214,16 @@ def api_whatsapp_webhook():
             )
         else:
             public_url = request.url
+        try:
+            from services.settings_service import _load_settings
+            _sandbox = _load_settings().get("twilio_sandbox_mode", False)
+        except Exception:
+            _sandbox = False
         if not whatsapp.validate_webhook_signature(
             public_url,
             request.form.to_dict(),
             signature,
+            skip_if_empty=bool(_sandbox),
         ):
             logger.warning(f"WhatsApp webhook signature invalid (url tried: {public_url!r})")
             return jsonify({"status": "error", "message": "Signature invalid"}), 403

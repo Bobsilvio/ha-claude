@@ -1608,6 +1608,12 @@ def get_chat_ui():
     voice_display = "flex" if voice_enabled else "none"
     cost_currency = getattr(api, 'COST_CURRENCY', 'USD')
 
+    try:
+        from services.auth_service import get_or_create_token
+        amira_token = get_or_create_token()
+    except Exception:
+        amira_token = ""
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -3534,6 +3540,18 @@ def get_chat_ui():
     </div>
 
     <script>
+        window.__AMIRA_TOKEN = '{amira_token}';
+        (function() {{
+          if (!window.__AMIRA_TOKEN) return;
+          var _origFetch = window.fetch.bind(window);
+          window.fetch = function(u, o) {{
+            if (typeof u === 'string' && u.indexOf('/api/') !== -1) {{
+              o = o || {{}};
+              o.headers = Object.assign({{}}, o.headers, {{'X-Amira-Token': window.__AMIRA_TOKEN}});
+            }}
+            return _origFetch(u, o);
+          }};
+        }})();
         // Global error handler — shows JS errors as visible banner + sends to backend
         if (!window.__AMIRA_ERROR_HANDLER) {{
             window.__AMIRA_ERROR_HANDLER = true;

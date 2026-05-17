@@ -50,6 +50,7 @@ SETTINGS_DEFAULTS = {
     "max_snapshots_per_file": 5,
     "cost_currency": "USD",
     "mcp_config_file": "/config/amira/mcp_config.json",
+    "twilio_sandbox_mode": False,
 }
 
 # Maps settings key → Python global variable name
